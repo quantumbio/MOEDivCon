@@ -1,0 +1,80 @@
+#svl
+//	qmspanel.svl    User-interface entrypoint to QMScore calculations
+
+#set title   'QMScore Main Panel'
+#set class   'MOE:simulation'
+#set version '2009.01'
+#set main    'qms_SetupPanel'
+
+
+// Callback function for displaying progress indications.
+
+//local function cb_PercentProgress data
+//    local [ttlfmt, msgkey, percent] = data;
+//    if token ttlfmt == '' then 
+//        Message [msgkey, []];
+//    return [ttlfmt, 0, 0];
+//    endif
+//    msgkey = Message [add msgkey, token swrite [ttlfmt, percent]];
+//    return [ttlfmt, msgkey, percent];
+//endfunction
+
+
+
+global function qms_SetupPanel [cfg, parent]
+    if MOE_BATCH then return [];
+    endif
+
+    parent = add parent;
+
+    local wkey = WindowCreate [
+        name: 'panel', 
+        title: 'QMScore',
+        windowName: 'QMScorePanel',
+        text: ['Run', 'Cancel']
+        ];
+
+
+    // ---------------------- embedded functions begin ----------------------
+//    function RunCalc [val, execute]
+//        cfg = qms_RunCalculation [cfg, 'pre', []]; // preconfigure
+//        Warning 'QMScore!';
+//    endfunction
+
+    // ----------------------- embedded functions end -----------------------
+
+    WindowShow [wkey, 1];
+
+    while wkey loop
+         local [val, trig] = WindowWait wkey;
+        if trig === 'panel' then
+            local tskttl = task_title -1;
+            if val.panel === 'Run' then
+//                GetContent val;
+//                if PopulateWithAtoms val.selonly then
+//                    SetContent []; // briefly show the update...
+//                    cfg = scf_DefineWavefunction [cfg, [showprogress: 1]];
+//
+//                    if second task_fork [] == 'child' then
+//                        task_settitle [-1, tskttl];
+//                        RunCalc [val, 1];
+//                        if WindowKey parent then
+//                            ResultsSetData [parent, cfg];
+//                       else
+//                            scf_ResultsPanel cfg;
+//                       endif
+//                       exit [];
+//                    else
+//                        WindowDestroy wkey;
+//                        wkey = 0;
+//                    endif
+//                endif
+            endif
+
+	    elseif val.panel === 'Cancel' then 
+                WindowDestroy wkey;
+                wkey = 0;
+        endif
+    endloop
+
+endfunction
