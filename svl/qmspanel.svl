@@ -31,49 +31,48 @@ global function qms_SetupPanel [cfg, parent]
         name: 'panel', 
         title: 'QMScore',
         windowName: 'QMScorePanel',
-        text: ['Run', 'Cancel']
+        text: ['Run', 'Cancel'],
+        Label: [text: '<input data>']
         ];
 
 
     // ---------------------- embedded functions begin ----------------------
-//    function RunCalc [val, execute]
-//        cfg = qms_RunCalculation [cfg, 'pre', []]; // preconfigure
-//        Warning 'QMScore!';
-//    endfunction
+    function RunCalc []
+    sleep 10;
+    endfunction
 
     // ----------------------- embedded functions end -----------------------
 
     WindowShow [wkey, 1];
-
     while wkey loop
          local [val, trig] = WindowWait wkey;
         if trig === 'panel' then
+            print "panel event";
             local tskttl = task_title -1;
             if val.panel === 'Run' then
-//                GetContent val;
-//                if PopulateWithAtoms val.selonly then
-//                    SetContent []; // briefly show the update...
-//                    cfg = scf_DefineWavefunction [cfg, [showprogress: 1]];
-//
-//                    if second task_fork [] == 'child' then
-//                        task_settitle [-1, tskttl];
-//                        RunCalc [val, 1];
-//                        if WindowKey parent then
-//                            ResultsSetData [parent, cfg];
-//                       else
-//                            scf_ResultsPanel cfg;
-//                       endif
-//                       exit [];
-//                    else
-//                        WindowDestroy wkey;
-//                        wkey = 0;
-//                    endif
-//                endif
-            endif
+
+                print "fork";
+
+                if second task_fork [] == 'child' then
+                    task_settitle [-1, tskttl];
+
+                    print "child run";
+                    RunCalc [];
+                    Warning 'QMScore!';
+
+                    print "child exit";
+                    exit [];
+                else
+                    print "parent self destruct";
+                    WindowDestroy wkey;
+                    wkey = 0;
+                endif
 
 	    elseif val.panel === 'Cancel' then 
+                print "cancel self destruct";
                 WindowDestroy wkey;
                 wkey = 0;
+            endif
         endif
     endloop
 
