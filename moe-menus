@@ -1,6 +1,6 @@
 MENU PREPEND "Main:Compute"
     "Quantum Mechanics"
         MENU  "Quantum Mechanics"
-            "QMScore..."          exec "run'qmspanel.svl'"
+            "QMScore..."          exec "run'$MOE_SVL_LOAD/qmspanel.svl'"
         ENDMENU
 ENDMENU
