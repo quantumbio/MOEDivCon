@@ -1,135 +1,125 @@
 #svl
 //    qmspanel.svl    User-interface entrypoint to QMScore calculations
+//
+//	31-aug-2009 (dk) created
 
-#set title   'QMScore Main Panel'
-#set class   'MOE:simulation'
+
+#set title   'QMScore Panel'
+#set class   'MOE:quantummechanics'
 #set version '2009.01'
 #set main    'qms_SetupPanel'
 
-// Rendering for printed wavefunctions.
-
+/****************************************************************************
+ *                          PrintDraw
+ *
+ *  Rendering for printed QMScore results.
+ *
+ ****************************************************************************/
 local function PrintDraw [scores, dspl, opt]
+
     local pagesize = opt.pagesize;
     local margin = opt.margin;
     if istrue opt.landscape then pagesize = reverse pagesize; endif
     local psize = maxE [0, pagesize - keep[margin,2] - drop[margin,2]];
     local grkeys = [], grkey;
     local fsize = opt.wfn_fontsize, bigfsize = fsize * 1.5;
-    
-        // generally useful variables
-    
-    local x, y, z, w, h, n, i, a, b, c, sc;
+    local y;
     
     grkey = gr_create [];
     grkeys = cat [grkeys, grkey];
     y = second psize - bigfsize;
+    local midx = first psize / 2;
+    local title = 'QMScore Results';
+    local tlen = tok_length title;
     gr_text [grkey, [0, 
-            [0, y], 'QMScore Read-out', 'sf-b', 0x000000, bigfsize, []
-    ]];
+         [midx - tlen * fsize / 2, y], title, 'sf-b', 0x000000, bigfsize, []
+         ]];
+    y = y - bigfsize * 2;
 
-//    if token cfg.jobtitle <> '' then
-//        gr_text [grkey, [0,
-//            [0, y - bigfsize * 1.5], token cfg.jobtitle, 'sf', 0x000000,
-//        fsize, []
-//        ]];
-//        y = y - fsize;
-//    endif
+    local rlbl, rval;
+    for [rlbl, rval] in scores loop
+        local rvaltok = twrite ['{n:20.8f}', rval];
+        gr_text [grkey, [0, [0, y], token rlbl, 'sf', 0x000000, fsize, []]];
+        gr_text [grkey, [0, [midx, y], rvaltok, 'tt', 0x000000, fsize, []]];
+        y = y - fsize * 1.5;
+    endloop
 
-//    y = y - bigfsize * 2;
-
-/*
-
-        grkeys = cat [grkeys, ArrangeMatrix [
-        'Overlap Integrals',
-        totok igen cfg.nao,
-        totok igen cfg.nao,
-        split [
-            apt twrite ['{n:11.6f}', cat cfg.overlap_integrals],
-        cfg.nao
-        ],
-        fsize, psize
-    ]];
-
-*/
-        // ensure that there is at least one page...
-
-    if isnull grkeys then
-        grkey = grkeys = gr_create [];
-        gr_text [grkey, [0, 
-        [0, 0.5 * psize(2)], 'No content', 'sf', 0x000000, bigfsize, []
-    ]];
-    endif
     return grkeys;
+
 endfunction
 
-
-// Printer-style formation of QMScore data.
-
+/****************************************************************************
+ *
+ *                          PrintContent
+ *
+ *  Printer-style formation of QMScore data.
+ *
+ ****************************************************************************/
 local function PrintContent [data, cmd, cmdarg]
+
     const DEFAULTS = [
-   wfn_fontsize:     10
-    ];
+        wfn_fontsize:     10
+        ];
     
     if cmd == 'begin' then
-    cmdarg = cat [cmdarg, DEFAULTS];
-    cmdarg = cmdarg | m_uniq tags cmdarg;
-    data = [
-        grkey:  [],           // graphics key cache
-        scores: data(1),      // wavefunction data
-        dspl:   data(2),      // rendered data
-        opt:    cmdarg        // display options
-    ];
+        cmdarg = cat [cmdarg, DEFAULTS];
+        cmdarg = cmdarg | m_uniq tags cmdarg;
+        data = [
+            grkey:  [],           // graphics key cache
+            scores: data(1),      // wavefunction data
+            dspl:   data(2),      // rendered data
+            opt:    cmdarg        // display options
+            ];
     
-    local cmargin = cmdarg.margin;
-    local cpagesize = cmdarg.pagesize;
-    if istrue data.opt.landscape then cpagesize = reverse cpagesize; endif
+        local cmargin = cmdarg.margin;
+        local cpagesize = cmdarg.pagesize;
+        if istrue data.opt.landscape then cpagesize = reverse cpagesize; endif
         local cpsize = maxE [0, cpagesize - keep[cmargin,2] - drop[cmargin,2]];
-    
-    data.grkey = PrintDraw [data.scores, data.dspl, data.opt];
+        data.grkey = PrintDraw [data.scores, data.dspl, data.opt];
 
-    return [data, max [1, length data.grkey]];
+        return [data, max [1, length data.grkey]];
 
     elseif cmd == 'end' then
-    app gr_destroy data.grkey;
-    return [];
+        app gr_destroy data.grkey;
+        return [];
 
     elseif cmd == 'defaults' then
-    return DEFAULTS;
+        return DEFAULTS;
     
     elseif cmd == 'widgets' then
         return [
-        Text: [name: 'wfn_fontsize', title: 'Font Size:', 
-        type: 'int', len: 4, onTrigger: 'return',
-        shortcut: ['10','11','12','14','16','18','20','24','26','28']
-        ]
-    ];
+            Text: [name: 'wfn_fontsize', title: 'Font Size:', 
+            type: 'int', len: 4, onTrigger: 'return',
+            shortcut: ['10','11','12','14','16','18','20','24','26','28']
+            ]];
     
     elseif cmd == 'window_init' then
         local wkey = cmdarg;
-        local scores = data(1);
-    WindowSetAttr [wkey, [
-        wfn_scores: [sensitive: not isnull scores]
-    ]];
-    
-    
+        local scores = data;
+   
     elseif cmd == 'page' then
         local margin = data.opt.margin;
         return [data, (data.grkey)(cmdarg), [keep [margin, 2]], []];
     
     else
-    return [];
+        return [];
     endif
 endfunction
 
-
+/****************************************************************************
+ *
+ *                          qms_ResultsPanel
+ *
+ ****************************************************************************/
 global function scf_ResultsPanel results
 
     //  Simple version:  convert results into token for label and clipboard.
+    //  Note:  field width doesn't work with tokens
     local resulttok = '';
-    local rlbl = '', rval = 0.0;
+    local rlbl, rval;
     for [rlbl, rval] in results loop
         resulttok = tok_cat [resulttok, 
-        twrite ['{t:-20} {n:20.8f}\n', rlbl, rval]];
+        twrite ['{t:-24} {n:20.8f}\n', rlbl, rval]];
     endloop
     resulttok = tok_cat [resulttok, '\n'];
 
@@ -138,14 +128,19 @@ global function scf_ResultsPanel results
         name: 'panel', 
         title: 'QMScore Results',
         text: ['Copy', 'Print', 'Close'],
-        Label: [name: 'label', text: resulttok, minWidth: 40, 
-            background: 'yellow']
-    ];
+        bubbleHelp: [
+            'Copy results to clipboard',
+            '',
+            ''
+            ],
+        Label: [name: 'label', text: resulttok, minWidth: 40, resizeH : 1,
+            resizeV: 1, background: 'yellow']
+        ];
 
 
     WindowShow [wkey, 1];
     while wkey loop
-         local [val, trig] = WindowWait wkey;
+        local [val, trig] = WindowWait wkey;
         if trig === 'panel' then
             local tskttl = task_title -1;
 
@@ -155,24 +150,26 @@ global function scf_ResultsPanel results
             elseif val.panel === 'Print' then 
                 if second task_fork [] == 'child' then 
                     task_settitle [-1, 'Print QMScore'];
-                    run ['printview.svl', [
-                        #PrintContent, 
-                        [resulttok],
-                        'Print QMScore'
+                    run ['printview.svl', [#PrintContent, 
+                        [results], 'Print QMScore Results'
                         ]];
                     exit [];
                 endif
 
-        elseif val.panel === 'Close' then 
+            elseif val.panel === 'Close' then 
                 WindowDestroy wkey;
                 wkey = 0;
             endif
         endif
     endloop
-
 endfunction
 
 
+/****************************************************************************
+ *
+ *                          qms_SetupPanel
+ *
+ ****************************************************************************/
 global function qms_SetupPanel [cfg, parent]
     if MOE_BATCH then return [];
     endif
@@ -184,7 +181,7 @@ global function qms_SetupPanel [cfg, parent]
         title: 'QMScore',
         windowName: 'QMScorePanel',
         text: ['Run', 'Cancel'],
-        Label: [text: '<Job Name>\n<input data>', margin: 1, minWidth: 20]
+        Label: [text: '                   <input data>', margin: 1, minWidth: 20]
         ];
 
 
@@ -193,18 +190,22 @@ global function qms_SetupPanel [cfg, parent]
     function RunCalc []
         sleep -1;    // Allow parent to close input window.
 
-        return [["label 1", 1234.56789], ["label 2", 9876.54321], ["label 3", 0.01]];
+        return [["Label 1", 1234.56789], 
+                ["Another Label 2", 9876.54321],
+                ["Some Other Label 3", 4444.4444],
+                ["And Label 4", 666666.7777777],
+                ["Final Label 5", 0.01]
+               ];
     endfunction
 
     // ----------------------- embedded functions end -----------------------
 
     WindowShow [wkey, 1];
     while wkey loop
-         local [val, trig] = WindowWait wkey;
+        local [val, trig] = WindowWait wkey;
         if trig === 'panel' then
             local tskttl = task_title -1;
             if val.panel === 'Run' then
-
                 if second task_fork [] == 'child' then
                     task_settitle [-1, tskttl];
 
@@ -216,11 +217,10 @@ global function qms_SetupPanel [cfg, parent]
                     wkey = 0;
                 endif
 
-        elseif val.panel === 'Cancel' then 
+            elseif val.panel === 'Cancel' then 
                 WindowDestroy wkey;
                 wkey = 0;
             endif
         endif
     endloop
-
 endfunction
