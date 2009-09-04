@@ -1,13 +1,15 @@
 #svl
 //    qmspanel.svl    User-interface entrypoint to QMScore calculations
 //
-//	31-aug-2009 (dk) created
+//    31-aug-2009 (dk) created
 
 
 #set title   'QMScore Panel'
 #set class   'MOE:quantummechanics'
 #set version '2009.01'
 #set main    'qms_SetupPanel'
+
+function qm_score;
 
 /****************************************************************************
  *                          PrintDraw
@@ -30,18 +32,27 @@ local function PrintDraw [scores, dspl, opt]
     y = second psize - bigfsize;
     local midx = first psize / 2;
     local title = 'QMScore Results';
-    local tlen = tok_length title;
+    local tlen = first second gr_text [0, 
+        [0, [0, 0], title, 'sf-b', 0, bigfsize, []]];
     gr_text [grkey, [0, 
-         [midx - tlen * fsize / 2, y], title, 'sf-b', 0x000000, bigfsize, []
-         ]];
+       [midx - tlen / 2 , y], title, 'sf-b', 0x000000, bigfsize, []]];
     y = y - bigfsize * 2;
+
+    local ligand = token second first scores;
+    local llen = first second gr_text [0, 
+        [0, [0, 0], ligand, 'rm', 0, fsize, []]];
+    gr_text [grkey, [0, 
+         [midx - llen / 2, y], ligand, 'rm', 0x000000, fsize, []]];
+    y = y - fsize * 2;
 
     local rlbl, rval;
     for [rlbl, rval] in scores loop
-        local rvaltok = twrite ['{n:20.8f}', rval];
-        gr_text [grkey, [0, [0, y], token rlbl, 'sf', 0x000000, fsize, []]];
-        gr_text [grkey, [0, [midx, y], rvaltok, 'tt', 0x000000, fsize, []]];
-        y = y - fsize * 1.5;
+        if  not (rlbl === first first scores) then
+            local rvaltok = twrite ['{n:16.5f}', rval];
+            gr_text [grkey, [0, [0, y], token rlbl, 'sf', 0x000000, fsize, []]];
+            gr_text [grkey, [0, [midx, y], rvaltok, 'tt', 0x000000, fsize, []]];
+            y = y - fsize * 1.5;
+        endif
     endloop
 
     return grkeys;
@@ -58,7 +69,7 @@ endfunction
 local function PrintContent [data, cmd, cmdarg]
 
     const DEFAULTS = [
-        wfn_fontsize:     10
+        wfn_fontsize:     16
         ];
     
     if cmd == 'begin' then
@@ -119,7 +130,7 @@ global function scf_ResultsPanel results
     local rlbl, rval;
     for [rlbl, rval] in results loop
         resulttok = tok_cat [resulttok, 
-        twrite ['{t:} {n:20.8f}\n', rlbl, rval]];
+        twrite ['{t:} {n:16.5f}\n', rlbl, rval]];
     endloop
     resulttok = tok_cat [resulttok, '\n'];
 
@@ -136,7 +147,6 @@ global function scf_ResultsPanel results
         Label: [name: 'label', text: resulttok, minWidth: 40, resizeH : 1,
             resizeV: 1, background: 'yellow']
         ];
-
 
     WindowShow [wkey, 1];
     while wkey loop
@@ -184,18 +194,14 @@ global function qms_SetupPanel [cfg, parent]
         Label: [text: '                   <input data>', margin: 1, minWidth: 20]
         ];
 
-
     // ---------------------- embedded functions begin ----------------------
 
     function RunCalc []
         sleep -1;    // Allow parent to close input window.
 
-        return [["Label 1", 1234.56789], 
-                ["Another Label 2", 9876.54321],
-                ["Some Other Label 3", 4444.4444],
-                ["And Label 4", 666666.7777777],
-                ["Final Label 5", 0.01]
-               ];
+        local results = qm_score [];
+
+        return results;
     endfunction
 
     // ----------------------- embedded functions end -----------------------
