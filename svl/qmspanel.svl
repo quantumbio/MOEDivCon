@@ -119,7 +119,7 @@ global function scf_ResultsPanel results
     local rlbl, rval;
     for [rlbl, rval] in results loop
         resulttok = tok_cat [resulttok, 
-        twrite ['{t:-24} {n:20.8f}\n', rlbl, rval]];
+        twrite ['{t:} {n:20.8f}\n', rlbl, rval]];
     endloop
     resulttok = tok_cat [resulttok, '\n'];
 
