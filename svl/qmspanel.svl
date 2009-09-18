@@ -1,178 +1,69 @@
 #svl
 //    qmspanel.svl    User-interface entrypoint to QMScore calculations
-//
-//    31-aug-2009 (dk) created
-
 
 #set title   'QMScore Panel'
-#set class   'MOE:quantummechanics'
+#set class   'QM'
 #set version '2009.01'
 #set main    'qms_SetupPanel'
 
-function qm_score;
+
+function qms_CopyPosesDB;
+function qms_GetMolField;
+function qms_SaveDBRow;
+function qms_SaveOptions;
+function qms_SaveTarget;
+function qms_SetFieldNames;
+
+function qms_Score;
+function qms_ScoreBatch;
+
 
 /****************************************************************************
- *                          PrintDraw
+ *                          OpenPosesDB
  *
- *  Rendering for printed QMScore results.
- *
- ****************************************************************************/
-local function PrintDraw [scores, dspl, opt]
-
-    local pagesize = opt.pagesize;
-    local margin = opt.margin;
-    if istrue opt.landscape then pagesize = reverse pagesize; endif
-    local psize = maxE [0, pagesize - keep[margin,2] - drop[margin,2]];
-    local grkeys = [], grkey;
-    local fsize = opt.wfn_fontsize, bigfsize = fsize * 1.5;
-    local y;
-    
-    grkey = gr_create [];
-    grkeys = cat [grkeys, grkey];
-    y = second psize - bigfsize;
-    local midx = first psize / 2;
-    local title = 'QMScore Results';
-    local tlen = first second gr_text [0, 
-        [0, [0, 0], title, 'sf-b', 0, bigfsize, []]];
-    gr_text [grkey, [0, 
-       [midx - tlen / 2 , y], title, 'sf-b', 0x000000, bigfsize, []]];
-    y = y - bigfsize * 2;
-
-    local ligand = token second first scores;
-    local llen = first second gr_text [0, 
-        [0, [0, 0], ligand, 'rm', 0, fsize, []]];
-    gr_text [grkey, [0, 
-         [midx - llen / 2, y], ligand, 'rm', 0x000000, fsize, []]];
-    y = y - fsize * 2;
-
-    local rlbl, rval;
-    for [rlbl, rval] in scores loop
-        if  not (rlbl === first first scores) then
-            local rvaltok = twrite ['{n:16.5f}', rval];
-            gr_text [grkey, [0, [0, y], token rlbl, 'sf', 0x000000, fsize, []]];
-            gr_text [grkey, [0, [midx, y], rvaltok, 'tt', 0x000000, fsize, []]];
-            y = y - fsize * 1.5;
-        endif
-    endloop
-
-    return grkeys;
-
-endfunction
-
-/****************************************************************************
- *
- *                          PrintContent
- *
- *  Printer-style formation of QMScore data.
+ *  Opens the input database of ligand poses.
  *
  ****************************************************************************/
-local function PrintContent [data, cmd, cmdarg]
+local function OpenPosesDB [filename]
 
-    const DEFAULTS = [
-        wfn_fontsize:     16
-        ];
-    
-    if cmd == 'begin' then
-        cmdarg = cat [cmdarg, DEFAULTS];
-        cmdarg = cmdarg | m_uniq tags cmdarg;
-        data = [
-            grkey:  [],           // graphics key cache
-            scores: data(1),      // wavefunction data
-            dspl:   data(2),      // rendered data
-            opt:    cmdarg        // display options
-            ];
-    
-        local cmargin = cmdarg.margin;
-        local cpagesize = cmdarg.pagesize;
-        if istrue data.opt.landscape then cpagesize = reverse cpagesize; endif
-        local cpsize = maxE [0, cpagesize - keep[cmargin,2] - drop[cmargin,2]];
-        data.grkey = PrintDraw [data.scores, data.dspl, data.opt];
-
-        return [data, max [1, length data.grkey]];
-
-    elseif cmd == 'end' then
-        app gr_destroy data.grkey;
-        return [];
-
-    elseif cmd == 'defaults' then
-        return DEFAULTS;
-    
-    elseif cmd == 'widgets' then
-        return [
-            Text: [name: 'wfn_fontsize', title: 'Font Size:', 
-            type: 'int', len: 4, onTrigger: 'return',
-            shortcut: ['10','11','12','14','16','18','20','24','26','28']
-            ]];
-    
-    elseif cmd == 'window_init' then
-        local wkey = cmdarg;
-        local scores = data;
-   
-    elseif cmd == 'page' then
-        local margin = data.opt.margin;
-        return [data, (data.grkey)(cmdarg), [keep [margin, 2]], []];
-    
-    else
-        return [];
+    local type = ftype filename;
+    local dbkey = 0;
+    if type == 'file' then
+        print swrite ['Reading database: {}', filename];  //DEBUG
+        dbkey = db_Open [filename, 'read'];
     endif
+
+    return dbkey;
 endfunction
+
 
 /****************************************************************************
+ *                          CreateResultDB
  *
- *                          qms_ResultsPanel
+ *  Create the output database for storing QMScore results and ensure that
+ *  the required fields are present.
  *
  ****************************************************************************/
-global function scf_ResultsPanel results
+local function CreateResultDB [filename]
 
-    //  Simple version:  convert results into token for label and clipboard.
-    //  Note:  field width doesn't work with tokens
-    local resulttok = '';
-    local rlbl, rval;
-    for [rlbl, rval] in results loop
-        resulttok = tok_cat [resulttok, 
-        twrite ['{t:} {n:16.5f}\n', rlbl, rval]];
-    endloop
-    resulttok = tok_cat [resulttok, '\n'];
-
-    local wkey = WindowCreate [
-        windowName: 'QMS_ResultsPanel',
-        name: 'panel', 
-        title: 'QMScore Results',
-        text: ['Copy', 'Print', 'Close'],
-        bubbleHelp: [
-            'Copy results to clipboard',
-            '',
-            ''
-            ],
-        Label: [name: 'label', text: resulttok, minWidth: 40, resizeH : 1,
-            resizeV: 1, background: 'yellow']
-        ];
-
-    WindowShow [wkey, 1];
-    while wkey loop
-        local [val, trig] = WindowWait wkey;
-        if trig === 'panel' then
-            local tskttl = task_title -1;
-
-            if val.panel === 'Copy' then
-                ClipboardSetText string resulttok;
-
-            elseif val.panel === 'Print' then 
-                if second task_fork [] == 'child' then 
-                    task_settitle [-1, 'Print QMScore'];
-                    run ['printview.svl', [#PrintContent, 
-                        [results], 'Print QMScore Results'
-                        ]];
-                    exit [];
-                endif
-
-            elseif val.panel === 'Close' then 
-                WindowDestroy wkey;
-                wkey = 0;
-            endif
+    local type = ftype filename;
+    local dbkey = 0;
+    if type == 'dir' then
+        return dbkey;
+    elseif type == 'file' then
+        if not MOE_BATCH and not YesNo token swrite ['Overwrite {}?', filename] then
+            return dbkey;
         endif
-    endloop
+    endif
+
+    print swrite ['Creating database: {}', filename];  //DEBUG
+    dbkey = db_Open [filename, 'create'];
+
+    qms_SetFieldNames [dbkey];
+
+    return dbkey;
 endfunction
+
 
 
 /****************************************************************************
@@ -181,6 +72,7 @@ endfunction
  *
  ****************************************************************************/
 global function qms_SetupPanel [cfg, parent]
+
     if MOE_BATCH then return [];
     endif
 
@@ -190,43 +82,101 @@ global function qms_SetupPanel [cfg, parent]
         name: 'panel', 
         title: 'QMScore',
         windowName: 'QMScorePanel',
-        text: ['Run', 'Cancel'],
+        text: ['Run', 'Save', 'Cancel'],
         Label: [text: '                   <input data>', margin: 1, minWidth: 20]
         ];
 
     // ---------------------- embedded functions begin ----------------------
 
     function RunCalc []
+        local msgkey = Message [0, 'QMScore is running ...'];
+
         sleep -1;    // Allow parent to close input window.
 
-        local results = qm_score [];
+        local results = qms_Score [];
+
+        Message [msgkey, 'QMScore is done.'];
 
         return results;
     endfunction
 
     // ----------------------- embedded functions end -----------------------
 
+    //DEBUG replace with vals from dialog
+    local outname = 'qmscore.mdb';
+    local inname = 'examples/ligand/poses.mdb';
+
+    local qmskey = 0;
+    local ligkey = 0;
+
     WindowShow [wkey, 1];
     while wkey loop
-        local [val, trig] = WindowWait wkey;
+        local [vals, trig] = WindowWait wkey;
         if trig === 'panel' then
             local tskttl = task_title -1;
-            if val.panel === 'Run' then
+            if vals.panel === 'Run' then
                 if second task_fork [] == 'child' then
                     task_settitle [-1, tskttl];
 
+                    qmskey = CreateResultDB [outname];
+                    if qmskey == 0 then
+                        Warning token swrite ['Unable to create database {}', 
+                            outname];
+                        continue;
+                    endif
+
+                    //NOTE:  save target and ligand in DB
                     local results = RunCalc [];
-                    scf_ResultsPanel results;
+                    qms_SaveDBRow [qmskey, 0, results];
+                    dbv_Open db_Filename qmskey;
+                    db_Close qmskey;
                     exit [];
                 else
                     WindowDestroy wkey;
                     wkey = 0;
                 endif
 
-            elseif val.panel === 'Cancel' then 
+            elseif vals.panel === 'Save' then
+                if second task_fork [] == 'child' then
+                    task_settitle [-1, tskttl];
+
+                    qmskey = CreateResultDB [outname];
+                    if qmskey == 0 then
+                        Warning token swrite ['Unable to create database {}', 
+                            outname];
+                        continue;
+                    endif
+
+                    ligkey = OpenPosesDB (inname);
+                    if ligkey == 0 then
+                        Warning token swrite ['Unable to open database {}',
+                            inname];
+                        continue;
+                    endif
+                    local absoutname = fabsname outname;
+                    qms_CopyPosesDB [qmskey, ligkey];
+                    db_Close ligkey;
+
+                    qms_SaveTarget [qmskey, Chains []];
+                    qms_SaveOptions [qmskey, []];
+
+                    dbv_Open db_Filename qmskey;
+                    db_Close qmskey;
+
+                    print absoutname;
+                    qms_ScoreBatch [absoutname];
+
+                    exit [];
+                else
+                    WindowDestroy wkey;
+                    wkey = 0;
+                endif
+
+            elseif vals.panel === 'Cancel' then 
                 WindowDestroy wkey;
                 wkey = 0;
             endif
         endif
     endloop
+
 endfunction

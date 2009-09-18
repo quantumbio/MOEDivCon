@@ -1,0 +1,92 @@
+#svl
+
+//    qmsbatch.svl    Executes QMScore calculations in batch mode
+
+#set title   'QMScore Batch'
+#set class   'QM'
+#set version '2009.01'
+#set main    'qm_score_batch'
+
+function qms_GetMolField;
+function qms_GetOptions;
+function qms_GetTarget;
+
+// function qms_Score;
+
+
+global function qms_ScoreBatch [dbpath]
+
+//    if not MOE_BATCH then local pdata = SystemPush []; endif
+
+    local dbkey = db_Open [dbpath, 'read-write'];
+
+    //  Extract target and run options from the database environment
+    local tgtmol = qms_GetTarget [dbkey];
+    local options = qms_GetOptions [dbkey];
+
+//    local target = mol_Create tgtmol;
+
+    //  For each ligand pose in the database, calculate QM score
+    local rowkey = 0, count = 0;
+    local total = db_nEntries (dbkey);
+    local molfld = qms_GetMolField [dbkey];
+    local mess = 0;
+    loop
+        if not MOE_BATCH then
+            Close [force:1];
+            mess = Message [mess, token swrite ['Scoring ligand {} of {}.',
+                count + 1, total]];
+       endif
+       local ligand = [];
+       local target = [];
+    
+        if count == 0 or rowkey <> 0 then
+            rowkey = db_NextEntry [dbkey, rowkey];
+        endif
+
+        if rowkey <> 0 then
+            count = inc count;
+            local ligmol = first db_ReadFields [dbkey, rowkey, [molfld]];
+
+//              mol_Create mol_Cat [tgtmol, ligmol];
+
+            local [[tgtvec], nc, nf] = sread [string tgtmol, '{v}'];
+            print tgtvec;
+            target = mol_Create tgtvec;
+            ligand = mol_Create ligmol;
+            View [];
+
+            print ["target  ", target];
+        endif
+
+/*
+        local [result, code, seqno, id] = mpu_batch [
+            select ['', 'call', rowkey == 0],
+            'qms_Score', [target, ligand, options], [rowkey]];
+
+        if code == '' then
+            if neL [tid, id(2)] then
+                exit 'MPU    ask conflict, aborting calculation.';
+            endif
+
+            db_Write [mdbkey, id(1), res];
+
+        elseif code == 'error' then
+            if opt.fld_error <> '' then
+                db_Write [mdbkey, id(1), [[opt.fld_error, string res]]];
+            else
+                write ['*** Error reported (entry id={}): {}\n', id(1), res];
+            endif
+        endif
+    until code == 'eof'
+*/
+    sleep 1;
+    until count >= db_nEntries dbkey
+    endloop
+
+    db_Close dbkey;
+
+//    if not MOE_BATCH then SystemPop pdata; endif
+
+endfunction
+

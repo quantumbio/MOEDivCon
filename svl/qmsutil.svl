@@ -1,0 +1,162 @@
+#svl
+
+//    qmsutil.svl    Utilities to support QMScore data management
+
+#set title   'QMScore Utilities'
+#set class   'QM'
+#set version '2009.01'
+
+//  Data fields are in the order in which they are returned by Divcon.
+
+const DATA_TAGS =
+    [
+    "LIGAND",
+    "TOTAL SCORE",
+    "GAS PHASE HEAT OF FORMATION",
+    "ELECTROSTATIC SOLVATION",
+    "ATTRACTIVE LENNARD JONES",
+    "SOLVATION ENTROPY",
+    "VIBRATIONAL ENTROPY",
+    "ELECTRONIC INTERACTION ENERGY",
+    "MRM STERIC ENERGY",
+    "MRM ELECTROSTATIC ENERGY",
+    "MRM SOLVATION ENERGY",
+    "MRM TOTAL ENERGY"
+    ];
+ 
+const DB_FIELDS =
+    [
+    'Ligand/Pose',
+    'QMScore',
+    'dHf_g',
+    'Solv_elec',
+    'LJ_att',
+    'S_solv',
+    'S_vib',
+    'E_eInt',
+    'MRMScore',
+    'E_stericMRM',
+    'E_elecMRM',
+    'E_solvMRM'
+    ];
+
+ const TARGET = 'target';
+ const WORKDIR = 'workdir';
+
+/****************************************************************************
+ *                          qms_CopyPosesDB
+ *
+ *  Copy the Poses database into the QMScore output database.
+ *
+ ****************************************************************************/
+global function qms_CopyPosesDB [resultskey, poseskey]
+
+    local [fields, ftypes] = db_Fields poseskey;
+    local molfield = fields | (ftypes == 'molecule');
+
+    if 1 <> length molfield then return 0; endif
+
+    //  HACK alert:  temporarily renames mol field to make copying easier
+    db_RenameField [resultskey, DB_FIELDS(1), molfield];
+    apt db_EnsureField [resultskey,  fields, ftypes];
+
+    local rowkey = 0;
+
+    while rowkey = db_NextEntry [poseskey, rowkey] loop
+        local rowdata = db_Read [poseskey, rowkey];
+        db_Write [resultskey, 0, rowdata];
+    endloop
+
+    db_RenameField [resultskey, molfield, DB_FIELDS(1)];
+
+    return 1;
+endfunction
+
+/****************************************************************************
+ *                          qms_GetMolField
+ *
+ ****************************************************************************/
+global function qms_GetMolField [dbkey]
+
+    return DB_FIELDS(1);
+
+endfunction
+
+/****************************************************************************
+ *                          qms_GetOptions
+ *
+ *  Save the QMScore score options.
+ *
+ ****************************************************************************/
+global function qms_GetOptions [mdbkey]
+
+//    return db_GetEnv [dbkey, WORKDIR];
+
+endfunction
+
+/****************************************************************************
+ *                          qms_GetTarget
+ *
+ *  Save the target (receptor) in the QMScore database.
+ *
+ ****************************************************************************/
+global function qms_GetTarget [dbkey]
+
+    return db_GetEnv [dbkey, TARGET];
+
+endfunction
+/****************************************************************************
+ *                          qms_SaveDBRow
+ *
+ *  Save a row of data in the QMScore database.
+ *
+ ****************************************************************************/
+global function qms_SaveDBRow [mdbkey, rowkey, scoredata]
+
+    if alltrue (DATA_TAGS === app first scoredata) then
+        db_Write [mdbkey, rowkey, tag [dropfirst DB_FIELDS, 
+            dropfirst app second scoredata]];
+    endif
+
+endfunction
+
+/****************************************************************************
+ *                          qms_SaveOptions
+ *
+ *  Save the QMScore score options.
+ *
+ ****************************************************************************/
+global function qms_SaveOptions [mdbkey, options]
+
+//    db_SetEnv [mdbkey, WORKDIR, twrite ['{v}', options]];
+
+endfunction
+
+/****************************************************************************
+ *                          qms_SaveTarget
+ *
+ *  Save the target (receptor) in the QMScore database.
+ *
+ ****************************************************************************/
+global function qms_SaveTarget [dbkey, tgtchains]
+
+    local tgtmol = mol_Extract tgtchains;
+    print tgtmol;
+
+    db_SetEnv [dbkey, TARGET, twrite ['{v}', tgtmol]];
+
+endfunction
+
+/****************************************************************************
+ *                          qms_SetFieldNames
+ *
+ *  Ensure that the required fields are present.
+ *
+ ****************************************************************************/
+global function qms_SetFieldNames [dbkey]
+
+    db_EnsureField [dbkey, DB_FIELDS(1), 'molecule'];
+    apt db_EnsureField [dbkey, dropfirst DB_FIELDS, 'double'];
+
+endfunction
+
