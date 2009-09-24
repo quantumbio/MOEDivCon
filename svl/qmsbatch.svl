@@ -5,83 +5,80 @@
 #set title   'QMScore Batch'
 #set class   'QM'
 #set version '2009.01'
-#set main    'qm_score_batch'
+#set main    'qm_ScoreBatch'
 
 function qms_GetMolField;
 function qms_GetOptions;
-function qms_GetTarget;
+function qms_GetMols;
+function qms_SaveScore;
 
-// function qms_Score;
+function qms_Score;
 
 
 global function qms_ScoreBatch [dbpath]
 
 //    if not MOE_BATCH then local pdata = SystemPush []; endif
 
+
     local dbkey = db_Open [dbpath, 'read-write'];
 
     //  Extract target and run options from the database environment
-    local tgtmol = qms_GetTarget [dbkey];
+    local [recmols, ligmol] = qms_GetMols [dbkey];
     local options = qms_GetOptions [dbkey];
 
-//    local target = mol_Create tgtmol;
+      if not MOE_BATCH then Close [force:1]; endif
+    local target = app mol_Create recmols;
+    local ligand = mol_Create ligmol;
+    View [];
 
     //  For each ligand pose in the database, calculate QM score
     local rowkey = 0, count = 0;
     local total = db_nEntries (dbkey);
     local molfld = qms_GetMolField [dbkey];
+    local tid = task_key -1;
     local mess = 0;
+    local ligpose = [];
     loop
         if not MOE_BATCH then
-            Close [force:1];
+            if not ligpose === [] then oDestroy ligpose; endif
+
             mess = Message [mess, token swrite ['Scoring ligand {} of {}.',
                 count + 1, total]];
        endif
-       local ligand = [];
-       local target = [];
     
         if count == 0 or rowkey <> 0 then
             rowkey = db_NextEntry [dbkey, rowkey];
         endif
 
         if rowkey <> 0 then
-            count = inc count;
-            local ligmol = first db_ReadFields [dbkey, rowkey, [molfld]];
+            count = count + 1;
+            local posemol = first db_ReadFields [dbkey, rowkey, [molfld]];
 
-//              mol_Create mol_Cat [tgtmol, ligmol];
-
-            local [[tgtvec], nc, nf] = sread [string tgtmol, '{v}'];
-            print tgtvec;
-            target = mol_Create tgtvec;
-            ligand = mol_Create ligmol;
+            ligpose = mol_Create posemol;
             View [];
 
-            print ["target  ", target];
-        endif
+//        local results = qms_Score [recmols, posemol, []];
+//        qms_SaveScore [dbkey, rowkey, results];
+//        endif
 
-/*
-        local [result, code, seqno, id] = mpu_batch [
+        local [results, code, seqno, indkey] = mpu_batch [
             select ['', 'call', rowkey == 0],
-            'qms_Score', [target, ligand, options], [rowkey]];
+            'qms_Score', [recmols, posemol, options], [count, rowkey, tid]];
 
         if code == '' then
-            if neL [tid, id(2)] then
-                exit 'MPU    ask conflict, aborting calculation.';
+            if neL [tid, indkey(3)] then
+                exit 'MPU/task conflict, aborting calculation.';
             endif
 
-            db_Write [mdbkey, id(1), res];
+            qms_SaveScore [dbkey, indkey(2), results];
 
         elseif code == 'error' then
-            if opt.fld_error <> '' then
-                db_Write [mdbkey, id(1), [[opt.fld_error, string res]]];
             else
-                write ['*** Error reported (entry id={}): {}\n', id(1), res];
+                write ['*** Error on pose {} (dbkey {}:  {})\n', 
+                    indkey(1), indkey(2), results];
             endif
         endif
     until code == 'eof'
-*/
-    sleep 1;
-    until count >= db_nEntries dbkey
     endloop
 
     db_Close dbkey;

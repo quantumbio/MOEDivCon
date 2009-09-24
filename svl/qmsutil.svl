@@ -40,8 +40,10 @@ const DB_FIELDS =
     'E_solvMRM'
     ];
 
- const TARGET = 'target';
- const WORKDIR = 'workdir';
+const LIGAND = 'ligand';
+const TARGET = 'target';
+const WORKDIR = 'workdir';
+
 
 /****************************************************************************
  *                          qms_CopyPosesDB
@@ -95,23 +97,44 @@ global function qms_GetOptions [mdbkey]
 endfunction
 
 /****************************************************************************
- *                          qms_GetTarget
+ *                          qms_GetMols
  *
- *  Save the target (receptor) in the QMScore database.
+ *  Get the molecules (ligand and receptor) from the QMScore database.
  *
  ****************************************************************************/
-global function qms_GetTarget [dbkey]
-
-    return db_GetEnv [dbkey, TARGET];
+global function qms_GetMols [dbkey]
+    local tgtmol = db_GetEnv [dbkey, TARGET];
+    local [[tgtvec]] = sread [string tgtmol, '{v}'];
+    local ligmol = db_GetEnv [dbkey, LIGAND];
+    local [[ligvec]] = sread [string ligmol, '{v}'];
+    return [tgtvec, ligvec];
 
 endfunction
+
 /****************************************************************************
  *                          qms_SaveDBRow
  *
  *  Save a row of data in the QMScore database.
  *
  ****************************************************************************/
-global function qms_SaveDBRow [mdbkey, rowkey, scoredata]
+global function qms_SaveDBRow [mdbkey, rowkey, ligand, scoredata]
+
+    if alltrue (DATA_TAGS === app first scoredata) then
+        local rowdata = tag [DB_FIELDS(1), [ligand]];
+        rowdata = cat [rowdata, tag [dropfirst DB_FIELDS, 
+            dropfirst app second scoredata]];
+        db_Write [mdbkey, rowkey, rowdata];
+    endif
+
+endfunction
+
+/****************************************************************************
+ *                          qms_SaveScore
+ *
+ *  Save just the score data in the QMScore database.
+ *
+ ****************************************************************************/
+global function qms_SaveScore [mdbkey, rowkey, scoredata]
 
     if alltrue (DATA_TAGS === app first scoredata) then
         db_Write [mdbkey, rowkey, tag [dropfirst DB_FIELDS, 
@@ -119,6 +142,7 @@ global function qms_SaveDBRow [mdbkey, rowkey, scoredata]
     endif
 
 endfunction
+
 
 /****************************************************************************
  *                          qms_SaveOptions
@@ -133,17 +157,15 @@ global function qms_SaveOptions [mdbkey, options]
 endfunction
 
 /****************************************************************************
- *                          qms_SaveTarget
+ *                          qms_SaveMols
  *
- *  Save the target (receptor) in the QMScore database.
+ *  Save the molecules (ligand and receptor) in the QMScore database.
  *
  ****************************************************************************/
-global function qms_SaveTarget [dbkey, tgtchains]
+global function qms_SaveMols [dbkey, tgtmols, ligmol]
 
-    local tgtmol = mol_Extract tgtchains;
-    print tgtmol;
-
-    db_SetEnv [dbkey, TARGET, twrite ['{v}', tgtmol]];
+    db_SetEnv [dbkey, TARGET, twrite ['{v}', tgtmols]];
+    db_SetEnv [dbkey, LIGAND, twrite ['{v}', ligmol]];
 
 endfunction
 

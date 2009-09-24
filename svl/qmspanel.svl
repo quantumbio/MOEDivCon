@@ -6,35 +6,19 @@
 #set version '2009.01'
 #set main    'qms_SetupPanel'
 
+function _Atoms;
 
 function qms_CopyPosesDB;
 function qms_GetMolField;
 function qms_SaveDBRow;
 function qms_SaveOptions;
-function qms_SaveTarget;
+function qms_SaveMols;
+function qms_SetFieldNames;
+
 function qms_SetFieldNames;
 
 function qms_Score;
 function qms_ScoreBatch;
-
-
-/****************************************************************************
- *                          OpenPosesDB
- *
- *  Opens the input database of ligand poses.
- *
- ****************************************************************************/
-local function OpenPosesDB [filename]
-
-    local type = ftype filename;
-    local dbkey = 0;
-    if type == 'file' then
-        print swrite ['Reading database: {}', filename];  //DEBUG
-        dbkey = db_Open [filename, 'read'];
-    endif
-
-    return dbkey;
-endfunction
 
 
 /****************************************************************************
@@ -56,7 +40,7 @@ local function CreateResultDB [filename]
         endif
     endif
 
-    print swrite ['Creating database: {}', filename];  //DEBUG
+    write ['Creating database: {}\n', filename];  //DEBUG
     dbkey = db_Open [filename, 'create'];
 
     qms_SetFieldNames [dbkey];
@@ -64,6 +48,121 @@ local function CreateResultDB [filename]
     return dbkey;
 endfunction
 
+/****************************************************************************
+ *                          OpenPosesDB
+ *
+ *  Opens the input database of ligand poses.
+ *
+ ****************************************************************************/
+local function OpenPosesDB [filename]
+
+    local type = ftype filename;
+    local dbkey = 0;
+    if type == 'file' then
+        write ['Reading database: {}\n', filename];  //DEBUG
+        dbkey = db_Open [filename, 'read'];
+    endif
+
+    return dbkey;
+endfunction
+
+
+/****************************************************************************
+ *                          SplitReceptor
+ *
+ ****************************************************************************/
+local function SplitReceptor [receptoratoms]
+
+    if receptoratoms === [] then return []; endif
+
+    local atomsets = [];
+    local [recidx, reccnt] = sac aMoleculeNumber receptoratoms;
+    if length reccnt > 1 then
+        receptoratoms = receptoratoms [recidx];
+        atomsets = split [receptoratoms, reccnt];
+    else
+        atomsets = [receptoratoms];
+    endif
+
+    return atomsets;
+
+endfunction
+
+/****************************************************************************
+ *                          ChainsToMols
+ *
+ ****************************************************************************/
+local function ChainsToMols []
+
+    local complexatoms = Atoms [];
+    if length complexatoms == 0 then return [[], []];
+        print 'complex is empty';  //DEBUG
+        return;
+    endif
+
+    local recatoms, ligatoms;
+    const LIGXNAME = 'LIGX_LIGAND';
+    local colnames = oCollections [];
+
+    if anytrue eqE [LIGXNAME, colnames] then
+        print LIGXNAME;  //DEBUG
+        ligatoms  = cat oAtoms oGetCollection LIGXNAME;
+        ligatoms = join [ligatoms, complexatoms];
+    endif
+
+    if length ligatoms == 0 then
+        print 'ligx is empty';  //DEBUG
+        ligatoms  = _Atoms '$$ligand';
+    endif
+
+    if length ligatoms == 0 or length ligatoms >= length complexatoms then
+        print 'ligand is undefined';  //DEBUG
+        return [[], []];
+    endif
+
+    if 1 <> length uniq aMoleculeNumber ligatoms then
+        print 'ligand can only be a single molecule';  //DEBUG
+        return [[], []];
+    endif
+
+    recatoms = diff [complexatoms, ligatoms];
+    local recsets = SplitReceptor [recatoms];
+
+    if recsets === [] then
+        print 'receptor atom sets are empty';  //DEBUG
+        return [[], []];
+    endif
+
+    local ligmol = mol_Extract ligatoms;
+    local recmols = app mol_Extract recsets;
+
+    return [recmols, ligmol];
+
+endfunction
+
+
+
+/****************************************************************************
+ *                          SameDB
+ *
+ *  Borrowed from dock_ui.svl
+ *
+ * Returns 1 if name1 and name2 refer to the same MDB.
+ * Otherwise return 0.
+ *
+ ****************************************************************************/
+local function SameDB [name1, name2]
+    if ftype name1 <> 'file' or ftype name2 <> 'file' then
+        return 0;
+    endif
+
+    local d1 = db_Open [name1,'read'];
+    local d2 = db_Open [name2,'read'];
+    db_Close d1;
+    db_Close d2;
+    return (d1==d2);
+
+endfunction
 
 
 /****************************************************************************
@@ -88,12 +187,12 @@ global function qms_SetupPanel [cfg, parent]
 
     // ---------------------- embedded functions begin ----------------------
 
-    function RunCalc []
+    function RunCalc [recset, ligand]
         local msgkey = Message [0, 'QMScore is running ...'];
 
         sleep -1;    // Allow parent to close input window.
 
-        local results = qms_Score [];
+        local results = qms_Score [recset, ligand, []];
 
         Message [msgkey, 'QMScore is done.'];
 
@@ -108,6 +207,7 @@ global function qms_SetupPanel [cfg, parent]
 
     local qmskey = 0;
     local ligkey = 0;
+    local recset, ligand;
 
     WindowShow [wkey, 1];
     while wkey loop
@@ -122,12 +222,13 @@ global function qms_SetupPanel [cfg, parent]
                     if qmskey == 0 then
                         Warning token swrite ['Unable to create database {}', 
                             outname];
-                        continue;
+                        exit [];
                     endif
 
-                    //NOTE:  save target and ligand in DB
-                    local results = RunCalc [];
-                    qms_SaveDBRow [qmskey, 0, results];
+                    [recset, ligand] = ChainsToMols [];
+                    qms_SaveMols [qmskey, recset, ligand];
+                    local results = RunCalc [recset, ligand];
+                    qms_SaveDBRow [qmskey, 0, ligand, results];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
                     exit [];
@@ -140,30 +241,38 @@ global function qms_SetupPanel [cfg, parent]
                 if second task_fork [] == 'child' then
                     task_settitle [-1, tskttl];
 
-                    qmskey = CreateResultDB [outname];
-                    if qmskey == 0 then
-                        Warning token swrite ['Unable to create database {}', 
-                            outname];
-                        continue;
+                    if SameDB [inname, outname] then
+                        Warning token swrite ['{} and {} are the same database', 
+                            inname, outname];
+                        exit [];
                     endif
 
                     ligkey = OpenPosesDB (inname);
                     if ligkey == 0 then
                         Warning token swrite ['Unable to open database {}',
                             inname];
-                        continue;
+                        exit [];
                     endif
+
+                    qmskey = CreateResultDB [outname];
+                    if qmskey == 0 then
+                        Warning token swrite ['Unable to create database {}', 
+                            outname];
+                        db_Close [ligkey];
+                        exit [];
+                    endif
+
                     local absoutname = fabsname outname;
                     qms_CopyPosesDB [qmskey, ligkey];
                     db_Close ligkey;
 
-                    qms_SaveTarget [qmskey, Chains []];
+                    [recset, ligand] = ChainsToMols [];
+                    qms_SaveMols [qmskey, recset, ligand];
                     qms_SaveOptions [qmskey, []];
 
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
 
-                    print absoutname;
                     qms_ScoreBatch [absoutname];
 
                     exit [];
