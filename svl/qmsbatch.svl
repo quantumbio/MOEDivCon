@@ -9,7 +9,7 @@
 
 function qms_GetMolField;
 function qms_GetOptions;
-function qms_GetMols;
+function qms_GetEnv;
 function qms_SaveScore;
 
 function qms_Score;
@@ -19,14 +19,12 @@ global function qms_ScoreBatch [dbpath]
 
 //    if not MOE_BATCH then local pdata = SystemPush []; endif
 
-
     local dbkey = db_Open [dbpath, 'read-write'];
 
-    //  Extract target and run options from the database environment
-    local [recmols, ligmol] = qms_GetMols [dbkey];
-    local options = qms_GetOptions [dbkey];
+    //  Extract molecules and run options from the database environment
+    local [recmols, ligmol, options] = qms_GetEnv [dbkey];
 
-      if not MOE_BATCH then Close [force:1]; endif
+    if not MOE_BATCH then Close [force:1]; endif
     local target = app mol_Create recmols;
     local ligand = mol_Create ligmol;
     View [];
@@ -40,10 +38,7 @@ global function qms_ScoreBatch [dbpath]
     local ligpose = [];
     loop
         if not MOE_BATCH then
-            if not ligpose === [] then oDestroy ligpose; endif
-
-            mess = Message [mess, token swrite ['Scoring ligand {} of {}.',
-                count + 1, total]];
+            if not ligpose === [] then oDestroy [ligpose]; endif
        endif
     
         if count == 0 or rowkey <> 0 then
@@ -52,14 +47,13 @@ global function qms_ScoreBatch [dbpath]
 
         if rowkey <> 0 then
             count = count + 1;
+            options.task = count;
             local posemol = first db_ReadFields [dbkey, rowkey, [molfld]];
-
+            mess = Message [mess, token swrite ['Scoring ligand {} of {}.',
+                count, total]];
             ligpose = mol_Create posemol;
             View [];
-
-//        local results = qms_Score [recmols, posemol, []];
-//        qms_SaveScore [dbkey, rowkey, results];
-//        endif
+        endif
 
         local [results, code, seqno, indkey] = mpu_batch [
             select ['', 'call', rowkey == 0],
@@ -73,12 +67,12 @@ global function qms_ScoreBatch [dbpath]
             qms_SaveScore [dbkey, indkey(2), results];
 
         elseif code == 'error' then
-            else
                 write ['*** Error on pose {} (dbkey {}:  {})\n', 
                     indkey(1), indkey(2), results];
-            endif
         endif
+
     until code == 'eof'
+
     endloop
 
     db_Close dbkey;

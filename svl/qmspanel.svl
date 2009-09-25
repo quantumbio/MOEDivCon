@@ -12,7 +12,7 @@ function qms_CopyPosesDB;
 function qms_GetMolField;
 function qms_SaveDBRow;
 function qms_SaveOptions;
-function qms_SaveMols;
+function qms_SaveEnv;
 function qms_SetFieldNames;
 
 function qms_SetFieldNames;
@@ -20,6 +20,26 @@ function qms_SetFieldNames;
 function qms_Score;
 function qms_ScoreBatch;
 
+
+const OPT_TAGS =
+    [
+    'mode',
+    'workdir',
+    'scoredb',
+    'posedb',
+    'recdb',
+    'ham',
+    'freq',
+    'opt',
+    'task'
+    ];
+
+const RUN_MODES =
+    [
+    '1to1',
+    '1toN',
+    'NtoN'
+    ];
 
 /****************************************************************************
  *                          CreateResultDB
@@ -95,9 +115,8 @@ endfunction
 local function ChainsToMols []
 
     local complexatoms = Atoms [];
-    if length complexatoms == 0 then return [[], []];
-        print 'complex is empty';  //DEBUG
-        return;
+    if length complexatoms == 0 then
+        return [[], [], 'No molecular complex loaded'];
     endif
 
     local recatoms, ligatoms;
@@ -105,41 +124,35 @@ local function ChainsToMols []
     local colnames = oCollections [];
 
     if anytrue eqE [LIGXNAME, colnames] then
-        print LIGXNAME;  //DEBUG
         ligatoms  = cat oAtoms oGetCollection LIGXNAME;
         ligatoms = join [ligatoms, complexatoms];
     endif
 
     if length ligatoms == 0 then
-        print 'ligx is empty';  //DEBUG
         ligatoms  = _Atoms '$$ligand';
     endif
 
     if length ligatoms == 0 or length ligatoms >= length complexatoms then
-        print 'ligand is undefined';  //DEBUG
-        return [[], []];
+        return [[], [], 'No ligand was recognized.  Use LigX to define it.'];
     endif
 
     if 1 <> length uniq aMoleculeNumber ligatoms then
-        print 'ligand can only be a single molecule';  //DEBUG
-        return [[], []];
+        return [[], [], 'Ligand has to be a single molecule.'];
     endif
 
     recatoms = diff [complexatoms, ligatoms];
     local recsets = SplitReceptor [recatoms];
 
     if recsets === [] then
-        print 'receptor atom sets are empty';  //DEBUG
-        return [[], []];
+        return [[], [], 'No receptor was recognized.'];
     endif
 
     local ligmol = mol_Extract ligatoms;
     local recmols = app mol_Extract recsets;
 
-    return [recmols, ligmol];
+    return [recmols, ligmol, []];
 
 endfunction
-
 
 
 /****************************************************************************
@@ -187,12 +200,12 @@ global function qms_SetupPanel [cfg, parent]
 
     // ---------------------- embedded functions begin ----------------------
 
-    function RunCalc [recset, ligand]
+    function RunCalc [recset, ligand, options]
         local msgkey = Message [0, 'QMScore is running ...'];
 
         sleep -1;    // Allow parent to close input window.
 
-        local results = qms_Score [recset, ligand, []];
+        local results = qms_Score [recset, ligand, options];
 
         Message [msgkey, 'QMScore is done.'];
 
@@ -202,12 +215,13 @@ global function qms_SetupPanel [cfg, parent]
     // ----------------------- embedded functions end -----------------------
 
     //DEBUG replace with vals from dialog
-    local outname = 'qmscore.mdb';
-    local inname = 'examples/ligand/poses.mdb';
-
+    local outname = '~daren/playground/MOEDivcon/qmscore.mdb';
+    local inname = '~daren/playground/MOEDivcon/examples/ligand/poses.mdb';
+    local options = []; 
     local qmskey = 0;
     local ligkey = 0;
     local recset, ligand;
+    local errmess = [];
 
     WindowShow [wkey, 1];
     while wkey loop
@@ -225,9 +239,17 @@ global function qms_SetupPanel [cfg, parent]
                         exit [];
                     endif
 
-                    [recset, ligand] = ChainsToMols [];
-                    qms_SaveMols [qmskey, recset, ligand];
-                    local results = RunCalc [recset, ligand];
+                    [recset, ligand, errmess] = ChainsToMols [];
+                    if recset === [] or ligand == []then
+                        Warning [errmess];
+                        exit [];
+                    endif
+
+                    options = tag [OPT_TAGS, [RUN_MODES(1), '/tmp', 
+                        outname, [], [], [], [], [], []]];
+                    qms_SaveEnv [qmskey, recset, ligand, options];
+
+                    local results = RunCalc [recset, ligand, options];
                     qms_SaveDBRow [qmskey, 0, ligand, results];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
@@ -266,9 +288,14 @@ global function qms_SetupPanel [cfg, parent]
                     qms_CopyPosesDB [qmskey, ligkey];
                     db_Close ligkey;
 
-                    [recset, ligand] = ChainsToMols [];
-                    qms_SaveMols [qmskey, recset, ligand];
-                    qms_SaveOptions [qmskey, []];
+                    [recset, ligand, errmess] = ChainsToMols [];
+                    if  recset === [] or ligand === [] then
+                        Warning [errmess];
+                        exit [];
+                    endif
+                    options = tag [OPT_TAGS, [RUN_MODES(2), '/tmp', outname, inname,
+                        [], [], [], [], []]];
+                    qms_SaveEnv [qmskey, recset, ligand, options];
 
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;

@@ -40,9 +40,10 @@ const DB_FIELDS =
     'E_solvMRM'
     ];
 
+// Environment fields
 const LIGAND = 'ligand';
 const TARGET = 'target';
-const WORKDIR = 'workdir';
+const OPTIONS = 'options';
 
 
 /****************************************************************************
@@ -85,29 +86,21 @@ global function qms_GetMolField [dbkey]
 endfunction
 
 /****************************************************************************
- *                          qms_GetOptions
+ *                          qms_GetEnv
  *
- *  Save the QMScore score options.
- *
- ****************************************************************************/
-global function qms_GetOptions [mdbkey]
-
-//    return db_GetEnv [dbkey, WORKDIR];
-
-endfunction
-
-/****************************************************************************
- *                          qms_GetMols
- *
- *  Get the molecules (ligand and receptor) from the QMScore database.
+ *  Get the molecules (ligand and receptor) and options from the QMScore 
+ *  database.
  *
  ****************************************************************************/
-global function qms_GetMols [dbkey]
-    local tgtmol = db_GetEnv [dbkey, TARGET];
-    local [[tgtvec]] = sread [string tgtmol, '{v}'];
-    local ligmol = db_GetEnv [dbkey, LIGAND];
-    local [[ligvec]] = sread [string ligmol, '{v}'];
-    return [tgtvec, ligvec];
+global function qms_GetEnv [dbkey]
+    local tgttok = db_GetEnv [dbkey, TARGET];
+    local [[tgtmols]] = sread [string tgttok, '{v}'];
+    local ligtok = db_GetEnv [dbkey, LIGAND];
+    local [[ligmol]] = sread [string ligtok, '{v}'];
+    local opttok = db_GetEnv [dbkey, OPTIONS];
+    local [[options]] = sread [string opttok, '{v}'];
+
+    return [tgtmols, ligmol, options];
 
 endfunction
 
@@ -143,29 +136,18 @@ global function qms_SaveScore [mdbkey, rowkey, scoredata]
 
 endfunction
 
-
 /****************************************************************************
- *                          qms_SaveOptions
+ *                          qms_SaveEnv
  *
- *  Save the QMScore score options.
+ *  Save the molecules (ligand and receptor) and options in the QMScore
+ *  database.
  *
  ****************************************************************************/
-global function qms_SaveOptions [mdbkey, options]
-
-//    db_SetEnv [mdbkey, WORKDIR, twrite ['{v}', options]];
-
-endfunction
-
-/****************************************************************************
- *                          qms_SaveMols
- *
- *  Save the molecules (ligand and receptor) in the QMScore database.
- *
- ****************************************************************************/
-global function qms_SaveMols [dbkey, tgtmols, ligmol]
+global function qms_SaveEnv [dbkey, tgtmols, ligmol, options]
 
     db_SetEnv [dbkey, TARGET, twrite ['{v}', tgtmols]];
     db_SetEnv [dbkey, LIGAND, twrite ['{v}', ligmol]];
+    db_SetEnv [dbkey, OPTIONS, twrite ['{v}', options]];
 
 endfunction
 
