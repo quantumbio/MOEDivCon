@@ -40,19 +40,22 @@ const DB_FIELDS =
     'E_solvMRM'
     ];
 
-// Environment fields
+const REC_FIELD = 'Receptor';
+const ERR_FIELD = 'Status';
+
+// Environment tags
 const LIGAND = 'ligand';
 const TARGET = 'target';
 const OPTIONS = 'options';
 
 
 /****************************************************************************
- *                          qms_CopyPosesDB
+ *                          qms_CopyPoseDB
  *
  *  Copy the Poses database into the QMScore output database.
  *
  ****************************************************************************/
-global function qms_CopyPosesDB [resultskey, poseskey]
+global function qms_CopyPoseDB [resultskey, poseskey]
 
     local [fields, ftypes] = db_Fields poseskey;
     local molfield = fields | (ftypes == 'molecule');
@@ -76,14 +79,72 @@ global function qms_CopyPosesDB [resultskey, poseskey]
 endfunction
 
 /****************************************************************************
- *                          qms_GetMolField
+ *                          qms_CopyRecPoseDB
+ *
+ *  Copy the Receptors and Poses databases into the QMScore output database.
+ *
+ *  HACK alert:  temporarily renames mol fields to make copying easier.
+ *
+****************************************************************************/
+global function qms_CopyRecPoseDB [resultskey, recskey, poseskey]
+
+    if db_nEntries recskey <> db_nEntries poseskey then return 0; endif
+
+    local [recfields, recftypes] = db_Fields recskey;
+    local recmolfield = recfields | (recftypes == 'molecule');
+    if 1 <> length recmolfield then return 0; endif
+
+    db_RenameField [resultskey, REC_FIELD, recmolfield];
+    apt db_EnsureField [resultskey, recfields, recftypes];
+
+    local recrowkey = 0;
+    while recrowkey = db_NextEntry [recskey, recrowkey] loop
+        local recrowdata = db_Read [recskey, recrowkey];
+        db_Write [resultskey, 0, recrowdata];
+    endloop
+
+    db_RenameField [resultskey, recmolfield, REC_FIELD];
+
+    local [posefields, poseftypes] = db_Fields poseskey;
+    local posemolfield = posefields | (poseftypes == 'molecule');
+    if 1 <> length posemolfield then return 0; endif
+
+    db_RenameField [resultskey, DB_FIELDS(1), posemolfield];
+    apt db_EnsureField [resultskey, posefields, poseftypes];
+
+    local poserowkey = 0;
+    local resultrowkey = 0;
+    while poserowkey = db_NextEntry [poseskey, poserowkey] loop
+        resultrowkey = db_NextEntry [resultskey, resultrowkey];
+        local poserowdata = db_Read [poseskey, poserowkey];
+        db_Write [resultskey, resultrowkey, poserowdata];
+    endloop
+
+    db_RenameField [resultskey, posemolfield, DB_FIELDS(1)];
+
+    return 1;
+endfunction
+
+/****************************************************************************
+ *                          qms_GetPoseField
  *
  ****************************************************************************/
-global function qms_GetMolField [dbkey]
+global function qms_GetPoseField []
 
     return DB_FIELDS(1);
 
 endfunction
+
+/****************************************************************************
+ *                          qms_GetRecField
+ *
+ ****************************************************************************/
+global function qms_GetRecField []
+
+    return REC_FIELD;
+
+endfunction
+
 
 /****************************************************************************
  *                          qms_GetEnv
@@ -122,6 +183,19 @@ global function qms_SaveDBRow [mdbkey, rowkey, ligand, scoredata]
 endfunction
 
 /****************************************************************************
+ *                          qms_SaveErr
+ *
+ *  Save the error/status message for the given row.
+ *
+ ****************************************************************************/
+global function qms_SaveErr [dbkey, rowkey, message]
+
+    local fielddata = tag [ERR_FIELD, [message]];
+    db_Write [dbkey, rowkey, fielddata];
+
+endfunction
+
+/****************************************************************************
  *                          qms_SaveScore
  *
  *  Save just the score data in the QMScore database.
@@ -152,15 +226,43 @@ global function qms_SaveEnv [dbkey, tgtmols, ligmol, options]
 endfunction
 
 /****************************************************************************
- *                          qms_SetFieldNames
+ *                          qms_SetErrField
+ *
+ *  Ensure that the error/status field is present.
+ *
+ ****************************************************************************/
+global function qms_SetErrField [dbkey]
+
+    db_EnsureField [dbkey, ERR_FIELD, 'char'];
+
+endfunction
+
+/****************************************************************************
+ *                          qms_SetFields
  *
  *  Ensure that the required fields are present.
  *
  ****************************************************************************/
-global function qms_SetFieldNames [dbkey]
+global function qms_SetFields [dbkey, addreceptor]
+
+    if addreceptor then
+        db_EnsureField [dbkey, REC_FIELD, 'molecule'];
+    endif
 
     db_EnsureField [dbkey, DB_FIELDS(1), 'molecule'];
     apt db_EnsureField [dbkey, dropfirst DB_FIELDS, 'double'];
+
+endfunction
+
+/****************************************************************************
+ *                          qms_SetRecField
+ *
+ *  Ensure that the receptor field is present.
+ *
+ ****************************************************************************/
+global function qms_SetRecField [dbkey]
+
+    db_EnsureField [dbkey, REC_FIELD, 'moleclule'];
 
 endfunction
 

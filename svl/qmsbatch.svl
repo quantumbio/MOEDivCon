@@ -5,42 +5,33 @@
 #set title   'QMScore Batch'
 #set class   'QM'
 #set version '2009.01'
-#set main    'qm_ScoreBatch'
+#set main    'qms_ScoreBatch'
 
-function qms_GetMolField;
+function qms_GetPoseField;
+function qms_GetRecField;
 function qms_GetOptions;
 function qms_GetEnv;
+function qms_SaveErr;
 function qms_SaveScore;
-
 function qms_Score;
 
 
 global function qms_ScoreBatch [dbpath]
-
-//    if not MOE_BATCH then local pdata = SystemPush []; endif
 
     local dbkey = db_Open [dbpath, 'read-write'];
 
     //  Extract molecules and run options from the database environment
     local [recmols, ligmol, options] = qms_GetEnv [dbkey];
 
-    if not MOE_BATCH then Close [force:1]; endif
-    local target = app mol_Create recmols;
-    local ligand = mol_Create ligmol;
-    View [];
 
     //  For each ligand pose in the database, calculate QM score
     local rowkey = 0, count = 0;
     local total = db_nEntries (dbkey);
-    local molfld = qms_GetMolField [dbkey];
+    local posefld = qms_GetPoseField [dbkey];
+    local recfld = qms_GetRecField [dbkey];
     local tid = task_key -1;
-    local mess = 0;
-    local ligpose = [];
+
     loop
-        if not MOE_BATCH then
-            if not ligpose === [] then oDestroy [ligpose]; endif
-       endif
-    
         if count == 0 or rowkey <> 0 then
             rowkey = db_NextEntry [dbkey, rowkey];
         endif
@@ -48,11 +39,13 @@ global function qms_ScoreBatch [dbpath]
         if rowkey <> 0 then
             count = count + 1;
             options.task = count;
-            local posemol = first db_ReadFields [dbkey, rowkey, [molfld]];
-            mess = Message [mess, token swrite ['Scoring ligand {} of {}.',
-                count, total]];
-            ligpose = mol_Create posemol;
-            View [];
+            local posemol = first db_ReadFields [dbkey, rowkey, [posefld]];
+
+            if options.mode === 'Many-to-Many' then
+                recmols = db_ReadFields [dbkey, rowkey, [recfld]];
+            endif
+
+            write ['Pose {} of {}:  key {}\n', count, total, rowkey];
         endif
 
         local [results, code, seqno, indkey] = mpu_batch [
@@ -65,9 +58,15 @@ global function qms_ScoreBatch [dbpath]
             endif
 
             qms_SaveScore [dbkey, indkey(2), results];
+            qms_SaveErr [dbkey, indkey(2), swrite ['Task {}, Key {}',
+                indkey(1), indkey(2)]];
 
         elseif code == 'error' then
-                write ['*** Error on pose {} (dbkey {}:  {})\n', 
+            qms_SaveErr [dbkey, indkey(2), 
+                swrite ['*** Error on pose {} (dbkey {}):  {}\n', 
+                indkey(1), indkey(2), results]];
+
+                write ['*** Error on pose {} (dbkey {}):  {}\n', 
                     indkey(1), indkey(2), results];
         endif
 
@@ -77,7 +76,34 @@ global function qms_ScoreBatch [dbpath]
 
     db_Close dbkey;
 
-//    if not MOE_BATCH then SystemPop pdata; endif
 
 endfunction
+
+#if 0
+    local ligpose = [];
+    local mess = 0;
+
+    //  If executing MOE, show feedback of job
+    if not MOE_BATCH then local pdata = SystemPush []; endif
+
+        if not MOE_BATCH then
+            if not ligpose === [] then oDestroy [ligpose]; endif
+       endif
+
+    if not MOE_BATCH then Close [force:1]; endif
+    local target = app mol_Create recmols;
+    local ligand = mol_Create ligmol;
+    View [];
+
+            ligpose = mol_Create posemol;
+            View [];
+
+            mess = Message [mess, token swrite ['Scoring ligand {} of {}.',
+                count, total]];
+
+    if not MOE_BATCH then SystemPop pdata; endif
+
+#endif
+
+
 

@@ -8,14 +8,14 @@
 
 function _Atoms;
 
-function qms_CopyPosesDB;
-function qms_GetMolField;
-function qms_SaveDBRow;
-function qms_SaveOptions;
+function qms_CopyPoseDB;
+function qms_CopyRecPoseDB;
+function qms_GetEnv;
+function qms_GetPoseField;
+function qms_SaveScore;
 function qms_SaveEnv;
-function qms_SetFieldNames;
-
-function qms_SetFieldNames;
+function qms_SetErrField;
+function qms_SetFields;
 
 function qms_Score;
 function qms_ScoreBatch;
@@ -36,56 +36,28 @@ const OPT_TAGS =
 
 const RUN_MODES =
     [
-    '1to1',
-    '1toN',
-    'NtoN'
+    'One-to-One',
+    'One-to-Many',
+    'Many-to-Many'
     ];
 
-/****************************************************************************
- *                          CreateResultDB
- *
- *  Create the output database for storing QMScore results and ensure that
- *  the required fields are present.
- *
- ****************************************************************************/
-local function CreateResultDB [filename]
+const HAMILTONIANS =
+    [
+    'AM1',
+    'MNDO',
+    'MNDO/d',
+    'MNDO/NMR',
+    'PDDG-PM3',
+    'PM3',
+    'PM6'
+    ];
 
-    local type = ftype filename;
-    local dbkey = 0;
-    if type == 'dir' then
-        return dbkey;
-    elseif type == 'file' then
-        if not MOE_BATCH and not YesNo token swrite ['Overwrite {}?', filename] then
-            return dbkey;
-        endif
-    endif
-
-    write ['Creating database: {}\n', filename];  //DEBUG
-    dbkey = db_Open [filename, 'create'];
-
-    qms_SetFieldNames [dbkey];
-
-    return dbkey;
-endfunction
-
-/****************************************************************************
- *                          OpenPosesDB
- *
- *  Opens the input database of ligand poses.
- *
- ****************************************************************************/
-local function OpenPosesDB [filename]
-
-    local type = ftype filename;
-    local dbkey = 0;
-    if type == 'file' then
-        write ['Reading database: {}\n', filename];  //DEBUG
-        dbkey = db_Open [filename, 'read'];
-    endif
-
-    return dbkey;
-endfunction
-
+const LIG_OPTS =
+    [
+    'in complex',
+    'in isolation',
+    'none'
+    ];
 
 /****************************************************************************
  *                          SplitReceptor
@@ -156,27 +128,66 @@ endfunction
 
 
 /****************************************************************************
- *                          SameDB
+ *                          SetUpRun
  *
- *  Borrowed from dock_ui.svl
+ *  Create the output database for storing QMScore results and ensure that
+ *  the required fields are present.  Store the molecules and run options 
+ *  in the DB environment.
  *
- * Returns 1 if name1 and name2 refer to the same MDB.
- * Otherwise return 0.
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
  *
  ****************************************************************************/
-local function SameDB [name1, name2]
-    if ftype name1 <> 'file' or ftype name2 <> 'file' then
-        return 0;
+local function SetUpRun [opts]
+
+    local qmskey = db_Open [opts.scoredb, 'create'];
+    qms_SetFields [qmskey, opts.mode === 'Many-to-Many'];
+
+    if opts.mode === 'One-to-One' or opts.mode === 'One-to-Many' then
+        local [recset, ligand, errmess] = ChainsToMols [];
+        if recset === [] or ligand === [] then
+            Warning [errmess];
+            exit [];
+        endif
+
+        qms_SaveEnv [qmskey, recset, ligand, opts];
+    else
+        qms_SaveEnv [qmskey, [], [], opts];
     endif
 
-    local d1 = db_Open [name1,'read'];
-    local d2 = db_Open [name2,'read'];
-    db_Close d1;
-    db_Close d2;
-    return (d1==d2);
+    if opts.mode === 'One-to-One' then
+        local posedata = tag [qms_GetPoseField [], [ligand]];
+        db_Write [qmskey, 0, posedata];
 
+    else
+        local posekey = db_Open [opts.posedb, 'read'];
+        if qmskey == posekey then
+            Warning token swrite ['{} and {} are the same database', 
+                opts.scoredb, opts.posedb];
+            exit [];
+        endif
+
+        if opts.mode === 'One-to-Many' then
+            qms_CopyPoseDB [qmskey, posekey];
+        else
+            local reckey = db_Open [opts.recdb, 'read'];
+            if qmskey == reckey then
+                Warning token swrite ['{} and {} are the same database', 
+                    opts.scoredb, opts.recdb];
+                exit [];
+            endif
+
+            qms_CopyRecPoseDB [qmskey, reckey, posekey];
+            db_Close reckey;
+        endif
+
+        db_Close posekey;
+    endif
+
+    qms_SetErrField [qmskey];
+
+    return qmskey;
 endfunction
-
 
 /****************************************************************************
  *
@@ -190,129 +201,238 @@ global function qms_SetupPanel [cfg, parent]
 
     parent = add parent;
 
-    local wkey = WindowCreate [
+    local wkey = WindowCreate
+        [
         name: 'panel', 
         title: 'QMScore',
         windowName: 'QMScorePanel',
         text: ['Run', 'Save', 'Cancel'],
-        Label: [text: '                   <input data>', margin: 1, minWidth: 20]
+        onTrigger: ['validate', 'validate', 'return'],
+        bubbleHelp: ['Execute QMScore from MOE',
+            'Save run parameters in database for later execution on cluster.', ''],
+
+        Hbox :
+            [
+            extendH: 1,
+            FSBText :
+                [
+                name: 'scoredb', len: 40, extendH: 1, title: 'Output DB:',
+                mode: 'saveAs', allowBlank: 0,
+                bubbleHelp:
+                    'The name of the output database that will hold\n'
+                    'the run paramaters and scoring results.'
+                ],
+            Button : [ name: 'browse_scoredb', text: 'Browse...' ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            extendH: 1,
+            Text :
+                [
+                name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
+                type: 'char', allowBlank: 0, onTrigger: 'return',
+                bubbleHelp:
+                    'The name of the working directory for storing\n'
+                    'QB Divcon intermediate calculations.'
+                ],
+            Button : [ name: 'browse_workdir', text: 'Browse...' ]
+            ],
+
+        Vbox :
+            [
+            Hbox :
+                [
+                extendH: 1,
+                Option :
+                    [
+                    name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
+                    type: 'int', minWidth: 8, extendH: 1,
+                    bubbleHelp:
+                        'TODO.'
+                    ],
+                Checkbox :
+                    [
+                    name: 'freq', text: 'Frequency',
+                    bubbleHelp:
+                         'TODO.\n'
+                        'The vibrational entropy calculation is computationally\n'
+                        'intensive and using the frequency option can easily\n'
+                        'double the execution time.'
+                    ]
+                ],
+            Option :
+                [
+                name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
+                type: 'int', minWidth: 11, extendH: 1,
+                bubbleHelp:
+                    'TODO.'
+                ]
+            ],
+
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            Radio :
+                [
+                name: 'mode', text: RUN_MODES, columns: 3, minWidth: 12, 
+                extendH: 1, onTrigger: 'return', title: 'Mapping Mode:',
+                type: 'char',
+                bubbleHelp:
+                    'The mapping mode of receptors to ligand/poses.'
+                ]
+            ],
+
+        Hbox :
+            [
+            name: 'posebox', extendH: 1, sensitive: 0,
+            FSBText :
+                [
+                name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
+                mode: 'open', allowBlank: 0,
+                bubbleHelp:
+                    'The name of the input database that holds\n'
+                    'the ligand poses (and possibly scores).'
+                ],
+            Button : [ name: 'browse_posedb', text: 'Browse...' ]
+            ],
+
+        Hbox :
+            [
+            name: 'recbox', extendH: 1, sensitive: 0,
+            FSBText :
+                [
+                name: 'recdb', len: 40, extendH: 1, title: 'Receptor DB:',
+                mode: 'open', allowBlank: 0,
+                bubbleHelp:
+                    'The name of the input database that holds\n'
+                    'the receptors.'
+                ],
+            Button : [ name: 'browse_recdb', text: 'Browse...' ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1]
         ];
 
     // ---------------------- embedded functions begin ----------------------
 
-    function RunCalc [recset, ligand, options]
+    function RunCalc [dbkey]
         local msgkey = Message [0, 'QMScore is running ...'];
-
         sleep -1;    // Allow parent to close input window.
 
+        local [recset, ligand, options] = qms_GetEnv [dbkey];
         local results = qms_Score [recset, ligand, options];
+        qms_SaveScore [dbkey, first db_Entries [dbkey], results];
 
         Message [msgkey, 'QMScore is done.'];
 
-        return results;
+        return;
     endfunction
 
     // ----------------------- embedded functions end -----------------------
 
-    //DEBUG replace with vals from dialog
-    local outname = '~daren/playground/MOEDivcon/qmscore.mdb';
-    local inname = '~daren/playground/MOEDivcon/examples/ligand/poses.mdb';
+    local btid, browsetasks = [];
     local options = []; 
     local qmskey = 0;
-    local ligkey = 0;
-    local recset, ligand;
-    local errmess = [];
+
+    WindowSetData [wkey, [scoredb: 'qmscore.mdb', freq: 0, workdir: '.']];
+    WindowSetAttr [wkey, [posebox: [sensitive: 0], posedb: [allowBlank: 1],
+         freq: [sensitive: 0], recbox: [sensitive: 0], recdb: [allowBlank: 1]]];
 
     WindowShow [wkey, 1];
-    while wkey loop
+    loop
         local [vals, trig] = WindowWait wkey;
-        if trig === 'panel' then
+        if trig === 'mode' then
+            if vals.mode === 'One-to-One' then
+                WindowSetAttr [wkey, [posebox: [sensitive: 0],
+                    posedb: [allowBlank: 1], recbox: [sensitive: 0], 
+                    recdb: [allowBlank: 1], panel:[sensitive: [1,1,1]]]];
+            elseif vals.mode === 'One-to-Many' then
+                WindowSetAttr [wkey, [posebox: [sensitive: 1],
+                    posedb: [allowBlank: 0],recbox: [sensitive: 0], 
+                    recdb: [allowBlank: 1], panel:[sensitive: [0,1,1]]]];
+            elseif vals.mode === 'Many-to-Many' then
+                WindowSetAttr [wkey, [posebox: [sensitive: 1],
+                    posedb: [allowBlank: 0], recbox: [sensitive: 1], 
+                    recdb: [allowBlank: 0], panel:[sensitive: [0,1,1]]]];
+            endif
+
+        elseif trig === 'workdir' then
+            local wdpath = fabsname vals.workdir;
+            if not ftype wdpath === 'dir' then
+                Warning token swrite ['{} is not a directory.', wdpath];
+                continue;
+            endif
+
+        elseif trig == 'browse_scoredb' then
+            btid = run ['fbrowse.svl', [trig, wkey, 'Select QMScore DB File', 
+                'none', '*.mdb', 'scoredb']];
+        if btid then browsetasks = append [browsetasks, btid]; endif
+
+         elseif trig == 'browse_workdir' then
+            btid = run ['fbrowse.svl', [trig, wkey, 'Select Working Directory', 
+                'none', '*', 'workdir']];
+        if btid then browsetasks = append [browsetasks, btid]; endif
+
+        elseif trig == 'browse_posedb' then
+            btid = run ['fbrowse.svl', [trig, wkey, 'Select Pose DB File', 
+                'open', '*.mdb', 'posedb']];
+        if btid then browsetasks = append [browsetasks, btid]; endif
+
+        elseif trig == 'browse_recdb' then
+            btid = run ['fbrowse.svl', [trig, wkey, 'Select Receptor DB File', 
+                'open', '*.mdb', 'recdb']];
+        if btid then browsetasks = append [browsetasks, btid]; endif
+
+       elseif trig === 'panel' then
             local tskttl = task_title -1;
-            if vals.panel === 'Run' then
+            if vals.panel === 'Cancel' then 
+                break;
+
+            elseif vals.panel === 'Run' then
                 if second task_fork [] == 'child' then
                     task_settitle [-1, tskttl];
 
-                    qmskey = CreateResultDB [outname];
-                    if qmskey == 0 then
-                        Warning token swrite ['Unable to create database {}', 
-                            outname];
-                        exit [];
-                    endif
+                    options = tag [OPT_TAGS, [vals.mode, 
+                      fabsname vals.workdir, fabsname vals.scoredb, [], [],
+                      vals.ham, vals.freq, vals.opt, []]];
 
-                    [recset, ligand, errmess] = ChainsToMols [];
-                    if recset === [] or ligand == []then
-                        Warning [errmess];
-                        exit [];
-                    endif
-
-                    options = tag [OPT_TAGS, [RUN_MODES(1), '/tmp', 
-                        outname, [], [], [], [], [], []]];
-                    qms_SaveEnv [qmskey, recset, ligand, options];
-
-                    local results = RunCalc [recset, ligand, options];
-                    qms_SaveDBRow [qmskey, 0, ligand, results];
+                    qmskey = SetUpRun [options];
+                    RunCalc [qmskey];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
                     exit [];
                 else
-                    WindowDestroy wkey;
-                    wkey = 0;
+                    break;
                 endif
 
             elseif vals.panel === 'Save' then
                 if second task_fork [] == 'child' then
                     task_settitle [-1, tskttl];
 
-                    if SameDB [inname, outname] then
-                        Warning token swrite ['{} and {} are the same database', 
-                            inname, outname];
-                        exit [];
-                    endif
-
-                    ligkey = OpenPosesDB (inname);
-                    if ligkey == 0 then
-                        Warning token swrite ['Unable to open database {}',
-                            inname];
-                        exit [];
-                    endif
-
-                    qmskey = CreateResultDB [outname];
-                    if qmskey == 0 then
-                        Warning token swrite ['Unable to create database {}', 
-                            outname];
-                        db_Close [ligkey];
-                        exit [];
-                    endif
-
-                    local absoutname = fabsname outname;
-                    qms_CopyPosesDB [qmskey, ligkey];
-                    db_Close ligkey;
-
-                    [recset, ligand, errmess] = ChainsToMols [];
-                    if  recset === [] or ligand === [] then
-                        Warning [errmess];
-                        exit [];
-                    endif
-                    options = tag [OPT_TAGS, [RUN_MODES(2), '/tmp', outname, inname,
-                        [], [], [], [], []]];
-                    qms_SaveEnv [qmskey, recset, ligand, options];
-
+                    options = tag [OPT_TAGS, [vals.mode, 
+                        fabsname vals.workdir, fabsname vals.scoredb,
+                        fabsname vals.posedb, fabsname vals.recdb, vals.ham,
+                        vals.freq, vals.opt, []]];
+                    qmskey = SetUpRun [options];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
 
-                    qms_ScoreBatch [absoutname];
+//                    qms_ScoreBatch [vals.scoredb];
 
                     exit [];
                 else
-                    WindowDestroy wkey;
-                    wkey = 0;
+                    break;
                 endif
-
-            elseif vals.panel === 'Cancel' then 
-                WindowDestroy wkey;
-                wkey = 0;
             endif
         endif
     endloop
+
+    task_kill browsetasks;
+    WindowDestroy wkey;
 
 endfunction
