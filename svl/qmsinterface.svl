@@ -5,12 +5,15 @@
 #set version '2009.01'
 #set main 'qms_Score'
 
+/*  NOTE:  If you change the Key lists here, you need to update the
+ *         Option lists and default indices in qmspanel.svl.
+ */
+
 const HAM_KEYS =
     [
     'AM1',
     'MNDO',
     'MNDOD',
-    'MNDO_NMR',
     'PDDGPM3',
     'PM3',
     'PM6'
@@ -18,22 +21,33 @@ const HAM_KEYS =
 
 const LIG_KEYS =
     [
-    'COMPLEXOPT',
+    'NOOPT',
     'LIGOPT',
-    'NOOPT'
+    'COMPLEXOPT'
     ];
 
 global function qms_Score [receptor_mols, ligand_mol, opts]
 
+local errmess = '';
+local workdir;
 local subdirname;
+if opts.pwd === 1 then
+    workdir = getenv 'PWD';
+else
+    workdir = opts.workdir;
+endif
+
+    write ['Work Dir:  {}\n', workdir];  //DEBUG
+
 if opts.task === [] then
     subdirname = opts.workdir;
 else
     subdirname = twrite ['{}/qb_out{n:}', opts.workdir, opts.task];
     local okay = _fmkdir subdirname;
-    if okay === -1 then 
-        write ['Unable to create subdirectory:  {}', subdirname];
-        return [];
+    if okay === -1 then
+        errmess = twrite ['Unable to create subdirectory:  {}',
+            subdirname];
+        return [[], errmess];
     endif
 endif
 
@@ -49,24 +63,18 @@ exe_setpriority [process_keys, prios];
 
 local stdin = exe_stdin process_keys;
 local stdout = exe_stdout process_keys;
-//local stderr = exe_stderr process_keys;
 
 //  Pass the two backbones to QuantumBio's Divcon QM Score
 //
 //  SplitReceptor ensures that there is only one chain per molecule
 //  in the receptor collection.
 
-local retValue;
+local retValue, success = 0;
 local mol, molIndex, molCount, residueIndex, residueCount, atomIndex, atomCount;
 molCount = length receptor_mols;
 fwrite [stdin, '{c:}\n', HAM_KEYS(opts.ham)];
 fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', opts.freq]];
 fwrite [stdin, '{c:}\n', LIG_KEYS(opts.opt)];
-
-write ['{}\n', HAM_KEYS(opts.ham)];
-write ['{}\n', select ['FREQ', 'NOFREQ', opts.freq]];
-write ['{}\n', LIG_KEYS(opts.opt)];
-
 fwrite [stdin, '{n:}\n', molCount];
 for molIndex = 1, molCount, 1 loop
     mol = receptor_mols(molIndex);
@@ -126,7 +134,7 @@ while exe_status process_key loop
     sleep_time = min [1, sleep_time + sleep_inc];
     [[return_statement]] = fread [stdout, '{c:*}'];
 
-    print return_statement;
+    write ['Divcon: {}\n', return_statement];//DEBUG
 
     if return_statement === "updatescore" then
         local name, nameValue;
@@ -139,7 +147,10 @@ while exe_status process_key loop
             [[parameterValue]] = fread [stdout, '{n:}'];
             results = cat [results, [[parameter, parameterValue]]];
         endloop
+        success = 1;
         fwrite [stdin, '{c:}\n', 'Ok'];
+    else
+        errmess = return_statement;
     endif
 endloop
 
@@ -156,9 +167,12 @@ if ftype fname === 'file' then
     templist = cat [templist, fname];
 endif
 
-//fdelete templist;
+//fdelete templist;//DEBUG
 
-return results;
-
+if success === 1 then
+    return [results, ''];
+else
+    return [[], errmess];
+endif
 endfunction
 
