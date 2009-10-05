@@ -11,28 +11,26 @@ function qms_GetPoseField;
 function qms_GetRecField;
 function qms_GetOptions;
 function qms_GetEnv;
-function qms_SaveErr;
+function qms_SaveStatus;
 function qms_SaveScore;
 function qms_Score;
 
-
 global function qms_ScoreBatch [dbpath]
 
-    local dbkey = db_Open [dbpath, 'read-write'];
+    if not MOE_BATCH then return; endif
 
     //  Extract molecules and run options from the database environment
+    local dbkey = db_Open [dbpath, 'read-write'];
     local [recmols, ligmol, options] = qms_GetEnv [dbkey];
 
-
-    //  For each ligand pose in the database, calculate QM score
+    //  For each ligand pose in the database, calculate QM score.
     local rowkey = 0, count = 0;
     local total = db_nEntries (dbkey);
     local posefld = qms_GetPoseField [dbkey];
     local recfld = qms_GetRecField [dbkey];
     local tid = task_key -1;
-
     loop
-        if count == 0 or rowkey <> 0 then
+        if count === 0 or rowkey <> 0 then
             rowkey = db_NextEntry [dbkey, rowkey];
         endif
 
@@ -44,66 +42,46 @@ global function qms_ScoreBatch [dbpath]
             if options.mode === 'Many-to-Many' then
                 recmols = db_ReadFields [dbkey, rowkey, [recfld]];
             endif
-
-            write ['Pose {} of {}:  key {}\n', count, total, rowkey];
         endif
 
-        local [results, code, seqno, indkey] = mpu_batch [
-            select ['', 'call', rowkey == 0],
-            'qms_Score', [recmols, posemol, options], [count, rowkey, tid]];
+        local [[results, errmess], code, seqno, indkey] = mpu_batch [
+            select ['', 'call', rowkey === 0],
+            'qms_Score', [recmols, posemol, options], [rowkey, tid]];
 
-        if code == '' then
-            if neL [tid, indkey(3)] then
+        if rowkey <> 0 then
+            write ['Scoring pose {} of {}\n', count, total];
+        endif
+
+        if code === '' then
+            if neL [tid, indkey(2)] then
                 exit 'MPU/task conflict, aborting calculation.';
             endif
 
-            qms_SaveScore [dbkey, indkey(2), results];
-            qms_SaveErr [dbkey, indkey(2), swrite ['Task {}, Key {}',
-                indkey(1), indkey(2)]];
+            if results === [] then
+                if errmess === [] or errmess === '' then
+                    errmess = "Unknown error!";
+                endif
+                qms_SaveStatus [dbkey, indkey(1), 
+                  swrite ['Error:  {}', errmess]];
+                write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
+            else
+                qms_SaveScore [dbkey, indkey(1), results];
+                qms_SaveStatus [dbkey, indkey(1), "Success"];
+            endif
 
-        elseif code == 'error' then
-            qms_SaveErr [dbkey, indkey(2), 
-                swrite ['*** Error on pose {} (dbkey {}):  {}\n', 
-                indkey(1), indkey(2), results]];
+        elseif code === 'error' then
+            if errmess === [] or errmess === '' then
+                errmess = "Unknown error!";
+            endif
+            qms_SaveStatus [dbkey, indkey(1), 
+                swrite ['Error:  {}', errmess]];
 
-                write ['*** Error on pose {} (dbkey {}):  {}\n', 
-                    indkey(1), indkey(2), results];
+            write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
         endif
 
-    until code == 'eof'
-
+    until code === 'eof'
     endloop
 
     db_Close dbkey;
 
-
 endfunction
-
-#if 0
-    local ligpose = [];
-    local mess = 0;
-
-    //  If executing MOE, show feedback of job
-    if not MOE_BATCH then local pdata = SystemPush []; endif
-
-        if not MOE_BATCH then
-            if not ligpose === [] then oDestroy [ligpose]; endif
-       endif
-
-    if not MOE_BATCH then Close [force:1]; endif
-    local target = app mol_Create recmols;
-    local ligand = mol_Create ligmol;
-    View [];
-
-            ligpose = mol_Create posemol;
-            View [];
-
-            mess = Message [mess, token swrite ['Scoring ligand {} of {}.',
-                count, total]];
-
-    if not MOE_BATCH then SystemPop pdata; endif
-
-#endif
-
-
-

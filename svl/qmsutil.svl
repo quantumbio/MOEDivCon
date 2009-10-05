@@ -57,10 +57,15 @@ const OPTIONS = 'options';
  ****************************************************************************/
 global function qms_CopyPoseDB [resultskey, poseskey]
 
+    local mess = '';
     local [fields, ftypes] = db_Fields poseskey;
     local molfield = fields | (ftypes == 'molecule');
 
-    if 1 <> length molfield then return 0; endif
+    if 1 <> length molfield then
+        mess = 'The poses database has\n'
+            'more than one molecule field.';
+        return mess;
+    endif
 
     //  HACK alert:  temporarily renames mol field to make copying easier
     db_RenameField [resultskey, DB_FIELDS(1), molfield];
@@ -75,7 +80,7 @@ global function qms_CopyPoseDB [resultskey, poseskey]
 
     db_RenameField [resultskey, molfield, DB_FIELDS(1)];
 
-    return 1;
+    return mess;
 endfunction
 
 /****************************************************************************
@@ -88,11 +93,20 @@ endfunction
 ****************************************************************************/
 global function qms_CopyRecPoseDB [resultskey, recskey, poseskey]
 
-    if db_nEntries recskey <> db_nEntries poseskey then return 0; endif
+    local mess = '';
+    if db_nEntries recskey <> db_nEntries poseskey then
+        mess = 'The receptor and pose databases\n'
+            'have different number of entries.';
+        return mess;
+    endif
 
     local [recfields, recftypes] = db_Fields recskey;
     local recmolfield = recfields | (recftypes == 'molecule');
-    if 1 <> length recmolfield then return 0; endif
+    if 1 <> length recmolfield then
+        mess = 'The ligand poses database has\n'
+            'more than one molecule field.';
+        return mess;
+    endif
 
     db_RenameField [resultskey, REC_FIELD, recmolfield];
     apt db_EnsureField [resultskey, recfields, recftypes];
@@ -107,7 +121,11 @@ global function qms_CopyRecPoseDB [resultskey, recskey, poseskey]
 
     local [posefields, poseftypes] = db_Fields poseskey;
     local posemolfield = posefields | (poseftypes == 'molecule');
-    if 1 <> length posemolfield then return 0; endif
+    if 1 <> length posemolfield then
+        mess = 'The pose database has\n'
+            'more than one molecule field.';
+        return mess;
+    endif
 
     db_RenameField [resultskey, DB_FIELDS(1), posemolfield];
     apt db_EnsureField [resultskey, posefields, poseftypes];
@@ -122,7 +140,7 @@ global function qms_CopyRecPoseDB [resultskey, recskey, poseskey]
 
     db_RenameField [resultskey, posemolfield, DB_FIELDS(1)];
 
-    return 1;
+    return mess;
 endfunction
 
 /****************************************************************************
@@ -183,15 +201,17 @@ global function qms_SaveDBRow [mdbkey, rowkey, ligand, scoredata]
 endfunction
 
 /****************************************************************************
- *                          qms_SaveErr
+ *                          qms_SaveEnv
  *
- *  Save the error/status message for the given row.
+ *  Save the molecules (ligand and receptor) and options in the QMScore
+ *  database.
  *
  ****************************************************************************/
-global function qms_SaveErr [dbkey, rowkey, message]
+global function qms_SaveEnv [dbkey, tgtmols, ligmol, options]
 
-    local fielddata = tag [ERR_FIELD, [message]];
-    db_Write [dbkey, rowkey, fielddata];
+    db_SetEnv [dbkey, TARGET, twrite ['{v}', tgtmols]];
+    db_SetEnv [dbkey, LIGAND, twrite ['{v}', ligmol]];
+    db_SetEnv [dbkey, OPTIONS, twrite ['{v}', options]];
 
 endfunction
 
@@ -211,17 +231,15 @@ global function qms_SaveScore [mdbkey, rowkey, scoredata]
 endfunction
 
 /****************************************************************************
- *                          qms_SaveEnv
+ *                          qms_SaveStatus
  *
- *  Save the molecules (ligand and receptor) and options in the QMScore
- *  database.
+ *  Save the error/status message for the given row.
  *
  ****************************************************************************/
-global function qms_SaveEnv [dbkey, tgtmols, ligmol, options]
+global function qms_SaveStatus [dbkey, rowkey, message]
 
-    db_SetEnv [dbkey, TARGET, twrite ['{v}', tgtmols]];
-    db_SetEnv [dbkey, LIGAND, twrite ['{v}', ligmol]];
-    db_SetEnv [dbkey, OPTIONS, twrite ['{v}', options]];
+    local fielddata = tag [ERR_FIELD, [message]];
+    db_Write [dbkey, rowkey, fielddata];
 
 endfunction
 

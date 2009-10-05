@@ -13,6 +13,7 @@ function qms_CopyRecPoseDB;
 function qms_GetEnv;
 function qms_GetPoseField;
 function qms_SaveScore;
+function qms_SaveStatus;
 function qms_SaveEnv;
 function qms_SetErrField;
 function qms_SetFields;
@@ -24,6 +25,7 @@ function qms_ScoreBatch;
 const OPT_TAGS =
     [
     'mode',
+    'pwd',
     'workdir',
     'scoredb',
     'posedb',
@@ -33,6 +35,10 @@ const OPT_TAGS =
     'opt',
     'task'
     ];
+
+/*  NOTE:  If you change the Option lists here, you need to update the
+ *         default indices below and the Keys in qmsinterface.svl.
+ */
 
 const RUN_MODES =
     [
@@ -46,7 +52,6 @@ const HAMILTONIANS =
     'AM1',
     'MNDO',
     'MNDO/d',
-    'MNDO/NMR',
     'PDDG-PM3',
     'PM3',
     'PM6'
@@ -54,9 +59,9 @@ const HAMILTONIANS =
 
 const LIG_OPTS =
     [
-    'in complex',
+    'none',
     'in isolation',
-    'none'
+    'in complex'
     ];
 
 /****************************************************************************
@@ -87,7 +92,7 @@ endfunction
 local function ChainsToMols []
 
     local complexatoms = Atoms [];
-    if length complexatoms == 0 then
+    if length complexatoms === 0 then
         return [[], [], 'No molecular complex loaded'];
     endif
 
@@ -100,12 +105,12 @@ local function ChainsToMols []
         ligatoms = join [ligatoms, complexatoms];
     endif
 
-    if length ligatoms == 0 then
+    if length ligatoms === 0 then
         ligatoms  = _Atoms '$$ligand';
     endif
 
-    if length ligatoms == 0 or length ligatoms >= length complexatoms then
-        return [[], [], 'No ligand was recognized.  Use LigX to define it.'];
+    if length ligatoms === 0 or length ligatoms >= length complexatoms then
+        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
     endif
 
     if 1 <> length uniq aMoleculeNumber ligatoms then
@@ -161,8 +166,8 @@ local function SetUpRun [opts]
 
     else
         local posekey = db_Open [opts.posedb, 'read'];
-        if qmskey == posekey then
-            Warning token swrite ['{} and {} are the same database', 
+        if qmskey === posekey then
+            Warning twrite ['{} and {}\n are the same database', 
                 opts.scoredb, opts.posedb];
             exit [];
         endif
@@ -171,8 +176,8 @@ local function SetUpRun [opts]
             qms_CopyPoseDB [qmskey, posekey];
         else
             local reckey = db_Open [opts.recdb, 'read'];
-            if qmskey == reckey then
-                Warning token swrite ['{} and {} are the same database', 
+            if qmskey === reckey then
+                Warning twrite ['{} and {}\n are the same database', 
                     opts.scoredb, opts.recdb];
                 exit [];
             endif
@@ -208,8 +213,9 @@ global function qms_SetupPanel [cfg, parent]
         windowName: 'QMScorePanel',
         text: ['Run', 'Save', 'Cancel'],
         onTrigger: ['validate', 'validate', 'return'],
-        bubbleHelp: ['Execute QMScore from MOE',
-            'Save run parameters in database for later execution on cluster.', ''],
+        bubbleHelp: ['Execute QMScore from MOE Window.',
+            'Save run parameters in database\n'
+            'for later execution on cluster.', ''],
 
         Hbox :
             [
@@ -234,41 +240,62 @@ global function qms_SetupPanel [cfg, parent]
                 [
                 name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
                 type: 'char', allowBlank: 0, onTrigger: 'return',
+                shortcut: ['~', '~/tmp', '.', '/tmp'],
                 bubbleHelp:
                     'The name of the working directory for storing\n'
-                    'QB Divcon intermediate calculations.'
+                    'QB Divcon intermediate calculations.  The\n'
+                    'absolute path to the specified directory will\n'
+                    'be stored and used at execution time.'
                 ],
-            Button : [ name: 'browse_workdir', text: 'Browse...' ]
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Checkbox :
+                [
+                name: 'pwd', text: 'Use PWD', onTrigger: 'return', 
+                bubbleHelp:
+                    'Use the PWD environment variable at\n'
+                    'run time to determine working directory.'
+                ]
             ],
 
         Vbox :
             [
+            Option :
+                [
+                name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
+                type: 'int', minWidth: 11,
+                bubbleHelp:
+                    ''
+                ],
             Hbox :
                 [
                 extendH: 1,
                 Option :
                     [
-                    name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
-                    type: 'int', minWidth: 8, extendH: 1,
+                    name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
+                    type: 'int', minWidth: 11, extendH: 1,
                     bubbleHelp:
-                        'TODO.'
+                        'A QM-based ligand optimization can be performed\n'
+                        'prior to scoring. This optimization may occur\n'
+                        'either while the ligand is docked within the target\n'
+                        'or while the ligand is separate from the target.\n'
+                        'Warning: this optional step will significantly\n'
+                        'increase the CPU cost of the calculation.'
+                    ],
+                Separator : 
+                    [
+                    vertical:0, shadow:'noline', extendH: 1, margin:1
                     ],
                 Checkbox :
                     [
                     name: 'freq', text: 'Frequency',
                     bubbleHelp:
-                         'TODO.\n'
-                        'The vibrational entropy calculation is computationally\n'
-                        'intensive and using the frequency option can easily\n'
-                        'double the execution time.'
+                        'Perform frequency calculation to determine ligand\n'
+                        'entropy in score function.  Warning: may increase\n'
+                        'CPU cost of the calculation.'
                     ]
-                ],
-            Option :
-                [
-                name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
-                type: 'int', minWidth: 11, extendH: 1,
-                bubbleHelp:
-                    'TODO.'
                 ]
             ],
 
@@ -283,7 +310,10 @@ global function qms_SetupPanel [cfg, parent]
                 extendH: 1, onTrigger: 'return', title: 'Mapping Mode:',
                 type: 'char',
                 bubbleHelp:
-                    'The mapping mode of receptors to ligand/poses.'
+                    'The mapping mode of receptors to ligand/poses:\n'
+                    '  One ligand docked into one receptor.\n'
+                    '  Many ligand poses docked into the same receptor.\n'
+                    '  Many ligand poses docked into its own receptor.'
                 ]
             ],
 
@@ -320,13 +350,41 @@ global function qms_SetupPanel [cfg, parent]
 
     // ---------------------- embedded functions begin ----------------------
 
+    function CheckWD [dirname]
+        local wdpath = fabsname dirname;
+        local ft = ftype wdpath;
+        if ft === '' then
+            Warning twrite ['{}\n does not exist.', wdpath];
+            return 0;
+        elseif ft === 'dir' then
+            return 1;
+        endif
+
+        Warning twrite ['{}\n is not a directory.', wdpath];
+        return 0;
+    endfunction
+
     function RunCalc [dbkey]
         local msgkey = Message [0, 'QMScore is running ...'];
         sleep -1;    // Allow parent to close input window.
 
         local [recset, ligand, options] = qms_GetEnv [dbkey];
-        local results = qms_Score [recset, ligand, options];
-        qms_SaveScore [dbkey, first db_Entries [dbkey], results];
+        local [results, errmess] = qms_Score [recset, ligand, options];
+
+        local rowkey = first db_Entries [dbkey];
+        if results === [] then
+            if errmess === [] or errmess === '' then
+                qms_SaveStatus [dbkey, rowkey, "Error:  Unknown error!"];
+                write ['QMScore Error:  Unknown error!\n'];
+            else
+                qms_SaveStatus [dbkey, rowkey, 
+                    swrite ['Error:  {}', errmess]];
+                write ['QMScore Error:  {}\n', errmess];
+            endif
+        else
+            qms_SaveScore [dbkey, rowkey, results];
+            qms_SaveStatus [dbkey, rowkey, "Success"];
+        endif
 
         Message [msgkey, 'QMScore is done.'];
 
@@ -338,10 +396,14 @@ global function qms_SetupPanel [cfg, parent]
     local btid, browsetasks = [];
     local options = []; 
     local qmskey = 0;
+    local prevwd = '';
 
-    WindowSetData [wkey, [scoredb: 'qmscore.mdb', freq: 0, workdir: '.']];
-    WindowSetAttr [wkey, [posebox: [sensitive: 0], posedb: [allowBlank: 1],
-         freq: [sensitive: 0], recbox: [sensitive: 0], recdb: [allowBlank: 1]]];
+    WindowSetData [wkey, [scoredb: 'qmscore.mdb', pwd:0, workdir: '~',
+        ham: 5, opt:1, freq: 0]];
+    WindowSetAttr [wkey, [freq: [sensitive: 0],
+         workdir: [sensitive: 1, allowBlank: 0],
+         posebox: [sensitive: 0], posedb: [allowBlank: 1],
+         recbox: [sensitive: 0], recdb: [allowBlank: 1]]];
 
     WindowShow [wkey, 1];
     loop
@@ -361,29 +423,31 @@ global function qms_SetupPanel [cfg, parent]
                     recdb: [allowBlank: 0], panel:[sensitive: [0,1,1]]]];
             endif
 
-        elseif trig === 'workdir' then
-            local wdpath = fabsname vals.workdir;
-            if not ftype wdpath === 'dir' then
-                Warning token swrite ['{} is not a directory.', wdpath];
-                continue;
+        elseif trig === 'pwd' then
+            if vals.pwd === 1 then
+                prevwd = vals.workdir;
+                WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
+                WindowSetData [wkey, [workdir: '']];
+            else
+                WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0]]];
+                WindowSetData [wkey, [workdir: prevwd]];
             endif
 
-        elseif trig == 'browse_scoredb' then
+        elseif trig === 'workdir' then
+            local flag = CheckWD [vals.workdir];
+            if not flag then continue; endif
+
+        elseif trig === 'browse_scoredb' then
             btid = run ['fbrowse.svl', [trig, wkey, 'Select QMScore DB File', 
                 'none', '*.mdb', 'scoredb']];
         if btid then browsetasks = append [browsetasks, btid]; endif
 
-         elseif trig == 'browse_workdir' then
-            btid = run ['fbrowse.svl', [trig, wkey, 'Select Working Directory', 
-                'none', '*', 'workdir']];
-        if btid then browsetasks = append [browsetasks, btid]; endif
-
-        elseif trig == 'browse_posedb' then
+        elseif trig === 'browse_posedb' then
             btid = run ['fbrowse.svl', [trig, wkey, 'Select Pose DB File', 
                 'open', '*.mdb', 'posedb']];
         if btid then browsetasks = append [browsetasks, btid]; endif
 
-        elseif trig == 'browse_recdb' then
+        elseif trig === 'browse_recdb' then
             btid = run ['fbrowse.svl', [trig, wkey, 'Select Receptor DB File', 
                 'open', '*.mdb', 'recdb']];
         if btid then browsetasks = append [browsetasks, btid]; endif
@@ -394,10 +458,12 @@ global function qms_SetupPanel [cfg, parent]
                 break;
 
             elseif vals.panel === 'Run' then
-                if second task_fork [] == 'child' then
+                if not istrue CheckWD [vals.workdir] then continue; endif
+
+                if second task_fork [] === 'child' then
                     task_settitle [-1, tskttl];
 
-                    options = tag [OPT_TAGS, [vals.mode, 
+                    options = tag [OPT_TAGS, [vals.mode, vals.pwd,
                       fabsname vals.workdir, fabsname vals.scoredb, [], [],
                       vals.ham, vals.freq, vals.opt, []]];
 
@@ -411,19 +477,18 @@ global function qms_SetupPanel [cfg, parent]
                 endif
 
             elseif vals.panel === 'Save' then
-                if second task_fork [] == 'child' then
+                if not istrue CheckWD [vals.workdir] then continue; endif
+
+                if second task_fork [] === 'child' then
                     task_settitle [-1, tskttl];
 
-                    options = tag [OPT_TAGS, [vals.mode, 
+                    options = tag [OPT_TAGS, [vals.mode, vals.pwd,
                         fabsname vals.workdir, fabsname vals.scoredb,
                         fabsname vals.posedb, fabsname vals.recdb, vals.ham,
                         vals.freq, vals.opt, []]];
                     qmskey = SetUpRun [options];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
-
-//                    qms_ScoreBatch [vals.scoredb];
-
                     exit [];
                 else
                     break;
