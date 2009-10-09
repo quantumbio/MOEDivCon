@@ -1,0 +1,29 @@
+#!/bin/bash
+#PBS -S /bin/bash
+#  Warning:  the number of processors (nodes * ppn) should not exceed the
+#  number of available MOE licenses.
+#PBS -l nodes=6:ppn=2
+#PBS -j oe
+
+hostname
+date
+cat $PBS_NODEFILE
+
+# Change the paths and name for the MOE database for your local file system.
+cd $PBS_O_WORKDIR
+USER_DATADB="$PWD/qmscore.mdb"
+USER_ENV="$HOME/moedivcon.bash"
+
+# Set up the environment for moebatch since it often forks a child process to
+# execute some of the tasks.
+source $USER_ENV
+
+# Generate the MOE machine file from the PBS list of processors.
+rm -f moedivcon_machinefile
+for mach in $( cat $PBS_NODEFILE ); do
+   echo "localhost ssh $mach 'source $USER_ENV; moebatch -mpu -'" >> moedivcon_machinefile
+done
+echo "\$eof" >> moedivcon_machinefile
+
+moebatch -mpu moedivcon_machinefile -exec "run ['$MOE_SVL_LOAD/qmsbatch.svl', ['$USER_DATADB']]" -exit
+
