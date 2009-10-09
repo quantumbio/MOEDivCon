@@ -1,0 +1,29 @@
+#!/bin/csh
+#$ -S /bin/csh
+#$ -cwd
+#$ -o job1.out
+#$ -e job1.err
+#  Warning:  the number of processors (-pe 8) should not exceed the
+#  number of available MOE licenses
+#$ -pe low* 8
+
+hostname
+date
+cat $TMPDIR/machines
+
+# Change the paths and name for the MOE database for your local file system.
+set USER_DATADB="$PWD/qmscore.mdb"
+set USER_ENV="$HOME/moedivcon.csh"
+
+# Set up the environment for moebatch since it often forks a child process to
+# execute some of the tasks.
+source $USER_ENV
+
+# Generate the MOE machine file from the SGE list of processors.
+rm -f moedivcon_machinefile
+foreach mach (`cat $TMPDIR/machines`)
+   echo "localhost ssh $mach 'source $USER_ENV; moebatch -mpu -'" >>! moedivcon_machinefile
+end
+echo '$eof' >>! moedivcon_machinefile
+
+moebatch -mpu moedivcon_machinefile -exec "run ['$MOE_SVL_LOAD/qmsbatch.svl', ['$USER_DATADB']]" -exit

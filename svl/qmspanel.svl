@@ -6,7 +6,8 @@
 #set version '2009.01'
 #set main    'qms_SetupPanel'
 
-function _Atoms;
+
+function qb_AtomsToMols;
 
 function qms_CopyPoseDB;
 function qms_CopyRecPoseDB;
@@ -65,74 +66,6 @@ const LIG_OPTS =
     ];
 
 /****************************************************************************
- *                          SplitReceptor
- *
- ****************************************************************************/
-local function SplitReceptor [receptoratoms]
-
-    if receptoratoms === [] then return []; endif
-
-    local atomsets = [];
-    local [recidx, reccnt] = sac aMoleculeNumber receptoratoms;
-    if length reccnt > 1 then
-        receptoratoms = receptoratoms [recidx];
-        atomsets = split [receptoratoms, reccnt];
-    else
-        atomsets = [receptoratoms];
-    endif
-
-    return atomsets;
-
-endfunction
-
-/****************************************************************************
- *                          ChainsToMols
- *
- ****************************************************************************/
-local function ChainsToMols []
-
-    local complexatoms = Atoms [];
-    if length complexatoms === 0 then
-        return [[], [], 'No molecular complex loaded'];
-    endif
-
-    local recatoms, ligatoms;
-    const LIGXNAME = 'LIGX_LIGAND';
-    local colnames = oCollections [];
-
-    if anytrue eqE [LIGXNAME, colnames] then
-        ligatoms  = cat oAtoms oGetCollection LIGXNAME;
-        ligatoms = join [ligatoms, complexatoms];
-    endif
-
-    if length ligatoms === 0 then
-        ligatoms  = _Atoms '$$ligand';
-    endif
-
-    if length ligatoms === 0 or length ligatoms >= length complexatoms then
-        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
-    endif
-
-    if 1 <> length uniq aMoleculeNumber ligatoms then
-        return [[], [], 'Ligand has to be a single molecule.'];
-    endif
-
-    recatoms = diff [complexatoms, ligatoms];
-    local recsets = SplitReceptor [recatoms];
-
-    if recsets === [] then
-        return [[], [], 'No receptor was recognized.'];
-    endif
-
-    local ligmol = mol_Extract ligatoms;
-    local recmols = app mol_Extract recsets;
-
-    return [recmols, ligmol, []];
-
-endfunction
-
-
-/****************************************************************************
  *                          SetUpRun
  *
  *  Create the output database for storing QMScore results and ensure that
@@ -149,7 +82,7 @@ local function SetUpRun [opts]
     qms_SetFields [qmskey, opts.mode === 'Many-to-Many'];
 
     if opts.mode === 'One-to-One' or opts.mode === 'One-to-Many' then
-        local [recset, ligand, errmess] = ChainsToMols [];
+        local [recset, ligand, errmess] = qb_AtomsToMols [];
         if recset === [] or ligand === [] then
             Warning [errmess];
             exit [];
