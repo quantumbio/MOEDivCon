@@ -1,9 +1,9 @@
 #svl
 
-//    qmsutil.svl    Utilities to support QMScore data management
+//    qbutil.svl    Utilities to support data management
 
-#set title   'QMScore Utilities'
-#set class   'QM'
+#set title   'QuantumBio Utilities'
+#set class   'QuantumBio'
 #set version '2009.01'
 
 function _Atoms;
@@ -11,7 +11,11 @@ function _Atoms;
 
 //  Data fields are in the order in which they are returned by Divcon.
 
-const DATA_TAGS =
+const POSE_FIELD = 'Ligand/Pose';
+const REC_FIELD = 'Receptor';
+const STATUS_FIELD = 'Status';
+
+const QMS_DATA_TAGS =
     [
     "LIGAND",
     "TOTAL SCORE",
@@ -27,9 +31,9 @@ const DATA_TAGS =
     "MRM TOTAL ENERGY"
     ];
  
-const DB_FIELDS =
+const QMS_DB_FIELDS =
     [
-    'Ligand/Pose',
+    POSE_FIELD,
     'QMScore',
     'dHf_g',
     'Solv_elec',
@@ -43,8 +47,6 @@ const DB_FIELDS =
     'E_solvMRM'
     ];
 
-const REC_FIELD = 'Receptor';
-const ERR_FIELD = 'Status';
 
 // Environment tags
 const LIGAND = 'ligand';
@@ -131,12 +133,12 @@ endfunction
 
 
 /****************************************************************************
- *                          qms_CopyPoseDB
+ *                          qb_CopyPoseDB
  *
  *  Copy the Poses database into the QMScore output database.
  *
  ****************************************************************************/
-global function qms_CopyPoseDB [resultskey, poseskey]
+global function qb_CopyPoseDB [resultskey, poseskey]
 
     local mess = '';
     local [fields, ftypes] = db_Fields poseskey;
@@ -149,7 +151,7 @@ global function qms_CopyPoseDB [resultskey, poseskey]
     endif
 
     //  HACK alert:  temporarily renames mol field to make copying easier
-    db_RenameField [resultskey, DB_FIELDS(1), molfield];
+    db_RenameField [resultskey, POSE_FIELD, molfield];
     apt db_EnsureField [resultskey,  fields, ftypes];
 
     local rowkey = 0;
@@ -159,20 +161,20 @@ global function qms_CopyPoseDB [resultskey, poseskey]
         db_Write [resultskey, 0, rowdata];
     endloop
 
-    db_RenameField [resultskey, molfield, DB_FIELDS(1)];
+    db_RenameField [resultskey, molfield, POSE_FIELD];
 
     return mess;
 endfunction
 
 /****************************************************************************
- *                          qms_CopyRecPoseDB
+ *                          qb_CopyRecPoseDB
  *
  *  Copy the Receptors and Poses databases into the QMScore output database.
  *
  *  HACK alert:  temporarily renames mol fields to make copying easier.
  *
 ****************************************************************************/
-global function qms_CopyRecPoseDB [resultskey, recskey, poseskey]
+global function qb_CopyRecPoseDB [resultskey, recskey, poseskey]
 
     local mess = '';
     if db_nEntries recskey <> db_nEntries poseskey then
@@ -208,7 +210,7 @@ global function qms_CopyRecPoseDB [resultskey, recskey, poseskey]
         return mess;
     endif
 
-    db_RenameField [resultskey, DB_FIELDS(1), posemolfield];
+    db_RenameField [resultskey, POSE_FIELD, posemolfield];
     apt db_EnsureField [resultskey, posefields, poseftypes];
 
     local poserowkey = 0;
@@ -219,23 +221,23 @@ global function qms_CopyRecPoseDB [resultskey, recskey, poseskey]
         db_Write [resultskey, resultrowkey, poserowdata];
     endloop
 
-    db_RenameField [resultskey, posemolfield, DB_FIELDS(1)];
+    db_RenameField [resultskey, posemolfield, POSE_FIELD];
 
     return mess;
 endfunction
 
 /****************************************************************************
- *                          qms_GetPoseField
+ *                          qb_GetPoseField
  *
  ****************************************************************************/
 global function qms_GetPoseField []
 
-    return DB_FIELDS(1);
+    return POSE_FIELD;
 
 endfunction
 
 /****************************************************************************
- *                          qms_GetRecField
+ *                          qb_GetRecField
  *
  ****************************************************************************/
 global function qms_GetRecField []
@@ -246,7 +248,7 @@ endfunction
 
 
 /****************************************************************************
- *                          qms_GetEnv
+ *                          qb_GetEnv
  *
  *  Get the molecules (ligand and receptor) and options from the QMScore 
  *  database.
@@ -273,7 +275,7 @@ endfunction
 global function qms_SaveDBRow [mdbkey, rowkey, ligand, scoredata]
 
     if alltrue (DATA_TAGS === app first scoredata) then
-        local rowdata = tag [DB_FIELDS(1), [ligand]];
+        local rowdata = tag [POSE_FIELD, [ligand]];
         rowdata = cat [rowdata, tag [dropfirst DB_FIELDS, 
             dropfirst app second scoredata]];
         db_Write [mdbkey, rowkey, rowdata];
@@ -348,7 +350,7 @@ global function qms_SetFields [dbkey, addreceptor]
         db_EnsureField [dbkey, REC_FIELD, 'molecule'];
     endif
 
-    db_EnsureField [dbkey, DB_FIELDS(1), 'molecule'];
+    db_EnsureField [dbkey, POSE_FIELD, 'molecule'];
     apt db_EnsureField [dbkey, dropfirst DB_FIELDS, 'double'];
 
 endfunction
