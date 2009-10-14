@@ -1,26 +1,26 @@
 #svl
 //    qmspanel.svl    User-interface entrypoint to QMScore calculations
 
-#set title   'QMScore Panel'
-#set class   'QM'
+#set title   'QuantumBio QMScore Panel'
+#set class   'QuantumBio'
 #set version '2009.01'
-#set main    'qms_SetupPanel'
+#set main    'qb_QMScoreSetupPanel'
 
 
 function qb_AtomsToMols;
 
-function qms_CopyPoseDB;
-function qms_CopyRecPoseDB;
-function qms_GetEnv;
-function qms_GetPoseField;
-function qms_SaveScore;
-function qms_SaveStatus;
-function qms_SaveEnv;
-function qms_SetErrField;
-function qms_SetFields;
+function qb_CopyPoseDB;
+function qb_CopyRecPoseDB;
+function qb_GetEnv;
+function qb_GetPoseField;
+function qb_SaveQMScore;
+function qb_SaveStatus;
+function qb_SaveEnv;
+function qb_SetStatusField;
+function qb_SetQMScoreFields;
 
-function qms_Score;
-function qms_ScoreBatch;
+function qb_QMScore;
+function qb_QMScoreBatch;
 
 
 const OPT_TAGS =
@@ -65,6 +65,9 @@ const LIG_OPTS =
     'in complex'
     ];
 
+
+//  Local Functions
+
 /****************************************************************************
  *                          SetUpRun
  *
@@ -79,7 +82,7 @@ const LIG_OPTS =
 local function SetUpRun [opts]
 
     local qmskey = db_Open [opts.scoredb, 'create'];
-    qms_SetFields [qmskey, opts.mode === 'Many-to-Many'];
+    qb_SetQMScoreFields [qmskey, opts.mode === 'Many-to-Many'];
 
     if opts.mode === 'One-to-One' or opts.mode === 'One-to-Many' then
         local [recset, ligand, errmess] = qb_AtomsToMols [];
@@ -88,13 +91,13 @@ local function SetUpRun [opts]
             exit [];
         endif
 
-        qms_SaveEnv [qmskey, recset, ligand, opts];
+        qb_SaveEnv [qmskey, recset, ligand, opts];
     else
-        qms_SaveEnv [qmskey, [], [], opts];
+        qb_SaveEnv [qmskey, [], [], opts];
     endif
 
     if opts.mode === 'One-to-One' then
-        local posedata = tag [qms_GetPoseField [], [ligand]];
+        local posedata = tag [qb_GetPoseField [], [ligand]];
         db_Write [qmskey, 0, posedata];
 
     else
@@ -106,7 +109,7 @@ local function SetUpRun [opts]
         endif
 
         if opts.mode === 'One-to-Many' then
-            qms_CopyPoseDB [qmskey, posekey];
+            qb_CopyPoseDB [qmskey, posekey];
         else
             local reckey = db_Open [opts.recdb, 'read'];
             if qmskey === reckey then
@@ -115,29 +118,29 @@ local function SetUpRun [opts]
                 exit [];
             endif
 
-            qms_CopyRecPoseDB [qmskey, reckey, posekey];
+            qb_CopyRecPoseDB [qmskey, reckey, posekey];
             db_Close reckey;
         endif
 
         db_Close posekey;
     endif
 
-    qms_SetErrField [qmskey];
+    qb_SetStatusField [qmskey];
 
     return qmskey;
 endfunction
 
+//  Global Functions
+
 /****************************************************************************
  *
- *                          qms_SetupPanel
+ *                          qb_QMScoreSetupPanel
  *
  ****************************************************************************/
-global function qms_SetupPanel [cfg, parent]
+global function qb_QMScoreSetupPanel []
 
-    if MOE_BATCH then return [];
-    endif
-
-    parent = add parent;
+    if MOE_BATCH then return; endif
+    if WindowShow ['QMScorePanel', 1] then return; endif
 
     local wkey = WindowCreate
         [
@@ -301,22 +304,22 @@ global function qms_SetupPanel [cfg, parent]
         local msgkey = Message [0, 'QMScore is running ...'];
         sleep -1;    // Allow parent to close input window.
 
-        local [recset, ligand, options] = qms_GetEnv [dbkey];
-        local [results, errmess] = qms_Score [recset, ligand, options];
+        local [recset, ligand, options] = qb_GetEnv [dbkey];
+        local [results, errmess] = qb_QMScore [recset, ligand, options];
 
         local rowkey = first db_Entries [dbkey];
         if results === [] then
             if errmess === [] or errmess === '' then
-                qms_SaveStatus [dbkey, rowkey, "Error:  Unknown error!"];
+                qb_SaveStatus [dbkey, rowkey, "Error:  Unknown error!"];
                 write ['QMScore Error:  Unknown error!\n'];
             else
-                qms_SaveStatus [dbkey, rowkey, 
+                qb_SaveStatus [dbkey, rowkey, 
                     swrite ['Error:  {}', errmess]];
                 write ['QMScore Error:  {}\n', errmess];
             endif
         else
-            qms_SaveScore [dbkey, rowkey, results];
-            qms_SaveStatus [dbkey, rowkey, "Success"];
+            qb_SaveQMScore [dbkey, rowkey, results];
+            qb_SaveStatus [dbkey, rowkey, "Success"];
         endif
 
         Message [msgkey, 'QMScore is done.'];
@@ -393,7 +396,7 @@ global function qms_SetupPanel [cfg, parent]
             elseif vals.panel === 'Run' then
                 if not istrue CheckWD [vals.workdir] then continue; endif
 
-                if second task_fork [] === 'child' then
+                if second task_fork [prio:3, idle:0] === 'child' then
                     task_settitle [-1, tskttl];
 
                     options = tag [OPT_TAGS, [vals.mode, vals.pwd,

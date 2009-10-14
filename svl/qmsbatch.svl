@@ -2,32 +2,32 @@
 
 //    qmsbatch.svl    Executes QMScore calculations in batch mode
 
-#set title   'QMScore Batch'
-#set class   'QM'
+#set title   'QuantumBio QMScore Batch'
+#set class   'QuantumBio'
 #set version '2009.01'
-#set main    'qms_ScoreBatch'
+#set main    'qb_QMScoreBatch'
 
-function qms_GetPoseField;
-function qms_GetRecField;
-function qms_GetOptions;
-function qms_GetEnv;
-function qms_SaveStatus;
-function qms_SaveScore;
-function qms_Score;
+function qb_GetPoseField;
+function qb_GetRecField;
+function qb_GetOptions;
+function qb_GetEnv;
+function qb_SaveStatus;
+function qb_SaveQMScore;
+function qb_QMScore;
 
-global function qms_ScoreBatch [dbpath]
+global function qb_QMScoreBatch [dbpath]
 
     if not MOE_BATCH then return; endif
 
     //  Extract molecules and run options from the database environment
     local dbkey = db_Open [dbpath, 'read-write'];
-    local [recmols, ligmol, options] = qms_GetEnv [dbkey];
+    local [recmols, ligmol, options] = qb_GetEnv [dbkey];
 
     //  For each ligand pose in the database, calculate QM score.
     local rowkey = 0, count = 0;
     local total = db_nEntries (dbkey);
-    local posefld = qms_GetPoseField [dbkey];
-    local recfld = qms_GetRecField [dbkey];
+    local posefld = qb_GetPoseField [dbkey];
+    local recfld = qb_GetRecField [dbkey];
     local tid = task_key -1;
     loop
         if count === 0 or rowkey <> 0 then
@@ -46,7 +46,7 @@ global function qms_ScoreBatch [dbpath]
 
         local [[results, errmess], code, seqno, indkey] = mpu_batch [
             select ['', 'call', rowkey === 0],
-            'qms_Score', [recmols, posemol, options], [rowkey, tid]];
+            'qb_QMScore', [recmols, posemol, options], [rowkey, tid]];
 
         if rowkey <> 0 then
             write ['Scoring pose {} of {}\n', count, total];
@@ -61,19 +61,19 @@ global function qms_ScoreBatch [dbpath]
                 if errmess === [] or errmess === '' then
                     errmess = "Unknown error!";
                 endif
-                qms_SaveStatus [dbkey, indkey(1), 
+                qb_SaveStatus [dbkey, indkey(1), 
                   swrite ['Error:  {}', errmess]];
                 write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
             else
-                qms_SaveScore [dbkey, indkey(1), results];
-                qms_SaveStatus [dbkey, indkey(1), "Success"];
+                qb_SaveQMScore [dbkey, indkey(1), results];
+                qb_SaveStatus [dbkey, indkey(1), "Success"];
             endif
 
         elseif code === 'error' then
             if errmess === [] or errmess === '' then
                 errmess = "Unknown error!";
             endif
-            qms_SaveStatus [dbkey, indkey(1), 
+            qb_SaveStatus [dbkey, indkey(1), 
                 swrite ['Error:  {}', errmess]];
 
             write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];

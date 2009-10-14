@@ -1,9 +1,9 @@
 #svl
 
-#set title   'QMScore Interface'
-#set class   'QM'
+#set title   'QuantumBio QMScore Interface'
+#set class   'QuantumBio'
 #set version '2009.01'
-#set main 'qms_Score'
+#set main 'qb_QMScore'
 
 /*  NOTE:  If you change the Key lists here, you need to update the
  *         Option lists and default indices in qmspanel.svl.
@@ -26,9 +26,17 @@ const LIG_KEYS =
     'COMPLEXOPT'
     ];
 
-global function qms_Score [receptor_mols, ligand_mol, opts]
+global function qb_QMScore [receptor_mols, ligand_mol, opts]
 
-local errmess = '';
+/*
+local fp = fopenw '~daren/tmp/mols.txt';
+fwrite [fp, 'Ligand:  {v}\n\n', ligand_mol];
+fwrite [fp, 'Target:  {v}\n', receptor_mols];
+return [[], "Test"];
+fclose fp;
+*/
+
+local errmess = [];
 local workdir;
 local subdirname;
 if opts.pwd === 1 then
@@ -45,7 +53,7 @@ else
     subdirname = twrite ['{}/qb_out{n:}', opts.workdir, opts.task];
     local okay = _fmkdir subdirname;
     if okay === -1 then
-        errmess = twrite ['Unable to create subdirectory:  {}',
+        errmess = swrite ['Unable to create subdirectory:  {}',
             subdirname];
         return [[], errmess];
     endif
@@ -64,7 +72,7 @@ exe_setpriority [process_keys, prios];
 local stdin = exe_stdin process_keys;
 local stdout = exe_stdout process_keys;
 
-//  Pass the two backbones to QuantumBio's Divcon QM Score
+//  Pass the two backbones to QuantumBio's Divcon QMScore
 //
 //  SplitReceptor ensures that there is only one chain per molecule
 //  in the receptor collection.
@@ -76,16 +84,29 @@ fwrite [stdin, '{c:}\n', HAM_KEYS(opts.ham)];
 fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', opts.freq]];
 fwrite [stdin, '{c:}\n', LIG_KEYS(opts.opt)];
 fwrite [stdin, '{n:}\n', molCount];
+
+write ['{c:}\n', HAM_KEYS(opts.ham)];//DEBUG
+write ['{c:}\n', select ['FREQ', 'NOFREQ', opts.freq]];//DEBUG
+write ['{c:}\n', LIG_KEYS(opts.opt)];//DEBUG
+write ['{n:}\n', molCount];//DEBUG
+
 for molIndex = 1, molCount, 1 loop
     mol = receptor_mols(molIndex);
     atomIndex = 1;
     residueCount = mol(2)(MOL_CHAIN_NRES)(1);
     fwrite [stdin, '{n:}\n', residueCount];
+
+    write ['{n:}\n', residueCount];//DEBUG
+
     for residueIndex = 1, residueCount, 1 loop
         atomCount = mol(3)(MOL_RES_NATOMS)(residueIndex);
         fwrite [stdin, '{c:} {n:} {n:}\n', mol(3)(MOL_RES_NAME)(residueIndex),
             mol(3)(MOL_RES_UID)(residueIndex), atomCount];
-        for atomCount loop
+
+        write ['{c:} {n:} {n:}\n', mol(3)(MOL_RES_NAME)(residueIndex),//DEBUG
+            mol(3)(MOL_RES_UID)(residueIndex), atomCount];//DEBUG
+
+       for atomCount loop
             fwrite [stdin, '{c:} {c:} {n:.4f}\n',
                 mol(4)(MOL_ATOM_NAME)(atomIndex),
                 mol(4)(MOL_ATOM_EL)(atomIndex),
@@ -94,6 +115,16 @@ for molIndex = 1, molCount, 1 loop
                 mol(4)(MOL_ATOM_X)(atomIndex),
                 mol(4)(MOL_ATOM_Y)(atomIndex),
                 mol(4)(MOL_ATOM_Z)(atomIndex)];
+
+            write ['{c:} {c:} {n:.4f}\n',//DEBUG
+                mol(4)(MOL_ATOM_NAME)(atomIndex),//DEBUG
+                mol(4)(MOL_ATOM_EL)(atomIndex),//DEBUG
+                mol(4)(MOL_ATOM_CHARGE)(atomIndex)];//DEBUG
+            write ['{n:.4f} {n:.4f} {n:.4f}\n',//DEBUG
+                mol(4)(MOL_ATOM_X)(atomIndex),//DEBUG
+                mol(4)(MOL_ATOM_Y)(atomIndex),//DEBUG
+                mol(4)(MOL_ATOM_Z)(atomIndex)];//DEBUG
+
             atomIndex = atomIndex + 1;
         endloop
     endloop
@@ -149,8 +180,14 @@ while exe_status process_key loop
         endloop
         success = 1;
         fwrite [stdin, '{c:}\n', 'Ok'];
-    else
-        errmess = return_statement;
+
+    elseif return_statement === "QBException" then
+        [[return_statement]] = fread [stdout, '{c:*}'];
+        while neL [return_statement, "Divcon done."] loop
+            errmess = cat [errmess, return_statement];
+            [[return_statement]] = fread [stdout, '{c:*}'];
+        endloop;
+        fwrite [stdin, '{c:}\n', 'Ok'];
     endif
 endloop
 
@@ -170,7 +207,7 @@ endif
 //fdelete templist;//DEBUG
 
 if success === 1 then
-    return [results, ''];
+    return [results, []];
 else
     return [[], errmess];
 endif
