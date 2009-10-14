@@ -31,9 +31,8 @@ const QMS_DATA_TAGS =
     "MRM TOTAL ENERGY"
     ];
  
-const QMS_DB_FIELDS =
+const QMS_NUM_FIELDS =
     [
-    POSE_FIELD,
     'QMScore',
     'dHf_g',
     'Solv_elec',
@@ -47,6 +46,10 @@ const QMS_DB_FIELDS =
     'E_solvMRM'
     ];
 
+const NMR_NUM_FIELDS =
+    [
+    'NMRScore'
+    ];
 
 // Environment tags
 const LIGAND = 'ligand';
@@ -54,6 +57,46 @@ const TARGET = 'target';
 const OPTIONS = 'options';
 
 //  Local Functions
+
+/****************************************************************************
+ *                          SplitComplex
+ *
+ *  Split the set of atoms in the MOE Window into ligand and receptor atoms.
+ *
+ ****************************************************************************/
+local function SplitComplex []
+
+    local complexatoms = Atoms [];
+    if length complexatoms === 0 then
+        return [[], [], 'No molecular complex loaded in MOE Window.'];
+    endif
+
+    local recatoms, ligatoms;
+    const LIGXNAME = 'LIGX_LIGAND';
+    local colnames = oCollections [];
+
+    if anytrue eqE [LIGXNAME, colnames] then
+        ligatoms  = cat oAtoms oGetCollection LIGXNAME;
+        ligatoms = join [ligatoms, complexatoms];
+    endif
+
+    if length ligatoms === 0 then
+        ligatoms  = _Atoms '$$ligand';
+    endif
+
+    if length ligatoms === 0 or length ligatoms >= length complexatoms then
+        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
+    endif
+
+    if 1 <> length uniq aMoleculeNumber ligatoms then
+        return [[], [], 'Ligand has to be a single molecule.'];
+    endif
+
+    recatoms = diff [complexatoms, ligatoms];
+
+    return [recatoms, ligatoms, []];
+
+endfunction
 
 /****************************************************************************
  *                          SplitReceptor
@@ -91,33 +134,12 @@ endfunction
  ****************************************************************************/
 global function qb_AtomsToMols []
 
-    local complexatoms = Atoms [];
-    if length complexatoms === 0 then
-        return [[], [], 'No molecular complex loaded in MOE Window.'];
+    local [recatoms, ligatoms, errmess] = SplitComplex [];
+
+    if recatoms === [] or ligatoms === [] then
+        return [[], [], errmess];
     endif
 
-    local recatoms, ligatoms;
-    const LIGXNAME = 'LIGX_LIGAND';
-    local colnames = oCollections [];
-
-    if anytrue eqE [LIGXNAME, colnames] then
-        ligatoms  = cat oAtoms oGetCollection LIGXNAME;
-        ligatoms = join [ligatoms, complexatoms];
-    endif
-
-    if length ligatoms === 0 then
-        ligatoms  = _Atoms '$$ligand';
-    endif
-
-    if length ligatoms === 0 or length ligatoms >= length complexatoms then
-        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
-    endif
-
-    if 1 <> length uniq aMoleculeNumber ligatoms then
-        return [[], [], 'Ligand has to be a single molecule.'];
-    endif
-
-    recatoms = diff [complexatoms, ligatoms];
     local recsets = SplitReceptor [recatoms];
 
     if recsets === [] then
@@ -227,34 +249,65 @@ global function qb_CopyRecPoseDB [resultskey, recskey, poseskey]
 endfunction
 
 /****************************************************************************
- *                          qb_GetPoseField
+ *                          qb_CutReceptor
+ *
+ *  Given a pose database and radius, find all receptor atoms of the current
+ *  complex in the MOE window that are within the radius distance from each
+ *  pose, expand those atoms out to their respective residues, and return
+ *  the "molecules" formed by those atoms.
  *
  ****************************************************************************/
-global function qms_GetPoseField []
+global function qb_CutReceptor [posedbkey, radius]
 
-    return POSE_FIELD;
+    if radius <= 0 then
+        return [[], 'Radius must be greater than zero.'];
+    endif
+
+    local [recatoms, ligatoms, errmess] = SplitComplex [];
+
+    if recatoms === [] or ligatoms === [] then
+        return [[], errmess];
+    endif
+
+    //  Find neighboring atoms within radius
+    local cutset = [];
+    local subset;
+    for subset in split [x_id recatoms, 50] loop
+        local key = prox_open [radius, aPos recatoms[subset], radius/2];
+        local cutidx = uniq second prox_find [key, aPos ligatoms, radius/2];
+        prox_close key;
+        cutset = cat [cutset, subset[cutidx]];
+    endloop
+
+    if length cutset === 0 then
+        return [[], twrite ['No receptor atoms within radius {n:.1f}\n.'
+            'of ligand pose atoms.', radius]];
+    endif
+
+    local recsets = SplitReceptor [cutset];
+
+    local ligmol = mol_Extract ligatoms;
+    local recmols = app mol_Extract recsets;
+
+
+local fp = fopenw '~daren/tmp/mols.txt';
+fwrite [fp, 'Ligand:  {v}\n\n', ligmol];
+fwrite [fp, 'Target:  {v}\n', recmols];
+return [[], "Test"];
+fclose fp;
+
+    return [recmols, []];
 
 endfunction
-
-/****************************************************************************
- *                          qb_GetRecField
- *
- ****************************************************************************/
-global function qms_GetRecField []
-
-    return REC_FIELD;
-
-endfunction
-
 
 /****************************************************************************
  *                          qb_GetEnv
  *
- *  Get the molecules (ligand and receptor) and options from the QMScore 
+ *  Get the molecules (ligand and receptor) and options from the  
  *  database.
  *
  ****************************************************************************/
-global function qms_GetEnv [dbkey]
+global function qb_GetEnv [dbkey]
     local tgttok = db_GetEnv [dbkey, TARGET];
     local [[tgtmols]] = sread [string tgttok, '{v}'];
     local ligtok = db_GetEnv [dbkey, LIGAND];
@@ -267,30 +320,34 @@ global function qms_GetEnv [dbkey]
 endfunction
 
 /****************************************************************************
- *                          qms_SaveDBRow
- *
- *  Save a row of data in the QMScore database.
+ *                          qb_GetPoseField
  *
  ****************************************************************************/
-global function qms_SaveDBRow [mdbkey, rowkey, ligand, scoredata]
+global function qb_GetPoseField []
 
-    if alltrue (DATA_TAGS === app first scoredata) then
-        local rowdata = tag [POSE_FIELD, [ligand]];
-        rowdata = cat [rowdata, tag [dropfirst DB_FIELDS, 
-            dropfirst app second scoredata]];
-        db_Write [mdbkey, rowkey, rowdata];
-    endif
+    return POSE_FIELD;
 
 endfunction
 
 /****************************************************************************
- *                          qms_SaveEnv
+ *                          qb_GetRecField
  *
- *  Save the molecules (ligand and receptor) and options in the QMScore
+ ****************************************************************************/
+global function qb_GetRecField []
+
+    return REC_FIELD;
+
+endfunction
+
+
+/****************************************************************************
+ *                          qb_SaveEnv
+ *
+ *  Save the molecules (ligand and receptor) and options in the 
  *  database.
  *
  ****************************************************************************/
-global function qms_SaveEnv [dbkey, tgtmols, ligmol, options]
+global function qb_SaveEnv [dbkey, tgtmols, ligmol, options]
 
     db_SetEnv [dbkey, TARGET, twrite ['{v}', tgtmols]];
     db_SetEnv [dbkey, LIGAND, twrite ['{v}', ligmol]];
@@ -299,71 +356,99 @@ global function qms_SaveEnv [dbkey, tgtmols, ligmol, options]
 endfunction
 
 /****************************************************************************
- *                          qms_SaveScore
+ *                          qb_SaveNMRScore
+ *
+ *  Save just the score data in the NMRScore database.
+ *
+ ****************************************************************************/
+global function qb_SaveNMRScore [mdbkey, rowkey, scoredata, atomdata]
+    scoredata = cat [tag [NMR_NUM_FIELDS, scoredata], atomdata];
+    db_Write [mdbkey, rowkey, scoredata];
+
+endfunction
+
+/****************************************************************************
+ *                          qb_SaveQMScore
  *
  *  Save just the score data in the QMScore database.
  *
  ****************************************************************************/
-global function qms_SaveScore [mdbkey, rowkey, scoredata]
+global function qb_SaveQMScore [mdbkey, rowkey, scoredata]
 
-    if alltrue (DATA_TAGS === app first scoredata) then
-        db_Write [mdbkey, rowkey, tag [dropfirst DB_FIELDS, 
+    if alltrue (QMS_DATA_TAGS === app first scoredata) then
+        db_Write [mdbkey, rowkey, tag [QMS_NUM_FIELDS, 
             dropfirst app second scoredata]];
     endif
 
 endfunction
 
 /****************************************************************************
- *                          qms_SaveStatus
+ *                          qb_SaveStatus
  *
  *  Save the error/status message for the given row.
  *
  ****************************************************************************/
-global function qms_SaveStatus [dbkey, rowkey, message]
+global function qb_SaveStatus [dbkey, rowkey, message]
 
-    local fielddata = tag [ERR_FIELD, [message]];
+    local fielddata = tag [STATUS_FIELD, [message]];
     db_Write [dbkey, rowkey, fielddata];
 
 endfunction
 
 /****************************************************************************
- *                          qms_SetErrField
- *
- *  Ensure that the error/status field is present.
- *
- ****************************************************************************/
-global function qms_SetErrField [dbkey]
-
-    db_EnsureField [dbkey, ERR_FIELD, 'char'];
-
-endfunction
-
-/****************************************************************************
- *                          qms_SetFields
+ *                          qb_SetNMRScoreFields
  *
  *  Ensure that the required fields are present.
  *
  ****************************************************************************/
-global function qms_SetFields [dbkey, addreceptor]
+global function qb_SetNMRScoreFields [dbkey, addreceptor, atomnames]
 
     if addreceptor then
         db_EnsureField [dbkey, REC_FIELD, 'molecule'];
     endif
 
     db_EnsureField [dbkey, POSE_FIELD, 'molecule'];
-    apt db_EnsureField [dbkey, dropfirst DB_FIELDS, 'double'];
+    apt db_EnsureField [dbkey, atomnames, 'double'];
 
 endfunction
 
 /****************************************************************************
- *                          qms_SetRecField
+ *                          qb_SetQMScoreFields
+ *
+ *  Ensure that the required fields are present.
+ *
+ ****************************************************************************/
+global function qb_SetQMScoreFields [dbkey, addreceptor]
+
+    if addreceptor then
+        db_EnsureField [dbkey, REC_FIELD, 'molecule'];
+    endif
+
+    db_EnsureField [dbkey, POSE_FIELD, 'molecule'];
+    apt db_EnsureField [dbkey, QMS_NUM_FIELDS, 'double'];
+
+endfunction
+
+/****************************************************************************
+ *                          qb_SetRecField
  *
  *  Ensure that the receptor field is present.
  *
  ****************************************************************************/
-global function qms_SetRecField [dbkey]
+global function qb_SetRecField [dbkey]
 
     db_EnsureField [dbkey, REC_FIELD, 'moleclule'];
 
 endfunction
 
+/****************************************************************************
+ *                          qb_SetStatusField
+ *
+ *  Ensure that the error/status field is present.
+ *
+ ****************************************************************************/
+global function qb_SetStatusField [dbkey]
+
+    db_EnsureField [dbkey, STATUS_FIELD, 'char'];
+
+endfunction
