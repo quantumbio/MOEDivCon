@@ -1,26 +1,27 @@
 #svl
-//    qmspanel.svl    User-interface entrypoint to QMScore calculations
+//    nmrpanel.svl    User-interface entrypoint to NMRScore calculations
 
-#set title   'QuantumBio QMScore Panel'
+#set title   'QuantumBio NMRScore Panel'
 #set class   'QuantumBio'
 #set version '2009.01'
-#set main    'qb_QMScoreSetupPanel'
+#set main    'qb_NMRScoreSetupPanel'
 
 
 function qb_AtomsToMols;
 
 function qb_CopyPoseDB;
 function qb_CopyRecPoseDB;
+function qb_CutReceptor;
 function qb_GetEnv;
 function qb_GetPoseField;
-function qb_SaveQMScore;
+function qb_SaveNMRScore;
 function qb_SaveStatus;
 function qb_SaveEnv;
 function qb_SetStatusField;
-function qb_SetQMScoreFields;
+function qb_SetNMRScoreFields;
 
-function qb_QMScore;
-function qb_QMScoreBatch;
+function qb_NMRScore;
+function qb_NMRScoreBatch;
 
 
 const OPT_TAGS =
@@ -31,14 +32,13 @@ const OPT_TAGS =
     'scoredb',
     'posedb',
     'recdb',
-    'ham',
-    'freq',
+    'guess',
     'opt',
     'task'
     ];
 
 /*  NOTE:  If you change the Option lists here, you need to update the
- *         default indices below and the Keys in qmsinterface.svl.
+ *         default indices below and the Keys in nmrinterface.svl.
  */
 
 const RUN_MODES =
@@ -48,30 +48,19 @@ const RUN_MODES =
     'Many-to-Many'
     ];
 
-const HAMILTONIANS =
-    [
-    'AM1',
-    'MNDO',
-    'MNDO/d',
-    'PDDG-PM3',
-    'PM3',
-    'PM6'
-    ];
-
-const LIG_OPTS =
+const GEOM_OPTS =
     [
     'none',
-    'in isolation',
-    'in complex'
+    'H only',
+    'all'
     ];
-
 
 //  Local Functions
 
 /****************************************************************************
  *                          SetUpRun
  *
- *  Create the output database for storing QMScore results and ensure that
+ *  Create the output database for storing NMRScore results and ensure that
  *  the required fields are present.  Store the molecules and run options 
  *  in the DB environment.
  *
@@ -81,8 +70,8 @@ const LIG_OPTS =
  ****************************************************************************/
 local function SetUpRun [opts]
 
-    local qmskey = db_Open [opts.scoredb, 'create'];
-    qb_SetQMScoreFields [qmskey, opts.mode === 'Many-to-Many'];
+    local nmrkey = db_Open [opts.scoredb, 'create'];
+    qb_SetNMRScoreFields [nmrkey, opts.mode === 'Many-to-Many'];
 
     if opts.mode === 'One-to-One' or opts.mode === 'One-to-Many' then
         local [recset, ligand, errmess] = qb_AtomsToMols [];
@@ -91,67 +80,69 @@ local function SetUpRun [opts]
             exit [];
         endif
 
-        qb_SaveEnv [qmskey, recset, ligand, opts];
+        qb_SaveEnv [nmrkey, recset, ligand, opts];
     else
-        qb_SaveEnv [qmskey, [], [], opts];
+        qb_SaveEnv [nmrkey, [], [], opts];
     endif
 
     if opts.mode === 'One-to-One' then
         local posedata = tag [qb_GetPoseField [], [ligand]];
-        db_Write [qmskey, 0, posedata];
+        db_Write [nmrkey, 0, posedata];
 
     else
         local posekey = db_Open [opts.posedb, 'read'];
-        if qmskey === posekey then
+        if nmrkey === posekey then
             Warning twrite ['{} and {}\n are the same database', 
                 opts.scoredb, opts.posedb];
             exit [];
         endif
 
         if opts.mode === 'One-to-Many' then
-            qb_CopyPoseDB [qmskey, posekey];
+            qb_CopyPoseDB [nmrkey, posekey];
         else
             local reckey = db_Open [opts.recdb, 'read'];
-            if qmskey === reckey then
+            if nmrkey === reckey then
                 Warning twrite ['{} and {}\n are the same database', 
                     opts.scoredb, opts.recdb];
                 exit [];
             endif
 
-            qb_CopyRecPoseDB [qmskey, reckey, posekey];
+            qb_CopyRecPoseDB [nmrkey, reckey, posekey];
             db_Close reckey;
         endif
 
         db_Close posekey;
     endif
 
-    qb_SetStatusField [qmskey];
+    qb_SetStatusField [nmrkey];
 
-    return qmskey;
+    return nmrkey;
 endfunction
 
 //  Global Functions
 
 /****************************************************************************
  *
- *                          qb_QMScoreSetupPanel
+ *                          qb_NMRScoreSetupPanel
  *
  ****************************************************************************/
-global function qb_QMScoreSetupPanel []
+global function qb_NMRScoreSetupPanel []
 
     if MOE_BATCH then return; endif
-    if WindowShow ['QMScorePanel', 1] then return; endif
+    if WindowShow ['NMRScorePanel', 1] then return; endif
 
     local wkey = WindowCreate
         [
         name: 'panel', 
-        title: 'QMScore',
-        windowName: 'QMScorePanel',
-        text: ['Run', 'Save', 'Cancel'],
-        onTrigger: ['validate', 'validate', 'return'],
-        bubbleHelp: ['Execute QMScore from MOE Window.',
+        title: 'NMRScore',
+        windowName: 'NMRScorePanel',
+        text: ['Run', 'Save', 'Load', 'Cancel'],
+        onTrigger: ['validate', 'validate', 'return', 'return'],
+        bubbleHelp: ['Execute NMRScore from MOE Window.',
             'Save run parameters in database\n'
-            'for later execution on cluster.', ''],
+            'for later execution on cluster.', 
+            'Load run parameters from a NMRScore database.', 
+            ''],
 
         Hbox :
             [
@@ -196,45 +187,35 @@ global function qb_QMScoreSetupPanel []
                 ]
             ],
 
-        Vbox :
+        Hbox :
             [
+            extendH: 1,
             Option :
                 [
-                name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
-                type: 'int', minWidth: 11,
+                name: 'opt', title: 'Geometry Optimization:', 
+                text: GEOM_OPTS, type: 'int', minWidth: 11, extendH: 1,
                 bubbleHelp:
-                    ''
+                    'A NMR-based ligand optimization can be performed\n'
+                    'prior to scoring. This optimization may occur\n'
+                    'either while the ligand is docked within the target\n'
+                    'or while the ligand is separate from the target.\n'
+                    'Warning: this optional step will significantly\n'
+                    'increase the CPU cost of the calculation.'
                 ],
-            Hbox :
+            Separator : 
                 [
-                extendH: 1,
-                Option :
-                    [
-                    name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
-                    type: 'int', minWidth: 11, extendH: 1,
-                    bubbleHelp:
-                        'A QM-based ligand optimization can be performed\n'
-                        'prior to scoring. This optimization may occur\n'
-                        'either while the ligand is docked within the target\n'
-                        'or while the ligand is separate from the target.\n'
-                        'Warning: this optional step will significantly\n'
-                        'increase the CPU cost of the calculation.'
-                    ],
-                Separator : 
-                    [
-                    vertical:0, shadow:'noline', extendH: 1, margin:1
-                    ],
-                Checkbox :
-                    [
-                    name: 'freq', text: 'Frequency',
-                    bubbleHelp:
-                        'Perform frequency calculation to determine ligand\n'
-                        'entropy in score function.  Warning: may increase\n'
-                        'CPU cost of the calculation.'
-                    ]
+                vertical:0, shadow:'noline', extendH: 1, margin:1
+                ],
+            Checkbox :
+                [
+                name: 'guess', text: 'Guess',
+                bubbleHelp:
+                    'Perform Single Point calculation to\n'
+                    'initialize density matrix.\n'
+                    'Warning: may not always\n'
+                    'improve convergence.'
                 ]
             ],
-
 
         Separator : [flushLeft:1, extendH:1, margin:1],
 
@@ -301,28 +282,30 @@ global function qb_QMScoreSetupPanel []
     endfunction
 
     function RunCalc [dbkey]
-        local msgkey = Message [0, 'QMScore is running ...'];
+        local msgkey = Message [0, 'NMRScore is running ...'];
         sleep -1;    // Allow parent to close input window.
 
         local [recset, ligand, options] = qb_GetEnv [dbkey];
-        local [results, errmess] = qb_QMScore [recset, ligand, options];
+        local [results, errmess] = qb_NMRScore [recset, ligand, options];
 
         local rowkey = first db_Entries [dbkey];
         if results === [] then
             if errmess === [] or errmess === '' then
                 qb_SaveStatus [dbkey, rowkey, "Error:  Unknown error!"];
-                write ['QMScore Error:  Unknown error!\n'];
+                write ['NMRScore Error:  Unknown error!\n'];
             else
                 qb_SaveStatus [dbkey, rowkey, 
                     swrite ['Error:  {}', errmess]];
-                write ['QMScore Error:  {}\n', errmess];
+                write ['NMRScore Error:  {}\n', errmess];
             endif
         else
-            qb_SaveQMScore [dbkey, rowkey, results];
+            qb_SetNMRScoreFields [dbkey, 0, app first results];
+            qb_SaveNMRScore [dbkey, rowkey, 9.99, 
+                tag [app first results, app second results]];
             qb_SaveStatus [dbkey, rowkey, "Success"];
         endif
 
-        Message [msgkey, 'QMScore is done.'];
+        Message [msgkey, 'NMRScore is done.'];
 
         return;
     endfunction
@@ -331,12 +314,13 @@ global function qb_QMScoreSetupPanel []
 
     local btid, browsetasks = [];
     local options = []; 
-    local qmskey = 0;
+    local nmrkey = 0;
     local prevwd = '';
 
-    WindowSetData [wkey, [scoredb: 'qmscore.mdb', pwd:0, workdir: '~',
-        ham: 5, opt:1, freq: 0]];
-    WindowSetAttr [wkey, [freq: [sensitive: 0],
+    WindowSetData [wkey, [scoredb: 'nmrscore.mdb', pwd:0, workdir: '~',
+        opt:1, guess: 0]];
+    WindowSetAttr [wkey, [panel: [sensitive: [1,0,0,0]],
+         guess: [sensitive: 0], opt: [sensitive:0], mode: [sensitive:0],
          workdir: [sensitive: 1, allowBlank: 0],
          posebox: [sensitive: 0], posedb: [allowBlank: 1],
          recbox: [sensitive: 0], recdb: [allowBlank: 1]]];
@@ -348,15 +332,15 @@ global function qb_QMScoreSetupPanel []
             if vals.mode === 'One-to-One' then
                 WindowSetAttr [wkey, [posebox: [sensitive: 0],
                     posedb: [allowBlank: 1], recbox: [sensitive: 0], 
-                    recdb: [allowBlank: 1], panel:[sensitive: [1,1,1]]]];
+                    recdb: [allowBlank: 1], panel: [sensitive: [1,1,1,1]]]];
             elseif vals.mode === 'One-to-Many' then
                 WindowSetAttr [wkey, [posebox: [sensitive: 1],
                     posedb: [allowBlank: 0],recbox: [sensitive: 0], 
-                    recdb: [allowBlank: 1], panel:[sensitive: [0,1,1]]]];
+                    recdb: [allowBlank: 1], panel: [sensitive: [0,1,1,1]]]];
             elseif vals.mode === 'Many-to-Many' then
                 WindowSetAttr [wkey, [posebox: [sensitive: 1],
                     posedb: [allowBlank: 0], recbox: [sensitive: 1], 
-                    recdb: [allowBlank: 0], panel:[sensitive: [0,1,1]]]];
+                    recdb: [allowBlank: 0], panel: [sensitive: [0,1,1,1]]]];
             endif
 
         elseif trig === 'pwd' then
@@ -374,7 +358,7 @@ global function qb_QMScoreSetupPanel []
             if not flag then continue; endif
 
         elseif trig === 'browse_scoredb' then
-            btid = run ['fbrowse.svl', [trig, wkey, 'Select QMScore DB File', 
+            btid = run ['fbrowse.svl', [trig, wkey, 'Select NMRScore DB File', 
                 'none', '*.mdb', 'scoredb']];
         if btid then browsetasks = append [browsetasks, btid]; endif
 
@@ -392,18 +376,31 @@ global function qb_QMScoreSetupPanel []
             if vals.panel === 'Cancel' then 
                 break;
 
+            elseif vals.panel === 'Load' then 
+                if second task_fork [master: 'parent'] === 'child' then
+                    local dbpath = FilePrompt [title: 'Input Database', 
+                        filter: '*.mdb', allowEmptyList: 0];
+                    if not isnull dbpath then
+                         write ['Open database: {}\n', dbpath];
+                    endif
+
+                    qb_CutReceptor [0, 5.0];//DEBUG TEST
+
+                    exit [];
+                endif
+
             elseif vals.panel === 'Run' then
                 if not istrue CheckWD [vals.workdir] then continue; endif
 
                 if second task_fork [prio:3, idle:0] === 'child' then
                     options = tag [OPT_TAGS, [vals.mode, vals.pwd,
                       fabsname vals.workdir, fabsname vals.scoredb, [], [],
-                      vals.ham, vals.freq, vals.opt, []]];
+                      vals.guess, vals.opt, []]];
 
-                    qmskey = SetUpRun [options];
-                    RunCalc [qmskey];
-                    dbv_Open db_Filename qmskey;
-                    db_Close qmskey;
+                    nmrkey = SetUpRun [options];
+                    RunCalc [nmrkey];
+                    dbv_Open db_Filename nmrkey;
+                    db_Close nmrkey;
                     exit [];
                 else
                     break;
@@ -415,11 +412,11 @@ global function qb_QMScoreSetupPanel []
                 if second task_fork [] === 'child' then
                     options = tag [OPT_TAGS, [vals.mode, vals.pwd,
                         fabsname vals.workdir, fabsname vals.scoredb,
-                        fabsname vals.posedb, fabsname vals.recdb, vals.ham,
-                        vals.freq, vals.opt, []]];
-                    qmskey = SetUpRun [options];
-                    dbv_Open db_Filename qmskey;
-                    db_Close qmskey;
+                        fabsname vals.posedb, fabsname vals.recdb,
+                        vals.guess, vals.opt, []]];
+                    nmrkey = SetUpRun [options];
+                    dbv_Open db_Filename nmrkey;
+                    db_Close nmrkey;
                     exit [];
                 else
                     break;

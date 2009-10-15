@@ -1,32 +1,22 @@
 #svl
 
-#set title   'QuantumBio QMScore Interface'
+#set title   'QuantumBio NMRScore Interface'
 #set class   'QuantumBio'
 #set version '2009.01'
-#set main 'qb_QMScore'
+#set main 'qb_NMRScore'
 
 /*  NOTE:  If you change the Key lists here, you need to update the
- *         Option lists and default indices in qmspanel.svl.
+ *         Option lists and default indices in nmrpanel.svl.
  */
 
-const HAM_KEYS =
-    [
-    'AM1',
-    'MNDO',
-    'MNDOD',
-    'PDDGPM3',
-    'PM3',
-    'PM6'
-    ];
-
-const LIG_KEYS =
+const GEOM_KEYS =
     [
     'NOOPT',
-    'LIGOPT',
-    'COMPLEXOPT'
+    'HONLYOPT',
+    'ALLOPT'
     ];
 
-global function qb_QMScore [receptor_mols, ligand_mol, opts]
+global function qb_NMRScore [receptor_mols, ligand_mol, opts]
 
 local errmess = [];
 local workdir;
@@ -52,7 +42,7 @@ else
 endif
 
 //  exe_open child process inherits parent's environment.
-local process_key = exe_open ['moedivconscoring', subdirname, [], 1];
+local process_key = exe_open ['moedivconnmr', subdirname, [], 1];
 local process_keys = [process_key];
 local status = exe_status process_keys;
 
@@ -62,7 +52,7 @@ exe_setpriority [process_keys, prios];
 local stdin = exe_stdin process_keys;
 local stdout = exe_stdout process_keys;
 
-//  Pass the two backbones to QuantumBio's Divcon QMScore
+//  Pass the two backbones to QuantumBio's Divcon NMRScore
 //
 //  SplitReceptor ensures that there is only one chain per molecule
 //  in the receptor collection.
@@ -70,9 +60,6 @@ local stdout = exe_stdout process_keys;
 local retValue, success = 0;
 local mol, molIndex, molCount, residueIndex, residueCount, atomIndex, atomCount;
 molCount = length receptor_mols;
-fwrite [stdin, '{c:}\n', HAM_KEYS(opts.ham)];
-fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', opts.freq]];
-fwrite [stdin, '{c:}\n', LIG_KEYS(opts.opt)];
 fwrite [stdin, '{n:}\n', molCount];
 for molIndex = 1, molCount, 1 loop
     mol = receptor_mols(molIndex);
@@ -124,7 +111,9 @@ endloop
 
 [retValue] = fread [stdout, '{n:}\n'];
 
-const NUMRESULTS = 11;
+local ligatmels = ligand_mol(4)(MOL_ATOM_EL);
+local numligH = add eqE [ligatmels, 'H'];
+
 local results, return_statement;
 local sleep_time = 0.05, sleep_inc = 0.05;
 while exe_status process_key loop
@@ -135,15 +124,11 @@ while exe_status process_key loop
     write ['Divcon: {}\n', return_statement];//DEBUG
 
     if return_statement === "updatescore" then
-        local name, nameValue;
-        local parameter, parameterValue;
-        [[name]] = fread [stdout, '{c:*}'];
-        [[nameValue]] = fread [stdout, '{c:*}'];
-        results = cat [results, [[name, nameValue]]];
-        for NUMRESULTS loop
-            [[parameter]] = fread [stdout, '{c:*}'];
-            [[parameterValue]] = fread [stdout, '{n:}'];
-            results = cat [results, [[parameter, parameterValue]]];
+        local atomname, atomvalue;
+        for numligH loop
+            [[atomname]] = fread [stdout, '{c:*}'];
+            [[atomvalue]] = fread [stdout, '{n:}'];
+            results = cat [results, [[atomname, atomvalue]]];
         endloop
         success = 1;
         fwrite [stdin, '{c:}\n', 'Ok'];
