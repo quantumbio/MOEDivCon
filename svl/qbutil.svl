@@ -284,7 +284,10 @@ global function qb_CutReceptor [posedbkey, radius]
             'of ligand pose atoms.', radius]];
     endif
 
-    local recsets = SplitReceptor [cutset];
+    local cutatoms = recatoms [cutset];
+    print app aMoleculeNumber cutatoms;
+
+    local recsets = SplitReceptor cutatoms;
 
     local ligmol = mol_Extract ligatoms;
     local recmols = app mol_Extract recsets;
