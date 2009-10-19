@@ -125,7 +125,10 @@ while exe_status process_key loop
 
     if return_statement === "updatescore" then
         local atomname, atomvalue;
-        for numligH loop
+        local numNMRH;
+        [[numNMRH]] = fread [stdout, '{n:}'];
+print [numligH,'numNMRH', numNMRH];	//DEBUG
+        for numNMRH loop
             [[atomname]] = fread [stdout, '{c:*}'];
             [[atomvalue]] = fread [stdout, '{n:}'];
             results = cat [results, [[atomname, atomvalue]]];
