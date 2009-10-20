@@ -124,14 +124,15 @@ while exe_status process_key loop
     write ['Divcon: {}\n', return_statement];//DEBUG
 
     if return_statement === "updatescore" then
-        local atomname, atomvalue;
+        local atomid, atomvalue;
         local numNMRH;
         [[numNMRH]] = fread [stdout, '{n:}'];
 print [numligH,'numNMRH', numNMRH];	//DEBUG
         for numNMRH loop
-            [[atomname]] = fread [stdout, '{c:*}'];
+            [[atomid]] = fread [stdout, '{n:}'];
             [[atomvalue]] = fread [stdout, '{n:}'];
-            results = cat [results, [[atomname, atomvalue]]];
+print [atomid, atomvalue];	//DEBUG
+            results = cat [results, [[atomid, atomvalue]]];
         endloop
         success = 1;
         fwrite [stdin, '{c:}\n', 'Ok'];
