@@ -19,11 +19,12 @@ function qb_SaveStatus;
 function qb_SaveEnv;
 function qb_SetStatusField;
 function qb_SetNMRScoreFields;
-
+function qb_LoadNMRScoreDB;
 function qb_NMRScore;
 function qb_NMRScoreBatch;
 
 
+/*  NOTE:  task must be the last tag.  */
 const OPT_TAGS =
     [
     'mode',
@@ -34,6 +35,8 @@ const OPT_TAGS =
     'recdb',
     'guess',
     'opt',
+    'cut',
+    'radius',
     'task'
     ];
 
@@ -52,7 +55,8 @@ const GEOM_OPTS =
     [
     'none',
     'H only',
-    'all'
+    'H and hetero',
+    'all atoms'
     ];
 
 //  Local Functions
@@ -68,7 +72,7 @@ const GEOM_OPTS =
  *  and will exit on an error.
  *
  ****************************************************************************/
-local function SetUpRun [opts]
+local function SetUpRun [complex, opts]
 
     local nmrkey = db_Open [opts.scoredb, 'create'];
     qb_SetNMRScoreFields [nmrkey, opts.mode === 'Many-to-Many'];
@@ -80,9 +84,9 @@ local function SetUpRun [opts]
             exit [];
         endif
 
-        qb_SaveEnv [nmrkey, recset, ligand, opts];
+        qb_SaveEnv [nmrkey, recset, ligand, opts, complex, 'nmrscore'];
     else
-        qb_SaveEnv [nmrkey, [], [], opts];
+        qb_SaveEnv [nmrkey, [], [], opts, complex, 'nmrscore'];
     endif
 
     if opts.mode === 'One-to-One' then
@@ -163,6 +167,36 @@ global function qb_NMRScoreSetupPanel []
         Hbox :
             [
             extendH: 1,
+            Checkbox :
+                [
+                name: 'cut', text: 'Cut Receptor?',
+                onTrigger: 'return',
+                bubbleHelp:
+                    'Cut the receptor at the specified radius.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Text :
+                [
+                name: 'radius', len: 7, extendH: 1, title: 'Radius:',
+                type: 'real', allowBlank: 0,
+                shortcut: ['2.5', '3.0', '3.5', '4.0', '4.5', '5.0'],
+                bubbleHelp: 'Cut radius in angstrums.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Button : [ name: 'showcut', text: 'Show Cut' ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            extendH: 1,
             Text :
                 [
                 name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
@@ -195,12 +229,18 @@ global function qb_NMRScoreSetupPanel []
                 name: 'opt', title: 'Geometry Optimization:', 
                 text: GEOM_OPTS, type: 'int', minWidth: 11, extendH: 1,
                 bubbleHelp:
-                    'A NMR-based ligand optimization can be performed\n'
-                    'prior to scoring. This optimization may occur\n'
-                    'either while the ligand is docked within the target\n'
-                    'or while the ligand is separate from the target.\n'
-                    'Warning: this optional step will significantly\n'
-                    'increase the CPU cost of the calculation.'
+                'Geometry optimization will often improve chances\n'
+                'of convergence:\n'
+                ' * none:  no optimization step is performed.\n'
+                ' * H only:  all proton positions in the complex are\n'
+                '     quantum mechanically optimized.  Heavy atoms\n'
+                '     remain unchanged.\n'
+                ' * H and hetero:  all non-C atom positions in the complex\n'
+                '     are quantum mechanically optimized. NOTE: the ligand\n'
+                '     pose should be considered a new pose.\n'
+                ' * All atoms:  all atom positions in the complex are\n'
+                '     quantum mechanically optimized. NOTE:  the ligand\n'
+                '     pose should be considered a new pose.'
                 ],
             Separator : 
                 [
@@ -230,13 +270,13 @@ global function qb_NMRScoreSetupPanel []
                     'The mapping mode of receptors to ligand/poses:\n'
                     '  One ligand docked into one receptor.\n'
                     '  Many ligand poses docked into the same receptor.\n'
-                    '  Many ligand poses docked into its own receptor.'
+                    '  Many ligand poses, each docked into its own receptor.'
                 ]
             ],
 
         Hbox :
             [
-            name: 'posebox', extendH: 1, sensitive: 0,
+            name: 'posebox', extendH: 1,
             FSBText :
                 [
                 name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
@@ -250,7 +290,7 @@ global function qb_NMRScoreSetupPanel []
 
         Hbox :
             [
-            name: 'recbox', extendH: 1, sensitive: 0,
+            name: 'recbox', extendH: 1,
             FSBText :
                 [
                 name: 'recdb', len: 40, extendH: 1, title: 'Receptor DB:',
@@ -299,9 +339,11 @@ global function qb_NMRScoreSetupPanel []
                 write ['NMRScore Error:  {}\n', errmess];
             endif
         else
-            qb_SetNMRScoreFields [dbkey, 0, app first results];
-            qb_SaveNMRScore [dbkey, rowkey, 9.99, 
-                tag [app first results, app second results]];
+            print results;
+            local atomnames = app first results;
+            local cspvalues = app second results;
+            qb_SetNMRScoreFields [dbkey, 0, atomnames];
+            qb_SaveNMRScore [dbkey, rowkey, 9.99, tag [atomnames, cspvalues]];
             qb_SaveStatus [dbkey, rowkey, "Success"];
         endif
 
@@ -315,15 +357,17 @@ global function qb_NMRScoreSetupPanel []
     local btid, browsetasks = [];
     local options = []; 
     local nmrkey = 0;
-    local prevwd = '';
+    local prevwd = '~/tmp';
+    local complexmol = mol_Extract Chains [];
 
-    WindowSetData [wkey, [scoredb: 'nmrscore.mdb', pwd:0, workdir: '~',
-        opt:1, guess: 0]];
-    WindowSetAttr [wkey, [panel: [sensitive: [1,0,0,0]],
-         guess: [sensitive: 0], opt: [sensitive:0], mode: [sensitive:0],
-         workdir: [sensitive: 1, allowBlank: 0],
-         posebox: [sensitive: 0], posedb: [allowBlank: 1],
-         recbox: [sensitive: 0], recdb: [allowBlank: 1]]];
+    WindowSetData [wkey, [scoredb: 'nmrscore.mdb', cut: 0, radius: 2.5,
+        pwd: 0, workdir: prevwd, opt: 1, guess: 0]];
+    WindowSetAttr [wkey, [panel: [sensitive: [1,1,1,1]],
+        radius: [sensitive: 0, allowBlank: 1], showcut: [sensitive: 0],
+        guess: [sensitive: 1], opt: [sensitive:1], mode: [sensitive: 1],
+        workdir: [sensitive: 1, allowBlank: 0],
+        posebox: [sensitive: 0], posedb: [allowBlank: 1],
+        recbox: [sensitive: 0], recdb: [allowBlank: 1]]];
 
     WindowShow [wkey, 1];
     loop
@@ -341,6 +385,43 @@ global function qb_NMRScoreSetupPanel []
                 WindowSetAttr [wkey, [posebox: [sensitive: 1],
                     posedb: [allowBlank: 0], recbox: [sensitive: 1], 
                     recdb: [allowBlank: 0], panel: [sensitive: [0,1,1,1]]]];
+            endif
+
+        elseif trig === 'cut' then
+            if vals.cut === 0 then
+                WindowSetAttr [wkey, [radius: [sensitive: 0, allowBlank: 1],
+                    showcut: [sensitive: 0]]];
+            else
+                WindowSetAttr [wkey, [radius: [sensitive: 1, allowBlank: 0],
+                    showcut: [sensitive: 1]]];
+            endif
+
+        elseif trig === 'showcut' then
+            if second task_fork [master: 'parent'] === 'child' then
+                local prio = task_prio 0;
+
+                local [cutrecmols, cutligmol, errmess] = qb_CutReceptor [0, 
+                    vals.radius];
+                if cutrecmols === [] or cutligmol === [] then
+                    Warning errmess;
+                    exit [];
+                endif
+
+	            Close [force:1];
+                local cutlig = mol_Create cutligmol;
+                local cutligatoms = cat oAtoms cutlig;
+                oSetCollection ['QB_LIGAND', cutligatoms];
+                aSetNucleusLook [cutligatoms, 'small-sphere'];
+                aSetBondLook [cutligatoms, 'cylinder'];
+                app mol_Create cutrecmols;
+	            View [];
+
+local fp = fopenw '~daren/tmp/mols.txt';  //DEBUG
+fwrite [fp, 'Ligand:  {v}\n\n', cutligmol];  //DEBUG
+fwrite [fp, 'Cut Target:  {v}\n', cutrecmols];  //DEBUG
+fclose fp;  //DEBUG
+
+                exit [];
             endif
 
         elseif trig === 'pwd' then
@@ -378,13 +459,39 @@ global function qb_NMRScoreSetupPanel []
 
             elseif vals.panel === 'Load' then 
                 if second task_fork [master: 'parent'] === 'child' then
+                    task_prio 0;
                     local dbpath = FilePrompt [title: 'Input Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
-                         write ['Open database: {}\n', dbpath];
+                         write ['Load database: {}\n', dbpath];
+                    local [ldcutrec, ldlig, ldopts, ldcomplex, ldmess] = 
+                        qb_LoadNMRScoreDB [dbpath];
+                    if ldcutrec === [] or ldlig === [] or ldopts === []
+                      or ldcomplex === [] then
+                        Warning ldmess;
+                        exit [];
                     endif
 
-                    qb_CutReceptor [0, 5.0];//DEBUG TEST
+                    complexmol = ldcomplex;
+                    /*  Drop the task tagged value.  */
+                    ldopts = droplast ldopts;
+                    WindowSetData [wkey, ldopts];
+
+    	            Close [force:1];
+                    local ldligmol = mol_Create ldlig;
+                    local ldligatoms = cat oAtoms ldligmol;
+                    oSetCollection ['QB_LIGAND', ldligatoms];
+                    aSetNucleusLook [ldligatoms, 'small-sphere'];
+                    aSetBondLook [ldligatoms, 'cylinder'];
+                    app mol_Create ldcutrec;
+    	            View [];
+
+local tfp = fopenw '~daren/tmp/mols.txt';  //DEBUG
+fwrite [tfp, 'Ligand:  {v}\n\n', cutligmol];  //DEBUG
+fwrite [tfp, 'Cut Target:  {v}\n', cutrecmols];  //DEBUG
+fclose tfp;  //DEBUG
+
+                    endif
 
                     exit [];
                 endif
@@ -395,9 +502,9 @@ global function qb_NMRScoreSetupPanel []
                 if second task_fork [prio:3, idle:0] === 'child' then
                     options = tag [OPT_TAGS, [vals.mode, vals.pwd,
                       fabsname vals.workdir, fabsname vals.scoredb, [], [],
-                      vals.guess, vals.opt, []]];
+                      vals.guess, vals.opt, vals.cut, vals.radius, []]];
 
-                    nmrkey = SetUpRun [options];
+                    nmrkey = SetUpRun [complexmol, options];
                     RunCalc [nmrkey];
                     dbv_Open db_Filename nmrkey;
                     db_Close nmrkey;
@@ -413,8 +520,8 @@ global function qb_NMRScoreSetupPanel []
                     options = tag [OPT_TAGS, [vals.mode, vals.pwd,
                         fabsname vals.workdir, fabsname vals.scoredb,
                         fabsname vals.posedb, fabsname vals.recdb,
-                        vals.guess, vals.opt, []]];
-                    nmrkey = SetUpRun [options];
+                        vals.guess, vals.opt, vals.cut, vals.radius, []]];
+                    nmrkey = SetUpRun [complexmol, options];
                     dbv_Open db_Filename nmrkey;
                     db_Close nmrkey;
                     exit [];

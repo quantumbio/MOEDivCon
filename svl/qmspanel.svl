@@ -91,9 +91,9 @@ local function SetUpRun [opts]
             exit [];
         endif
 
-        qb_SaveEnv [qmskey, recset, ligand, opts];
+        qb_SaveEnv [qmskey, recset, ligand, opts, [], 'qmscore'];
     else
-        qb_SaveEnv [qmskey, [], [], opts];
+        qb_SaveEnv [qmskey, [], [], opts, [], 'qmscore'];
     endif
 
     if opts.mode === 'One-to-One' then
@@ -249,13 +249,13 @@ global function qb_QMScoreSetupPanel []
                     'The mapping mode of receptors to ligand/poses:\n'
                     '  One ligand docked into one receptor.\n'
                     '  Many ligand poses docked into the same receptor.\n'
-                    '  Many ligand poses docked into its own receptor.'
+                    '  Many ligand poses, each docked into its own receptor.'
                 ]
             ],
 
         Hbox :
             [
-            name: 'posebox', extendH: 1, sensitive: 0,
+            name: 'posebox', extendH: 1,
             FSBText :
                 [
                 name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
@@ -269,7 +269,7 @@ global function qb_QMScoreSetupPanel []
 
         Hbox :
             [
-            name: 'recbox', extendH: 1, sensitive: 0,
+            name: 'recbox', extendH: 1,
             FSBText :
                 [
                 name: 'recdb', len: 40, extendH: 1, title: 'Receptor DB:',
@@ -414,7 +414,7 @@ global function qb_QMScoreSetupPanel []
 
                 if second task_fork [] === 'child' then
                     options = tag [OPT_TAGS, [vals.mode, vals.pwd,
-                        fabsname vals.workdir, fabsname vals.scoredb,
+                        vals.workdir, fabsname vals.scoredb,
                         fabsname vals.posedb, fabsname vals.recdb, vals.ham,
                         vals.freq, vals.opt, []]];
                     qmskey = SetUpRun [options];

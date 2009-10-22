@@ -34,7 +34,7 @@ local subdirname;
 if opts.pwd === 1 then
     workdir = getenv 'PWD';
 else
-    workdir = opts.workdir;
+    workdir = fabsname opts.workdir;
 endif
 
     write ['Work Dir:  {}\n', workdir];  //DEBUG
