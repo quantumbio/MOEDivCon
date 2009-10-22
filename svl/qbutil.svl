@@ -8,13 +8,7 @@
 
 function _Atoms;
 
-
-//  Data fields are in the order in which they are returned by Divcon.
-
-const POSE_FIELD = 'Ligand/Pose';
-const REC_FIELD = 'Receptor';
-const STATUS_FIELD = 'Status';
-
+//  Data tags are in the order in which they are returned by Divcon.
 const QMS_DATA_TAGS =
     [
     "LIGAND",
@@ -31,6 +25,11 @@ const QMS_DATA_TAGS =
     "MRM TOTAL ENERGY"
     ];
  
+//  Database Fields
+const POSE_FIELD = 'Ligand/Pose';
+const REC_FIELD = 'Receptor';
+const STATUS_FIELD = 'Status';
+
 const QMS_NUM_FIELDS =
     [
     'QMScore',
@@ -52,9 +51,14 @@ const NMR_NUM_FIELDS =
     ];
 
 // Environment tags
+const COMPLEX = 'complex';
 const LIGAND = 'ligand';
 const TARGET = 'target';
 const OPTIONS = 'options';
+
+const DBTYPE = 'qb_dbtype';
+const QMSCORE = 'qb_qmscoredb';
+const NMRSCORE = 'qb_nmrscoredb';
 
 //  Local Functions
 
@@ -71,17 +75,22 @@ local function SplitComplex []
         return [[], [], 'No molecular complex loaded in MOE Window.'];
     endif
 
+    const COLLECTNAMES = ['QB_LIGAND', 'LIGX_LIGAND'];
     local recatoms, ligatoms;
-    const LIGXNAME = 'LIGX_LIGAND';
-    local colnames = oCollections [];
+    local cname, makecoll = 0;
 
-    if anytrue eqE [LIGXNAME, colnames] then
-        ligatoms  = cat oAtoms oGetCollection LIGXNAME;
-        ligatoms = join [ligatoms, complexatoms];
-    endif
+    local colnames = oCollections [];
+    for cname in COLLECTNAMES loop
+        if anytrue eqE [cname, colnames] then
+            ligatoms  = cat oAtoms oGetCollection cname;
+            ligatoms = join [ligatoms, complexatoms];
+            break;
+        endif
+    endloop
 
     if length ligatoms === 0 then
         ligatoms  = _Atoms '$$ligand';
+        makecoll = 1;
     endif
 
     if length ligatoms === 0 or length ligatoms >= length complexatoms then
@@ -91,6 +100,10 @@ local function SplitComplex []
     if 1 <> length uniq aMoleculeNumber ligatoms then
         return [[], [], 'Ligand has to be a single molecule.'];
     endif
+
+    if makecoll then
+        oSetCollection ['QB_LIGAND', ligatoms];
+     endif
 
     recatoms = diff [complexatoms, ligatoms];
 
@@ -259,14 +272,14 @@ endfunction
  ****************************************************************************/
 global function qb_CutReceptor [posedbkey, radius]
 
-    if radius <= 0 then
-        return [[], 'Radius must be greater than zero.'];
+    if radius <= 0.0 then
+        return [[], [], 'Radius must be greater than zero.'];
     endif
 
     local [recatoms, ligatoms, errmess] = SplitComplex [];
 
     if recatoms === [] or ligatoms === [] then
-        return [[], errmess];
+        return [[], [], errmess];
     endif
 
     //  Find neighboring atoms within radius
@@ -280,26 +293,39 @@ global function qb_CutReceptor [posedbkey, radius]
     endloop
 
     if length cutset === 0 then
-        return [[], twrite ['No receptor atoms within radius {n:.1f}\n.'
-            'of ligand pose atoms.', radius]];
+        return [[], [], twrite ['No receptor atoms within radius {n:.1f}\n'
+            'of the ligand pose atoms.', radius]];
     endif
 
     local cutatoms = recatoms [cutset];
-    print app aMoleculeNumber cutatoms;
 
-    local recsets = SplitReceptor cutatoms;
+    print aMoleculeNumber cutatoms;  //DEBUG
+
+    local residues = uniq oParent (cutatoms);
+    local resatoms = cat oChildren residues;
+
+    print aMoleculeNumber resatoms;  //DEBUG
+
+    local delatoms = diff [recatoms, resatoms];
+    local delresidues = uniq oParent delatoms;
+    oDestroy delatoms;
+    delresidues = delresidues | rAtomCount delresidues == 0;
+    local delchains = uniq oParent delresidues;
+    oDestroy delresidues;
+    delchains = delchains | cResidueCount delchains == 0;
+    oDestroy delchains;
+
+	Add_H (resatoms | aLonePairs resatoms <= 0);
+	Add_HLP (resatoms | aLonePairs resatoms > 0);
+
+    print aMoleculeNumber resatoms;  //DEBUG
+
+    local recsets = SplitReceptor [resatoms];
 
     local ligmol = mol_Extract ligatoms;
     local recmols = app mol_Extract recsets;
 
-
-local fp = fopenw '~daren/tmp/mols.txt';
-fwrite [fp, 'Ligand:  {v}\n\n', ligmol];
-fwrite [fp, 'Target:  {v}\n', recmols];
-return [[], "Test"];
-fclose fp;
-
-    return [recmols, []];
+    return [recmols, ligmol, []];
 
 endfunction
 
@@ -317,8 +343,10 @@ global function qb_GetEnv [dbkey]
     local [[ligmol]] = sread [string ligtok, '{v}'];
     local opttok = db_GetEnv [dbkey, OPTIONS];
     local [[options]] = sread [string opttok, '{v}'];
+    local cpxtok = db_GetEnv [dbkey, COMPLEX];
+    local [[complex]] = sread [string cpxtok, '{v}'];
 
-    return [tgtmols, ligmol, options];
+    return [tgtmols, ligmol, options, complex];
 
 endfunction
 
@@ -342,6 +370,32 @@ global function qb_GetRecField []
 
 endfunction
 
+/****************************************************************************
+ *                          qb_LoadNMRScoreDB
+ *
+ ****************************************************************************/
+global function qb_LoadNMRScoreDB [dbpath]
+
+    local dbkey = db_Open [dbpath, 'read'];
+    local type = db_GetEnv [dbkey, DBTYPE];
+    if neL [type, NMRSCORE] then
+        db_Close dbkey;
+        return [[], [], [], [], twrite ['{}\nis not a NMRScore Database.',
+            dbpath]];
+    endif
+
+    local [cutrec, lig, opts, complex] = qb_GetEnv [dbkey];
+
+    if not MOE_BATCH then
+      dbv_Open db_Filename dbkey;
+    endif
+
+    db_Close dbkey;
+
+    return [cutrec, lig, opts, complex, []];
+
+endfunction
+
 
 /****************************************************************************
  *                          qb_SaveEnv
@@ -350,11 +404,18 @@ endfunction
  *  database.
  *
  ****************************************************************************/
-global function qb_SaveEnv [dbkey, tgtmols, ligmol, options]
+global function qb_SaveEnv [dbkey, tgtmols, ligmol, options, complex, type]
 
     db_SetEnv [dbkey, TARGET, twrite ['{v}', tgtmols]];
     db_SetEnv [dbkey, LIGAND, twrite ['{v}', ligmol]];
     db_SetEnv [dbkey, OPTIONS, twrite ['{v}', options]];
+    db_SetEnv [dbkey, COMPLEX, twrite ['{v}', complex]];
+
+    if type === 'nmrscore' then
+        db_SetEnv [dbkey, DBTYPE, NMRSCORE];
+    elseif type === 'qmscore' then
+        db_SetEnv [dbkey, DBTYPE, QMSCORE];
+    endif
 
 endfunction
 
