@@ -87,7 +87,7 @@ for molIndex = 1, molCount, 1 loop
             fwrite [stdin, '{c:} {c:} {n:.4f}\n',
                 mol(4)(MOL_ATOM_NAME)(atomIndex),
                 mol(4)(MOL_ATOM_EL)(atomIndex),
-                mol(4)(MOL_ATOM_CHARGE)(atomIndex)];
+                mol(4)(MOL_ATOM_ION)(atomIndex)];
             fwrite [stdin, '{n:.4f} {n:.4f} {n:.4f}\n',
                 mol(4)(MOL_ATOM_X)(atomIndex),
                 mol(4)(MOL_ATOM_Y)(atomIndex),
@@ -113,7 +113,7 @@ for residueIndex = 1, residueCount, 1 loop
         fwrite [stdin, '{c:} {c:} {n:.4f}\n',
             mol(4)(MOL_ATOM_NAME)(atomIndex),
             mol(4)(MOL_ATOM_EL)(atomIndex),
-            mol(4)(MOL_ATOM_CHARGE)(atomIndex)];
+            mol(4)(MOL_ATOM_ION)(atomIndex)];
         fwrite [stdin, '{n:.4f} {n:.4f} {n:.4f}\n',
             mol(4)(MOL_ATOM_X)(atomIndex),
             mol(4)(MOL_ATOM_Y)(atomIndex),

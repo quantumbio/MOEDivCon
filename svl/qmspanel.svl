@@ -61,8 +61,8 @@ const HAMILTONIANS =
 const LIG_OPTS =
     [
     'none',
-    'in isolation',
-    'in complex'
+    'free',
+    'bound'
     ];
 
 
@@ -189,10 +189,10 @@ global function qb_QMScoreSetupPanel []
                 ],
             Checkbox :
                 [
-                name: 'pwd', text: 'Use PWD', onTrigger: 'return', 
+                name: 'pwd', text: 'CWD', onTrigger: 'return', 
                 bubbleHelp:
-                    'Use the PWD environment variable at\n'
-                    'run time to determine working directory.'
+                    'Determine the current working directory\n'
+                    'from the run time environment.'
                 ]
             ],
 
@@ -211,7 +211,7 @@ global function qb_QMScoreSetupPanel []
                 Option :
                     [
                     name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
-                    type: 'int', minWidth: 11, extendH: 1,
+                    type: 'int', minWidth: 5, extendH: 1,
                     bubbleHelp:
                         'A QM-based ligand optimization can be performed\n'
                         'prior to scoring. This optimization may occur\n'
