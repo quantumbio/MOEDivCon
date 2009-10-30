@@ -1,7 +1,11 @@
-MENU PREPEND "Main:Compute"
-    "Quantum Mechanics"
-        MENU  "Quantum Mechanics"
+MENU APPEND "Main:Compute:Simulations"
+    "QuantumBio"
+        MENU  "QuantumBio"
             "QMScore..."          exec "run'$MOE_SVL_LOAD/qmspanel.svl'"
-            "NMRScore..."         exec "run'$MOE_SVL_LOAD/nmrpanel.svl'"
+#            "NMRScore..."         exec "run'$MOE_SVL_LOAD/nmrpanel.svl'"
         ENDMENU
 ENDMENU
+
+#MENU APPEND "Main:Help:Tutorials"
+#    "QuantumBio ..."  exec "LaunchDocument'$QBHOME/qmscore_tut.html'"
+#ENDMENU
