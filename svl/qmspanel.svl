@@ -26,7 +26,7 @@ function qb_QMScoreBatch;
 const OPT_TAGS =
     [
     'mode',
-    'pwd',
+    'cwd',
     'workdir',
     'scoredb',
     'posedb',
@@ -189,10 +189,10 @@ global function qb_QMScoreSetupPanel []
                 ],
             Checkbox :
                 [
-                name: 'pwd', text: 'CWD', onTrigger: 'return', 
+                name: 'cwd', text: 'CWD', onTrigger: 'return', 
                 bubbleHelp:
-                    'Determine the current working directory\n'
-                    'from the run time environment.'
+                    'Set the current working directory using\n'
+                    'the run time environment variable $PWD.'
                 ]
             ],
 
@@ -334,7 +334,7 @@ global function qb_QMScoreSetupPanel []
     local qmskey = 0;
     local prevwd = '';
 
-    WindowSetData [wkey, [scoredb: 'qmscore.mdb', pwd:0, workdir: '~',
+    WindowSetData [wkey, [scoredb: 'qmscore.mdb', cwd:0, workdir: '~',
         ham: 5, opt:1, freq: 0]];
     WindowSetAttr [wkey, [freq: [sensitive: 0],
          workdir: [sensitive: 1, allowBlank: 0],
@@ -359,8 +359,8 @@ global function qb_QMScoreSetupPanel []
                     recdb: [allowBlank: 0], panel:[sensitive: [0,1,1]]]];
             endif
 
-        elseif trig === 'pwd' then
-            if vals.pwd === 1 then
+        elseif trig === 'cwd' then
+            if vals.cwd === 1 then
                 prevwd = vals.workdir;
                 WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
                 WindowSetData [wkey, [workdir: '']];
@@ -396,7 +396,7 @@ global function qb_QMScoreSetupPanel []
                 if not istrue CheckWD [vals.workdir] then continue; endif
 
                 if second task_fork [prio:3, idle:0] === 'child' then
-                    options = tag [OPT_TAGS, [vals.mode, vals.pwd,
+                    options = tag [OPT_TAGS, [vals.mode, vals.cwd,
                       fabsname vals.workdir, fabsname vals.scoredb, [], [],
                       vals.ham, vals.freq, vals.opt, []]];
 
@@ -413,7 +413,7 @@ global function qb_QMScoreSetupPanel []
                 if not istrue CheckWD [vals.workdir] then continue; endif
 
                 if second task_fork [] === 'child' then
-                    options = tag [OPT_TAGS, [vals.mode, vals.pwd,
+                    options = tag [OPT_TAGS, [vals.mode, vals.cwd,
                         vals.workdir, fabsname vals.scoredb,
                         fabsname vals.posedb, fabsname vals.recdb, vals.ham,
                         vals.freq, vals.opt, []]];

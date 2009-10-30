@@ -28,7 +28,7 @@ function qb_NMRScoreBatch;
 const OPT_TAGS =
     [
     'mode',
-    'pwd',
+    'cwd',
     'workdir',
     'scoredb',
     'posedb',
@@ -214,10 +214,10 @@ global function qb_NMRScoreSetupPanel []
                 ],
             Checkbox :
                 [
-                name: 'pwd', text: 'Use PWD', onTrigger: 'return', 
+                name: 'cwd', text: 'CWD', onTrigger: 'return', 
                 bubbleHelp:
-                    'Use the PWD environment variable at\n'
-                    'run time to determine working directory.'
+                    'Set the current working directory using\n'
+                    'the run time environment variable $PWD.'
                 ]
             ],
 
@@ -361,7 +361,7 @@ global function qb_NMRScoreSetupPanel []
     local complexmol = mol_Extract Chains [];
 
     WindowSetData [wkey, [scoredb: 'nmrscore.mdb', cut: 0, radius: 2.5,
-        pwd: 0, workdir: prevwd, opt: 1, guess: 0]];
+        cwd: 0, workdir: prevwd, opt: 1, guess: 0]];
     WindowSetAttr [wkey, [panel: [sensitive: [1,1,1,1]],
         radius: [sensitive: 0, allowBlank: 1], showcut: [sensitive: 0],
         guess: [sensitive: 1], opt: [sensitive:1], mode: [sensitive: 1],
@@ -424,8 +424,8 @@ fclose fp;  //DEBUG
                 exit [];
             endif
 
-        elseif trig === 'pwd' then
-            if vals.pwd === 1 then
+        elseif trig === 'cwd' then
+            if vals.cwd === 1 then
                 prevwd = vals.workdir;
                 WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
                 WindowSetData [wkey, [workdir: '']];
@@ -500,7 +500,7 @@ fclose tfp;  //DEBUG
                 if not istrue CheckWD [vals.workdir] then continue; endif
 
                 if second task_fork [prio:3, idle:0] === 'child' then
-                    options = tag [OPT_TAGS, [vals.mode, vals.pwd,
+                    options = tag [OPT_TAGS, [vals.mode, vals.cwd,
                       fabsname vals.workdir, fabsname vals.scoredb, [], [],
                       vals.guess, vals.opt, vals.cut, vals.radius, []]];
 
@@ -517,7 +517,7 @@ fclose tfp;  //DEBUG
                 if not istrue CheckWD [vals.workdir] then continue; endif
 
                 if second task_fork [] === 'child' then
-                    options = tag [OPT_TAGS, [vals.mode, vals.pwd,
+                    options = tag [OPT_TAGS, [vals.mode, vals.cwd,
                         fabsname vals.workdir, fabsname vals.scoredb,
                         fabsname vals.posedb, fabsname vals.recdb,
                         vals.guess, vals.opt, vals.cut, vals.radius, []]];
