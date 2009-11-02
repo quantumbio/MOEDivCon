@@ -1,0 +1,246 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html>
+<head>
+<title>PlyWord Help</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<meta http-equiv="content-style-type" content="text/css" />
+<style>
+h1 {font: bold 2.0em Helvetica, sans-serif; color: #0099DD;
+    text-align: center;}
+h2 {font: bold 1.5em Helvetica, sans-serif; color: #44AAEE;
+    background-color: #FFFFFF; counter-increment:h2n;counter-reset:h3n}
+h2:before {content: counter(h2n, upper-roman) ".  "}
+h3 {font: bold 1.25em Helvetica, sans-serif; color: #44AAEE;
+    background-color: #FFFFFF;counter-increment:h3n;}
+h3:before {content: counter(h3n, upper-latin) ".  "}
+body {font: 12pt "Times New Roman", serif; margin: 3em;
+    background-color: #F0F7FF;}
+ol#tocl {list-style-type: upper-roman;}
+ol ol {list-style-type: upper-latin;}
+table#po {border-collapse:  collapse; border-style: groove;
+          border-width: thick; border-color: #443311;
+          margin: 1em;}
+th {padding: 0.5em 1.0em; border: solid thin #443311;}
+td {padding: 0.5em 1.0em; border: solid thin #443311; background: #FFFCDC;}
+table#fl {border-collapse:  collapse; border-style: solid;
+          border-width: thin; border-color: #443311;
+          margin: 1em;}
+table#fl th {padding: 0.5em 1.0em; border: solid thin #443311;
+             font: bold normal 110%/120% monospace;}
+
+em#pat {padding: 1px; margin: 2px; border: thin solid black;
+        font: bold normal 110%/120% monospace;}
+pre {margin-left: 3em; background-color: #FFFDDC;}
+w {text-decoration: underline;}
+x {font-weight: bold;}
+n {font: 11pt "Gill Sans", sans-serif;}
+bn {font: bold 11pt "Helvetica", sans-serif;}
+code {margin-left: 4em; font: bold 11pt "Arial", serif;}
+inlinecode {font: bold 11pt "Arial", serif;}
+gbx {padding: 1px 2px; margin: 2px; border: thin solid green;}
+rbx {padding: 1px 2px; margin: 2px; border: thin solid red;}
+</style>
+</head>
+
+<body>
+<hr>
+<p>
+<object height=50 align=left data="images/qb_logo.png" type=image/png>
+QuantumBio
+</object>
+<object id=ri height=50 align=right data="images/qb_logo.png" type=image/png>
+QuantumBio
+</object>
+<h1>MOEDivcon QMScore</h1>
+</p>
+<hr>
+
+<h2><a name="ToC"></a>Table of Contents</h2>
+<ol id=tocl>
+  <li><a href="#ToC">Table of Contents</a></li>
+  <li><a href="#install">Installation</a></li>
+  <li><a href="#start">Getting Started</a></li>
+  <li><a href="#options">Options</a></li>
+  <ol>
+    <li><a href="#options-outdb">Output MOE Database</a></li>
+    <li><a href="#options-workdir">Working Directory</a></li>
+    <li><a href="#options-ham">Hamiltonian</a></li>
+    <li><a href="#options-opt">Ligand Optimization</a></li>
+    <li><a href="#options-freq">Frequency</a></li>
+  </ol>
+  <li><a href="#mode">Mapping Mode</a></li>
+  <ol>
+    <li><a href="#mode-1to1">One Receptor--One Ligand</a></li>
+    <li><a href="#mode-1toM">One Receptor--Many Ligand Poses</a></li>
+    <li><a href="#mode-MtoM">Many Receptors--Many Ligands</a></li>
+  </ol>
+  <li><a href="#trouble">Troubleshooting</a></li>
+</ol>
+
+<h2><a name="install"></a>Installation</h2>
+<p>  The last two steps of the installation are very important.  First,
+you need to copy or link the MOEDivcon menus to your home directory.
+For example:
+<p>
+<code>
+> ln -s ${QB_INSTALL_DIR}/moe_menus   ${HOME}
+</code>
+</p>
+
+Second, in order for
+MOE to locate the MOEDivcon SVL library, you must create a link to the
+library in a place where MOE can find it.  If you already have a directory
+of SVL scripts, link the MOEDivcon SVL libarary as a subdirectory.
+For example:
+<p>
+<code>
+> ln -s ${QB_INSTALL_DIR}/svl   ${MOE_SVL_PATH}/qb_lib.svl
+</code>
+</p>
+Otherwise, create an SVL directory in your home directory and link the
+MOEDivcon SVL library under it.  For example:
+<p>
+<code>
+> mkdir ${HOME}/svl
+</code>
+</p>
+<p>
+<code>
+> ln -s ${QB_INSTALL_DIR}/svl   ${HOME}/svl/qb_lib.svl
+</code>
+</p>
+Note:  the link of the subdirectory must be named
+<inlinecode> qb_lib.svl </inlinecode>.
+</p>
+
+<p>  If you are having difficulties with the installation, see the
+<a href="#trouble">troubleshooting</a> section.
+</p>
+
+<h2><a name="start"></a>Getting Started</h2>
+<p>
+The workflow of MOEDivcon QMScoring involves four steps:
+<ul>
+  <li>Prepping the receptors and ligands involved in the calculation.  </li>
+  <li>Setting up the run parameters to QMScore. </li>
+  <li>Executing QMScore either on a local machine or in parallel on a cluster.
+  </li>
+  <li>Analyzing the QMScore results.  </li>
+</ul>
+</p>
+<p>
+To demonstrate the process, let's work through a simple example.  First, load
+<x>simplecomplex.moe</x> from the MOEDivcon examples directory.  Then,
+select the MOE menu <w>Compute</w>, submenu <w>Simulations</w>, submenu
+<w>QuantumBio</w>, and menu item <w>QMScore</w> (see below).
+</p>
+<p>
+<object id="MOEwithMenu" width=1000 align=center vspace=12px
+data="images/mainwithmenu.png" type=image/png>
+</p>
+<p>
+The QMScore dialog should appear with the default values (see below).
+</p>
+<p>
+<object id="QMScoreDefaultDialog" align=center vspace=12px
+data="images/qmscoredefault.png" type=image/png>
+</p>
+<p>
+Click on the arrow in the <w>Working Dir</w> drop down menu and select
+<inlinecode>/tmp</inlinecode>.  Press the <w>Run</w> button.  If all goes
+well, QMScore will execute using the receptor and ligand complex shown in
+the MOE Window.  After several seconds, the MOE database viewer should open
+the QMScore database showing the results (see below).
+</p>
+<p>
+<object id="QMScoreDatabase" width=1000 align=center vspace=12px
+data="images/qmscoredatabase.png" type=image/png>
+</p>
+
+<p>
+In this simple example, one was able to perform all four workflow steps
+in one session with the MOE Window.  In general, one would prep the molecules
+and set up the QMScore parameters in one session, save them to the QMScore
+database, then use moebatch to execute the tasks in parallel on a cluster
+(example scripts for SGE and PBS are provided).  After the QMScore runs have
+completed, one can use MOE to open the QMScore database to view the collated
+results.
+</p>
+
+<p>
+Of course, the real power of MOEDivcon QMScore is the ability to use
+moebatch to execute in parallel on a cluster and collate the results in
+a MOE database. See <a href="#mode-1toM">One Receptor--Many Ligand Poses</a>
+and <a href="#mode-MtoM">Many Receptors--Many Ligands</a> sections for
+more information on taking advantage of this feature.
+
+</p>
+
+<h2><a name="options"></a>Options</h2>
+<p>
+</p>
+
+<h3><a name="options-outdb"></a>Output MOE Database</h3>
+<p>
+MOEDivcon uses the same MOE database to store run parameters and to store
+QMScore results.  The advantage is that the database is self-contained:  all
+of the data and parameters needed to execute QMScore are stored in the
+database.  The database can be moved to a working directory prior to
+execution time as long as the correct path is provided to the moebatch
+command.
+</p>
+<p>
+</p>
+
+<h3><a name="options-workdir"></a>Working Directory</h3>
+<p>
+</p>
+
+<h3><a name="options-ham"></a>Hamiltonian</h3>
+<p>
+Several options are available in chosing the Hamiltonian algorithm to use
+with QMScore.  However, PM3 the default, has proved to be the most reliable.
+</p>
+
+<h3><a name="options-opt"></a>Ligand Optimization</h3>
+<p>
+A QM-based ligand optimization can be performed prior to scoring.
+This optimization may occur either while the ligand is docked within
+the target or while the ligand is separate from the target.
+Warning: this optional step will significantly increase the CPU cost
+of the calculation.
+</p>
+
+<h3><a name="options-freq"></a>Frequency</h3>
+<p>
+Perform frequency calculation to determine ligand entropy in score
+function.  Warning: may increase CPU cost of the calculation.
+</p>
+
+<h2><a name="mode"></a>Mapping Mode</h2>
+<p>
+</p>
+
+<h3><a name="mode-1to1"></a>One Receptor--One Ligand</h3>
+<p>
+</p>
+
+<h3><a name="mode-1toM"></a>One Receptor--Many Ligand Poses</h3>
+<p>
+</p>
+
+<h3><a name="mode-MtoM"></a>Many Receptors--Many Ligands</h3>
+<p>
+</p>
+
+
+<h2><a name="trouble"></a>Troubleshooting</h2>
+
+Contact information?
+
+<hr>
+<p>&#169; 2009 by QuantumBio, Inc.</p>
+
+</body>
+
+</html>
