@@ -1,0 +1,54 @@
+#!/bin/sh
+
+if [ ! "$CHEMIXDIR" ]; then
+    filename=$0
+    if [ "`echo $filename | grep -s '/'`" ]; then
+        D="`echo $filename | sed 's:/[^/]*$::'`"
+    elif [ "`echo $filename | grep -s '[\\]'`" ]; then
+        filename="`echo $filename | sed 's:[\\]:/:g'`"
+        D="`echo $filename | sed 's:/[^/]*$::'`"
+    else
+        D=
+    fi
+
+    if [ "$D" = "." ]; then
+        D=`pwd`
+    fi
+
+        # If the file was specified without /s then search the PATH variable to
+        # find the first path to this script.
+
+    if [ ! "$D" ]; then
+        for d in `echo $PATH | tr ' :' '\001 '`; do
+            d=`echo $d | tr '\001' ' '`
+            if [ -f "$d/$filename" ]; then
+                D=$d
+                break
+            fi
+        done
+
+        if [ "$D" = "." -o ! "$D" ]; then
+            D=`pwd`
+        fi
+    fi
+
+        # Build an absolute directory path from D.  What is in D can either
+        # be absolute or relative.
+
+    if [ "`echo "$D" | grep -s '^/'`" ]; then
+        D=$D
+    elif [ "`echo "$D" | grep -s '^[a-z]:/'`" ]; then
+        D=$D
+    else
+        D=`pwd`/"$D"
+    fi
+
+    CHEMIXDIR=`echo "$D" | sed 's:/bin$::'`
+    export CHEMIXDIR
+fi
+
+if [ -z "$QBENVSET" ]; then
+    . $CHEMIXDIR/etc/chemix.sh
+fi
+
+moedivconnmr.bin $@ - 
