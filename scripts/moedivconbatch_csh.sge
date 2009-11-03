@@ -11,19 +11,17 @@ hostname
 date
 cat $TMPDIR/machines
 
-# Change the paths and name for the MOE database for your local file system.
-set USER_DATADB="$PWD/qmscore.mdb"
-set USER_ENV="$HOME/moedivcon.csh"
-
-# Set up the environment for moebatch since it often forks a child process to
-# execute some of the tasks.
-source $USER_ENV
-
 # Generate the MOE machine file from the SGE list of processors.
 rm -f moedivcon_machinefile
 foreach mach (`cat $TMPDIR/machines`)
-   echo "localhost ssh $mach 'source $USER_ENV; moebatch -mpu -'" >>! moedivcon_machinefile
+   echo "localhost ssh $mach 'moebatch -mpu -'" >>! moedivcon_machinefile
 end
 echo '$eof' >>! moedivcon_machinefile
 
-moebatch -mpu moedivcon_machinefile -exec "run ['$MOE_SVL_LOAD/qmsbatch.svl', ['$USER_DATADB']]" -exit
+# Change the path and name for the MOE database.
+USER_DATADB="$PWD/qmscore.mdb"
+
+# Change the path to the QB SVL library according to your local installation.
+QB_LIB_SVL="$HOME/svl/qb_lib.svl"
+
+moebatch -mpu moedivcon_machinefile -exec "run ['$QB_LIB_SVL/qmsbatch.svl', ['$USER_DATADB']]" -exit
