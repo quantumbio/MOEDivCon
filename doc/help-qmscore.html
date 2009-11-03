@@ -37,11 +37,11 @@ sol:before {content: "Possible solution:  "; color:  #0099DD; }
 <body>
 <hr>
 <p>
-<a href="http://www.quantumbioinc.com"> <object height=51 align=left
+<a href="http://www.quantumbioinc.com" target="QBHomePage"> <object height=51 align=left
   data="images/qb_logo.png" type=image/png>
 QuantumBio
 </object> </a>
-<a href="http://www.quantumbioinc.com"> <object id=ri height=51 align=right
+<a href="http://www.quantumbioinc.com"target="QBHomePage"> <object id=ri height=51 align=right
   data="images/qb_logo.png" type=image/png>
 QuantumBio
 </object> </a>
@@ -73,11 +73,89 @@ QuantumBio
 
 <h2><a name="intro"></a>QMScore Introduction</h2>
 
-<p><todo> QMSCORE INTRODUCTION  </todo></p>
+<p>
+Analogous to conventional scoring functions from other vendors, QuantumBio provides
+a scoring function based upon linear-scaling, semi-empirical, quantum mechanics. This 
+patent pending algorithm characterizes the entire target/ligand complex quantum mechanically,
+and determines the energy of binding.
+</p>
+<p>
+The QMScore algorithm has been validated against several key structural motifs, and the 
+results of these validations have been detailed in several 
+key peer-reviewed <a href="http://www.quantumbioinc.com/Support/Publications/index_files/category-qmscore.html" target="QBHomePage">publications</a>.
+</p>
 
 <h2><a name="install"></a>Installation</h2>
 
-<p><todo> SOFTWARE INSTALLATION INSTRUCTIONS  </todo></p>
+<P>
+The Binary Distribution requires some knowledge of the Linux/Unix
+environment. The following set of steps will show you the types of
+commands you will need to execute in order to properly install DivCon.
+
+<P>
+
+<UL>
+<LI>The distribution is found within a tar.gz file. This file must be
+uncompressed in order to install the application. To begin, put the
+tar.gz file in a place where you like it. Anywhere will do, but a
+good place for it may be /usr/local. Once you put the file in /usr/local
+you will need to type the following<TT>:</TT>
+</LI>
+</UL>
+<BLOCKQUOTE>
+<TT>% tar -zxvf divcon-&lt;platform&gt;-&lt;version&gt;.tar.gz</TT>
+
+</BLOCKQUOTE>
+
+<UL>
+<LI>Once the file has decompressed, it is ready to become part of your
+environment. This will require the addition of the $CHEMIXDIR environment
+variable along with the sourcing of an environment file (chemix.sh
+or chemix.csh). By adding two lines to your .bashrc file (for the
+bash shell) or .cshrc file (for the csh or the tcsh shells), you will
+be able to access DivCon features. You should execute the following
+in order to (a) find the correct installation directory and switch
+to the bash shell, (b) set that installation path in both .bashrc
+and .cshrc, and (c) source the correct QuantumBio supplied environment
+file. The install.sh file within the DivCon root directory is provided
+for this purpose. It will set the <A NAME="116"></A>$CHEMIXDIR variable
+and allow the correct files to be sourced upon login. Note: this install.sh
+script will need to be executed for each user.
+</LI>
+</UL>
+<BLOCKQUOTE>
+<TT>% cd divcon-&lt;platform&gt;-&lt;version&gt; ; <A NAME="119"></A>./install.sh</TT>
+
+</BLOCKQUOTE>
+
+<UL>
+<LI>Now simply re-login to make sure that environment features have taken.
+Once you re-login, you should be able to run the following test. This
+test will simply check the environment, and run the prep characteristics
+of the simulation without actually performing any of the quantum mechanics
+calculation.
+</LI>
+</UL>
+<BLOCKQUOTE>
+<TT>% cd $CHEMIXDIR/Examples/1PEF</TT>
+</BLOCKQUOTE>
+<P>
+<BLOCKQUOTE><TT>% divcon <A NAME="125"></A>-i 1PEF.mol2 <A NAME="126"></A>-test</TT>
+
+</BLOCKQUOTE>
+
+<UL>
+<LI>If you have not installed a license file, the above test will fail
+with a statement that an license file must be obtained. Contact sales@quantumbioinc.com
+to purchase a license file. Once you have received a license file
+from QuantumBio, you may install the file with a simple move statement.
+</LI>
+</UL>
+<BLOCKQUOTE>
+<TT>% mv license-file $CHEMIXDIR/etc/license</TT>
+
+</BLOCKQUOTE>
+
 
 <p>
 Before you can run QMScore using MOE or moebatch, you need to make sure that
@@ -104,11 +182,9 @@ you need to copy the MOEDivcon menu file to your home directory.
 For example:
   <p>
   <pre>
-  > cp -u   ${MOEDIVCON_INSTALL_DIR}/moe_menus   ${HOME}
+  > cat   ${MOEDIVCON_INSTALL_DIR}/moe_menus  >> ${HOME}/moe_menus
   </pre>
   </p>
-If you already have a <inlinecode>moe_menus</inlinecode> file in your home
-directory, you will need to concatenate the two menu files.
 </p>
 <p>
 Second, in order for
