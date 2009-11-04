@@ -20,13 +20,12 @@ body {font: 12pt "Times New Roman", serif; margin: 3em;
     background-color: #F0F7FF;}
 ol#tocl {list-style-type: upper-roman;}
 ol ol {list-style-type: upper-latin;}
-pre {margin-left: 4em; font: bold 11pt "Arial", serif;}
 w {text-decoration: underline;}
 x {font-weight: bold;}
 todo {font: bold 11pt "Helvetica", sans-serif; padding: 1px 2px; margin: 2px;
       border: thin solid red;}
 todo:before {content: "TODO: "; color: red;}
-pre {margin-left: 4em; font: bold 11pt "Arial", serif;}
+pre {margin-left: 4em; font: bold 11pt "Courier", serif;}
 inlinecode {font: bold 11pt "Arial", serif;}
 prob {font: italic 11pt "Helvetica", sans-serif;}
 sol {font: 11pt "Times New Roman", serif;}
@@ -88,74 +87,77 @@ key peer-reviewed
 
 <h2><a name="install"></a>Installation</h2>
 
-<P>
+<p>
 The Binary Distribution requires some knowledge of the Linux/Unix
 environment. The following set of steps will show you the types of
 commands you will need to execute in order to properly install DivCon.
+</p>
+<p>
 
-<P>
 
-<UL>
-<LI>The distribution is found within a tar.gz file. This file must be
+The distribution is found within a tar.gz file. This file must be
 uncompressed in order to install the application. To begin, put the
 tar.gz file in a place where you like it. Anywhere will do, but a
 good place for it may be /usr/local. Once you put the file in /usr/local
-you will need to type the following<TT>:</TT>
-</LI>
-</UL>
-<BLOCKQUOTE>
-<TT>% tar -zxvf divcon-&lt;platform&gt;-&lt;version&gt;.tar.gz</TT>
+you will need to type the following:
+<p>
+<pre>
+> tar -zxvf divcon-&lt;platform&gt;-&lt;version&gt;.tar.gz
+</pre>
+</p>
 
-</BLOCKQUOTE>
-
-<UL>
-<LI>Once the file has decompressed, it is ready to become part of your
-environment. This will require the addition of the $CHEMIXDIR environment
-variable along with the sourcing of an environment file (chemix.sh
-or chemix.csh). By adding two lines to your .bashrc file (for the
+<p>
+Once the file has decompressed, it is ready to become part of your
+environment. This will require the addition of the $QBHOME environment
+variable along with the sourcing of an environment file (qbenv.sh
+or qbenv.csh). By adding two lines to your .bashrc file (for the
 bash shell) or .cshrc file (for the csh or the tcsh shells), you will
 be able to access DivCon features. You should execute the following
 in order to (a) find the correct installation directory and switch
 to the bash shell, (b) set that installation path in both .bashrc
 and .cshrc, and (c) source the correct QuantumBio supplied environment
 file. The install.sh file within the DivCon root directory is provided
-for this purpose. It will set the <A NAME="116"></A>$CHEMIXDIR variable
+for this purpose. It will set the <inlinecode>$QBHOME </inlinecode> variable
 and allow the correct files to be sourced upon login. Note: this install.sh
 script will need to be executed for each user.
-</LI>
-</UL>
-<BLOCKQUOTE>
-<TT>% cd divcon-&lt;platform&gt;-&lt;version&gt; ; <A NAME="119"></A>./install.sh</TT>
+</p>
 
-</BLOCKQUOTE>
+<p>
+<pre>
+> cd divcon-&lt;platform&gt;-&lt;version&gt; ; <A NAME="119"></A>./install.sh
+</pre>
+</p>
 
-<UL>
-<LI>Now simply re-login to make sure that environment features have taken.
+<p>
+Now simply re-login to make sure that environment features have taken.
 Once you re-login, you should be able to run the following test. This
 test will simply check the environment, and run the prep characteristics
 of the simulation without actually performing any of the quantum mechanics
 calculation.
-</LI>
-</UL>
-<BLOCKQUOTE>
-<TT>% cd $CHEMIXDIR/Examples/1PEF</TT>
-</BLOCKQUOTE>
-<P>
-<BLOCKQUOTE><TT>% divcon <A NAME="125"></A>-i 1PEF.mol2 <A NAME="126"></A>-test</TT>
+</p>
 
-</BLOCKQUOTE>
-
-<UL>
-<LI>If you have not installed a license file, the above test will fail
+<p>
+<pre>
+> cd   $QBHOME/Examples/1PEF
+</pre>
+</p>
+<p>
+<pre>
+> divcon   -i   1PEF.mol2   -test
+</pre>
+</p>
+<p>
+If you have not installed a license file, the above test will fail
 with a statement that an license file must be obtained. Contact sales@quantumbioinc.com
 to purchase a license file. Once you have received a license file
 from QuantumBio, you may install the file with a simple move statement.
-</LI>
-</UL>
-<BLOCKQUOTE>
-<TT>% mv license-file $CHEMIXDIR/etc/license</TT>
+</p>
 
-</BLOCKQUOTE>
+<p>
+<pre>
+> mv   license-file   $QBHOME/etc/license
+</pre>
+</p>
 
 
 <p>
@@ -165,7 +167,7 @@ your .bashrc file:
 </p>
 <p>
 <pre>
-export  PATH=${MOEDIVCON_INSTALL_DIR}/bin:${PATH}
+> export  PATH=${QBHOME}/bin:${PATH}
 </pre>
 </p>
 <p>
@@ -173,7 +175,7 @@ or add to your .cshrc file:
 </p>
 <p>
 <pre>
-setenv   PATH   ${MOEDIVCON_INSTALL_DIR}/bin:${PATH}
+> setenv   PATH   ${QBHOME}/bin:${PATH}
 </pre>
 </p>
 
@@ -181,11 +183,11 @@ setenv   PATH   ${MOEDIVCON_INSTALL_DIR}/bin:${PATH}
 The last two steps of the installation are very important.  First,
 you need to copy the MOEDivcon menu file to your home directory.
 For example:
-  <p>
-  <pre>
-  > cat   ${MOEDIVCON_INSTALL_DIR}/moe_menus  >> ${HOME}/moe_menus
-  </pre>
-  </p>
+<p>
+<pre>
+> cat   ${QBHOME}/moe_menus  >> ${HOME}/moe_menus
+</pre>
+</p>
 </p>
 <p>
 Second, in order for
@@ -193,23 +195,23 @@ MOE to locate the MOEDivcon SVL library, you must create a link to the
 library in a place where MOE can find it.  If you already have a directory
 of SVL scripts, link the MOEDivcon SVL libarary as a subdirectory.
 For example:
-  <p>
-  <pre>
-  > ln -s   ${MOEDIVCON_INSTALL_DIR}/svl   ${MOE_SVL_PATH}/qb_lib.svl
-  </pre>
-  </p>
+<p>
+<pre>
+> ln -s   ${QBHOME}/svl   ${MOE_SVL_PATH}/qb_lib.svl
+</pre>
+</p>
 Otherwise, create an SVL directory in your home directory and link the
 MOEDivcon SVL library under it.  For example:
-  <p>
-  <pre>
-  > mkdir  ${HOME}/svl
-  </pre>
-  </p>
-  <p>
-  <pre>
-  > ln -s   ${MOEDIVCON_INSTALL_DIR}/svl   ${HOME}/svl/qb_lib.svl
-  </pre>
-  </p>
+<p>
+<pre>
+> mkdir  ${HOME}/svl
+</pre>
+</p>
+<p>
+<pre>
+> ln -s   ${QBHOME}/svl   ${HOME}/svl/qb_lib.svl
+</pre>
+</p>
 Note:  the link of the subdirectory must be named
 <inlinecode> qb_lib.svl </inlinecode>.
 </p>
