@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ ! "$CHEMIXDIR" ]; then
+if [ ! "$QBHOME" ]; then
     filename=$0
     if [ "`echo $filename | grep -s '/'`" ]; then
         D="`echo $filename | sed 's:/[^/]*$::'`"
@@ -43,12 +43,12 @@ if [ ! "$CHEMIXDIR" ]; then
         D=`pwd`/"$D"
     fi
 
-    CHEMIXDIR=`echo "$D" | sed 's:/bin$::'`
-    export CHEMIXDIR
+    QBHOME=`echo "$D" | sed 's:/bin$::'`
+    export QBHOME
 fi
 
 if [ -z "$QBENVSET" ]; then
-    . $CHEMIXDIR/etc/chemix.sh
+    . $QBHOME/etc/qbenv.sh
 fi
 
 moedivconscoring.bin $@ - 
