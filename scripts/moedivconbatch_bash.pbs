@@ -20,8 +20,5 @@ echo "\$eof" >> moedivcon_machinefile
 # Change the path and name for the MOE database.
 USER_DATADB="$PWD/qmscore.mdb"
 
-# Change the path to the QB SVL library according to your local installation.
-QB_LIB_SVL="$HOME/svl/qb_lib.svl"
-
-moebatch -mpu moedivcon_machinefile -exec "run ['$QB_LIB_SVL/qmsbatch.svl', ['$USER_DATADB']]" -exit
+moebatch -mpu moedivcon_machinefile -exec "run ['qmsbatch.svl', ['$USER_DATADB']]" -exit
 

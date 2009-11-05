@@ -26,10 +26,12 @@ todo {font: bold 11pt "Helvetica", sans-serif; padding: 1px 2px; margin: 2px;
       border: thin solid red;}
 todo:before {content: "TODO: "; color: red;}
 pre {margin-left: 4em; font: bold 11pt "Courier", serif;}
-inlinecode {font: bold 11pt "Arial", serif;}
+inline {font: bold 11pt "Courier", serif;}
 prob {font: italic 11pt "Helvetica", sans-serif;}
 sol {font: 11pt "Times New Roman", serif;}
 sol:before {content: "Possible solution:  "; color:  #0099DD; }
+sup {font: bold 1.5em Helvetica, sans-serif; color: #0099DD;
+    text-align: center;}
 </style>
 </head>
 
@@ -68,7 +70,7 @@ QuantumBio
     <li><a href="#parallel-mode">Parallel Mapping Mode</a></li>
   </ol>
   <li><a href="#trouble">Troubleshooting</a></li>
-</ol>
+  <li><a href="#contact">Support Contact Information</a></li></ol>
 
 <h2><a name="intro"></a>QMScore Introduction</h2>
 
@@ -88,108 +90,37 @@ key peer-reviewed
 <h2><a name="install"></a>Installation</h2>
 
 <p>
-The Binary Distribution requires some knowledge of the Linux/Unix
-environment. The following set of steps will show you the types of
-commands you will need to execute in order to properly install DivCon.
+MOEDivcon is packaged along with the QuantumBio Divcon Distribution in a
+<inline>tar.gz</inline> file using the following naming convention 
+<inline>divcon-&lt;platform&gt;-&lt;version&gt;.tar.gz</inline>.
 </p>
 <p>
+ For instance, if you extract the divcon version 5.0.0.1 package
+for linux in
+<inline>/usr/local</inline> directory, <inline>$QBHOME</inline> will
+refer to <inline>/usr/local/divcon-linux-5.0.0.1</inline>.
 
-
-The distribution is found within a tar.gz file. This file must be
-uncompressed in order to install the application. To begin, put the
-tar.gz file in a place where you like it. Anywhere will do, but a
-good place for it may be /usr/local. Once you put the file in /usr/local
-you will need to type the following:
+</p>
 <p>
 <pre>
-> tar -zxvf divcon-&lt;platform&gt;-&lt;version&gt;.tar.gz
+&gt; tar -zxvf divcon-&lt;platform&gt;-&lt;version&gt;.tar.gz
 </pre>
 </p>
 
 <p>
-Once the file has decompressed, it is ready to become part of your
-environment. This will require the addition of the $QBHOME environment
-variable along with the sourcing of an environment file (qbenv.sh
-or qbenv.csh). By adding two lines to your .bashrc file (for the
-bash shell) or .cshrc file (for the csh or the tcsh shells), you will
-be able to access DivCon features. You should execute the following
-in order to (a) find the correct installation directory and switch
-to the bash shell, (b) set that installation path in both .bashrc
-and .cshrc, and (c) source the correct QuantumBio supplied environment
-file. The install.sh file within the DivCon root directory is provided
-for this purpose. It will set the <inlinecode>$QBHOME </inlinecode> variable
-and allow the correct files to be sourced upon login. Note: this install.sh
-script will need to be executed for each user.
 </p>
 
-<p>
-<pre>
-> cd divcon-&lt;platform&gt;-&lt;version&gt; ; <A NAME="119"></A>./install.sh
-</pre>
-</p>
-
-<p>
-Now simply re-login to make sure that environment features have taken.
-Once you re-login, you should be able to run the following test. This
-test will simply check the environment, and run the prep characteristics
-of the simulation without actually performing any of the quantum mechanics
-calculation.
-</p>
-
-<p>
-<pre>
-> cd   $QBHOME/Examples/1PEF
-</pre>
-</p>
-<p>
-<pre>
-> divcon   -i   1PEF.mol2   -test
-</pre>
-</p>
-<p>
-If you have not installed a license file, the above test will fail
-with a statement that an license file must be obtained. Contact sales@quantumbioinc.com
-to purchase a license file. Once you have received a license file
-from QuantumBio, you may install the file with a simple move statement.
-</p>
-
-<p>
-<pre>
-> mv   license-file   $QBHOME/etc/license
-</pre>
-</p>
-
-
-<p>
-Before you can run QMScore using MOE or moebatch, you need to make sure that
-the MOEDivcon executables are in your path.  For example, you should add to
-your .bashrc file:
-</p>
-<p>
-<pre>
-> export  PATH=${QBHOME}/bin:${PATH}
-</pre>
-</p>
-<p>
-or add to your .cshrc file:
-</p>
-<p>
-<pre>
-> setenv   PATH   ${QBHOME}/bin:${PATH}
-</pre>
-</p>
-
-<p>
+<p><p><a name="install-menu"></a>
 The last two steps of the installation are very important.  First,
 you need to copy the MOEDivcon menu file to your home directory.
 For example:
 <p>
 <pre>
-> cat   ${QBHOME}/moe_menus  >> ${HOME}/moe_menus
+&gt; cat   ${QBHOME}/moe_menus  >> ${HOME}/moe_menus
 </pre>
 </p>
 </p>
-<p>
+<p><p><a name="install-svl"></a>
 Second, in order for
 MOE to locate the MOEDivcon SVL library, you must create a link to the
 library in a place where MOE can find it.  If you already have a directory
@@ -197,27 +128,57 @@ of SVL scripts, link the MOEDivcon SVL libarary as a subdirectory.
 For example:
 <p>
 <pre>
-> ln -s   ${QBHOME}/svl   ${MOE_SVL_PATH}/qb_lib.svl
+&gt; ln -s   ${QBHOME}/svl   ${MOE_SVL_PATH}/qb_lib.svl
 </pre>
 </p>
 Otherwise, create an SVL directory in your home directory and link the
 MOEDivcon SVL library under it.  For example:
 <p>
 <pre>
-> mkdir  ${HOME}/svl
+&gt; mkdir  ${HOME}/svl
 </pre>
 </p>
 <p>
 <pre>
-> ln -s   ${QBHOME}/svl   ${HOME}/svl/qb_lib.svl
+&gt; ln -s   ${QBHOME}/svl   ${HOME}/svl/qb_lib.svl
 </pre>
 </p>
 Note:  the link of the subdirectory must be named
-<inlinecode> qb_lib.svl </inlinecode>.
+<inline> qb_lib.svl</inline>.
+<p><a name="install-path"></a>
+Before you can run QMScore using MOE or moebatch, you need to make sure that
+the MOEDivcon executables are in your path.  For example, you should add to
+your .bashrc file:
+</p>
+<p>
+<pre>
+&gt; export  PATH=${QBHOME}/bin:${PATH}
+</pre>
+</p>
+<p>
+or add to your .cshrc file:
+</p>
+<p>
+<pre>
+&gt; setenv   PATH   ${QBHOME}/bin:${PATH}
+</pre>
+</p>
+</p>
+<p><a name="install-license"></a>
+MOEDivcon is distributed with an evaluation license that will eventually 
+expire. Contact sales@quantumbioinc.com to purchase a license file. 
+Once you have received a license file
+from QuantumBio, you can install the file with a simple move statement.
+</p>
+<p>
+<pre>
+&gt; mv   license-file   $QBHOME/etc/license
+</pre>
 </p>
 
+
 <p>  If you are having difficulties with the installation, see the
-<a href="#trouble">troubleshooting</a> section.
+<a href="#contact">Support Contact Information</a> section.
 </p>
 
 <h2><a name="start"></a>Getting Started</h2>
@@ -251,7 +212,7 @@ data="images/qmscoredefault.png" type=image/png>
 </p>
 <p>
 Click on the arrow in the <w>Working Dir</w> drop down menu and select
-<inlinecode>/tmp</inlinecode> (files for storing intermediate
+<inline>/tmp</inline> (files for storing intermediate
 calculations will be written here).  Press the <w>Run</w> button.  If all goes
 well, QMScore will execute using the receptor and ligand complex shown in
 the MOE Window.  After several seconds, the MOE database viewer should open
@@ -282,7 +243,6 @@ section for more information on taking advantage of this feature.
 
 <h2><a name="options"></a>Options</h2>
 <p>
-<p><todo> Describe the options.  </todo></p>
 
 Note:  not all options are fully implemented at this time.
 
@@ -313,15 +273,12 @@ directory will be ahead of time, you can select the CWD option.
 data="images/qmscorecwd.png" type=image/png>
 </p>
 In this case the current working directory will be set using the run time
-environment variable <inlinecode>$PWD</inlinecode>.
+environment variable <inline>$PWD</inline>.
 
 <h3><a name="options-ham"></a>Hamiltonian</h3>
 <p>
 Several options are available in chosing the Hamiltonian algorithm to use
 with QMScore.  However, PM3 the default, has proved to be the most reliable.
-
-<p><todo> Describe more completely chemistry-related options.  </todo></p>
-
 </p>
 
 <h3><a name="options-opt"></a>Ligand Optimization</h3>
@@ -331,18 +288,12 @@ This optimization may occur either while the ligand is docked within
 the target or while the ligand is separate from the target.
 Warning: this optional step will significantly increase the CPU cost
 of the calculation.
-
-<p><todo> Describe more completely chemistry-related options.  </todo></p>
-
 </p>
 
 <h3><a name="options-freq"></a>Frequency</h3>
 <p>
 Perform frequency calculation to determine ligand entropy in score
 function.  Warning: may increase CPU cost of the calculation.
-
-<p><todo> Describe more completely chemistry-related options.  </todo></p>
-
 </p>
 
 <h2><a name="parallel"></a>Batch and Parallel Execution</h2>
@@ -409,13 +360,97 @@ moebatch -mpu moedivcon_machinefile -exec "run ['qmsbatch.svl', ['$USER_DATADB']
 
 
 <h2><a name="trouble"></a>Troubleshooting</h2>
-<p><todo> Verify MOE procedure.  </todo></p>
-
+We list here potential problems using the MOEDivcon integration and possible
+solutions.  If your problem is not listed here or the proposed solution 
+doesn't help, please <a href="#contact">contact</a> support.
 <ui>
   <li><p><prob>
-    I don't know.
+    The QuantumBio submenu is not appearing in the MOE menu system.
+    </prob></p>
+    <p><sol>MOE requires that custom menu files
+    (<inline>moe_menus</inline>) reside in the user's home directory.
+    Either copy, link, or concatenate the MOEDivon custom menu into yours (see
+    the <a href="#install-menu">menu installation</a> section).
+  </sol></p></li>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+run: Environment variable not found.
+    </pre>
     </prob></p><p><sol>
-    Why should I care?
+    MOE's run is unable to find the MOEDivcon SVL scripts.  Make sure the
+    <inline>MOE_SVL_RUNPATH</inline> is 
+    set up correctly (see the <a href="#install-path">installation</a>
+    section).
+  </sol></p></li>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+No molecular complex loaded in MOE Window.
+    </pre>
+    </prob></p><p><sol>
+    When using QMScore in 'One-to-One' or 'One-to-Many' mode, you need to first
+    open the molecule files (.pdb, .moe, etc.) of the complex (or receptor and
+    ligand separately) into MOE.  MOEDivcon populates the QMScore database with
+    the molecular data in the MOE Window.
+  </sol></p></li>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+No ligand was recognized.  Use LigX to define it.
+    </pre>
+    </prob></p><p><sol>
+    For most protein/ligand complexes, MOE should be able to identify the ligand
+    using its heuristics.  However in smaller systems, especially when the
+    receptor has been cut, the ligand isn't always easily picked out.  You can
+    assist the process with this quick guide to LigX.
+    <ol>
+      <li> Select an atom in the ligand. </li>
+      <li> Extend the selection to entire molecule
+      (<w>Select</w>&rarr;<w>Extend </w>&rarr;<w>Molecule</w>). </li>
+      <li> In <w>LigX</w>, select menu <w>Prepare</w> and submenu item
+           <w>Choose Ligand</w>.</li>
+      <li> <w>Quit LigX</w>. </li>
+      <li> LigX alters the MOE View for pocket elucidation.  To clean up the
+           View, select MOE menus <w>Show</w>&rarr;<w>All</w>
+           and <w>Color</w>&rarr;<w>Element</w>.
+      </li>
+    </ol>
+    MOEDivcon should now be able to identify the ligand.
+  </sol></p></li>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+Ligand has to be a single molecule.
+    </pre>
+    </prob></p><p><sol>
+    The current version of QMScore expects one receptor and one ligand.  The
+    receptor may comprise many chains, solvents, etc.  The ligand has to
+    a single molecule.  If your problem involves multiple ligands within the
+    same complex, we recommend you isolate each ligand for independent
+    analysis.  Or <a href=#contact>contact</a> our scientific support group
+    to resolve this issue in a future release.
+  </sol></p></li>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+    qb_QMScore: fwrite: Broken pipe.
+    </pre>
+    </prob></p><p><sol>
+    MOE is unable to find the MOEDivcon executables.  Make sure the 
+    <inline>PATH</inline> is 
+    set up correctly (see the <a href="#install-path">installation</a>
+    section).
+  </sol></p></li>
+  <li><p><prob>
+    I get the message in the <w>Status</w> field of the QMScore database:
+    <pre>
+Error:   LICENSE ERROR: Problem with license file. Be sure that QBHOME is set correctly and license file is correct.Error Code: 1003.
+    </pre>
+    </prob></p><p><sol>
+    MOEDivcon is distributed with an evaluation license which expires after a
+    few months.  See the <a href="#install-license">license installation</a>
+    section for more information on purchasing and installing a license.
   </sol></p></li>
   <li><p><prob>
     I don't know.
@@ -441,55 +476,6 @@ moebatch -mpu moedivcon_machinefile -exec "run ['qmsbatch.svl', ['$USER_DATADB']
 
     </sol></p></li>
   <li><p><prob>
-    The QuantumBio submenu is not appearing in the MOE menu system.
-    </prob></p>
-    <p><sol>MOE requires that custom menu files
-    (<inlinecode>moe_menus</inlinecode>) reside in the user's home directory.
-    Either copy, link, or concatenate the MOEDivon custom menu into yours (see
-    the <a href="#install">Installation</a> section for details).
-  </sol></p></li>
-  <li><p><prob>
-    I got the message: "No molecular complex loaded in MOE Window."  Why?
-    </prob></p><p><sol>
-    When using QMScore in 'One-to-One' or 'One-to-Many' mode, you need to first
-    open the molecule files (.pdb, .moe, etc) of the complex (or receptor and
-    ligand separately) into MOE.  MOEDivcon populates the QMScore database with
-    the molecular data in the MOE View.
-  </sol></p></li>
-  <li><p><prob>
-    I got the message:  "No ligand was recognized.  Use LigX to define it."
-    Why?
-    </prob></p><p><sol>
-    For most protein/ligand complexes, MOE should be able to identify the ligand
-    using its heuristics.  However in smaller systems, especially when the
-    receptor has been cut, the ligand isn't always easily picked out.  You can
-    assist the process with this quick guide to LigX.
-    <ol>
-      <li> Select an atom in the ligand. </li>
-      <li> Extend the selection to entire molecule. </li>
-      <li> In <w>LigX</w>, select menu <w>Prepare</w> and submenu item
-           <w>Select Ligand</w></li>
-      <li> Exit out of <w>LigX</w>. </li>
-      <li> LigX alters the MOE View for pocket elucidation.  To clean up the
-           View, select MOE menus <w>Show All</w> and <w>Color Element</w>.
-      </li>
-    </ol>
-    MOEDivcon should now be able to identify the ligand.
-  </sol></p></li>
-  <li><p><prob>
-    I got the message: "Ligand has to be a single molecule."  What does this
-    mean?
-    </prob></p><p><sol>
-    The current version of QMScore expects one receptor and one ligand.  The
-    receptor may comprise many chains, solvents, etc.  The ligand, no--only a
-    single molecule.  If your problem involves multiple ligands within the
-    same complex, we recommend you isolate each ligand for independent
-    analysis.  Or contact our scientific support group to resolve this issue
-    in a future release.
-     <p><todo> Support contact information?  </todo></p>
-
- </sol></p></li>
-  <li><p><prob>
     How do I know when all jobs of a MOEDivcon batch run have completed, or
     more importantly, are likely to converge.
     </prob></p><p><sol>
@@ -499,12 +485,33 @@ moebatch -mpu moedivcon_machinefile -exec "run ['qmsbatch.svl', ['$USER_DATADB']
   </sol></p></li>
 </ui>
 
+<h2><a name="contact"></a>Support Contact Information</h2>
 
-<p><todo> Support contact information?  </todo></p>
-
+<p>
+<a href="http://www.quantumbioinc.com/Support/index.html"
+   target="QBHomePageSupport"> <object height=51 align=left
+   data="images/qb_logo.png" type=image/png>
+QuantumBioSupport
+</object> </a>
+<a href="http://www.quantumbioinc.com/Support/index.html"
+   target="QBHomePageSupport"> <object id=ri height=51 align=right
+   data="images/qb_logo.png" type=image/png>
+QuantumBioSupport
+</object> </a>
+<sup>
+<div>
+QuantumBio Inc.<br>
+200 Innovation Blvd.<br>
+State College, PA 16803<br>
+Phone: 814-308-9406<br>
+Fax: 814-235-6909<br>
+email: support@quantumbioinc.com
+</div>
+</sup>
+</p>
 
 <hr>
-<p>&#169; 2009 by QuantumBio, Inc.</p>
+<p>&copy;2009 by QuantumBio, Inc.</p>
 
 </body>
 
