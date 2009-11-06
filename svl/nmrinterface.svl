@@ -52,9 +52,9 @@ endif
     write ['Work Dir:  {}\n', workdir];  //DEBUG
 
 if opts.task === [] then
-    subdirname = opts.workdir;
+    subdirname = workdir;
 else
-    subdirname = twrite ['{}/qb_out{n:}', opts.workdir, opts.task];
+    subdirname = twrite ['{}/qb_out{n:}', workdir, opts.task];
     local okay = _fmkdir subdirname;
     if okay === -1 then
         errmess = swrite ['Unable to create subdirectory:  {}',
