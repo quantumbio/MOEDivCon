@@ -90,20 +90,19 @@ key peer-reviewed
 <h2><a name="install"></a>Installation</h2>
 
 <p>
-MOEDivcon is packaged along with the QuantumBio Divcon Distribution in a
+MOEDivcon is part of the QuantumBio Distribution packaged in a
 <inline>tar.gz</inline> file using the following naming convention 
-<inline>divcon-&lt;platform&gt;-&lt;version&gt;.tar.gz</inline>.
-</p>
-<p>
- For instance, if you extract the divcon version 5.0.0.1 package
-for linux in
-<inline>/usr/local</inline> directory, <inline>$QBHOME</inline> will
-refer to <inline>/usr/local/divcon-linux-5.0.0.1</inline>.
+<inline>quantumbio-&lt;platform&gt;-&lt;version&gt;.tar.gz</inline>.  We will
+use <inline>$QBHOME</inline> to refer to the path where the package is
+installed.  For instance, if you install version 5.0.0.1 for linux in 
+the <inline>/usr/local</inline> directory, 
+<inline>$QBHOME</inline> will
+refer to <inline>/usr/local/quantumbio-linux-5.0.0.1</inline>.
 
 </p>
 <p>
 <pre>
-&gt; tar -zxvf divcon-&lt;platform&gt;-&lt;version&gt;.tar.gz
+&gt; tar -zxvf quantumbio-&lt;platform&gt;-&lt;version&gt;.tar.gz
 </pre>
 </p>
 
@@ -324,11 +323,11 @@ moebatch -mpu moedivcon_machinefile -exec "run ['qmsbatch.svl', ['$USER_DATADB']
 
 <h4><a name="parallel-mode-1to1"></a>One Receptor--One Ligand</h4>
 <p>
-<p>
+</p>
 <pre>
 moebatch -exec "run ['qmsbatch.svl', ['$USER_DATADB']]" -exit
 </pre>
-</p>
+<p>
 
 </p>
 
