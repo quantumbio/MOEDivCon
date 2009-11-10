@@ -51,20 +51,11 @@ const LIG_KEYS =
 global function qb_QMScore [receptor_mols, ligand_mol, opts]
 
 local errmess = [];
-local workdir;
 local subdirname;
-if opts.pwd === 1 then
-    workdir = getenv 'PWD';
-else
-    workdir = fabsname opts.workdir;
-endif
-
-    write ['Work Dir:  {}\n', workdir];  //DEBUG
-
 if opts.task === [] then
-    subdirname = workdir;
+    subdirname = opts.workdir;
 else
-    subdirname = twrite ['{}/qb_out{n:}', workdir, opts.task];
+    subdirname = twrite ['{}/qb_out{n:}', opts.workdir, opts.task];
     local okay = _fmkdir subdirname;
     if okay === -1 then
         errmess = swrite ['Unable to create subdirectory:  {}',
