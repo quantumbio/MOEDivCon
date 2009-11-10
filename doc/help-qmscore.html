@@ -54,14 +54,14 @@ QuantumBio Homepage
 
 <h2><a name="ToC"></a>Table of Contents</h2>
 <ol id=tocl>
-  <li><a href="ToC">Table of Contents</a></li>
+  <li><a href="#ToC">Table of Contents</a></li>
   <li><a href="#intro">QMScore Introduction</a></li>
   <li><a href="#install">Installation</a></li>
   <li><a href="#start">Getting Started</a></li>
   <li><a href="#parallel">Batch and Parallel Execution</a></li>
   <ol>
     <li><a href="#parallel-mode">Parallel Mapping Mode</a></li>
-    <li><a href="#parallel-moebatch">Moebatch</a></li>
+    <li><a href="#parallel-moebatch">Running Moebatch</a></li>
   </ol>
   <li><a href="#options">Options</a></li>
   <ol>
@@ -154,7 +154,8 @@ else<br>
 </pre>
 
 <p><a name="install-license"></a>
-MOEDivcon is distributed with an evaluation license that will eventually 
+Finally, MOEDivcon is distributed with an evaluation license that will
+eventually 
 expire. Contact sales@quantumbioinc.com to purchase a license file. 
 Once you have received a license file
 from QuantumBio, you can install the file with a simple move statement.<pre>
@@ -168,11 +169,11 @@ If you are having difficulties with the installation, see the
 <p>
 To verify that the installation was successful, let's work through a 
 simple example.  If you run into any problems, see the <a href="#trouble">
-troubleshooting</a> section.
+Troubleshooting</a> section.
 <p>
 The workflow of MOEDivcon QMScoring involves four steps:
 <ol>
-  <li>Prepping the receptors and ligand (poses) involved in the calculation.
+  <li>Prepping the receptors and ligands/poses involved in the calculation.
   </li>
   <li>Setting up the run parameters to QMScore. </li>
   <li>Executing QMScore either on a local machine or in parallel on a cluster.
@@ -183,14 +184,14 @@ The workflow of MOEDivcon QMScoring involves four steps:
 First, start MOE and open 
 <inline>${QBHOME}/examples/simplecomplex.moe</inline>.  Then,
 select the MOE menu <w>Compute</w>, submenu <w>Simulations</w>, submenu
-<w>QuantumBio</w>, and menu item <w>QMScore</w> (see below).
+<w>QuantumBio</w>, and menu item <w>QMScore</w>.
 <p>
 <object id="MOEwithMenu" title="Moe Window with QuantumBio Menu" width=1000 
 data="images/mainwithmenu.png" type=image/png>
 Moe Window with QuantumBio Menu
 </object>
 <p>
-The QMScore dialog should appear with the default values (see below).
+The QMScore dialog should appear with the default values.
 <p>
 <object id="QMScoreDefaultDialog" title="QMScore Dialog"
 data="images/qmscoredefault.png" type=image/png>
@@ -202,7 +203,7 @@ Ensure that the <w>Working Dir</w> is
  will be written here).  Press the <w>Run</w> button.  If all goes
 well, QMScore will execute using the receptor and ligand complex shown in
 the MOE Window.  After several seconds, the MOE database viewer should open
-the QMScore database showing the results (see below).
+the QMScore database showing the results.
 <p>
 <object id="QMScoreDatabase" title="QMScore Database" width=1000 
 data="images/qmscoredatabase.png" type=image/png>
@@ -220,7 +221,7 @@ and collate the results in a MOE database.  In this case, one would prep
 the molecules with MOE and set up the QMScore parameters in one
 session, then use moebatch to execute the tasks in parallel on a cluster.
 After the QMScore runs have completed, one can use MOE to open the QMScore
-database to view the collated results.
+database to view and analyze the collated results.
 
 <h2><a name="parallel"></a>Batch and Parallel Execution</h2>
 <p>
@@ -229,44 +230,41 @@ of MOEDivcon QMSore proceeds in four step:  preparation, set up, execution,
 and analysis.  The prep, set up, and analysis steps are performed using MOE on
 your local workstation or laptop.  The third step, execution, is best left to a
 computational cluster, whether you are scoring one complex or hundreds.  
-
 <p>
-This
-is where moebatch comes into play.
-
+Before getting into the details of executing moebatch on a cluster, we'll
+explain how to setup MOEDivcon QMScore to run a single job in batch mode or
+many jobs in parallel.
 
 <h3><a name="parallel-mode"></a>Mapping Mode</h3>
 <p>
-The mapping mode determines how receptors are to be mapped to ligand (poses).
+The mapping mode determines how receptors are to be mapped to ligands (poses).
 
 <h4><a name="parallel-mode-1to1"></a>One Receptor--One Ligand</h4>
 <p>
-In <w>One-to-One</w> mode, the set up is the same as in the 
+In <w>One-to-One</w> batch mode, the set up is the same as in the 
 <a href="#start">Getting Started</a> section.  Open the receptor
-and ligand files into the MOE Window, perform any necessary preparations,
-open the QMScore dialog and chose your options, and then chose <w>Save</w>
-rather than <w>Run</w>.  MOEDivcon will store your receptor, ligand, and 
+and ligand files into the MOE Window and perform any necessary preparatory
+steps.
+Next, open the QMScore dialog and select your options, and then choose
+<w>Save</w> rather than <w>Run</w>.  MOEDivcon will store your receptor,
+ligand, and 
 options in the QMScore database, and then open the MOE DB viewer so you can
-verify the data.  
-<p>
-After you close the database, you can execute QMScore with
-moebatch from the command line:
-<pre>
-&gt; moebatch -exec "run ['qmsbatch.svl', ['$USER_DATADB']]" -exit
-</pre>
-where <inline>$USER_DATADB</inline> is the path to your database.  You can
-also execute moebatch by submitting the job to a cluster queue.  Example
-scripts for PBS and SGE are located in <inline>${QBHOME}/scripts</inline>.
+verify the ligand/pose data.  See the 
+<a href="#parallel-moebatch">Running Moebatch</a> section
+to learn how to execute the job.
+
 <h4><a name="parallel-mode-1toM"></a>One Receptor--Many Ligand Poses</h4>
 <p>
-In <w>One-to-Many</w> mode, the set up is similar to  
-<a href="#parallel-mode-1to1"><w>One-to-One</w></a> mode.  The difference
-is that you need to create a MOE database to store the ligand poses generated
-by your favorite docking program beforehand.
-
+In <w>One-to-Many</w> parallel mode, MOEDivcon scores many ligand poses
+generated by your favorite docking program against the same receptor.  The set
+up is similar to <a href="#parallel-mode-1to1"><w>One-to-One</w></a> mode in
+that MOEDivcon expects the receptor/ligand complex to be in the MOE Window.
+The difference is that you need to create a MOE database to store the ligand
+poses beforehand (see the MOE documentation if you are not familiar with
+this process).
 <p>
-Open the receptor
-and ligand files into the MOE Window, open the QMScore dialog and chose your 
+Open the receptor and ligand files into the MOE Window, open the QMScore
+dialog and choose your 
 options.  When you select the <w>One-to-Many</w> mode, you will be prompted
 to supply a ligand/pose database.
 <p>
@@ -275,26 +273,21 @@ data="images/qmscoreonetomany.png" type=image/png >
 QMScore One-to-Many Mode
 </object>
 <p>
-When you chose <w>Save</w>,  MOEDivcon will store your receptor, ligand, and 
+When you choose <w>Save</w>,  MOEDivcon will store your receptor, ligand, and 
 options in the QMScore database, and it will copy the ligand/pose database into
 the QMScore database including any data fields (e.g., results from other scoring
 algorithms).  The MOE DB viewer will then open the QMScore database so 
-you can verify the data. 
-<p>
-After you close the database, you can execute QMScore with
-moebatch from the command line: 
-<pre>
-moebatch -mpu moedivcon_machinefile -exec "run ['qmsbatch.svl', ['$USER_DATADB']]" -exit
-</pre>
-where <inline>$USER_DATADB</inline> is the path to your database and
-<inline>moedivcon_machinefile</inline> specifies the MOE machine file (see
-the MOE/smp documentation for details on the machine file).  You can
-also execute moebatch by submitting the job to a cluster queue.  Example
-scripts for PBS and SGE are located in <inline>${QBHOME}/scripts</inline>.  The
-scripts also demonstrate how to automatically generate the MOE machine file.
+you can verify the ligand/pose data.  See the 
+<a href="#parallel-moebatch">Running Moebatch</a> 
+section to learn how to execute the job.
 
 <h4><a name="parallel-mode-MtoM"></a>Many Receptors--Many Ligands</h4>
 <p>
+In the <w>Many-to-Many</w> parallel mode, MOEDivcon scores many receptors,
+each against its own ligand.  In this case, MOEDivcon gathers the molecular
+information from the two databases you need to supply.  Additionally, it
+is up to the user to assure that the receptors and ligands are stored in the
+correct order in the MOE databases.
 
 <p>
 <object id="QMScoreManyToMany" title="QMScore Many-to-Many Mode"
@@ -302,21 +295,79 @@ data="images/qmscoremanytomany.png" type=image/png>
 QMScore Many-to-Many Mode
 </object>
 <p>
+When you choose <w>Save</w>,  MOEDivcon will store your options in the 
+QMScore database, and it will copy the receptor and ligand databases, row
+by row, into the QMScore database including any data fields.  The MOE 
+DB viewer will then open the QMScore database so you can verify the receptor
+and ligand data. 
+See the <a href="#parallel-moebatch">Running Moebatch</a> section
+to learn how to execute the job.
+
+<h3><a name="parallel-moebatch"></a>Running Moebatch</h3>
+<p>
+After you close the database, you can execute MOEDivcon QMScore in at least
+three different ways.  In the examples below, <inline>$USER_DATADB</inline> 
+is the path to your QMScore database.
+
+<p>
+You can run moebatch on your workstation from the command line:
+<pre>
+&gt; moebatch -N -exec "run ['qmsbatch.svl', ['$USER_DATADB']]" -exit
+</pre>
+where <inline>N</inline> is the number of local processors to use.
+
+<p>
+You can run moebatch on a LAN:
 <pre>
 moebatch -mpu moedivcon_machinefile -exec "run ['qmsbatch.svl', ['$USER_DATADB']]" -exit
 </pre>
-
-
-<h3><a name="parallel-moebatch"></a>Moebatch</h3>
-<p>
-
-Warning:  the number of processors (nodes * ppn) should not exceed the
-number of available MOE licenses.
-
-<p>
+where <inline>moedivcon_machinefile</inline> is the MOE machine file, which
+has the following format:
 <pre>
+localhost ssh hostname01 'moebatch -mpu -'
+localhost ssh hostname01 'moebatch -mpu -'
+localhost ssh hostname02 'moebatch -mpu -'
+localhost ssh hostname02 'moebatch -mpu -'
+localhost ssh hostname03 'moebatch -mpu -'
+localhost ssh hostname03 'moebatch -mpu -'
+$eof
+</pre>
+See the MOE/smp documentation for more details on the machine file.
+<p>
+You can
+also execute moebatch by submitting the job to a cluster queue.  Example
+scripts for PBS and SGE are located in <inline>${QBHOME}/scripts</inline>.
+For example, below is the script for submitting a parallel job to PBS
+using bash (<inline>${QBHOME}/scripts/moedivconbatch_bash.pbs</inline>):
+<pre>
+#!/bin/bash
+#PBS -S /bin/bash
+#  Warning:  the number of processors (nodes * ppn) should not exceed the
+#  number of available MOE licenses.
+#PBS -l nodes=6:ppn=2
+#PBS -j oe
+
+hostname
+date
+cat $PBS_NODEFILE
+cd $PBS_O_WORKDIR
+
+# Generate the MOE machine file from the PBS list of processors.
+rm -f moedivcon_machinefile
+for mach in $( cat $PBS_NODEFILE ); do
+   echo "localhost ssh $mach 'moebatch -mpu -'" >> moedivcon_machinefile
+done
+echo "\$eof" >> moedivcon_machinefile
+
+# Change the path and name for the MOE database.
+USER_DATADB="$PWD/qmscore.mdb"
+
 moebatch -mpu moedivcon_machinefile -exec "run ['qmsbatch.svl', ['$USER_DATADB']]" -exit
 </pre>
+The script requests the number of proccessors to use in the batch job and
+uses the list of nodes in the <inline>PBS_NODEFILE</inline> to automatically
+generate the MOE machine file.  Note that the number of processors you can
+use is limited by the number of MOE licenses you have been granted.
 
 
 <h2><a name="options"></a>Options</h2>
@@ -332,7 +383,7 @@ QMScore results.  One advantage is that the database is self-contained:  all
 of the data and parameters needed to execute QMScore are stored in the
 database.  The database can be moved to a working directory prior to
 execution time as long as the correct path is provided to the moebatch
-command (see the <a href="#parallel-moebatch">Moebatch</a>
+command (see the <a href="#parallel-moebatch">Running Moebatch</a>
 section for more information).  Another advantage is the suite of MOE 
 data analysis tools designed to work with its database.
 
@@ -471,17 +522,22 @@ Ligand has to be a single molecule.
   <li><p><prob>
     I get the message in the <w>Status</w> field of the QMScore database:
     <pre>
-Error:   LICENSE ERROR: Problem with license file. Be sure that QBHOME is set correctly and license file is correct.Error Code: 1003.
+Error:   LICENSE ERROR: Problem with license file. Error Code: 1003.
     </pre>
     </prob><p><sol>
-    MOEDivcon is distributed with an evaluation license which expires after a
-    few months.  See the <a href="#install-license">license installation</a>
+    MOEDivcon is distributed with an evaluation license which eventually
+    expires.  See the <a href="#install-license">license installation</a>
     section for more information on purchasing and installing a license.
   </sol></li>
   <li><p><prob>
-    I don't know.
+    I get the MOE message:
+    <pre>
+The pose (or receptor) database has more than one molecule field.
+    </pre>
     </prob><p><sol>
-    Why should I care?
+    MOEDivcon cannot determine which is the correct molecule field for the
+    poses (receptors) if there is more than one.  Copy the correct field into
+    a new MOE database.
   </sol></li>
   <li><p><prob>
     I submitted a parallel PBS (SGE, etc.) QMScore batch script and it returned
@@ -493,14 +549,11 @@ Error:   LICENSE ERROR: Problem with license file. Be sure that QBHOME is set co
     </sol>
     <p><sol>
     The cluster manager (PBS, SGE, etc.) is not properly configured for
-    submitting parallel jobs.  That is, the variable $PBS_NODEFILE, file
-    $TMPDIR/machines, etc., are not being properly initiated.  You can either
+    submitting parallel jobs.  That is, the files $PBS_NODEFILE,
+    $TMPDIR/machines, etc., are not being properly initialized.  You can either
     configure the cluster manager for parallel submissions, or generate the
-    moedivcon_machinefile by hand.
-
-    <p><todo> Describe the very messy method of generating machine files.  </todo>
-
-    </sol></li>
+    <inline>moedivcon_machinefile</inline> by hand.
+  </sol></li>
   <li><p><prob>
     How do I know when all jobs of a MOEDivcon batch run have completed, or
     more importantly, are likely to converge.

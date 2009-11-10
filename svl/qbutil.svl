@@ -221,7 +221,7 @@ global function qb_CopyRecPoseDB [resultskey, recskey, poseskey]
     local [recfields, recftypes] = db_Fields recskey;
     local recmolfield = recfields | (recftypes == 'molecule');
     if 1 <> length recmolfield then
-        mess = 'The ligand poses database has\n'
+        mess = 'The receptor database has\n'
             'more than one molecule field.';
         return mess;
     endif
