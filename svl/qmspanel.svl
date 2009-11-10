@@ -198,13 +198,13 @@ global function qb_QMScoreSetupPanel []
             Text :
                 [
                 name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
-                type: 'char', allowBlank: 0, onTrigger: 'return',
-                shortcut: ['~', '~/tmp', '.', '/tmp'],
+                type: 'char', allowBlank: 0,
+                shortcut: ['/tmp', '.', '~', '~/tmp', '/scratch'],
                 bubbleHelp:
                     'The name of the working directory for storing\n'
-                    'QB Divcon intermediate calculations.  The\n'
-                    'absolute path to the specified directory will\n'
-                    'be stored and used at execution time.'
+                    'QB Divcon intermediate calculations and logs.\n'
+                    'The absolute path to the specified directory\n'
+                    'will be stored and used at execution time.'
                 ],
             Separator : 
                 [
@@ -309,25 +309,21 @@ global function qb_QMScoreSetupPanel []
 
     // ---------------------- embedded functions begin ----------------------
 
-    function CheckWD [dirname]
-        local wdpath = fabsname dirname;
-        local ft = ftype wdpath;
-        if ft === '' then
-            Warning twrite ['{}\n does not exist.', wdpath];
-            return 0;
-        elseif ft === 'dir' then
-            return 1;
-        endif
-
-        Warning twrite ['{}\n is not a directory.', wdpath];
-        return 0;
-    endfunction
-
     function RunCalc [dbkey]
         local msgkey = Message [0, 'QMScore is running ...'];
         sleep -1;    // Allow parent to close input window.
 
         local [recset, ligand, options] = qb_GetEnv [dbkey];
+        local workdir;
+        if options.pwd === 1 then
+            workdir = getenv 'PWD';
+        else
+            workdir = fabsname options.workdir;
+        endif
+
+        options.workdir = workdir;
+        write ['Work Dir:  {}\n', workdir];  //DEBUG
+
         local [results, errmess] = qb_QMScore [recset, ligand, options];
 
         local rowkey = first db_Entries [dbkey];
@@ -357,9 +353,9 @@ global function qb_QMScoreSetupPanel []
     local qmskey = 0;
     local prevwd = '';
 
-    WindowSetData [wkey, [scoredb: 'qmscore.mdb', cwd:0, workdir: '~',
+    WindowSetData [wkey, [scoredb: 'qmscore.mdb', cwd:0, workdir: '/tmp',
         ham: 5, opt:1, freq: 0]];
-    WindowSetAttr [wkey, [freq: [sensitive: 0],
+    WindowSetAttr [wkey, [freq: [sensitive: 1],
          workdir: [sensitive: 1, allowBlank: 0],
          posebox: [sensitive: 0], posedb: [allowBlank: 1],
          recbox: [sensitive: 0], recdb: [allowBlank: 1]]];
@@ -392,10 +388,6 @@ global function qb_QMScoreSetupPanel []
                 WindowSetData [wkey, [workdir: prevwd]];
             endif
 
-        elseif trig === 'workdir' then
-            local flag = CheckWD [vals.workdir];
-            if not flag then continue; endif
-
         elseif trig === 'browse_scoredb' then
             btid = run ['fbrowse.svl', [trig, wkey, 'Select QMScore DB File', 
                 'none', '*.mdb', 'scoredb']];
@@ -416,8 +408,6 @@ global function qb_QMScoreSetupPanel []
                 break;
 
             elseif vals.panel === 'Run' then
-                if not istrue CheckWD [vals.workdir] then continue; endif
-
                 if second task_fork [prio:3, idle:0] === 'child' then
                     options = tag [OPT_TAGS, [vals.mode, vals.cwd,
                       fabsname vals.workdir, fabsname vals.scoredb, [], [],
@@ -433,8 +423,6 @@ global function qb_QMScoreSetupPanel []
                 endif
 
             elseif vals.panel === 'Save' then
-                if not istrue CheckWD [vals.workdir] then continue; endif
-
                 if second task_fork [] === 'child' then
                     options = tag [OPT_TAGS, [vals.mode, vals.cwd,
                         vals.workdir, fabsname vals.scoredb,
