@@ -472,6 +472,7 @@ global function qb_SetNMRScoreFields [dbkey, addreceptor, atomnames]
     endif
 
     db_EnsureField [dbkey, POSE_FIELD, 'molecule'];
+    apt db_EnsureField [dbkey, NMR_NUM_FIELDS , 'double'];
     apt db_EnsureField [dbkey, atomnames, 'double'];
 
 endfunction

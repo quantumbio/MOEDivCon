@@ -363,7 +363,9 @@ global function qb_NMRScoreSetupPanel []
             endif
         else
             print results;
-            local atomnames = app first results;
+            local atomindices = app first results;
+            local atomnames = get [ligand(4)(MOL_ATOM_NAME), atomindices];
+write ['Atom names:  {v}\n', atomnames]; //DEBUG
             local cspvalues = app second results;
             qb_SetNMRScoreFields [dbkey, 0, atomnames];
             qb_SaveNMRScore [dbkey, rowkey, 9.99, tag [atomnames, cspvalues]];
