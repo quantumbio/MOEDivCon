@@ -174,8 +174,8 @@ exe_kill  process_key;
 exe_close process_keys;
 
 //  Clean up working directory.
-local templist = flist [subdirname, 'MOE_AM1_*.dmx*'];
-templist = cat [templist, flist [subdirname, 'MOE_AM1_*.out']];
+local templist = flist [subdirname, 'MOE_*.dmx*'];
+templist = cat [templist, flist [subdirname, 'MOE_*.out']];
 
 local fname = twrite ['{}/fort.8', subdirname];
 if ftype fname === 'file' then
