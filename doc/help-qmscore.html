@@ -372,8 +372,8 @@ use is limited by the number of MOE licenses you have been granted.
 
 <h2><a name="options"></a>Options</h2>
 <p>
-
-<em>Note:  not all options are fully implemented at this time.</em>
+Here we include a more detailed description of the options in the MOEDivcon
+QMScoring dialog.
 
 
 <h3><a name="options-outdb"></a>Output MOE Database</h3>
@@ -426,14 +426,13 @@ A QM-based ligand optimization can be performed prior to scoring.
 This optimization may occur either while the ligand is docked within
 the target or while the ligand is separate from the target.
 Warning: this optional step will significantly increase the CPU cost
-of the calculation.  <em>Note:  not fully implemented yet.</em>
+of the calculation.
 
 
 <h3><a name="options-freq"></a>Frequency</h3>
 <p>
 Perform frequency calculation to determine ligand entropy in score
 function.  Warning: may increase CPU cost of the calculation.
-<em>Note:  not implemented yet.</em>
 
 
 <h2><a name="trouble"></a>Troubleshooting</h2>
@@ -446,8 +445,7 @@ doesn't help, please <a href="#contact">contact</a> support.
     </prob>
     <p><sol>MOE requires that custom menu files
     (<inline>moe_menus</inline>) reside in the user's home directory.
-    Either copy, link, or concatenate the MOEDivon custom menu into yours (see
-    the <a href="#install-menu">menu installation</a> section).
+    See the <a href="#install-menu">installation</a> section.
   </sol></li>
   <li><p><prob>
     I get the MOE message:
@@ -526,7 +524,7 @@ Error:   LICENSE ERROR: Problem with license file. Error Code: 1003.
     </pre>
     </prob><p><sol>
     MOEDivcon is distributed with an evaluation license which eventually
-    expires.  See the <a href="#install-license">license installation</a>
+    expires.  See the <a href="#install-license">installation</a>
     section for more information on purchasing and installing a license.
   </sol></li>
   <li><p><prob>
@@ -540,6 +538,13 @@ The pose (or receptor) database has more than one molecule field.
     a new MOE database.
   </sol></li>
   <li><p><prob>
+    Divcon isn't generating a log file (<inline><em>divcon.log</em></inline>).
+    </prob><p><sol>
+    A logging configuration file <inline>divcon-log.config</inline> has to be
+    in the working directory or in <inline>$QBHOME/etc</inline>.  The 
+    configuration file in the working directory takes precendence.
+  </sol></li>
+  <li><p><prob>
     I submitted a parallel PBS (SGE, etc.) QMScore batch script and it returned
     immediately without executing any jobs.
     </prob><p><sol>
@@ -548,11 +553,8 @@ The pose (or receptor) database has more than one molecule field.
     the reason will make it back to the stderr, more often not.
     </sol>
     <p><sol>
-    The cluster manager (PBS, SGE, etc.) is not properly configured for
-    submitting parallel jobs.  That is, the files $PBS_NODEFILE,
-    $TMPDIR/machines, etc., are not being properly initialized.  You can either
-    configure the cluster manager for parallel submissions, or generate the
-    <inline>moedivcon_machinefile</inline> by hand.
+    There may be configuration problems.  Please <a href=#contact>contact</a>
+    our support staff to resolve the issue.
   </sol></li>
   <li><p><prob>
     How do I know when all jobs of a MOEDivcon batch run have completed, or
