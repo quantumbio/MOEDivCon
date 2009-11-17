@@ -84,6 +84,7 @@ local retValue, success = 0;
 local mol, molIndex, molCount, residueIndex, residueCount, atomIndex, atomCount;
 molCount = length receptor_mols;
 fwrite [stdin, '{c:}\n', HAM_KEYS(opts.ham)];
+fwrite [stdin, '{c:}\n', select ['STANDARD', 'NOSTANDARD', opts.standard]];
 fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', opts.freq]];
 fwrite [stdin, '{c:}\n', LIG_KEYS(opts.opt)];
 fwrite [stdin, '{n:}\n', molCount];
