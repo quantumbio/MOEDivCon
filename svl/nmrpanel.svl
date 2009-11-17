@@ -212,7 +212,28 @@ global function qb_NMRScoreSetupPanel []
                 [
                 vertical:0, shadow:'noline', extendH: 0, margin:1
                 ],
-            Button : [ name: 'showcut', text: 'Show Cut' ]
+            Button :
+                [
+                name: 'showcut', text: 'Show Cut',
+                bubbleHelp: 'Perform cut and show in MOE Window.'
+                ],
+            Button :
+                [
+                name: 'original', text: 'Original',
+                bubbleHelp: 'Revert back to original receptor/ligand complex.'
+                ]
+            ],
+
+        Hbox :
+            [
+            Button :
+                [
+                name: 'experimental', text: 'Enter/Edit Experimental Data', 
+                extendH: 1,
+                bubbleHelp:
+                    'Open dialog to enter the data\n'
+                    'for the free and bound ligand.'
+               ]
             ],
 
         Separator : [flushLeft:1, extendH:1, margin:1],
@@ -223,8 +244,8 @@ global function qb_NMRScoreSetupPanel []
             Text :
                 [
                 name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
-                type: 'char', allowBlank: 0, onTrigger: 'return',
-                shortcut: ['~', '~/tmp', '.', '/tmp'],
+                type: 'char', allowBlank: 0,
+                shortcut: ['/tmp', '.', '~', '~/tmp', '/scratch'],
                 bubbleHelp:
                     'The name of the working directory for storing\n'
                     'QB Divcon intermediate calculations.  The\n'
@@ -330,20 +351,6 @@ global function qb_NMRScoreSetupPanel []
 
     // ---------------------- embedded functions begin ----------------------
 
-    function CheckWD [dirname]
-        local wdpath = fabsname dirname;
-        local ft = ftype wdpath;
-        if ft === '' then
-            Warning twrite ['{}\n does not exist.', wdpath];
-            return 0;
-        elseif ft === 'dir' then
-            return 1;
-        endif
-
-        Warning twrite ['{}\n is not a directory.', wdpath];
-        return 0;
-    endfunction
-
     function RunCalc [dbkey]
         local msgkey = Message [0, 'NMRScore is running ...'];
         sleep -1;    // Allow parent to close input window.
@@ -380,6 +387,7 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
     // ----------------------- embedded functions end -----------------------
 
     local btid, browsetasks = [];
+    local prio;
     local options = []; 
     local nmrkey = 0;
     local prevwd = '~/tmp';
@@ -388,7 +396,8 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
     WindowSetData [wkey, [scoredb: 'nmrscore.mdb', cut: 0, radius: 2.5,
         cwd: 0, workdir: prevwd, opt: 1, guess: 0]];
     WindowSetAttr [wkey, [panel: [sensitive: [1,1,1,1]],
-        radius: [sensitive: 0, allowBlank: 1], showcut: [sensitive: 0],
+        radius: [sensitive: 0, allowBlank: 1],
+        showcut: [sensitive: 0], original: [sensitive: 0],
         guess: [sensitive: 1], opt: [sensitive:1], mode: [sensitive: 1],
         workdir: [sensitive: 1, allowBlank: 0],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
@@ -423,7 +432,7 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
 
         elseif trig === 'showcut' then
             if second task_fork [master: 'parent'] === 'child' then
-                local prio = task_prio 0;
+                prio = task_prio 0;
 
                 local [cutrecmols, cutligmol, errmess] = qb_CutReceptor [0, 
                     vals.radius];
@@ -431,7 +440,8 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
                     Warning errmess;
                     exit [];
                 endif
-
+                WindowSetAttr [wkey, [showcut: [sensitive: 0],
+                    original: [sensitive: 1]]];
 	            Close [force:1];
                 local cutlig = mol_Create cutligmol;
                 local cutligatoms = cat oAtoms cutlig;
@@ -440,12 +450,33 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
                 aSetBondLook [cutligatoms, 'cylinder'];
                 app mol_Create cutrecmols;
 	            View [];
+                exit [];
+            endif
 
-local fp = fopenw '~daren/tmp/mols.txt';  //DEBUG
-fwrite [fp, 'Ligand:  {v}\n\n', cutligmol];  //DEBUG
-fwrite [fp, 'Cut Target:  {v}\n', cutrecmols];  //DEBUG
-fclose fp;  //DEBUG
+        elseif trig === 'original' then
+            if second task_fork [master: 'parent'] === 'child' then
+                prio = task_prio 0;
 
+                if complexmol === [] then
+                    Warning 'No original complex.';
+                    exit [];
+                endif
+                WindowSetAttr [wkey, [showcut: [sensitive: 1],
+                    original: [sensitive: 0]]];
+	            Close [force:1];
+                mol_Create complexmol;
+	            View [];
+                exit [];
+            endif
+
+        elseif trig === 'experimental' then
+            if second task_fork [master: 'parent'] === 'child' then
+
+                if complexmol === [] then
+                    Warning 'No original complex.';
+                    exit [];
+                endif
+                Warning 'Pop up experimental window.';
                 exit [];
             endif
 
@@ -458,10 +489,6 @@ fclose fp;  //DEBUG
                 WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0]]];
                 WindowSetData [wkey, [workdir: prevwd]];
             endif
-
-        elseif trig === 'workdir' then
-            local flag = CheckWD [vals.workdir];
-            if not flag then continue; endif
 
         elseif trig === 'browse_scoredb' then
             btid = run ['fbrowse.svl', [trig, wkey, 'Select NMRScore DB File', 
@@ -522,8 +549,6 @@ fclose tfp;  //DEBUG
                 endif
 
             elseif vals.panel === 'Run' then
-                if not istrue CheckWD [vals.workdir] then continue; endif
-
                 if second task_fork [prio:3, idle:0] === 'child' then
                     options = tag [OPT_TAGS, [vals.mode, vals.cwd,
                       fabsname vals.workdir, fabsname vals.scoredb, [], [],
@@ -539,8 +564,6 @@ fclose tfp;  //DEBUG
                 endif
 
             elseif vals.panel === 'Save' then
-                if not istrue CheckWD [vals.workdir] then continue; endif
-
                 if second task_fork [] === 'child' then
                     options = tag [OPT_TAGS, [vals.mode, vals.cwd,
                         fabsname vals.workdir, fabsname vals.scoredb,
