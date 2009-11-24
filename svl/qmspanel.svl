@@ -58,6 +58,7 @@ const OPT_TAGS =
     'standard',
     'freq',
     'opt',
+    'shift',
     'task'
     ];
 
@@ -230,17 +231,28 @@ global function qb_QMScoreSetupPanel []
                     type: 'int', minWidth: 11,
                     bubbleHelp:
                         ''
+                    ]
+                ],
+            Hbox :
+                 [
+                Checkbox :
+                    [
+                    name: 'standard', title: 'Calculation:', text: 'Standard',
+                    bubbleHelp:
+                        'Standard closed-shell calculation\n'
+                        '(no divide and conquer).'
                     ],
                 Separator : 
                     [
                     vertical:0, shadow:'noline', extendH: 1, margin:1
                     ],
-                Checkbox :
+                Text :
                     [
-                    name: 'standard', text: 'Standard',
+                    name: 'shift', title: 'Shift:', len: 15, extendH: 1, 
+                    type: 'real', allowBlank: 0,
+                    shortcut: ['0.0', '2.0', '4.0', '8.0', '16.0'],
                     bubbleHelp:
-                        'Standard closed-shell calculation\n'
-                        '(no divide and conquer).'
+                        'Initial dynamic level shift (eV).'
                     ]
                 ],
             Hbox :
@@ -369,7 +381,7 @@ global function qb_QMScoreSetupPanel []
     local prevwd = '/tmp';
 
     WindowSetData [wkey, [scoredb: 'qmscore.mdb', cwd:0, workdir: prevwd,
-        ham: 5, opt:1, freq: 0, standard: 0]];
+        ham: 5, opt:1, freq: 0, standard: 0, shift : 0.0]];
     WindowSetAttr [wkey, [freq: [sensitive: 1],
          workdir: [sensitive: 1, allowBlank: 0],
          posebox: [sensitive: 0], posedb: [allowBlank: 1],
@@ -426,7 +438,8 @@ global function qb_QMScoreSetupPanel []
                 if second task_fork [prio:3, idle:0] === 'child' then
                     options = tag [OPT_TAGS, [vals.mode, vals.cwd,
                       fabsname vals.workdir, fabsname vals.scoredb, [], [],
-                      vals.ham, vals.standard, vals.freq, vals.opt, []]];
+                      vals.ham, vals.standard, vals.freq, vals.opt, 
+                      vals.shift, []]];
 
                     qmskey = SetUpRun [options];
                     RunCalc [qmskey];
@@ -442,7 +455,8 @@ global function qb_QMScoreSetupPanel []
                     options = tag [OPT_TAGS, [vals.mode, vals.cwd,
                         vals.workdir, fabsname vals.scoredb,
                         fabsname vals.posedb, fabsname vals.recdb, vals.ham,
-                        vals.standard, vals.freq, vals.opt, []]];
+                        vals.standard, vals.freq, vals.opt, 
+                        vals.shift, []]];
                     qmskey = SetUpRun [options];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;

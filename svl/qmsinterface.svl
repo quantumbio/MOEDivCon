@@ -87,6 +87,7 @@ fwrite [stdin, '{c:}\n', HAM_KEYS(opts.ham)];
 fwrite [stdin, '{c:}\n', select ['STANDARD', 'NOSTANDARD', opts.standard]];
 fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', opts.freq]];
 fwrite [stdin, '{c:}\n', LIG_KEYS(opts.opt)];
+fwrite [stdin, '{n:}\n', opts.shift];
 fwrite [stdin, '{n:}\n', molCount];
 for molIndex = 1, molCount, 1 loop
     mol = receptor_mols(molIndex);
@@ -140,10 +141,13 @@ endloop
 
 const NUMRESULTS = 11;
 local results, return_statement;
-local sleep_time = 0.05, sleep_inc = 0.05;
+local sleep_time = 0.05;
 while exe_status process_key loop
-    sleep sleep_time;
-    sleep_time = min [1, sleep_time + sleep_inc];
+    if not MOE_BATCH then
+        sleep sleep_time;
+    endif
+
+
     [[return_statement]] = fread [stdout, '{c:*}'];
 
     write ['Divcon: {}\n', return_statement];//DEBUG
