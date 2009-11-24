@@ -396,6 +396,38 @@ global function qb_LoadNMRScoreDB [dbpath]
 
 endfunction
 
+/****************************************************************************
+ *                          qb_MergeDB
+ *
+ *  Perform a naive merge of the two databases (that is, assume the first
+ *  row of data in srcname1 corresponds to the first row of data srcname2,
+ *  etc.).
+ *
+ ****************************************************************************/
+global function qb_MergeDB [srcname1, srcname2, dstname]
+
+    local dstkey = db_Open [dstname, 'create'];
+    local srckey1 = db_Open [srcname1, 'read'];
+    local srckey2 = db_Open [srcname2, 'read'];
+    local [fields1, ftypes1] = db_Fields srckey1;
+    local [fields2, ftypes2] = db_Fields srckey2;
+
+    apt db_EnsureField [dstkey,  fields1, ftypes1];
+    apt db_EnsureField [dstkey,  fields2, ftypes2];
+
+    local rowkey1 = 0, rowkey2 = 0;
+    while (rowkey1 = db_NextEntry [srckey1, rowkey1])
+        and (rowkey2 = db_NextEntry [srckey2, rowkey2]) loop
+        local rowdata1 = db_Read [srckey1, rowkey1];
+        local rowdata2 = db_Read [srckey2, rowkey2];
+        db_Write [dstkey, 0, cat [rowdata1, rowdata2]];
+    endloop
+
+    db_Close dstkey;
+    db_Close srckey1;
+    db_Close srckey2;
+endfunction
+
 
 /****************************************************************************
  *                          qb_SaveEnv
