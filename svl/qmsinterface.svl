@@ -141,12 +141,11 @@ endloop
 
 const NUMRESULTS = 11;
 local results, return_statement;
-local sleep_time = 0.05;
+local sleep_time = 0.0;
 while exe_status process_key loop
     if not MOE_BATCH then
         sleep sleep_time;
     endif
-
 
     [[return_statement]] = fread [stdout, '{c:*}'];
 

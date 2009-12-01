@@ -137,11 +137,10 @@ local ligatmels = ligand_mol(4)(MOL_ATOM_EL);
 local numligH = add eqE [ligatmels, 'H'];
 
 local results, return_statement;
-local sleep_time = 0.05, sleep_inc = 0.05;
+local sleep_time = 0.0;
 while exe_status process_key loop
     if not MOE_BATCH then
         sleep sleep_time;
-        sleep_time = min [1, sleep_time + sleep_inc];
     endif
 
     [[return_statement]] = fread [stdout, '{c:*}'];
