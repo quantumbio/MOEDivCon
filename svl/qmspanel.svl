@@ -34,8 +34,10 @@ function qb_AtomsToMols;
 
 function qb_CopyPoseDB;
 function qb_CopyRecPoseDB;
+function qb_GetDefaultsQMScore;
 function qb_GetEnv;
 function qb_GetPoseField;
+function qb_GetTagsQMScore;
 function qb_SaveQMScore;
 function qb_SaveStatus;
 function qb_SaveEnv;
@@ -45,25 +47,8 @@ function qb_SetQMScoreFields;
 function qb_QMScore;
 function qb_QMScoreBatch;
 
-
-const OPT_TAGS =
-    [
-    'mode',
-    'cwd',
-    'workdir',
-    'scoredb',
-    'posedb',
-    'recdb',
-    'ham',
-    'standard',
-    'freq',
-    'opt',
-    'shift',
-    'task'
-    ];
-
 /*  NOTE:  If you change the Option lists here, you need to update the
- *         default indices below and the Keys in qmsinterface.svl.
+ *         Defaults in qbutil.svl and the Keys in qmsinterface.svl.
  */
 
 const RUN_MODES =
@@ -378,10 +363,12 @@ global function qb_QMScoreSetupPanel []
     local btid, browsetasks = [];
     local options = []; 
     local qmskey = 0;
-    local prevwd = '/tmp';
+    local defs = qb_GetDefaultsQMScore [];
+    local prevwd = defs.workdir;
 
-    WindowSetData [wkey, [scoredb: 'qmscore.mdb', cwd:0, workdir: prevwd,
-        ham: 5, opt:1, freq: 0, standard: 0, shift : 0.0]];
+    WindowSetData [wkey, [scoredb: defs.scoredb, cwd: defs.cwd, 
+        workdir: defs.workdir, ham: defs.ham, opt: defs.opt, freq: defs.freq,
+        standard: defs.standard, shift : defs.shift]];
     WindowSetAttr [wkey, [freq: [sensitive: 1],
          workdir: [sensitive: 1, allowBlank: 0],
          posebox: [sensitive: 0], posedb: [allowBlank: 1],
@@ -436,7 +423,7 @@ global function qb_QMScoreSetupPanel []
 
             elseif vals.panel === 'Run' then
                 if second task_fork [prio:3, idle:0] === 'child' then
-                    options = tag [OPT_TAGS, [vals.mode, vals.cwd,
+                    options = tag [qb_GetTagsQMScore [], [vals.mode, vals.cwd,
                       fabsname vals.workdir, fabsname vals.scoredb, [], [],
                       vals.ham, vals.standard, vals.freq, vals.opt, 
                       vals.shift, []]];
@@ -452,7 +439,7 @@ global function qb_QMScoreSetupPanel []
 
             elseif vals.panel === 'Save' then
                 if second task_fork [] === 'child' then
-                    options = tag [OPT_TAGS, [vals.mode, vals.cwd,
+                    options = tag [qb_GetTagsQMScore [], [vals.mode, vals.cwd,
                         vals.workdir, fabsname vals.scoredb,
                         fabsname vals.posedb, fabsname vals.recdb, vals.ham,
                         vals.standard, vals.freq, vals.opt, 

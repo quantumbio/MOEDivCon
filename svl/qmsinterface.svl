@@ -50,9 +50,11 @@ const LIG_KEYS =
 
 global function qb_QMScore [receptor_mols, ligand_mol, opts]
 
+write ['{v}\n', opts];  //DEBUG
+
 local errmess = [];
 local subdirname;
-if opts.task === [] then
+if opts.task === [] or opts.task === 0 then
     subdirname = opts.workdir;
 else
     subdirname = twrite ['{}/qb_out{n:}', opts.workdir, opts.task];
