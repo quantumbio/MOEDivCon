@@ -60,6 +60,38 @@ const DBTYPE = 'qb_dbtype';
 const QMSCORE = 'qb_qmscoredb';
 const NMRSCORE = 'qb_nmrscoredb';
 
+/*  NOTE:  task must be the last tag.  */
+const QMSCORE_OPT_DEFAULTS =
+    [
+    ['mode',         'One-to-One' ],
+    ['cwd',          0            ],
+    ['workdir',      '/tmp'       ],
+    ['scoredb',      'qmscore.mdb'],
+    ['posedb',       ''           ],
+    ['recdb',        ''           ],
+    ['ham',          5            ],
+    ['standard',     0            ],
+    ['freq',         0            ],
+    ['opt',          1            ],
+    ['shift',        0.0          ],
+    ['task',         0            ]
+    ];
+
+const NMRSCORE_OPT_DEFAULTS =
+    [
+    ['mode',         'One-to-One'  ],
+    ['cwd',          0             ],
+    ['workdir',      '/tmp'        ],
+    ['scoredb',      'nmrscore.mdb'],
+    ['posedb',       ''            ],
+    ['recdb',        ''            ],
+    ['guess',        0             ],
+    ['opt',          1             ],
+    ['cut',          0             ],
+    ['radius',       2.5           ],
+    ['task',         0             ]
+    ];
+
 //  Local Functions
 
 /****************************************************************************
@@ -330,6 +362,26 @@ global function qb_CutReceptor [posedbkey, radius]
 endfunction
 
 /****************************************************************************
+ *                          qb_GetDefaultsNMRScore
+ *
+ *  Return the default options for NMRScore.
+ *
+ ****************************************************************************/
+global function qb_GetDefaultsNMRScore []
+    return tag tr NMRSCORE_OPT_DEFAULTS;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetDefaultsQMScore
+ *
+ *  Return the default options for QMScore.
+ *
+ ****************************************************************************/
+global function qb_GetDefaultsQMScore []
+    return tag tr QMSCORE_OPT_DEFAULTS;
+endfunction
+
+/****************************************************************************
  *                          qb_GetEnv
  *
  *  Get the molecules (ligand and receptor) and options from the  
@@ -337,14 +389,22 @@ endfunction
  *
  ****************************************************************************/
 global function qb_GetEnv [dbkey]
+
     local tgttok = db_GetEnv [dbkey, TARGET];
     local [[tgtmols]] = sread [string tgttok, '{v}'];
     local ligtok = db_GetEnv [dbkey, LIGAND];
     local [[ligmol]] = sread [string ligtok, '{v}'];
-    local opttok = db_GetEnv [dbkey, OPTIONS];
-    local [[options]] = sread [string opttok, '{v}'];
     local cpxtok = db_GetEnv [dbkey, COMPLEX];
     local [[complex]] = sread [string cpxtok, '{v}'];
+
+    local opttok = db_GetEnv [dbkey, OPTIONS];
+    local [[options]] = sread [string opttok, '{v}'];
+    local type = db_GetEnv [dbkey, DBTYPE];
+    if type === QMSCORE then
+        options = tagcat [options, tag tr QMSCORE_OPT_DEFAULTS];
+    elseif type === NMRSCORE then
+        options = tagcat [options, tag tr NMRSCORE_OPT_DEFAULTS];
+    endif
 
     return [tgtmols, ligmol, options, complex];
 
@@ -368,6 +428,26 @@ global function qb_GetRecField []
 
     return REC_FIELD;
 
+endfunction
+
+/****************************************************************************
+ *                          qb_GetTagsNMRScore
+ *
+ *  Return the tags for NMRScore.
+ *
+ ****************************************************************************/
+global function qb_GetTagsNMRScore []
+    return first tr NMRSCORE_OPT_DEFAULTS;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetTagsQMScore
+ *
+ *  Return the tags for QMScore.
+ *
+ ****************************************************************************/
+global function qb_GetTagsQMScore []
+    return first tr QMSCORE_OPT_DEFAULTS;
 endfunction
 
 /****************************************************************************

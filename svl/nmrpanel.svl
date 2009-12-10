@@ -35,36 +35,23 @@ function qb_AtomsToMols;
 function qb_CopyPoseDB;
 function qb_CopyRecPoseDB;
 function qb_CutReceptor;
+function qb_GetDefaultsNMRScore;
 function qb_GetEnv;
 function qb_GetPoseField;
+function qb_GetTagsNMRScore;
 function qb_SaveNMRScore;
 function qb_SaveStatus;
 function qb_SaveEnv;
 function qb_SetStatusField;
 function qb_SetNMRScoreFields;
 function qb_LoadNMRScoreDB;
+
 function qb_NMRScore;
 function qb_NMRScoreBatch;
 
 
-/*  NOTE:  task must be the last tag.  */
-const OPT_TAGS =
-    [
-    'mode',
-    'cwd',
-    'workdir',
-    'scoredb',
-    'posedb',
-    'recdb',
-    'guess',
-    'opt',
-    'cut',
-    'radius',
-    'task'
-    ];
-
 /*  NOTE:  If you change the Option lists here, you need to update the
- *         default indices below and the Keys in nmrinterface.svl.
+ *         Defaults in qbutil.svl and the Keys in nmrinterface.svl.
  */
 
 const RUN_MODES =
@@ -390,11 +377,14 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
     local prio;
     local options = []; 
     local nmrkey = 0;
-    local prevwd = '~/tmp';
+    local defs = qb_GetDefaultsNMRScore [];
+    local prevwd = defs.workdir;
     local complexmol = mol_Extract Chains [];
 
-    WindowSetData [wkey, [scoredb: 'nmrscore.mdb', cut: 0, radius: 2.5,
-        cwd: 0, workdir: prevwd, opt: 1, guess: 0]];
+    WindowSetData [wkey, [scoredb: defs.scoredb, cut: defs.cut,
+        radius: defs.radius, cwd: defs.cwd, workdir: defs.workdir, 
+        opt: defs.opt, guess : defs.guess]];
+
     WindowSetAttr [wkey, [panel: [sensitive: [1,1,1,1]],
         radius: [sensitive: 0, allowBlank: 1],
         showcut: [sensitive: 0], original: [sensitive: 0],
@@ -550,7 +540,7 @@ fclose tfp;  //DEBUG
 
             elseif vals.panel === 'Run' then
                 if second task_fork [prio:3, idle:0] === 'child' then
-                    options = tag [OPT_TAGS, [vals.mode, vals.cwd,
+                    options = tag [qb_GetTagsNMRScore [], [vals.mode, vals.cwd,
                       fabsname vals.workdir, fabsname vals.scoredb, [], [],
                       vals.guess, vals.opt, vals.cut, vals.radius, []]];
 
@@ -565,7 +555,7 @@ fclose tfp;  //DEBUG
 
             elseif vals.panel === 'Save' then
                 if second task_fork [] === 'child' then
-                    options = tag [OPT_TAGS, [vals.mode, vals.cwd,
+                    options = tag [qb_GetTagsNMRScore [], [vals.mode, vals.cwd,
                         fabsname vals.workdir, fabsname vals.scoredb,
                         fabsname vals.posedb, fabsname vals.recdb,
                         vals.guess, vals.opt, vals.cut, vals.radius, []]];
