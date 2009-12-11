@@ -477,6 +477,32 @@ global function qb_LoadNMRScoreDB [dbpath]
 endfunction
 
 /****************************************************************************
+ *                          qb_LoadQMScoreDB
+ *
+ ****************************************************************************/
+global function qb_LoadQMScoreDB [dbpath]
+
+    local dbkey = db_Open [dbpath, 'read'];
+    local type = db_GetEnv [dbkey, DBTYPE];
+    if neL [type, QMSCORE] then
+        db_Close dbkey;
+        return [[], [], [], [], twrite ['{}\nis not a QMScore Database.',
+            dbpath]];
+    endif
+
+    local [cutrec, lig, opts] = qb_GetEnv [dbkey];
+
+    if not MOE_BATCH then
+      dbv_Open db_Filename dbkey;
+    endif
+
+    db_Close dbkey;
+
+    return [cutrec, lig, opts, []];
+
+endfunction
+
+/****************************************************************************
  *                          qb_MergeDB
  *
  *  Perform a naive merge of the two databases (that is, assume the first

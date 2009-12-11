@@ -38,6 +38,7 @@ function qb_GetDefaultsQMScore;
 function qb_GetEnv;
 function qb_GetPoseField;
 function qb_GetTagsQMScore;
+function qb_LoadQMScoreDB;
 function qb_SaveQMScore;
 function qb_SaveStatus;
 function qb_SaveEnv;
@@ -156,11 +157,13 @@ global function qb_QMScoreSetupPanel []
         name: 'panel', 
         title: 'QMScore',
         windowName: 'QMScorePanel',
-        text: ['Run', 'Save', 'Cancel'],
-        onTrigger: ['validate', 'validate', 'return'],
+        text: ['Run', 'Save', 'Load', 'Cancel'],
+        onTrigger: ['validate', 'validate', 'return', 'return'],
         bubbleHelp: ['Execute QMScore from MOE Window.',
             'Save run parameters in database\n'
-            'for later execution on cluster.', ''],
+            'for later execution on cluster.', 
+            'Load run parameters from a NMRScore database.', 
+            ''],
 
         Hbox :
             [
@@ -364,17 +367,16 @@ global function qb_QMScoreSetupPanel []
     local options = []; 
     local qmskey = 0;
     local defs = qb_GetDefaultsQMScore [];
+    local windefs = droplast defs;
     local prevwd = defs.workdir;
 
-    WindowSetData [wkey, [scoredb: defs.scoredb, cwd: defs.cwd, 
-        workdir: defs.workdir, ham: defs.ham, opt: defs.opt, freq: defs.freq,
-        standard: defs.standard, shift : defs.shift]];
+    WindowSetData [wkey, windefs];
     WindowSetAttr [wkey, [freq: [sensitive: 1],
          workdir: [sensitive: 1, allowBlank: 0],
          posebox: [sensitive: 0], posedb: [allowBlank: 1],
          recbox: [sensitive: 0], recdb: [allowBlank: 1]]];
-
     WindowShow [wkey, 1];
+
     loop
         local [vals, trig] = WindowWait wkey;
         if trig === 'mode' then
@@ -420,6 +422,37 @@ global function qb_QMScoreSetupPanel []
        elseif trig === 'panel' then
             if vals.panel === 'Cancel' then 
                 break;
+
+            elseif vals.panel === 'Load' then 
+                if second task_fork [master: 'parent'] === 'child' then
+                    task_prio 0;
+                    local dbpath = FilePrompt [title: 'Input Database', 
+                        filter: '*.mdb', allowEmptyList: 0];
+                    if not isnull dbpath then
+                        write ['Load database: {}\n', dbpath];
+                        local [ldrec, ldlig, ldopts, ldmess] = 
+                            qb_LoadQMScoreDB [dbpath];
+                        if ldrec === [] or ldlig === [] or ldopts === [] then
+                            Warning ldmess;
+                            exit [];
+                        endif
+
+                        /*  Drop the task tagged value.  */
+                        ldopts = droplast ldopts;
+                        WindowSetData [wkey, ldopts];
+
+    	                Close [force:1];
+                        local ldligmol = mol_Create ldlig;
+                        local ldligatoms = cat oAtoms ldligmol;
+                        oSetCollection ['QB_LIGAND', ldligatoms];
+                        aSetNucleusLook [ldligatoms, 'small-sphere'];
+                        aSetBondLook [ldligatoms, 'cylinder'];
+                        app mol_Create ldrec;
+    	                View [];
+                    endif
+
+                    exit [];
+                endif
 
             elseif vals.panel === 'Run' then
                 if second task_fork [prio:3, idle:0] === 'child' then
