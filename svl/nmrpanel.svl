@@ -378,13 +378,11 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
     local options = []; 
     local nmrkey = 0;
     local defs = qb_GetDefaultsNMRScore [];
+    local windefs = droplast defs;
     local prevwd = defs.workdir;
     local complexmol = mol_Extract Chains [];
 
-    WindowSetData [wkey, [scoredb: defs.scoredb, cut: defs.cut,
-        radius: defs.radius, cwd: defs.cwd, workdir: defs.workdir, 
-        opt: defs.opt, guess : defs.guess]];
-
+    WindowSetData [wkey, windefs];
     WindowSetAttr [wkey, [panel: [sensitive: [1,1,1,1]],
         radius: [sensitive: 0, allowBlank: 1],
         showcut: [sensitive: 0], original: [sensitive: 0],
@@ -392,8 +390,8 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
         workdir: [sensitive: 1, allowBlank: 0],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
         recbox: [sensitive: 0], recdb: [allowBlank: 1]]];
-
     WindowShow [wkey, 1];
+
     loop
         local [vals, trig] = WindowWait wkey;
         if trig === 'mode' then
@@ -505,38 +503,32 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
                     local dbpath = FilePrompt [title: 'Input Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
-                         write ['Load database: {}\n', dbpath];
-                    local [ldcutrec, ldlig, ldopts, ldcomplex, ldmess] = 
-                        qb_LoadNMRScoreDB [dbpath];
-                    if ldcutrec === [] or ldlig === [] or ldopts === []
-                      or ldcomplex === [] then
-                        Warning ldmess;
-                        exit [];
+                        write ['Load database: {}\n', dbpath];
+                        local [ldcutrec, ldlig, ldopts, ldcomplex, ldmess] = 
+                            qb_LoadNMRScoreDB [dbpath];
+                        if ldcutrec === [] or ldlig === [] or ldopts === []
+                                or ldcomplex === [] then
+                            Warning ldmess;
+                            exit [];
+                        endif
+
+                        complexmol = ldcomplex;
+                        /*  Drop the task tagged value.  */
+                        ldopts = droplast ldopts;
+                        WindowSetData [wkey, ldopts];
+
+    	                Close [force:1];
+                        local ldligmol = mol_Create ldlig;
+                        local ldligatoms = cat oAtoms ldligmol;
+                        oSetCollection ['QB_LIGAND', ldligatoms];
+                        aSetNucleusLook [ldligatoms, 'small-sphere'];
+                        aSetBondLook [ldligatoms, 'cylinder'];
+                        app mol_Create ldcutrec;
+    	                View [];
                     endif
 
-                    complexmol = ldcomplex;
-                    /*  Drop the task tagged value.  */
-                    ldopts = droplast ldopts;
-                    WindowSetData [wkey, ldopts];
-
-    	            Close [force:1];
-                    local ldligmol = mol_Create ldlig;
-                    local ldligatoms = cat oAtoms ldligmol;
-                    oSetCollection ['QB_LIGAND', ldligatoms];
-                    aSetNucleusLook [ldligatoms, 'small-sphere'];
-                    aSetBondLook [ldligatoms, 'cylinder'];
-                    app mol_Create ldcutrec;
-    	            View [];
-
-local tfp = fopenw '~daren/tmp/mols.txt';  //DEBUG
-fwrite [tfp, 'Ligand:  {v}\n\n', cutligmol];  //DEBUG
-fwrite [tfp, 'Cut Target:  {v}\n', cutrecmols];  //DEBUG
-fclose tfp;  //DEBUG
-
-                    endif
-
-                    exit [];
-                endif
+                exit [];
+            endif
 
             elseif vals.panel === 'Run' then
                 if second task_fork [prio:3, idle:0] === 'child' then
