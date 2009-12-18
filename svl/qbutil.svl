@@ -27,7 +27,9 @@ const QMS_DATA_TAGS =
  
 //  Database Fields
 const POSE_FIELD = 'Ligand/Pose';
+const LIGCHG_FIELD = 'Lig Chg';
 const REC_FIELD = 'Receptor';
+const RECCHG_FIELD = 'Rec Chg';
 const STATUS_FIELD = 'Status';
 
 const QMS_NUM_FIELDS =
@@ -63,18 +65,21 @@ const NMRSCORE = 'qb_nmrscoredb';
 /*  NOTE:  task must be the last tag.  */
 const QMSCORE_OPT_DEFAULTS =
     [
-    ['mode',         'One-to-One' ],
-    ['cwd',          0            ],
-    ['workdir',      '/tmp'       ],
-    ['scoredb',      'qmscore.mdb'],
-    ['posedb',       ''           ],
-    ['recdb',        ''           ],
-    ['ham',          5            ],
-    ['standard',     0            ],
-    ['freq',         0            ],
-    ['opt',          1            ],
-    ['shift',        0.0          ],
-    ['task',         0            ]
+    ['mode',         'One-to-One'  ],
+    ['cwd',          0             ],
+    ['workdir',      '/tmp'        ],
+    ['scoredb',      'qmscore.mdb' ],
+    ['posedb',       ''            ],
+    ['recdb',        ''            ],
+    ['ligchg',       0             ],
+    ['recchg',       0             ],
+    ['poseschg',     0             ],
+    ['ham',          5             ],
+    ['standard',     0             ],
+    ['freq',         0             ],
+    ['opt',          1             ],
+    ['shift',        0.0           ],
+    ['task',         0             ]
     ];
 
 const NMRSCORE_OPT_DEFAULTS =
@@ -85,6 +90,9 @@ const NMRSCORE_OPT_DEFAULTS =
     ['scoredb',      'nmrscore.mdb'],
     ['posedb',       ''            ],
     ['recdb',        ''            ],
+    ['ligchg',       0             ],
+    ['recchg',       0             ],
+    ['poseschg',     0             ],
     ['guess',        0             ],
     ['opt',          1             ],
     ['cut',          0             ],
@@ -93,6 +101,36 @@ const NMRSCORE_OPT_DEFAULTS =
     ];
 
 //  Local Functions
+
+/****************************************************************************
+ *                          CalcCharge
+ *
+ *  Determine the total charge of the molecule collection represented by 
+ * the set of atoms.
+ *
+ ****************************************************************************/
+local function CalcCharge [atoms]
+
+    local charge = add aFCharge atoms;
+    local numelecs = add aAtomicNumber atoms;
+    if even (charge + numelecs) then
+      return charge;
+    endif
+
+    /*  Adjust the charge up or down one so that Divcon will be happy.  */
+    local adjchg = add aIon atoms;
+    if adjchg === charge then
+        adjchg = add aExplicitFCharge atoms;
+    endif
+
+    if adjchg > charge then
+      charge = charge + 1;
+    else
+      charge = charge - 1;
+    endif
+
+    return charge;
+endfunction
 
 /****************************************************************************
  *                          SplitComplex
@@ -198,6 +236,27 @@ global function qb_AtomsToMols []
 
 endfunction
 
+/****************************************************************************
+ *                          qb_CalcCharge
+ *
+ *  Determine the total charge of the ligand and receptor in the MOE window.
+ *
+ ****************************************************************************/
+global function qb_CalcCharge []
+
+    local [recatoms, ligatoms, errmess] = SplitComplex [];
+    if recatoms === [] or ligatoms === [] then
+        return  [[], [], errmess];
+    endif
+
+    local ligchg = CalcCharge [ligatoms];
+    local recchg = CalcCharge [recatoms];
+
+    return [ligchg, recchg, []];
+
+endfunction
+
+function qb_GetEnv;
 
 /****************************************************************************
  *                          qb_CopyPoseDB
@@ -217,16 +276,34 @@ global function qb_CopyPoseDB [resultskey, poseskey]
         return mess;
     endif
 
+    local [t, l, opts, c] = qb_GetEnv [resultskey];
+
     //  HACK alert:  temporarily renames mol field to make copying easier
     db_RenameField [resultskey, POSE_FIELD, molfield];
     apt db_EnsureField [resultskey,  fields, ftypes];
 
-    local rowkey = 0;
+    local [osys, nsys] = SystemPush [];
 
+    local rowkey = 0;
     while rowkey = db_NextEntry [poseskey, rowkey] loop
         local rowdata = db_Read [poseskey, rowkey];
+        local chgdata;
+        if opts.poseschg then
+            chgdata = tag [[LIGCHG_FIELD], [opts.ligchg]];
+        else
+            local ligmol = tagpeek [rowdata, molfield];
+            local ligch = mol_Create ligmol;
+            local ligatms = cat cAtoms ligch;
+            local charge = CalcCharge [ligatms];
+            chgdata = tag [[LIGCHG_FIELD], [charge]];
+            oDestroy ligch;
+        endif
+
+        rowdata = cat [chgdata, rowdata];
         db_Write [resultskey, 0, rowdata];
     endloop
+
+    SystemPop [osys, nsys];
 
     db_RenameField [resultskey, molfield, POSE_FIELD];
 
@@ -261,10 +338,19 @@ global function qb_CopyRecPoseDB [resultskey, recskey, poseskey]
     db_RenameField [resultskey, REC_FIELD, recmolfield];
     apt db_EnsureField [resultskey, recfields, recftypes];
 
+    local [osys, nsys] = SystemPush [];
+
     local recrowkey = 0;
     while recrowkey = db_NextEntry [recskey, recrowkey] loop
         local recrowdata = db_Read [recskey, recrowkey];
+        local recmol = tagpeek [recrowdata, recmolfield];
+        local recch = mol_Create recmol;
+        local recatms = cat cAtoms recch;
+        local recchg = CalcCharge [recatms];
+        local recchgdata = tag [[RECCHG_FIELD], [recchg]];
+        recrowdata = cat [recchgdata, recrowdata];
         db_Write [resultskey, 0, recrowdata];
+        oDestroy recch;
     endloop
 
     db_RenameField [resultskey, recmolfield, REC_FIELD];
@@ -274,6 +360,7 @@ global function qb_CopyRecPoseDB [resultskey, recskey, poseskey]
     if 1 <> length posemolfield then
         mess = 'The pose database has\n'
             'more than one molecule field.';
+        SystemPop [osys, nsys];
         return mess;
     endif
 
@@ -285,11 +372,19 @@ global function qb_CopyRecPoseDB [resultskey, recskey, poseskey]
     while poserowkey = db_NextEntry [poseskey, poserowkey] loop
         resultrowkey = db_NextEntry [resultskey, resultrowkey];
         local poserowdata = db_Read [poseskey, poserowkey];
+        local posemol = tagpeek [poserowdata, posemolfield];
+        local posech = mol_Create posemol;
+        local poseatms = cat cAtoms posech;
+        local posechg = CalcCharge [poseatms];
+        local posechgdata = tag [[LIGCHG_FIELD], [posechg]];
+        poserowdata = cat [posechgdata, poserowdata];
         db_Write [resultskey, resultrowkey, poserowdata];
+        oDestroy posech;
     endloop
 
     db_RenameField [resultskey, posemolfield, POSE_FIELD];
 
+    SystemPop [osys, nsys];
     return mess;
 endfunction
 
@@ -411,22 +506,22 @@ global function qb_GetEnv [dbkey]
 endfunction
 
 /****************************************************************************
- *                          qb_GetPoseField
+ *                          qb_GetPoseFields
  *
  ****************************************************************************/
-global function qb_GetPoseField []
+global function qb_GetPoseFields []
 
-    return POSE_FIELD;
+    return [POSE_FIELD, LIGCHG_FIELD];
 
 endfunction
 
 /****************************************************************************
- *                          qb_GetRecField
+ *                          qb_GetRecFields
  *
  ****************************************************************************/
-global function qb_GetRecField []
+global function qb_GetRecFields []
 
-    return REC_FIELD;
+    return [REC_FIELD, RECCHG_FIELD];
 
 endfunction
 
@@ -486,7 +581,7 @@ global function qb_LoadQMScoreDB [dbpath]
     local type = db_GetEnv [dbkey, DBTYPE];
     if neL [type, QMSCORE] then
         db_Close dbkey;
-        return [[], [], [], [], twrite ['{}\nis not a QMScore Database.',
+        return [[], [], [], twrite ['{}\nis not a QMScore Database.',
             dbpath]];
     endif
 
@@ -625,9 +720,11 @@ global function qb_SetQMScoreFields [dbkey, addreceptor]
 
     if addreceptor then
         db_EnsureField [dbkey, REC_FIELD, 'molecule'];
+        db_EnsureField [dbkey, RECCHG_FIELD, 'int'];
     endif
 
     db_EnsureField [dbkey, POSE_FIELD, 'molecule'];
+    db_EnsureField [dbkey, LIGCHG_FIELD, 'int'];
     apt db_EnsureField [dbkey, QMS_NUM_FIELDS, 'double'];
 
 endfunction

@@ -547,9 +547,13 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
 
             elseif vals.panel === 'Save' then
                 if second task_fork [] === 'child' then
+                    vals.posedb = select ['', fabsname vals.posedb, 
+                        vals.posedb === ''];
+                    vals.recdb = select ['', fabsname vals.recdb, 
+                        vals.recdb === ''];
                     options = tag [qb_GetTagsNMRScore [], [vals.mode, vals.cwd,
-                        fabsname vals.workdir, fabsname vals.scoredb,
-                        fabsname vals.posedb, fabsname vals.recdb,
+                        vals.workdir, fabsname vals.scoredb,
+                        vals.posedb, vals.recdb,
                         vals.guess, vals.opt, vals.cut, vals.radius, []]];
                     nmrkey = SetUpRun [complexmol, options];
                     dbv_Open db_Filename nmrkey;

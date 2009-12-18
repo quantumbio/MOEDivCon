@@ -24,15 +24,6 @@ global function qb_dumpEnvVars [worker]
   fclose tempf;
 endfunction
 
-global function qb_dumpCharges [filename]
-    local env = db_Environment (filename);
-    local envtok = twrite ['{v}', env];
-    local f = fopenw 'mdbenv.txt';
-    fwrite [f, '{}\n', envtok];
-    fclose f;
-endfunction
-
-
 global function qb_dumpMDBEnv [filename]
     local env = db_Environment (filename);
     local envtok = twrite ['{v}', env];
