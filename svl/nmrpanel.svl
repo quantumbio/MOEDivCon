@@ -31,13 +31,13 @@
 
 
 function qb_AtomsToMols;
-
+function qb_CalcCharge;
 function qb_CopyPoseDB;
 function qb_CopyRecPoseDB;
 function qb_CutReceptor;
 function qb_GetDefaultsNMRScore;
 function qb_GetEnv;
-function qb_GetPoseField;
+function qb_GetPoseFields;
 function qb_GetTagsNMRScore;
 function qb_SaveNMRScore;
 function qb_SaveStatus;
@@ -72,7 +72,57 @@ const GEOM_OPTS =
 //  Local Functions
 
 /****************************************************************************
- *                          SetUpRun
+ *                          RunCalc
+ *
+ *  Run the One-to-One scoring from the MOE Window.
+ *
+ ****************************************************************************/
+function RunCalc [dbkey]
+    local msgkey = Message [0, 'NMRScore is running ...'];
+    sleep -1;    // Allow parent to close input window.
+
+    local [recset, ligand, options] = qb_GetEnv [dbkey];
+    local workdir;
+    if options.pwd === 1 then
+        workdir = getenv 'PWD';
+    else
+        workdir = fabsname options.workdir;
+    endif
+
+    options.workdir = workdir;
+    write ['Work Dir:  {}\n', workdir];  //DEBUG
+
+    local [results, errmess] = qb_NMRScore [recset, ligand, options];
+
+    local rowkey = first db_Entries [dbkey];
+    if results === [] then
+        if errmess === [] or errmess === '' then
+            qb_SaveStatus [dbkey, rowkey, "Error:  Unknown error!"];
+            write ['NMRScore Error:  Unknown error!\n'];
+        else
+            qb_SaveStatus [dbkey, rowkey, 
+                swrite ['Error:  {}', errmess]];
+            write ['NMRScore Error:  {}\n', errmess];
+        endif
+    else
+        print results;  //DEBUG
+        local atomindices = app first results;
+        local atomnames = get [ligand(4)(MOL_ATOM_NAME), atomindices];
+        local cspvalues = app second results;
+        qb_SetNMRScoreFields [dbkey, 0, atomnames];
+        qb_SaveNMRScore [dbkey, rowkey, 9.99, tag [atomnames, cspvalues]];
+        qb_SaveStatus [dbkey, rowkey, "Success"];
+    endif
+
+    Message [msgkey, 'NMRScore is done.'];
+
+    return;
+endfunction
+
+    // ----------------------- embedded functions end -----------------------
+
+/****************************************************************************
+ *                          SetUpDB
  *
  *  Create the output database for storing NMRScore results and ensure that
  *  the required fields are present.  Store the molecules and run options 
@@ -82,7 +132,7 @@ const GEOM_OPTS =
  *  and will exit on an error.
  *
  ****************************************************************************/
-local function SetUpRun [complex, opts]
+local function SetUpDB [complex, opts]
 
     local nmrkey = db_Open [opts.scoredb, 'create'];
     qb_SetNMRScoreFields [nmrkey, opts.mode === 'Many-to-Many'];
@@ -100,7 +150,7 @@ local function SetUpRun [complex, opts]
     endif
 
     if opts.mode === 'One-to-One' then
-        local posedata = tag [qb_GetPoseField [], [ligand]];
+        local posedata = tag [qb_GetPoseFields [], [ligand, opts.ligchg]];
         db_Write [nmrkey, 0, posedata];
 
     else
@@ -131,6 +181,52 @@ local function SetUpRun [complex, opts]
     qb_SetStatusField [nmrkey];
 
     return nmrkey;
+endfunction
+
+/****************************************************************************
+ *                          UpdateCWD
+ *
+ *  Update the window based on new CWD value.
+ *
+ ****************************************************************************/
+local function UpdateCWD [wkey, cwd, wd, prev]
+    if cwd === 1 then
+        WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
+        WindowSetData [wkey, [workdir: '']];
+        return wd;
+    else
+        WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0]]];
+        WindowSetData [wkey, [workdir: prev]];
+        return prev;
+    endif
+endfunction
+
+/****************************************************************************
+ *                          UpdateMode
+ *
+ *  Update the window based on new mode value.
+ *
+ ****************************************************************************/
+local function UpdateMode [wkey, mode]
+    if mode === 'One-to-One' then
+        WindowSetAttr [wkey, [posebox: [sensitive: 0],
+            posedb: [allowBlank: 1], recbox: [sensitive: 0], 
+            recdb: [allowBlank: 1], panel:[sensitive: [1,1,1,1]],
+            chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
+            recchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
+    elseif mode === 'One-to-Many' then
+        WindowSetAttr [wkey, [posebox: [sensitive: 1],
+            posedb: [allowBlank: 0],recbox: [sensitive: 0], 
+            recdb: [allowBlank: 1], panel:[sensitive: [0,1,1,1]],
+            chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
+            recchg: [allowBlank: 0], poseschg: [sensitive: 1]]];
+    elseif mode === 'Many-to-Many' then
+        WindowSetAttr [wkey, [posebox: [sensitive: 1],
+            posedb: [allowBlank: 0], recbox: [sensitive: 1], 
+            recdb: [allowBlank: 0], panel:[sensitive: [0,1,1,1]],
+            chgbox: [sensitive: 0], ligchg: [allowBlank: 1],
+            recchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
+    endif
 endfunction
 
 //  Global Functions
@@ -333,45 +429,48 @@ global function qb_NMRScoreSetupPanel []
             Button : [ name: 'browse_recdb', text: 'Browse...' ]
             ],
 
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            extendH: 1, name: 'chgbox', title: 'Charges:',
+            Button : [ name: 'calcchg', text: 'Calculate' ],
+            Vbox :
+                [
+                Hbox :
+                    [
+                    extendH: 1,
+                    Text :
+                        [
+                        name: 'recchg', title: 'Receptor:', allowBlank: 0,
+                        type: 'int', minWidth: 4,
+                        bubbleHelp:
+                            'Total charge of receptor.'
+                        ]
+                    ],
+                Hbox :
+                    [
+                    extendH: 1,
+                    Text :
+                        [
+                        name: 'ligchg', title: 'Ligand:', allowBlank: 0,
+                        type: 'int', minWidth: 4, extendH: 1,
+                        bubbleHelp:
+                            'Total charge of ligand.'
+                        ],
+                    Checkbox :
+                        [
+                        name: 'poseschg', text: 'All Poses',
+                        bubbleHelp:
+                            'Use the ligand charge for all\n'
+                            'poses in the poses database.'
+                        ]
+                    ]
+                ]
+            ],
+
         Separator : [flushLeft:1, extendH:1, margin:1]
         ];
-
-    // ---------------------- embedded functions begin ----------------------
-
-    function RunCalc [dbkey]
-        local msgkey = Message [0, 'NMRScore is running ...'];
-        sleep -1;    // Allow parent to close input window.
-
-        local [recset, ligand, options] = qb_GetEnv [dbkey];
-        local [results, errmess] = qb_NMRScore [recset, ligand, options];
-
-        local rowkey = first db_Entries [dbkey];
-        if results === [] then
-            if errmess === [] or errmess === '' then
-                qb_SaveStatus [dbkey, rowkey, "Error:  Unknown error!"];
-                write ['NMRScore Error:  Unknown error!\n'];
-            else
-                qb_SaveStatus [dbkey, rowkey, 
-                    swrite ['Error:  {}', errmess]];
-                write ['NMRScore Error:  {}\n', errmess];
-            endif
-        else
-            print results;
-            local atomindices = app first results;
-            local atomnames = get [ligand(4)(MOL_ATOM_NAME), atomindices];
-write ['Atom names:  {v}\n', atomnames]; //DEBUG
-            local cspvalues = app second results;
-            qb_SetNMRScoreFields [dbkey, 0, atomnames];
-            qb_SaveNMRScore [dbkey, rowkey, 9.99, tag [atomnames, cspvalues]];
-            qb_SaveStatus [dbkey, rowkey, "Success"];
-        endif
-
-        Message [msgkey, 'NMRScore is done.'];
-
-        return;
-    endfunction
-
-    // ----------------------- embedded functions end -----------------------
 
     local btid, browsetasks = [];
     local prio;
@@ -389,24 +488,30 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
         guess: [sensitive: 1], opt: [sensitive:1], mode: [sensitive: 1],
         workdir: [sensitive: 1, allowBlank: 0],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
-        recbox: [sensitive: 0], recdb: [allowBlank: 1]]];
+        recbox: [sensitive: 0], recdb: [allowBlank: 1],
+        poseschg: [sensitive: 0]]];
     WindowShow [wkey, 1];
 
     loop
         local [vals, trig] = WindowWait wkey;
         if trig === 'mode' then
-            if vals.mode === 'One-to-One' then
-                WindowSetAttr [wkey, [posebox: [sensitive: 0],
-                    posedb: [allowBlank: 1], recbox: [sensitive: 0], 
-                    recdb: [allowBlank: 1], panel: [sensitive: [1,1,1,1]]]];
-            elseif vals.mode === 'One-to-Many' then
-                WindowSetAttr [wkey, [posebox: [sensitive: 1],
-                    posedb: [allowBlank: 0],recbox: [sensitive: 0], 
-                    recdb: [allowBlank: 1], panel: [sensitive: [0,1,1,1]]]];
-            elseif vals.mode === 'Many-to-Many' then
-                WindowSetAttr [wkey, [posebox: [sensitive: 1],
-                    posedb: [allowBlank: 0], recbox: [sensitive: 1], 
-                    recdb: [allowBlank: 0], panel: [sensitive: [0,1,1,1]]]];
+            UpdateMode [wkey, vals.mode];
+
+        elseif trig === 'cwd' then
+            prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir, prevwd];
+
+        elseif trig === 'calcchg' then
+            if second task_fork [master: 'parent'] === 'child' then
+                task_prio 0;
+
+                local [lchg, rchg, ccerrmess] = qb_CalcCharge [];
+                if lchg === [] or rchg === [] then
+                    Warning  ccerrmess;
+                    exit [];
+                endif
+
+                WindowSetData [wkey, [ligchg: lchg, recchg: rchg]];
+                exit [];
             endif
 
         elseif trig === 'cut' then
@@ -422,10 +527,10 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
             if second task_fork [master: 'parent'] === 'child' then
                 prio = task_prio 0;
 
-                local [cutrecmols, cutligmol, errmess] = qb_CutReceptor [0, 
+                local [cutrecmols, cutligmol, crerrmess] = qb_CutReceptor [0, 
                     vals.radius];
                 if cutrecmols === [] or cutligmol === [] then
-                    Warning errmess;
+                    Warning crerrmess;
                     exit [];
                 endif
                 WindowSetAttr [wkey, [showcut: [sensitive: 0],
@@ -468,30 +573,20 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
                 exit [];
             endif
 
-        elseif trig === 'cwd' then
-            if vals.cwd === 1 then
-                prevwd = vals.workdir;
-                WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
-                WindowSetData [wkey, [workdir: '']];
-            else
-                WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0]]];
-                WindowSetData [wkey, [workdir: prevwd]];
-            endif
-
         elseif trig === 'browse_scoredb' then
             btid = run ['fbrowse.svl', [trig, wkey, 'Select NMRScore DB File', 
                 'none', '*.mdb', 'scoredb']];
-        if btid then browsetasks = append [browsetasks, btid]; endif
+            if btid then browsetasks = append [browsetasks, btid]; endif
 
         elseif trig === 'browse_posedb' then
             btid = run ['fbrowse.svl', [trig, wkey, 'Select Pose DB File', 
                 'open', '*.mdb', 'posedb']];
-        if btid then browsetasks = append [browsetasks, btid]; endif
+            if btid then browsetasks = append [browsetasks, btid]; endif
 
         elseif trig === 'browse_recdb' then
             btid = run ['fbrowse.svl', [trig, wkey, 'Select Receptor DB File', 
                 'open', '*.mdb', 'recdb']];
-        if btid then browsetasks = append [browsetasks, btid]; endif
+            if btid then browsetasks = append [browsetasks, btid]; endif
 
        elseif trig === 'panel' then
             if vals.panel === 'Cancel' then 
@@ -516,6 +611,9 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
                         /*  Drop the task tagged value.  */
                         ldopts = droplast ldopts;
                         WindowSetData [wkey, ldopts];
+                        UpdateMode [wkey, ldopts.mode];
+                        prevwd = UpdateCWD [wkey, ldopts.cwd, ldopts.workdir, 
+                            ldopts.workdir];
 
     	                Close [force:1];
                         local ldligmol = mol_Create ldlig;
@@ -533,10 +631,11 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
             elseif vals.panel === 'Run' then
                 if second task_fork [prio:3, idle:0] === 'child' then
                     options = tag [qb_GetTagsNMRScore [], [vals.mode, vals.cwd,
-                      fabsname vals.workdir, fabsname vals.scoredb, [], [],
-                      vals.guess, vals.opt, vals.cut, vals.radius, []]];
+                        fabsname vals.workdir, fabsname vals.scoredb, [], [],
+                        vals.ligchg, vals.recchg, vals.poseschg,
+                        vals.guess, vals.opt, vals.cut, vals.radius, []]];
 
-                    nmrkey = SetUpRun [complexmol, options];
+                    nmrkey = SetUpDB [complexmol, options];
                     RunCalc [nmrkey];
                     dbv_Open db_Filename nmrkey;
                     db_Close nmrkey;
@@ -554,8 +653,9 @@ write ['Atom names:  {v}\n', atomnames]; //DEBUG
                     options = tag [qb_GetTagsNMRScore [], [vals.mode, vals.cwd,
                         vals.workdir, fabsname vals.scoredb,
                         vals.posedb, vals.recdb,
+                        vals.ligchg, vals.recchg, vals.poseschg,
                         vals.guess, vals.opt, vals.cut, vals.radius, []]];
-                    nmrkey = SetUpRun [complexmol, options];
+                    nmrkey = SetUpDB [complexmol, options];
                     dbv_Open db_Filename nmrkey;
                     db_Close nmrkey;
                     exit [];

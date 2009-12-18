@@ -41,20 +41,12 @@ const GEOM_KEYS =
 global function qb_NMRScore [receptor_mols, ligand_mol, opts]
 
 local errmess = [];
-local workdir;
 local subdirname;
-if opts.pwd === 1 then
-    workdir = getenv 'PWD';
-else
-    workdir = fabsname opts.workdir;
-endif
 
-    write ['Work Dir:  {}\n', workdir];  //DEBUG
-
-if opts.task === [] then
-    subdirname = workdir;
+if opts.task === [] or opts.task === 0 then
+    subdirname = opts.workdir;
 else
-    subdirname = twrite ['{}/qb_out{n:}', workdir, opts.task];
+    subdirname = twrite ['{}/qb_out{n:}', opts.workdir, opts.task];
     local okay = _fmkdir subdirname;
     if okay === -1 then
         errmess = swrite ['Unable to create subdirectory:  {}',
@@ -80,8 +72,9 @@ local stdout = exe_stdout process_keys;
 //  in the receptor collection.
 
 local retValue, success = 0;
-local mol, molIndex, molCount, residueIndex, residueCount, atomIndex, atomCount;
-molCount = length receptor_mols;
+local mol, molIndex, residueIndex, residueCount, atomIndex, atomCount;
+local molCount = length receptor_mols;
+fwrite [stdin, '{n:}\n', opts.recchg];
 fwrite [stdin, '{n:}\n', molCount];
 for molIndex = 1, molCount, 1 loop
     mol = receptor_mols(molIndex);
@@ -93,10 +86,9 @@ for molIndex = 1, molCount, 1 loop
         fwrite [stdin, '{c:} {n:} {n:}\n', mol(3)(MOL_RES_NAME)(residueIndex),
             mol(3)(MOL_RES_UID)(residueIndex), atomCount];
        for atomCount loop
-            fwrite [stdin, '{c:} {c:} {n:.4f}\n',
+            fwrite [stdin, '{c:} {c:}\n',
                 mol(4)(MOL_ATOM_NAME)(atomIndex),
-                mol(4)(MOL_ATOM_EL)(atomIndex),
-                mol(4)(MOL_ATOM_ION)(atomIndex)];
+                mol(4)(MOL_ATOM_EL)(atomIndex)];
             fwrite [stdin, '{n:.4f} {n:.4f} {n:.4f}\n',
                 mol(4)(MOL_ATOM_X)(atomIndex),
                 mol(4)(MOL_ATOM_Y)(atomIndex),
@@ -109,6 +101,7 @@ endloop
 [retValue] = fread [stdout, '{n:}\n'];
 
 //  There is only one molecule and one chain in the ligand/poses collection.
+fwrite [stdin, '{n:}\n', opts.ligchg];
 fwrite [stdin, '{n:}\n', 1];
 mol = ligand_mol;
 atomIndex = 1;
@@ -119,10 +112,9 @@ for residueIndex = 1, residueCount, 1 loop
     fwrite [stdin, '{c:} {n:} {n:}\n', mol(3)(MOL_RES_NAME)(residueIndex),
         mol(3)(MOL_RES_UID)(residueIndex), atomCount];
     for  atomCount loop
-        fwrite [stdin, '{c:} {c:} {n:.4f}\n',
+        fwrite [stdin, '{c:} {c:}\n',
             mol(4)(MOL_ATOM_NAME)(atomIndex),
-            mol(4)(MOL_ATOM_EL)(atomIndex),
-            mol(4)(MOL_ATOM_ION)(atomIndex)];
+            mol(4)(MOL_ATOM_EL)(atomIndex)];
         fwrite [stdin, '{n:.4f} {n:.4f} {n:.4f}\n',
             mol(4)(MOL_ATOM_X)(atomIndex),
             mol(4)(MOL_ATOM_Y)(atomIndex),

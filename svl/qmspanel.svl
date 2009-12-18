@@ -460,10 +460,10 @@ global function qb_QMScoreSetupPanel []
 
     WindowSetData [wkey, windefs];
     WindowSetAttr [wkey, [freq: [sensitive: 1],
-         workdir: [sensitive: 1, allowBlank: 0],
-         posebox: [sensitive: 0], posedb: [allowBlank: 1],
-         recbox: [sensitive: 0], recdb: [allowBlank: 1],
-         poseschg: [sensitive: 0]]];
+        workdir: [sensitive: 1, allowBlank: 0],
+        posebox: [sensitive: 0], posedb: [allowBlank: 1],
+        recbox: [sensitive: 0], recdb: [allowBlank: 1],
+        poseschg: [sensitive: 0]]];
     WindowShow [wkey, 1];
 
     loop
