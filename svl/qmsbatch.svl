@@ -29,8 +29,8 @@
 #set version '2009.01'
 #set main    'qb_QMScoreBatch'
 
-function qb_GetPoseField;
-function qb_GetRecField;
+function qb_GetPoseFields;
+function qb_GetRecFields;
 function qb_GetOptions;
 function qb_GetEnv;
 function qb_SaveStatus;
@@ -44,7 +44,7 @@ global function qb_QMScoreBatch [dbpath]
     //  Extract molecules and run options from the database environment
     local dbkey = db_Open [dbpath, 'read-write'];
     local [recmols, ligmol, options] = qb_GetEnv [dbkey];
-write ['LIGAND ION:  {v}\n', ligmol(4)(MOL_ATOM_ION)];  //DEBUG
+    local recchg;
     local workdir;
     if options.pwd === 1 then
         workdir = getenv 'PWD';
@@ -58,8 +58,8 @@ write ['LIGAND ION:  {v}\n', ligmol(4)(MOL_ATOM_ION)];  //DEBUG
     //  For each ligand pose in the database, calculate QM score.
     local rowkey = 0, count = 0;
     local total = db_nEntries (dbkey);
-    local posefld = qb_GetPoseField [dbkey];
-    local recfld = qb_GetRecField [dbkey];
+    local poseflds = qb_GetPoseFields [dbkey];
+    local recflds = qb_GetRecFields [dbkey];
     local tid = task_key -1;
     loop
         if count === 0 or rowkey <> 0 then
@@ -69,14 +69,20 @@ write ['LIGAND ION:  {v}\n', ligmol(4)(MOL_ATOM_ION)];  //DEBUG
         if rowkey <> 0 then
             count = count + 1;
             options.task = count;
-            local posemol = first db_ReadFields [dbkey, rowkey, [posefld]];
+            local [posemol, posechg] = db_ReadFields [dbkey, rowkey, 
+                [poseflds]];
 
-write ['POSE ION:  {v}\n', posemol(4)(MOL_ATOM_ION)];  //DEBUG
- 
             if options.mode === 'Many-to-Many' then
-                recmols = db_ReadFields [dbkey, rowkey, [recfld]];
+                [recmols, recchg] = db_ReadFields [dbkey, rowkey, [recflds]];
+            else
+                recchg = options.recchg;
             endif
         endif
+
+        options.ligchg = posechg;
+        options.recchg = recchg;
+
+write ['Rec chg:  {}    Lig chg:  {}\n', options.recchg, options.ligchg];//DEBUG
 
         local [[results, errmess], code, seqno, indkey] = mpu_batch [
             select ['', 'call', rowkey === 0],
