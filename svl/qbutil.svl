@@ -8,6 +8,15 @@
 
 function _Atoms;
 
+//  Charge status
+const CHG_COLOR = 
+    [
+    'white',
+    'green',
+    'yellow',
+    'red'
+    ];
+
 //  Data tags are in the order in which they are returned by Divcon.
 const QMS_DATA_TAGS =
     [
@@ -52,20 +61,34 @@ const NMR_NUM_FIELDS =
     'NMRScore'
     ];
 
+
 // Environment tags
 const COMPLEX = 'complex';
 const LIGAND = 'ligand';
 const TARGET = 'target';
 const OPTIONS = 'options';
+const STATUS = 'status';
 
 const DBTYPE = 'qb_dbtype';
 const QMSCORE = 'qb_qmscoredb';
 const NMRSCORE = 'qb_nmrscoredb';
 
-/*  NOTE:  task must be the last tag.  */
+const STATUS_DEFAULTS =
+    [
+    ['calcchg',      0             ],
+    ['ligchg',       1             ],
+    ['recchg',       1             ],
+    ['adjligchg',    0             ],
+    ['adjrecchg',    0             ],
+    ['moeligchg',    0             ],
+    ['moerecchg',    0             ]
+    ];
+
+/*  NOTE:  Non-GUI opt task must be the first tag.  */
 const QMSCORE_OPT_DEFAULTS =
     [
-    ['mode',         'One-to-One'  ],
+    ['task',         0             ],
+    ['mode',         'One-to-One'  ],  // Shared dialog defaults options
     ['cwd',          0             ],
     ['workdir',      '/tmp'        ],
     ['scoredb',      'qmscore.mdb' ],
@@ -74,17 +97,17 @@ const QMSCORE_OPT_DEFAULTS =
     ['ligchg',       0             ],
     ['recchg',       0             ],
     ['poseschg',     0             ],
-    ['ham',          5             ],
+    ['ham',          5             ],  // QMScore defaults start here
     ['standard',     0             ],
     ['freq',         0             ],
     ['opt',          1             ],
-    ['shift',        0.0           ],
-    ['task',         0             ]
+    ['shift',        0.0           ]
     ];
 
 const NMRSCORE_OPT_DEFAULTS =
     [
-    ['mode',         'One-to-One'  ],
+    ['task',         0             ],
+    ['mode',         'One-to-One'  ],  // Shared dialog option defaults
     ['cwd',          0             ],
     ['workdir',      '/tmp'        ],
     ['scoredb',      'nmrscore.mdb'],
@@ -93,11 +116,10 @@ const NMRSCORE_OPT_DEFAULTS =
     ['ligchg',       0             ],
     ['recchg',       0             ],
     ['poseschg',     0             ],
-    ['guess',        0             ],
+    ['guess',        0             ],  // NMRScore defaults start here
     ['opt',          1             ],
     ['cut',          0             ],
-    ['radius',       2.5           ],
-    ['task',         0             ]
+    ['radius',       2.5           ]
     ];
 
 //  Local Functions
@@ -106,7 +128,9 @@ const NMRSCORE_OPT_DEFAULTS =
  *                          CalcCharge
  *
  *  Determine the total charge of the molecule collection represented by 
- * the set of atoms.
+ * the set of atoms.  Return the adjusted flag along with the charge.
+ *     0)  Okay, no adjustment.
+ *     1)  Adjusted odd number of electrons.
  *
  ****************************************************************************/
 local function CalcCharge [atoms]
@@ -114,7 +138,7 @@ local function CalcCharge [atoms]
     local charge = add aFCharge atoms;
     local numelecs = add aAtomicNumber atoms;
     if even (charge + numelecs) then
-      return charge;
+      return [charge, 0];
     endif
 
     /*  Adjust the charge up or down one so that Divcon will be happy.  */
@@ -129,7 +153,22 @@ local function CalcCharge [atoms]
       charge = charge - 1;
     endif
 
-    return charge;
+    return [charge, 1];
+endfunction
+
+/****************************************************************************
+ *                          CheckCharge
+ *
+ *  Determine whether the given total charge of the molecule collection 
+ *  represented by the set of atoms will result in a system with an even
+ *  number of electrons.
+ *
+ ****************************************************************************/
+local function CheckCharge [atoms, charge]
+
+    local numelecs = add aAtomicNumber atoms;
+    return even (charge + numelecs);
+
 endfunction
 
 /****************************************************************************
@@ -246,13 +285,34 @@ global function qb_CalcCharge []
 
     local [recatoms, ligatoms, errmess] = SplitComplex [];
     if recatoms === [] or ligatoms === [] then
+        return  [[], [], [], [], errmess];
+    endif
+
+    local [recchg, recadj] = CalcCharge [recatoms];
+    local [ligchg, ligadj] = CalcCharge [ligatoms];
+
+    return [recchg, recadj, ligchg, ligadj, []];
+
+endfunction
+
+/****************************************************************************
+ *                          qb_CheckCharge
+ *
+ *  Determine whether the given total charges of the ligand and receptor
+ *  in the MOE window will result in systems with an even number of electrons.
+ *
+ ****************************************************************************/
+global function qb_CheckCharge [recchg, ligchg]
+
+    local [recatoms, ligatoms, errmess] = SplitComplex [];
+    if recatoms === [] or ligatoms === [] then
         return  [[], [], errmess];
     endif
 
-    local ligchg = CalcCharge [ligatoms];
-    local recchg = CalcCharge [recatoms];
+    local recok = CheckCharge [recatoms, recchg];
+    local ligok = CheckCharge [ligatoms, ligchg];
 
-    return [ligchg, recchg, []];
+    return [recok, ligok, []];
 
 endfunction
 
@@ -457,6 +517,20 @@ global function qb_CutReceptor [posedbkey, radius]
 endfunction
 
 /****************************************************************************
+ *                          qb_DrawChgStatus
+ *
+ *  Return the graphics key for the status label.
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+global function qb_DrawChgStatus [cidx]
+    local color = CHG_COLOR (cidx);
+    local key = gr_create [title: 'status', size: [13, 13], units: 'pt'];
+    gr_oval [key, [0, [6,6], [6,6], icolor color, 1, icolor color]];
+    return key;
+endfunction
+
+/****************************************************************************
  *                          qb_GetDefaultsNMRScore
  *
  *  Return the default options for NMRScore.
@@ -477,6 +551,15 @@ global function qb_GetDefaultsQMScore []
 endfunction
 
 /****************************************************************************
+ *                          qb_GetDefaultsStatus
+ *
+ *  Return the default options for the GUI status.
+ *
+ ****************************************************************************/
+global function qb_GetDefaultsStatus []
+    return tag tr STATUS_DEFAULTS;
+endfunction
+/****************************************************************************
  *                          qb_GetEnv
  *
  *  Get the molecules (ligand and receptor) and options from the  
@@ -492,6 +575,10 @@ global function qb_GetEnv [dbkey]
     local cpxtok = db_GetEnv [dbkey, COMPLEX];
     local [[complex]] = sread [string cpxtok, '{v}'];
 
+    local ststok = db_GetEnv [dbkey, STATUS];
+    local [[status]] = sread [string ststok, '{v}'];
+    status = tagcat [status, tag tr STATUS_DEFAULTS];
+
     local opttok = db_GetEnv [dbkey, OPTIONS];
     local [[options]] = sread [string opttok, '{v}'];
     local type = db_GetEnv [dbkey, DBTYPE];
@@ -501,7 +588,7 @@ global function qb_GetEnv [dbkey]
         options = tagcat [options, tag tr NMRSCORE_OPT_DEFAULTS];
     endif
 
-    return [tgtmols, ligmol, options, complex];
+    return [tgtmols, ligmol, status, options, complex];
 
 endfunction
 
@@ -555,11 +642,11 @@ global function qb_LoadNMRScoreDB [dbpath]
     local type = db_GetEnv [dbkey, DBTYPE];
     if neL [type, NMRSCORE] then
         db_Close dbkey;
-        return [[], [], [], [], twrite ['{}\nis not a NMRScore Database.',
+        return [[], [], [], [], [], twrite ['{}\nis not a NMRScore Database.',
             dbpath]];
     endif
 
-    local [cutrec, lig, opts, complex] = qb_GetEnv [dbkey];
+    local [cutrec, lig, status, opts, complex] = qb_GetEnv [dbkey];
 
     if not MOE_BATCH then
       dbv_Open db_Filename dbkey;
@@ -567,7 +654,7 @@ global function qb_LoadNMRScoreDB [dbpath]
 
     db_Close dbkey;
 
-    return [cutrec, lig, opts, complex, []];
+    return [cutrec, lig, status, opts, complex, []];
 
 endfunction
 
@@ -581,11 +668,11 @@ global function qb_LoadQMScoreDB [dbpath]
     local type = db_GetEnv [dbkey, DBTYPE];
     if neL [type, QMSCORE] then
         db_Close dbkey;
-        return [[], [], [], twrite ['{}\nis not a QMScore Database.',
+        return [[], [], [], [], twrite ['{}\nis not a QMScore Database.',
             dbpath]];
     endif
 
-    local [cutrec, lig, opts] = qb_GetEnv [dbkey];
+    local [rec, lig, status, opts] = qb_GetEnv [dbkey];
 
     if not MOE_BATCH then
       dbv_Open db_Filename dbkey;
@@ -593,7 +680,7 @@ global function qb_LoadQMScoreDB [dbpath]
 
     db_Close dbkey;
 
-    return [cutrec, lig, opts, []];
+    return [rec, lig, status, opts, []];
 
 endfunction
 
@@ -602,7 +689,7 @@ endfunction
  *
  *  Perform a naive merge of the two databases (that is, assume the first
  *  row of data in srcname1 corresponds to the first row of data srcname2,
- *  etc.).
+ *  etc.).  Only the fields are merged, the environment is ignored.
  *
  ****************************************************************************/
 global function qb_MergeDB [srcname1, srcname2, dstname]
@@ -637,10 +724,12 @@ endfunction
  *  database.
  *
  ****************************************************************************/
-global function qb_SaveEnv [dbkey, tgtmols, ligmol, options, complex, type]
+global function qb_SaveEnv [dbkey, tgtmols, ligmol, status, options,
+        complex, type]
 
     db_SetEnv [dbkey, TARGET, twrite ['{v}', tgtmols]];
     db_SetEnv [dbkey, LIGAND, twrite ['{v}', ligmol]];
+    db_SetEnv [dbkey, STATUS, twrite ['{v}', status]];
     db_SetEnv [dbkey, OPTIONS, twrite ['{v}', options]];
     db_SetEnv [dbkey, COMPLEX, twrite ['{v}', complex]];
 
@@ -680,12 +769,12 @@ global function qb_SaveQMScore [mdbkey, rowkey, scoredata]
 endfunction
 
 /****************************************************************************
- *                          qb_SaveStatus
+ *                          qb_SaveDivconStatus
  *
  *  Save the error/status message for the given row.
  *
  ****************************************************************************/
-global function qb_SaveStatus [dbkey, rowkey, message]
+global function qb_SaveDivconStatus [dbkey, rowkey, message]
 
     local fielddata = tag [STATUS_FIELD, [message]];
     db_Write [dbkey, rowkey, fielddata];

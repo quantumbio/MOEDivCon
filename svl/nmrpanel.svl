@@ -477,9 +477,17 @@ global function qb_NMRScoreSetupPanel []
     local options = []; 
     local nmrkey = 0;
     local defs = qb_GetDefaultsNMRScore [];
-    local windefs = droplast defs;
+    local windefs = dropfirst defs;
     local prevwd = defs.workdir;
     local complexmol = mol_Extract Chains [];
+
+    local [ligchg, recchg, errmess] = qb_CalcCharge [];
+    if ligchg === [] or recchg === [] then
+        Warning  errmess;
+    else
+        windefs.ligchg = ligchg;
+        windefs.recchg = recchg;
+    endif
 
     WindowSetData [wkey, windefs];
     WindowSetAttr [wkey, [panel: [sensitive: [1,1,1,1]],
@@ -504,13 +512,13 @@ global function qb_NMRScoreSetupPanel []
             if second task_fork [master: 'parent'] === 'child' then
                 task_prio 0;
 
-                local [lchg, rchg, ccerrmess] = qb_CalcCharge [];
-                if lchg === [] or rchg === [] then
-                    Warning  ccerrmess;
+                [ligchg, recchg, errmess] = qb_CalcCharge [];
+                if ligchg === [] or recchg === [] then
+                    Warning  errmess;
                     exit [];
                 endif
 
-                WindowSetData [wkey, [ligchg: lchg, recchg: rchg]];
+                WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
                 exit [];
             endif
 
@@ -609,7 +617,7 @@ global function qb_NMRScoreSetupPanel []
 
                         complexmol = ldcomplex;
                         /*  Drop the task tagged value.  */
-                        ldopts = droplast ldopts;
+                        ldopts = dropfirst ldopts;
                         WindowSetData [wkey, ldopts];
                         UpdateMode [wkey, ldopts.mode];
                         prevwd = UpdateCWD [wkey, ldopts.cwd, ldopts.workdir, 

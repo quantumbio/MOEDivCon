@@ -32,15 +32,18 @@
 
 function qb_AtomsToMols;
 function qb_CalcCharge;
+function qb_CheckCharge;
 function qb_CopyPoseDB;
 function qb_CopyRecPoseDB;
+function qb_DrawChgStatus;
 function qb_GetDefaultsQMScore;
+function qb_GetDefaultsStatus;
 function qb_GetEnv;
 function qb_GetPoseFields;
 function qb_GetTagsQMScore;
 function qb_LoadQMScoreDB;
 function qb_SaveQMScore;
-function qb_SaveStatus;
+function qb_SaveDivconStatus;
 function qb_SaveEnv;
 function qb_SetStatusField;
 function qb_SetQMScoreFields;
@@ -76,7 +79,51 @@ const LIG_OPTS =
     'bound'
     ];
 
+
 //  Local Functions
+
+function SetChargeStatus;
+
+/****************************************************************************
+ *                          CheckCharge
+ *
+ *  Check user-defined charges for even number of electrons.
+ *
+ ****************************************************************************/
+local function CheckCharge [wkey, status, recchg, ligchg]
+
+    local [recok, ligok, errmess] = qb_CheckCharge [recchg, ligchg];
+    if recok === [] or ligok === [] then
+        Warning errmess;  //DEBUG
+        SetChargeStatus [wkey, status];
+        return status;
+    endif
+
+    status.ligchg = select [status.ligchg, 4, ligok];
+    status.recchg = select [status.recchg, 4, recok];
+
+    SetChargeStatus [wkey, status];
+    return status;
+endfunction
+
+/****************************************************************************
+ *                          ClearChargeStatus
+ *
+ *  Clear charge status.
+ *
+ ****************************************************************************/
+local function ClearChargeStatus [wkey]
+
+    local ligkey = qb_DrawChgStatus [1];
+    local reckey = qb_DrawChgStatus [1];
+
+    WindowSetAttr [wkey, [ligflg: [graphics: ligkey],
+        recflg: [graphics: reckey]]];
+    
+    gr_destroy ligkey;
+    gr_destroy reckey;
+
+endfunction
 
 /****************************************************************************
  *                          RunCalc
@@ -88,7 +135,7 @@ local function RunCalc [dbkey]
     local msgkey = Message [0, 'QMScore is running ...'];
     sleep -1;    // Allow parent to close input window.
 
-    local [recset, ligand, options] = qb_GetEnv [dbkey];
+    local [recset, ligand, status, options] = qb_GetEnv [dbkey];
     local workdir;
     if options.pwd === 1 then
         workdir = getenv 'PWD';
@@ -104,21 +151,40 @@ local function RunCalc [dbkey]
     local rowkey = first db_Entries [dbkey];
     if results === [] then
         if errmess === [] or errmess === '' then
-            qb_SaveStatus [dbkey, rowkey, "Error:  Unknown error!"];
+            qb_SaveDivconStatus [dbkey, rowkey, "Error:  Unknown error!"];
             write ['QMScore Error:  Unknown error!\n'];
         else
-            qb_SaveStatus [dbkey, rowkey, 
+            qb_SaveDivconStatus [dbkey, rowkey, 
                 swrite ['Error:  {}', errmess]];
             write ['QMScore Error:  {}\n', errmess];
         endif
     else
         qb_SaveQMScore [dbkey, rowkey, results];
-        qb_SaveStatus [dbkey, rowkey, "Success"];
+        qb_SaveDivconStatus [dbkey, rowkey, "Success"];
     endif
 
     Message [msgkey, 'QMScore is done.'];
 
     return;
+endfunction
+
+/****************************************************************************
+ *                          SetChargeStatus
+ *
+ *  Set charge status label.
+ *
+ ****************************************************************************/
+local function SetChargeStatus [wkey, status]
+
+    local ligkey = qb_DrawChgStatus [status.ligchg];
+    local reckey = qb_DrawChgStatus [status.recchg];
+
+    WindowSetAttr [wkey, [ligflg: [graphics: ligkey],
+        recflg: [graphics: reckey]]];
+    
+    gr_destroy ligkey;
+    gr_destroy reckey;
+
 endfunction
 
 /****************************************************************************
@@ -132,7 +198,7 @@ endfunction
  *  and will exit on an error.
  *
  ****************************************************************************/
-local function SetUpDB [opts]
+local function SetUpDB [status, opts]
 
     local qmskey = db_Open [opts.scoredb, 'create'];
     qb_SetQMScoreFields [qmskey, opts.mode === 'Many-to-Many'];
@@ -144,9 +210,9 @@ local function SetUpDB [opts]
             exit [];
         endif
 
-        qb_SaveEnv [qmskey, recset, ligand, opts, [], 'qmscore'];
+        qb_SaveEnv [qmskey, recset, ligand, status, opts, [], 'qmscore'];
     else
-        qb_SaveEnv [qmskey, [], [], opts, [], 'qmscore'];
+        qb_SaveEnv [qmskey, [], [], status, opts, [], 'qmscore'];
     endif
 
     if opts.mode === 'One-to-One' then
@@ -184,6 +250,37 @@ local function SetUpDB [opts]
 endfunction
 
 /****************************************************************************
+ *                          UpdateCharge
+ *
+ *  Update the window based on new charge.
+ *
+ ****************************************************************************/
+local function UpdateCharge [wkey, status]
+
+    local [recchg, recadj, ligchg, ligadj, errmess] = qb_CalcCharge [];
+    if recchg === [] or ligchg === [] then
+        Warning  errmess;
+        SetChargeStatus [wkey, status];
+        return status;
+    endif
+
+    status.calcchg = 1;
+    status.moerecchg = recchg;
+    status.moeligchg = ligchg;
+    status.adjrecchg = recadj;
+    status.adjligchg = ligadj;
+
+    status.recchg = select [3, 2, recadj];
+    status.ligchg = select [3, 2, ligadj];
+
+    WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
+    SetChargeStatus [wkey, status];
+
+    return status;
+endfunction
+
+
+/****************************************************************************
  *                          UpdateCWD
  *
  *  Update the window based on new CWD value.
@@ -207,25 +304,28 @@ endfunction
  *  Update the window based on new mode value.
  *
  ****************************************************************************/
-local function UpdateMode [wkey, mode]
+local function UpdateMode [wkey, mode, status]
     if mode === 'One-to-One' then
         WindowSetAttr [wkey, [posebox: [sensitive: 0],
             posedb: [allowBlank: 1], recbox: [sensitive: 0], 
             recdb: [allowBlank: 1], panel:[sensitive: [1,1,1,1]],
             chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
             recchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
+        SetChargeStatus [wkey, status];
     elseif mode === 'One-to-Many' then
         WindowSetAttr [wkey, [posebox: [sensitive: 1],
             posedb: [allowBlank: 0],recbox: [sensitive: 0], 
             recdb: [allowBlank: 1], panel:[sensitive: [0,1,1,1]],
             chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
             recchg: [allowBlank: 0], poseschg: [sensitive: 1]]];
+        SetChargeStatus [wkey, status];
     elseif mode === 'Many-to-Many' then
         WindowSetAttr [wkey, [posebox: [sensitive: 1],
             posedb: [allowBlank: 0], recbox: [sensitive: 1], 
             recdb: [allowBlank: 0], panel:[sensitive: [0,1,1,1]],
             chgbox: [sensitive: 0], ligchg: [allowBlank: 1],
             recchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
+        ClearChargeStatus [wkey];
     endif
 endfunction
 
@@ -419,10 +519,20 @@ global function qb_QMScoreSetupPanel []
                 Hbox :
                     [
                     extendH: 1,
+                    Label :
+                        [
+                        name: 'recflg', title: 'Receptor:',
+                         bubbleHelp:
+                            'Problems with the total charge of receptor?\n'
+                            '   Green:  okay!\n'
+                            '   Yellow:  odd number of electrons, charge adjusted.\n'
+                            '   Red:  odd number of electrons, Divcon will fail.'
+                       ],
                     Text :
                         [
-                        name: 'recchg', title: 'Receptor:', allowBlank: 0,
+                        name: 'recchg', allowBlank: 0,
                         type: 'int', minWidth: 4,
+                        onTrigger: 'validate',
                         bubbleHelp:
                             'Total charge of receptor.'
                         ]
@@ -430,10 +540,21 @@ global function qb_QMScoreSetupPanel []
                 Hbox :
                     [
                     extendH: 1,
+                    Label :
+                        [
+                        name: 'ligflg', title: 'Ligand:',
+                         bubbleHelp:
+                            'Problems with the total charge of ligand?\n'
+                            '   Green:  okay!\n'
+                            '   Yellow:  odd number of electrons, charge adjusted.\n'
+                            '   Red:  odd number of electrons, Divcon will fail.'
+
+                       ],
                     Text :
                         [
-                        name: 'ligchg', title: 'Ligand:', allowBlank: 0,
+                        name: 'ligchg', allowBlank: 0,
                         type: 'int', minWidth: 4, extendH: 1,
+                        onTrigger: 'validate',
                         bubbleHelp:
                             'Total charge of ligand.'
                         ],
@@ -452,24 +573,27 @@ global function qb_QMScoreSetupPanel []
         ];
 
     local btid, browsetasks = [];
-    local options = []; 
     local qmskey = 0;
-    local defs = qb_GetDefaultsQMScore [];
-    local windefs = droplast defs;
-    local prevwd = defs.workdir;
+    local defaults = qb_GetDefaultsQMScore [];
+    local prevwd = defaults.workdir;
+    local options = [];
+    local status = qb_GetDefaultsStatus [];
 
-    WindowSetData [wkey, windefs];
+    WindowSetData [wkey, dropfirst defaults];
     WindowSetAttr [wkey, [freq: [sensitive: 1],
         workdir: [sensitive: 1, allowBlank: 0],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
         recbox: [sensitive: 0], recdb: [allowBlank: 1],
         poseschg: [sensitive: 0]]];
+    status = UpdateCharge [wkey, status];
     WindowShow [wkey, 1];
 
     loop
         local [vals, trig] = WindowWait wkey;
+
         if trig === 'mode' then
-            UpdateMode [wkey, vals.mode];
+write['{v}\n', status];//DEBUG
+            UpdateMode [wkey, vals.mode, status];
 
         elseif trig === 'cwd' then
             prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir, prevwd];
@@ -478,13 +602,25 @@ global function qb_QMScoreSetupPanel []
             if second task_fork [master: 'parent'] === 'child' then
                 task_prio 0;
 
-                local [lchg, rchg, errmess] = qb_CalcCharge [];
-                if lchg === [] or rchg === [] then
-                    Warning  errmess;
-                    exit [];
-                endif
+                status = UpdateCharge [wkey, status];
+                exit [];
+            endif
 
-                WindowSetData [wkey, [ligchg: lchg, recchg: rchg]];
+        elseif trig === 'ligchg' then
+            if second task_fork [master: 'parent'] === 'child' then
+                task_prio 0;
+
+                status = CheckCharge [wkey, status, vals.recchg,
+                    vals.ligchg];
+                exit [];
+            endif
+
+        elseif trig === 'recchg' then
+            if second task_fork [master: 'parent'] === 'child' then
+                task_prio 0;
+
+                status = CheckCharge [wkey, status, vals.recchg,
+                    vals.ligchg];
                 exit [];
             endif
 
@@ -510,23 +646,18 @@ global function qb_QMScoreSetupPanel []
             elseif vals.panel === 'Load' then 
                 if second task_fork [master: 'parent'] === 'child' then
                     task_prio 0;
+
                     local dbpath = FilePrompt [title: 'Input Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
                         write ['Load database: {}\n', dbpath];
-                        local [ldrec, ldlig, ldopts, ldmess] = 
+                        local [ldrec, ldlig, ldsts, ldopts, ldmess] = 
                             qb_LoadQMScoreDB [dbpath];
-                        if ldrec === [] or ldlig === [] or ldopts === [] then
+                        if ldrec === [] or ldlig === [] or ldopts === []
+                                or ldsts === [] then
                             Warning ldmess;
                             exit [];
                         endif
-
-                        /*  Drop the task tagged value.  */
-                        ldopts = droplast ldopts;
-                        WindowSetData [wkey, ldopts];
-                        UpdateMode [wkey, ldopts.mode];
-                        prevwd = UpdateCWD [wkey, ldopts.cwd, ldopts.workdir, 
-                            ldopts.workdir];
 
     	                Close [force:1];
                         local ldligmol = mol_Create ldlig;
@@ -536,6 +667,25 @@ global function qb_QMScoreSetupPanel []
                         aSetBondLook [ldligatoms, 'cylinder'];
                         app mol_Create ldrec;
     	                View [];
+
+                        /*  Drop the task tagged value.  */
+                        ldopts = dropfirst ldopts;
+                        WindowSetData [wkey, ldopts];
+
+//                        status = ldsts;
+                        status.calcchg = ldsts.calcchg;
+                        status.recchg = ldsts.recchg;
+                        status.ligchg = ldsts.ligchg;
+                        status.moerecchg = ldsts.moerecchg;
+                        status.moeligchg = ldsts.moeligchg;
+                        status.adjrecchg = ldsts.adjrecchg;
+                        status.adjligchg = ldsts.adjligchg;
+                        status = CheckCharge [wkey, status, ldopts.recchg,
+                            ldopts.ligchg];
+                        UpdateMode [wkey, ldopts.mode, status];
+                        prevwd = UpdateCWD [wkey, ldopts.cwd, ldopts.workdir, 
+                            ldopts.workdir];
+
                     endif
 
                     exit [];
@@ -543,13 +693,17 @@ global function qb_QMScoreSetupPanel []
 
             elseif vals.panel === 'Run' then
                 if second task_fork [prio:3, idle:0] === 'child' then
-                    options = tag [qb_GetTagsQMScore [], [vals.mode, vals.cwd,
-                        fabsname vals.workdir, fabsname vals.scoredb, [], [],
+                    vals.workdir = fabsname vals.workdir;
+                    vals.scoredb = fabsname vals.scoredb;
+                    vals.posedb = '';
+                    vals.recdb = '';
+                    options = tag [qb_GetTagsQMScore [], [defaults.task,
+                        vals.mode, vals.cwd, vals.workdir,
+                        vals.scoredb, vals.posedb, vals.recdb,
                         vals.ligchg, vals.recchg, vals.poseschg,
-                        vals.ham, vals.standard, vals.freq, vals.opt, 
-                        vals.shift, []]];
-
-                    qmskey = SetUpDB [options];
+                        vals.ham, vals.standard, vals.freq, vals.opt,
+                        vals.shift]];
+                    qmskey = SetUpDB [status, options];
                     RunCalc [qmskey];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
@@ -560,17 +714,18 @@ global function qb_QMScoreSetupPanel []
 
             elseif vals.panel === 'Save' then
                 if second task_fork [] === 'child' then
+                    vals.scoredb = fabsname vals.scoredb;
                     vals.posedb = select ['', fabsname vals.posedb, 
                         vals.posedb === ''];
                     vals.recdb = select ['', fabsname vals.recdb, 
                         vals.recdb === ''];
-                    options = tag [qb_GetTagsQMScore [], [vals.mode, vals.cwd,
-                        vals.workdir, fabsname vals.scoredb,
-                        vals.posedb, vals.recdb, 
+                    options = tag [qb_GetTagsQMScore [], [defaults.task,
+                        vals.mode, vals.cwd, vals.workdir,
+                        vals.scoredb, vals.posedb, vals.recdb,
                         vals.ligchg, vals.recchg, vals.poseschg,
-                        vals.ham, vals.standard, vals.freq, vals.opt, 
-                        vals.shift, []]];
-                    qmskey = SetUpDB [options];
+                        vals.ham, vals.standard, vals.freq, vals.opt,
+                        vals.shift]];
+                    qmskey = SetUpDB [status, options];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
                     exit [];
