@@ -162,7 +162,7 @@ local function RunCalc [dbkey]
     local msgkey = Message [0, 'QMScore is running ...'];
     sleep -1;    // Allow parent to close input window.
 
-    local [recset, ligand, status, options] = qb_GetEnv [dbkey];
+    local [recset, ligand, status, options, c] = qb_GetEnv [dbkey];
     local workdir;
     if options.pwd === 1 then
         workdir = getenv 'PWD';

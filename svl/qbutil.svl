@@ -721,7 +721,7 @@ global function qb_LoadQMScoreDB [dbpath]
             dbpath]];
     endif
 
-    local [rec, lig, status, opts] = qb_GetEnv [dbkey];
+    local [rec, lig, status, opts, c] = qb_GetEnv [dbkey];
 
     if not MOE_BATCH then
       dbv_Open db_Filename dbkey;

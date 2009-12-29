@@ -43,7 +43,7 @@ global function qb_QMScoreBatch [dbpath]
 
     //  Extract molecules and run options from the database environment
     local dbkey = db_Open [dbpath, 'read-write'];
-    local [recmols, ligmol, options] = qb_GetEnv [dbkey];
+    local [recmols, ligmol, s, options, c] = qb_GetEnv [dbkey];
     local recchg;
     local workdir;
     if options.pwd === 1 then
@@ -69,11 +69,10 @@ global function qb_QMScoreBatch [dbpath]
         if rowkey <> 0 then
             count = count + 1;
             options.task = count;
-            local [posemol, posechg] = db_ReadFields [dbkey, rowkey, 
-                [poseflds]];
+            local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
 
             if options.mode === 'Many-to-Many' then
-                [recmols, recchg] = db_ReadFields [dbkey, rowkey, [recflds]];
+                [recmols, recchg] = db_ReadFields [dbkey, rowkey, recflds];
             else
                 recchg = options.recchg;
             endif
