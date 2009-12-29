@@ -244,10 +244,12 @@ local function SetUpDB [status, opts]
 
     if opts.mode === 'One-to-One' then
         local posedata = tag [qb_GetPoseFields [], [ligand, opts.ligchg]];
-        local stsmess = qb_GetStatusMessage ['Receptor', neL [status.recchg, 4],
-            status.adjrecchg];
+        local stsmess = qb_GetStatusMessage ['Receptor', 
+            eqL [opts.recchg, status.moerecchg],
+            neL [status.recchg, 4], status.adjrecchg];
         stsmess = cat [stsmess, qb_GetStatusMessage ['Ligand',
-                neL [status.ligchg, 4], status.adjligchg]];
+            eqL [opts.ligchg, status.moeligchg],
+            neL [status.ligchg, 4], status.adjligchg]];
         posedata = cat [posedata, tag [[qb_GetStatusField []], [stsmess]]];
         db_Write [qmskey, 0, posedata];
 

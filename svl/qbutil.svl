@@ -340,7 +340,8 @@ global function qb_CopyPoseDB [resultskey, poseskey]
     local [recmols, l, status, opts, c] = qb_GetEnv [resultskey];
 
     //  Check receptor charge
-    local recmess = qb_GetStatusMessage ['Receptor', neL [status.recchg, 4],
+    local recmess = qb_GetStatusMessage ['Receptor', 
+        eqL [status.recchg, status.moerecchg], neL [status.recchg, 4],
         status.adjrecchg];
 
     //  HACK alert:  temporarily renames mol field to make copying easier
@@ -355,6 +356,7 @@ global function qb_CopyPoseDB [resultskey, poseskey]
         local chgdata;
         if opts.poseschg then
             stsmess = cat [recmess, qb_GetStatusMessage ['Ligand',
+                eqL [opts.ligchg, status.moeligchg],
                 neL [status.ligchg, 4], status.adjligchg]];
             chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [opts.ligchg, stsmess]];
         else
@@ -363,7 +365,7 @@ global function qb_CopyPoseDB [resultskey, poseskey]
             local ligatms = cat cAtoms ligch;
             local [charge, chgadj] = CalcCharge [ligatms];
             local chgok = CheckCharge [ligatms, charge];
-            stsmess = cat [recmess, qb_GetStatusMessage ['Ligand', chgok,
+            stsmess = cat [recmess, qb_GetStatusMessage ['Ligand', 1, chgok,
                 chgadj]];
             chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [charge, stsmess]];
             oDestroy ligch;
@@ -416,7 +418,7 @@ global function qb_CopyRecPoseDB [resultskey, recskey, poseskey]
         local recatms = cat cAtoms recch;
         local [recchg, recadj] = CalcCharge [recatms];
         local recok = CheckCharge [recatms, recchg];
-        stsmess = qb_GetStatusMessage ['Receptor', recok, recadj];
+        stsmess = qb_GetStatusMessage ['Receptor', 1, recok, recadj];
         recmsgs = append [recmsgs, stsmess];
         local recchgdata = tag [[RECCHG_FIELD], [recchg]];
         recrowdata = cat [recchgdata, recrowdata];
@@ -447,7 +449,7 @@ global function qb_CopyRecPoseDB [resultskey, recskey, poseskey]
         local poseatms = cat cAtoms posech;
         local [posechg, poseadj] = CalcCharge [poseatms];
         local poseok = CheckCharge [poseatms, posechg];
-        stsmess = cat [recmsgs(ith), qb_GetStatusMessage ['Pose', poseok,
+        stsmess = cat [recmsgs(ith), qb_GetStatusMessage ['Pose', 1, poseok,
             poseadj]];
         local posechgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [posechg,
             stsmess]];
@@ -643,11 +645,12 @@ endfunction
  *  Return a string message describing the charge status.
  *
  ****************************************************************************/
-global function qb_GetStatusMessage [which, ok, adj]
+global function qb_GetStatusMessage [which, calc, ok, adj]
 
     local mess = "";
+
     if ok then
-        if adj then
+        if calc and adj then
             mess = swrite ['Warning: {} has an adjusted charge\n', which];
         endif
     else
