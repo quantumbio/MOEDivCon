@@ -317,6 +317,7 @@ global function qb_CheckCharge [recchg, ligchg]
 endfunction
 
 function qb_GetEnv;
+function qb_GetStatusMessage;
 
 /****************************************************************************
  *                          qb_CopyPoseDB
@@ -336,7 +337,11 @@ global function qb_CopyPoseDB [resultskey, poseskey]
         return mess;
     endif
 
-    local [t, l, opts, c] = qb_GetEnv [resultskey];
+    local [recmols, l, status, opts, c] = qb_GetEnv [resultskey];
+
+    //  Check receptor charge
+    local recmess = qb_GetStatusMessage ['Receptor', neL [status.recchg, 4],
+        status.adjrecchg];
 
     //  HACK alert:  temporarily renames mol field to make copying easier
     db_RenameField [resultskey, POSE_FIELD, molfield];
@@ -344,18 +349,23 @@ global function qb_CopyPoseDB [resultskey, poseskey]
 
     local [osys, nsys] = SystemPush [];
 
-    local rowkey = 0;
+    local rowkey = 0, stsmess = "";
     while rowkey = db_NextEntry [poseskey, rowkey] loop
         local rowdata = db_Read [poseskey, rowkey];
         local chgdata;
         if opts.poseschg then
-            chgdata = tag [[LIGCHG_FIELD], [opts.ligchg]];
+            stsmess = cat [recmess, qb_GetStatusMessage ['Ligand',
+                neL [status.ligchg, 4], status.adjligchg]];
+            chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [opts.ligchg, stsmess]];
         else
             local ligmol = tagpeek [rowdata, molfield];
             local ligch = mol_Create ligmol;
             local ligatms = cat cAtoms ligch;
-            local charge = CalcCharge [ligatms];
-            chgdata = tag [[LIGCHG_FIELD], [charge]];
+            local [charge, chgadj] = CalcCharge [ligatms];
+            local chgok = CheckCharge [ligatms, charge];
+            stsmess = cat [recmess, qb_GetStatusMessage ['Ligand', chgok,
+                chgadj]];
+            chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [charge, stsmess]];
             oDestroy ligch;
         endif
 
@@ -397,16 +407,17 @@ global function qb_CopyRecPoseDB [resultskey, recskey, poseskey]
 
     db_RenameField [resultskey, REC_FIELD, recmolfield];
     apt db_EnsureField [resultskey, recfields, recftypes];
-
     local [osys, nsys] = SystemPush [];
-
-    local recrowkey = 0;
+    local recrowkey = 0, recmsgs = [], stsmess = "";
     while recrowkey = db_NextEntry [recskey, recrowkey] loop
         local recrowdata = db_Read [recskey, recrowkey];
         local recmol = tagpeek [recrowdata, recmolfield];
         local recch = mol_Create recmol;
         local recatms = cat cAtoms recch;
-        local recchg = CalcCharge [recatms];
+        local [recchg, recadj] = CalcCharge [recatms];
+        local recok = CheckCharge [recatms, recchg];
+        stsmess = qb_GetStatusMessage ['Receptor', recok, recadj];
+        recmsgs = append [recmsgs, stsmess];
         local recchgdata = tag [[RECCHG_FIELD], [recchg]];
         recrowdata = cat [recchgdata, recrowdata];
         db_Write [resultskey, 0, recrowdata];
@@ -427,19 +438,23 @@ global function qb_CopyRecPoseDB [resultskey, recskey, poseskey]
     db_RenameField [resultskey, POSE_FIELD, posemolfield];
     apt db_EnsureField [resultskey, posefields, poseftypes];
 
-    local poserowkey = 0;
-    local resultrowkey = 0;
+    local poserowkey = 0, resultrowkey = 0, ith = 1;
     while poserowkey = db_NextEntry [poseskey, poserowkey] loop
         resultrowkey = db_NextEntry [resultskey, resultrowkey];
         local poserowdata = db_Read [poseskey, poserowkey];
         local posemol = tagpeek [poserowdata, posemolfield];
         local posech = mol_Create posemol;
         local poseatms = cat cAtoms posech;
-        local posechg = CalcCharge [poseatms];
-        local posechgdata = tag [[LIGCHG_FIELD], [posechg]];
+        local [posechg, poseadj] = CalcCharge [poseatms];
+        local poseok = CheckCharge [poseatms, posechg];
+        stsmess = cat [recmsgs(ith), qb_GetStatusMessage ['Pose', poseok,
+            poseadj]];
+        local posechgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [posechg,
+            stsmess]];
         poserowdata = cat [posechgdata, poserowdata];
         db_Write [resultskey, resultrowkey, poserowdata];
         oDestroy posech;
+        ith = ith + 1;
     endloop
 
     db_RenameField [resultskey, posemolfield, POSE_FIELD];
@@ -613,6 +628,37 @@ global function qb_GetRecFields []
 endfunction
 
 /****************************************************************************
+ *                          qb_GetStatusField
+ *
+ ****************************************************************************/
+global function qb_GetStatusField []
+
+    return STATUS_FIELD;
+
+endfunction
+
+/****************************************************************************
+ *                          qb_GetStatusMessage
+ *
+ *  Return a string message describing the charge status.
+ *
+ ****************************************************************************/
+global function qb_GetStatusMessage [which, ok, adj]
+
+    local mess = "";
+    if ok then
+        if adj then
+            mess = swrite ['Warning: {} has an adjusted charge\n', which];
+        endif
+    else
+        mess = swrite ['Warning: {} has a bad charge\n', which];
+    endif
+
+    return mess;
+
+endfunction
+
+/****************************************************************************
  *                          qb_GetTagsNMRScore
  *
  *  Return the tags for NMRScore.
@@ -716,6 +762,20 @@ global function qb_MergeDB [srcname1, srcname2, dstname]
     db_Close srckey2;
 endfunction
 
+/****************************************************************************
+ *                          qb_SaveDivconStatus
+ *
+ *  Save the error/status message for the given row.
+ *
+ ****************************************************************************/
+global function qb_SaveDivconStatus [dbkey, rowkey, message]
+
+    local [status] = db_ReadFields [dbkey, rowkey, [STATUS_FIELD]];
+    message = cat [status, message];
+    local fielddata = tag [STATUS_FIELD, [message]];
+    db_Write [dbkey, rowkey, fielddata];
+
+endfunction
 
 /****************************************************************************
  *                          qb_SaveEnv
@@ -769,19 +829,6 @@ global function qb_SaveQMScore [mdbkey, rowkey, scoredata]
 endfunction
 
 /****************************************************************************
- *                          qb_SaveDivconStatus
- *
- *  Save the error/status message for the given row.
- *
- ****************************************************************************/
-global function qb_SaveDivconStatus [dbkey, rowkey, message]
-
-    local fielddata = tag [STATUS_FIELD, [message]];
-    db_Write [dbkey, rowkey, fielddata];
-
-endfunction
-
-/****************************************************************************
  *                          qb_SetNMRScoreFields
  *
  *  Ensure that the required fields are present.
@@ -796,6 +843,7 @@ global function qb_SetNMRScoreFields [dbkey, addreceptor, atomnames]
 
     db_EnsureField [dbkey, POSE_FIELD, 'molecule'];
     db_EnsureField [dbkey, LIGCHG_FIELD, 'int'];
+    db_EnsureField [dbkey, STATUS_FIELD, 'char'];
     apt db_EnsureField [dbkey, NMR_NUM_FIELDS , 'double'];
     apt db_EnsureField [dbkey, atomnames, 'double'];
 
@@ -816,6 +864,7 @@ global function qb_SetQMScoreFields [dbkey, addreceptor]
 
     db_EnsureField [dbkey, POSE_FIELD, 'molecule'];
     db_EnsureField [dbkey, LIGCHG_FIELD, 'int'];
+    db_EnsureField [dbkey, STATUS_FIELD, 'char'];
     apt db_EnsureField [dbkey, QMS_NUM_FIELDS, 'double'];
 
 endfunction
@@ -829,17 +878,5 @@ endfunction
 global function qb_SetRecField [dbkey]
 
     db_EnsureField [dbkey, REC_FIELD, 'moleclule'];
-
-endfunction
-
-/****************************************************************************
- *                          qb_SetStatusField
- *
- *  Ensure that the error/status field is present.
- *
- ****************************************************************************/
-global function qb_SetStatusField [dbkey]
-
-    db_EnsureField [dbkey, STATUS_FIELD, 'char'];
 
 endfunction
