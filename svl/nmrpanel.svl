@@ -42,7 +42,6 @@ function qb_GetTagsNMRScore;
 function qb_SaveNMRScore;
 function qb_SaveStatus;
 function qb_SaveEnv;
-function qb_SetStatusField;
 function qb_SetNMRScoreFields;
 function qb_LoadNMRScoreDB;
 
@@ -177,8 +176,6 @@ local function SetUpDB [complex, opts]
 
         db_Close posekey;
     endif
-
-    qb_SetStatusField [nmrkey];
 
     return nmrkey;
 endfunction

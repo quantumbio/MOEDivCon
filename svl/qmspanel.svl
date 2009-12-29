@@ -38,6 +38,8 @@ function qb_CopyRecPoseDB;
 function qb_DrawChgStatus;
 function qb_GetDefaultsQMScore;
 function qb_GetDefaultsStatus;
+function qb_GetStatusField;
+function qb_GetStatusMessage;
 function qb_GetEnv;
 function qb_GetPoseFields;
 function qb_GetTagsQMScore;
@@ -45,7 +47,6 @@ function qb_LoadQMScoreDB;
 function qb_SaveQMScore;
 function qb_SaveDivconStatus;
 function qb_SaveEnv;
-function qb_SetStatusField;
 function qb_SetQMScoreFields;
 
 function qb_QMScore;
@@ -82,6 +83,7 @@ const LIG_OPTS =
 
 //  Local Functions
 
+
 function SetChargeStatus;
 
 /****************************************************************************
@@ -91,7 +93,6 @@ function SetChargeStatus;
  *
  ****************************************************************************/
 local function CheckCharge [wkey, status, recchg, ligchg]
-
     local [recok, ligok, errmess] = qb_CheckCharge [recchg, ligchg];
     if recok === [] or ligok === [] then
         Warning errmess;  //DEBUG
@@ -99,8 +100,34 @@ local function CheckCharge [wkey, status, recchg, ligchg]
         return status;
     endif
 
-    status.ligchg = select [status.ligchg, 4, ligok];
-    status.recchg = select [status.recchg, 4, recok];
+    if ligok then
+        if ligchg === status.moeligchg then
+            if status.adjligchg then
+                status.ligchg = 3;
+            else
+                status.ligchg = 2;
+            endif
+        else
+            status.ligchg = 1;
+        endif
+    else
+        status.ligchg = 4;
+    endif
+
+    if recok then
+        if recchg === status.moerecchg then
+            if status.adjrecchg then
+               status.recchg = 3;
+            else
+               status.recchg = 2;
+           endif
+        else
+          status.recchg = 1;
+        endif
+
+    else
+        status.recchg = 4;
+    endif
 
     SetChargeStatus [wkey, status];
     return status;
@@ -217,6 +244,11 @@ local function SetUpDB [status, opts]
 
     if opts.mode === 'One-to-One' then
         local posedata = tag [qb_GetPoseFields [], [ligand, opts.ligchg]];
+        local stsmess = qb_GetStatusMessage ['Receptor', neL [status.recchg, 4],
+            status.adjrecchg];
+        stsmess = cat [stsmess, qb_GetStatusMessage ['Ligand',
+                neL [status.ligchg, 4], status.adjligchg]];
+        posedata = cat [posedata, tag [[qb_GetStatusField []], [stsmess]]];
         db_Write [qmskey, 0, posedata];
 
     else
@@ -228,7 +260,13 @@ local function SetUpDB [status, opts]
         endif
 
         if opts.mode === 'One-to-Many' then
-            qb_CopyPoseDB [qmskey, posekey];
+            local pmess = qb_CopyPoseDB [qmskey, posekey];
+            if neL [pmess, ''] then
+                db_Close posekey;
+                db_Close qmskey;
+                Warning pmess;
+                exit [];
+            endif
         else
             local reckey = db_Open [opts.recdb, 'read'];
             if qmskey === reckey then
@@ -237,14 +275,20 @@ local function SetUpDB [status, opts]
                 exit [];
             endif
 
-            qb_CopyRecPoseDB [qmskey, reckey, posekey];
+            local rmess = qb_CopyRecPoseDB [qmskey, reckey, posekey];
+            if neL [rmess, ''] then
+                db_Close reckey;
+                db_Close posekey;
+                db_Close qmskey;
+                Warning rmess;
+                exit [];
+            endif
+
             db_Close reckey;
         endif
 
         db_Close posekey;
     endif
-
-    qb_SetStatusField [qmskey];
 
     return qmskey;
 endfunction
@@ -338,10 +382,43 @@ endfunction
  ****************************************************************************/
 global function qb_QMScoreSetupPanel []
 
+    static status;                     //  Shared with child tasks.
+    local wkey, vals, trig;
+
+        //  Nested Functions
+        local function VerifyCharges []
+            if vals.mode === 'Many-to-Many' then
+                return 1;
+            endif
+
+            status = CheckCharge [wkey, status, vals.recchg, vals.ligchg];
+            if status.ligchg === 4 or status.recchg === 4 then
+                local which;
+                if status.ligchg === 4 and status.recchg === 4 then
+                    which = 'receptor and ligand';
+                elseif status.ligchg === 4 then
+                    which = 'ligand';
+                else
+                    which = 'receptor';
+                endif
+                local ynmess = twrite [
+                    'Divcon is going to have problems\n'
+                    'with the {}.  Continue anyway?', which];
+                if YesNo ynmess then
+                    return 1;
+                else
+                    return 0;
+                endif
+            else
+                return 1;
+            endif
+        endfunction
+
+
     if MOE_BATCH then return; endif
     if WindowShow ['QMScorePanel', 1] then return; endif
 
-    local wkey = WindowCreate
+    wkey = WindowCreate
         [
         name: 'panel', 
         title: 'QMScore',
@@ -396,6 +473,116 @@ global function qb_QMScoreSetupPanel []
                     'the run time environment variable $PWD.'
                 ]
             ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            Radio :
+                [
+                name: 'mode', text: RUN_MODES, columns: 3, minWidth: 12, 
+                extendH: 1, onTrigger: 'return', title: 'Mapping Mode:',
+                type: 'char',
+                bubbleHelp:
+                    'The mapping mode of receptors to ligand/poses:\n'
+                    '  One ligand docked into one receptor.\n'
+                    '  Many ligand poses docked into the same receptor.\n'
+                    '  Many ligand poses, each docked into its own receptor.'
+                ]
+            ],
+
+        Hbox :
+            [
+            name: 'posebox', extendH: 1,
+            FSBText :
+                [
+                name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
+                mode: 'open', allowBlank: 0,
+                bubbleHelp:
+                    'The name of the input database that holds\n'
+                    'the ligand poses (and possibly scores).'
+                ],
+            Button : [ name: 'browse_posedb', text: 'Browse...' ]
+            ],
+
+        Hbox :
+            [
+            name: 'recbox', extendH: 1,
+            FSBText :
+                [
+                name: 'recdb', len: 40, extendH: 1, title: 'Receptor DB:',
+                mode: 'open', allowBlank: 0,
+                bubbleHelp:
+                    'The name of the input database that holds\n'
+                    'the receptors.'
+                ],
+            Button : [ name: 'browse_recdb', text: 'Browse...' ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            extendH: 1, name: 'chgbox', title: 'Charges:',
+            Button : [ name: 'calcchg', text: 'Calculate' ],
+            Vbox :
+                [
+                Hbox :
+                    [
+                    extendH: 1,
+                    Label :
+                        [
+                        name: 'recflg', title: 'Receptor:',
+                         bubbleHelp:
+                            'Problems with the total charge of receptor?\n'
+                            '   White:   uncalculated or user-entered charge.\n'
+                            '   Green:   charge calculated by MOE.\n'
+                            '   Yellow:  MOE\'s charge was adjusted.\n'
+                            '   Red:      Divcon will fail.'
+                       ],
+                    Text :
+                        [
+                        name: 'recchg', allowBlank: 0,
+                        type: 'int', minWidth: 4,
+                        onTrigger: 'validate',
+                        bubbleHelp:
+                            'Total charge of receptor.'
+                        ]
+                    ],
+                Hbox :
+                    [
+                    extendH: 1,
+                    Label :
+                        [
+                        name: 'ligflg', title: 'Ligand:',
+                         bubbleHelp:
+                            'Problems with the total charge of ligand?\n'
+                            '   White:   uncalculated or user-entered charge.\n'
+                            '   Green:   charge calculated by MOE.\n'
+                            '   Yellow:  MOE\'s charge was adjusted.\n'
+                            '   Red:      Divcon will fail.'
+
+                       ],
+                    Text :
+                        [
+                        name: 'ligchg', allowBlank: 0,
+                        type: 'int', minWidth: 4, extendH: 1,
+                        onTrigger: 'validate',
+                        bubbleHelp:
+                            'Total charge of ligand.'
+                        ],
+                    Checkbox :
+                        [
+                        name: 'poseschg', text: 'All Poses',
+                        bubbleHelp:
+                            'Use the ligand charge for all\n'
+                            'poses in the poses database.'
+                        ]
+                    ]
+                ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
 
         Vbox :
             [
@@ -462,113 +649,6 @@ global function qb_QMScoreSetupPanel []
                 ]
             ],
 
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            Radio :
-                [
-                name: 'mode', text: RUN_MODES, columns: 3, minWidth: 12, 
-                extendH: 1, onTrigger: 'return', title: 'Mapping Mode:',
-                type: 'char',
-                bubbleHelp:
-                    'The mapping mode of receptors to ligand/poses:\n'
-                    '  One ligand docked into one receptor.\n'
-                    '  Many ligand poses docked into the same receptor.\n'
-                    '  Many ligand poses, each docked into its own receptor.'
-                ]
-            ],
-
-        Hbox :
-            [
-            name: 'posebox', extendH: 1,
-            FSBText :
-                [
-                name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
-                mode: 'open', allowBlank: 0,
-                bubbleHelp:
-                    'The name of the input database that holds\n'
-                    'the ligand poses (and possibly scores).'
-                ],
-            Button : [ name: 'browse_posedb', text: 'Browse...' ]
-            ],
-
-        Hbox :
-            [
-            name: 'recbox', extendH: 1,
-            FSBText :
-                [
-                name: 'recdb', len: 40, extendH: 1, title: 'Receptor DB:',
-                mode: 'open', allowBlank: 0,
-                bubbleHelp:
-                    'The name of the input database that holds\n'
-                    'the receptors.'
-                ],
-            Button : [ name: 'browse_recdb', text: 'Browse...' ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            extendH: 1, name: 'chgbox', title: 'Charges:',
-            Button : [ name: 'calcchg', text: 'Calculate' ],
-            Vbox :
-                [
-                Hbox :
-                    [
-                    extendH: 1,
-                    Label :
-                        [
-                        name: 'recflg', title: 'Receptor:',
-                         bubbleHelp:
-                            'Problems with the total charge of receptor?\n'
-                            '   Green:  okay!\n'
-                            '   Yellow:  odd number of electrons, charge adjusted.\n'
-                            '   Red:  odd number of electrons, Divcon will fail.'
-                       ],
-                    Text :
-                        [
-                        name: 'recchg', allowBlank: 0,
-                        type: 'int', minWidth: 4,
-                        onTrigger: 'validate',
-                        bubbleHelp:
-                            'Total charge of receptor.'
-                        ]
-                    ],
-                Hbox :
-                    [
-                    extendH: 1,
-                    Label :
-                        [
-                        name: 'ligflg', title: 'Ligand:',
-                         bubbleHelp:
-                            'Problems with the total charge of ligand?\n'
-                            '   Green:  okay!\n'
-                            '   Yellow:  odd number of electrons, charge adjusted.\n'
-                            '   Red:  odd number of electrons, Divcon will fail.'
-
-                       ],
-                    Text :
-                        [
-                        name: 'ligchg', allowBlank: 0,
-                        type: 'int', minWidth: 4, extendH: 1,
-                        onTrigger: 'validate',
-                        bubbleHelp:
-                            'Total charge of ligand.'
-                        ],
-                    Checkbox :
-                        [
-                        name: 'poseschg', text: 'All Poses',
-                        bubbleHelp:
-                            'Use the ligand charge for all\n'
-                            'poses in the poses database.'
-                        ]
-                    ]
-                ]
-            ],
-
         Separator : [flushLeft:1, extendH:1, margin:1]
         ];
 
@@ -577,7 +657,7 @@ global function qb_QMScoreSetupPanel []
     local defaults = qb_GetDefaultsQMScore [];
     local prevwd = defaults.workdir;
     local options = [];
-    local status = qb_GetDefaultsStatus [];
+    status = qb_GetDefaultsStatus [];
 
     WindowSetData [wkey, dropfirst defaults];
     WindowSetAttr [wkey, [freq: [sensitive: 1],
@@ -589,17 +669,17 @@ global function qb_QMScoreSetupPanel []
     WindowShow [wkey, 1];
 
     loop
-        local [vals, trig] = WindowWait wkey;
+        [vals, trig] = WindowWait wkey;
 
         if trig === 'mode' then
-write['{v}\n', status];//DEBUG
             UpdateMode [wkey, vals.mode, status];
 
         elseif trig === 'cwd' then
             prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir, prevwd];
 
         elseif trig === 'calcchg' then
-            if second task_fork [master: 'parent'] === 'child' then
+            if second task_fork [master: 'parent',
+                    statics:'share'] === 'child' then
                 task_prio 0;
 
                 status = UpdateCharge [wkey, status];
@@ -607,7 +687,8 @@ write['{v}\n', status];//DEBUG
             endif
 
         elseif trig === 'ligchg' then
-            if second task_fork [master: 'parent'] === 'child' then
+            if second task_fork [master: 'parent',
+                    statics:'share'] === 'child' then
                 task_prio 0;
 
                 status = CheckCharge [wkey, status, vals.recchg,
@@ -616,7 +697,8 @@ write['{v}\n', status];//DEBUG
             endif
 
         elseif trig === 'recchg' then
-            if second task_fork [master: 'parent'] === 'child' then
+            if second task_fork [master: 'parent', 
+                    statics:'share'] === 'child' then
                 task_prio 0;
 
                 status = CheckCharge [wkey, status, vals.recchg,
@@ -644,7 +726,8 @@ write['{v}\n', status];//DEBUG
                 break;
 
             elseif vals.panel === 'Load' then 
-                if second task_fork [master: 'parent'] === 'child' then
+                if second task_fork [master: 'parent',
+                        statics:'share'] === 'child' then
                     task_prio 0;
 
                     local dbpath = FilePrompt [title: 'Input Database', 
@@ -672,15 +755,7 @@ write['{v}\n', status];//DEBUG
                         ldopts = dropfirst ldopts;
                         WindowSetData [wkey, ldopts];
 
-//                        status = ldsts;
-                        status.calcchg = ldsts.calcchg;
-                        status.recchg = ldsts.recchg;
-                        status.ligchg = ldsts.ligchg;
-                        status.moerecchg = ldsts.moerecchg;
-                        status.moeligchg = ldsts.moeligchg;
-                        status.adjrecchg = ldsts.adjrecchg;
-                        status.adjligchg = ldsts.adjligchg;
-                        status = CheckCharge [wkey, status, ldopts.recchg,
+                        status = CheckCharge [wkey, ldsts, ldopts.recchg,
                             ldopts.ligchg];
                         UpdateMode [wkey, ldopts.mode, status];
                         prevwd = UpdateCWD [wkey, ldopts.cwd, ldopts.workdir, 
@@ -692,7 +767,11 @@ write['{v}\n', status];//DEBUG
                 endif
 
             elseif vals.panel === 'Run' then
-                if second task_fork [prio:3, idle:0] === 'child' then
+                if not VerifyCharges [] then continue; endif
+
+                if second task_fork [statics:'share',
+                        prio:3, idle:0] === 'child' then
+
                     vals.workdir = fabsname vals.workdir;
                     vals.scoredb = fabsname vals.scoredb;
                     vals.posedb = '';
@@ -713,7 +792,11 @@ write['{v}\n', status];//DEBUG
                 endif
 
             elseif vals.panel === 'Save' then
+                if not VerifyCharges [] then continue; endif
+
                 if second task_fork [] === 'child' then
+                    task_prio 0;
+
                     vals.scoredb = fabsname vals.scoredb;
                     vals.posedb = select ['', fabsname vals.posedb, 
                         vals.posedb === ''];
