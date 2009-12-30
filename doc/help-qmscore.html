@@ -20,6 +20,10 @@ body {font: 12pt "Times New Roman", serif; margin: 3em;
     background-color: #F0F7FF;}
 ol#tocl {list-style-type: upper-roman;}
 ol ol {list-style-type: upper-latin;}
+th.white {font: bold 2.0em Helvetica, sans-serif; color: white}
+th.green {font: bold 2.0em Helvetica, sans-serif; color: green}
+th.yellow {font: bold 2.0em Helvetica, sans-serif; color: yellow}
+th.red {font: bold 2.0em Helvetica, sans-serif; color: red}
 w {text-decoration: underline;}
 x {font-weight: bold;}
 todo {font: bold 11pt "Helvetica", sans-serif; padding: 1px 2px; margin: 2px;
@@ -32,6 +36,7 @@ sol {font: 12pt "Times New Roman", serif;}
 sol:before {content: "Possible solution:  "; color:  #0099DD; }
 sup {font: bold 1.5em Helvetica, sans-serif; color: #0099DD;
     text-align: center;}
+warn {font: italic 11pt "Helvetica", sans-serif; color: red}
 </style>
 </head>
 
@@ -54,25 +59,29 @@ QuantumBio Homepage
 
 <h2><a name="ToC"></a>Table of Contents</h2>
 <ol id=tocl>
-  <li><a href="#ToC">Table of Contents</a></li>
-  <li><a href="#intro">QMScore Introduction</a></li>
-  <li><a href="#install">Installation</a></li>
-  <li><a href="#start">Getting Started</a></li>
-  <li><a href="#parallel">Batch and Parallel Execution</a></li>
+  <li><a href="#ToC">Table of Contents</a>
+  <li><a href="#intro">QMScore Introduction</a>
+  <li><a href="#install">Installation</a>
+  <li><a href="#start">Getting Started</a>
+  <li><a href="#parallel">Batch and Parallel Execution</a>
   <ol>
-    <li><a href="#parallel-mode">Parallel Mapping Mode</a></li>
-    <li><a href="#parallel-moebatch">Running Moebatch</a></li>
+    <li><a href="#parallel-mode">Parallel Mapping Mode</a>
+    <li><a href="#parallel-moebatch">Running Moebatch</a>
   </ol>
-  <li><a href="#options">Options</a></li>
+  <li><a href="#charge">Charges</a>
+  <li><a href="#load">Load</a>
+  <li><a href="#options">Options</a>
   <ol>
-    <li><a href="#options-outdb">Output MOE Database</a></li>
-    <li><a href="#options-workdir">Working Directory</a></li>
-    <li><a href="#options-ham">Hamiltonian</a></li>
-    <li><a href="#options-opt">Ligand Optimization</a></li>
-    <li><a href="#options-freq">Frequency</a></li>
+    <li><a href="#options-outdb">Output MOE Database</a>
+    <li><a href="#options-workdir">Working Directory</a>
+    <li><a href="#options-ham">Hamiltonian</a>
+    <li><a href="#options-stand">Standard</a>
+    <li><a href="#options-shift">Shift</a>
+    <li><a href="#options-opt">Ligand Optimization</a>
+    <li><a href="#options-freq">Frequency</a>
   </ol>
-  <li><a href="#trouble">Troubleshooting</a></li>
-  <li><a href="#contact">Support Contact Information</a></li></ol>
+  <li><a href="#trouble">Troubleshooting</a>
+  <li><a href="#contact">Support Contact Information</a></ol>
 
 <h2><a name="intro"></a>QMScore Introduction</h2>
 
@@ -83,17 +92,17 @@ mechanics. This patent pending algorithm characterizes the entire target/ligand
 complex quantum mechanically, and determines the energy of binding.
 <p>
 The QMScore algorithm has been validated against several key structural motifs,
-and the results of these validations have been detailed in several 
-key peer-reviewed 
+and the results of these validations have been detailed in several
+key peer-reviewed
 <a href="http://www.quantumbioinc.com/Support/Publications/index_files/category-qmscore.html"
    target="QBHomePage">publications</a>.
 
 <h2><a name="install"></a>Installation</h2>
 <p>
 MOEDivcon is part of the QuantumBio Distribution, which is packaged in a
-<inline>tar.gz</inline> file that uses the following naming convention 
+<inline>tar.gz</inline> file that uses the following naming convention
 <inline>quantumbio-&lt;platform&gt;-&lt;version&gt;.tar.gz</inline>.  Move
-the file where you wish to install the QuantumBio software (e.g., 
+the file where you wish to install the QuantumBio software (e.g.,
 <inline>/usr/local</inline>), then uncompress and untar the file.
 <pre>
 &gt; tar  -zxvf  quantumbio-&lt;platform&gt;-&lt;version&gt;.tar.gz
@@ -101,7 +110,7 @@ the file where you wish to install the QuantumBio software (e.g.,
 We will
 use <inline>$QBHOME</inline> to refer to the path where the package is
 installed.  For instance, if you install linux version 5.0.0.1 in
-the <inline>/usr/local</inline> directory, 
+the <inline>/usr/local</inline> directory,
 <inline>$QBHOME</inline> will
 refer to <inline>/usr/local/quantumbio-linux-5.0.0.1</inline>.
 
@@ -137,7 +146,9 @@ MOEDivcon SVL library under it.  For example:
 <p><a name="install-path"></a>
 Before you can run QMScore using MOE or moebatch, you need to make sure that
 the MOEDivcon executables are in your path and the MOEDivcon SVL library is in
-your MOE run path.  For example, you should add to your .bashrc file:<pre>export  PATH=${QBHOME}/bin:${PATH}<br>
+your MOE run path.  For example, you should add to your .bashrc file:
+<pre>
+export  PATH=${QBHOME}/bin:${PATH}<br>
 if [ -z  $MOE_SVL_RUNPATH ] ; then<br>
   export  MOE_SVL_RUNPATH="${QBHOME}/svl"<br>
 else<br>
@@ -155,10 +166,11 @@ else<br>
 
 <p><a name="install-license"></a>
 Finally, MOEDivcon is distributed with an evaluation license that will
-eventually 
-expire. Contact sales@quantumbioinc.com to purchase a license file. 
+eventually
+expire. Contact sales@quantumbioinc.com to purchase a license file.
 Once you have received a license file
-from QuantumBio, you can install the file with a simple move statement.<pre>
+from QuantumBio, you can install the file with a simple move statement.
+<pre>
 &gt; mv  license-file  $QBHOME/etc/license
 </pre>
 
@@ -167,26 +179,27 @@ If you are having difficulties with the installation, see the
 
 <h2><a name="start"></a>Getting Started</h2>
 <p>
-To verify that the installation was successful, let's work through a 
+To verify that the installation was successful, let's work through a
 simple example.  If you run into any problems, see the <a href="#trouble">
 Troubleshooting</a> section.
 <p>
-The workflow of MOEDivcon QMScoring involves four steps:
+The workflow of MOEDivcon QMScoring involves five steps:
 <ol>
   <li>Prepping the receptors and ligands/poses involved in the calculation.
-  </li>
-  <li>Setting up the run parameters to QMScore. </li>
+
+  <li>Verify the formal charges calculated by MOE.
+  <li>Setting up the run parameters to QMScore.
   <li>Executing QMScore either on a local machine or in parallel on a cluster.
-  </li>
-  <li>Analyzing the QMScore results.  </li>
+
+  <li>Analyzing the QMScore results.
 </ol>
 <p>
-First, start MOE and open 
+First, start MOE and open
 <inline>${QBHOME}/examples/simplecomplex.moe</inline>.  Then,
 select the MOE menu <w>Compute</w>, submenu <w>Simulations</w>, submenu
 <w>QuantumBio</w>, and menu item <w>QMScore</w>.
 <p>
-<object id="MOEwithMenu" title="Moe Window with QuantumBio Menu" width=1000 
+<object id="MOEwithMenu" title="Moe Window with QuantumBio Menu" width=1000
 data="images/mainwithmenu.png" type=image/png>
 Moe Window with QuantumBio Menu
 </object>
@@ -198,14 +211,14 @@ data="images/qmscoredefault.png" type=image/png>
 QMScore Dialog
 </object>
 <p>
-Ensure that the <w>Working Dir</w> is 
+Ensure that the <w>Working Dir</w> is
 <inline>/tmp</inline> (files for storing intermediate calculations and logs
  will be written here).  Press the <w>Run</w> button.  If all goes
 well, QMScore will execute using the receptor and ligand complex shown in
 the MOE Window.  After several seconds, the MOE database viewer should open
 the QMScore database showing the results.
 <p>
-<object id="QMScoreDatabase" title="QMScore Database" width=1000 
+<object id="QMScoreDatabase" title="QMScore Database" width=1000
 data="images/qmscoredatabase.png" type=image/png>
 QMScore Database
 </object>
@@ -229,7 +242,7 @@ As described in the <a href="#start">Getting Started</a> section, the workflow
 of MOEDivcon QMSore proceeds in four step:  preparation, set up, execution,
 and analysis.  The prep, set up, and analysis steps are performed using MOE on
 your local workstation or laptop.  The third step, execution, is best left to a
-computational cluster, whether you are scoring one complex or hundreds.  
+computational cluster, whether you are scoring one complex or hundreds.
 <p>
 Before getting into the details of executing moebatch on a cluster, we'll
 explain how to setup MOEDivcon QMScore to run a single job in batch mode or
@@ -241,15 +254,15 @@ The mapping mode determines how receptors are to be mapped to ligands (poses).
 
 <h4><a name="parallel-mode-1to1"></a>One Receptor--One Ligand</h4>
 <p>
-In <w>One-to-One</w> batch mode, the set up is the same as in the 
+In <w>One-to-One</w> batch mode, the set up is the same as in the
 <a href="#start">Getting Started</a> section.  Open the receptor
 and ligand files into the MOE Window and perform any necessary preparatory
 steps.
 Next, open the QMScore dialog and select your options, and then choose
 <w>Save</w> rather than <w>Run</w>.  MOEDivcon will store your receptor,
-ligand, and 
+ligand, and
 options in the QMScore database, and then open the MOE DB viewer so you can
-verify the ligand/pose data.  See the 
+verify the ligand/pose data.  See the
 <a href="#parallel-moebatch">Running Moebatch</a> section
 to learn how to execute the job.
 
@@ -264,7 +277,7 @@ poses beforehand (see the MOE documentation if you are not familiar with
 this process).
 <p>
 Open the receptor and ligand files into the MOE Window, open the QMScore
-dialog and choose your 
+dialog and choose your
 options.  When you select the <w>One-to-Many</w> mode, you will be prompted
 to supply a ligand/pose database.
 <p>
@@ -273,12 +286,12 @@ data="images/qmscoreonetomany.png" type=image/png >
 QMScore One-to-Many Mode
 </object>
 <p>
-When you choose <w>Save</w>,  MOEDivcon will store your receptor, ligand, and 
+When you choose <w>Save</w>,  MOEDivcon will store your receptor, ligand, and
 options in the QMScore database, and it will copy the ligand/pose database into
 the QMScore database including any data fields (e.g., results from other scoring
-algorithms).  The MOE DB viewer will then open the QMScore database so 
-you can verify the ligand/pose data.  See the 
-<a href="#parallel-moebatch">Running Moebatch</a> 
+algorithms).  The MOE Database Viewer will then open the QMScore database so
+you can verify the ligand/pose data.  See the
+<a href="#parallel-moebatch">Running Moebatch</a>
 section to learn how to execute the job.
 
 <h4><a name="parallel-mode-MtoM"></a>Many Receptors--Many Ligands</h4>
@@ -295,18 +308,18 @@ data="images/qmscoremanytomany.png" type=image/png>
 QMScore Many-to-Many Mode
 </object>
 <p>
-When you choose <w>Save</w>,  MOEDivcon will store your options in the 
+When you choose <w>Save</w>,  MOEDivcon will store your options in the
 QMScore database, and it will copy the receptor and ligand databases, row
-by row, into the QMScore database including any data fields.  The MOE 
-DB viewer will then open the QMScore database so you can verify the receptor
-and ligand data. 
+by row, into the QMScore database including any data fields.  The MOE
+Database Viewer will then open the QMScore database so you can verify the
+receptor and ligand data.
 See the <a href="#parallel-moebatch">Running Moebatch</a> section
 to learn how to execute the job.
 
 <h3><a name="parallel-moebatch"></a>Running Moebatch</h3>
 <p>
 After you close the database, you can execute MOEDivcon QMScore in at least
-three different ways.  In the examples below, <inline>$USER_DATADB</inline> 
+three different ways.  In the examples below, <inline>$USER_DATADB</inline>
 is the path to your QMScore database.
 
 <p>
@@ -369,6 +382,77 @@ uses the list of nodes in the <inline>PBS_NODEFILE</inline> to automatically
 generate the MOE machine file.  Note that the number of processors you can
 use is limited by the number of MOE licenses you have been granted.
 
+<h2><a name="load"></a>Load</h2>
+<p>
+You can load an existing QMScore database into the QMScore dialog by pressing
+the <w>Load</w> button.  A file dialog will open allowing you to browse for
+the QMScore database.  When you select a MOE database, it is checked to make
+sure it is a QMScore database.  The receptor/ligand complex stored in the
+database is loaded then into the MOE window, the QMScore dialog is updated with
+the settings stored in the database, and then the database itself is opened
+using the MOE Database Viewer.
+<p>
+<todo>Finish load description.  Test new links.</todo>
+
+<p>
+<warn>The current settings in the QMScore dialog and the molecules in the
+MOE Window are replaced and may be lost if not saved beforehand.</warn>
+
+<h2><a name="charge"></a>Charges</h2>
+<todo>Consistent Examples</todo>
+<p>
+When you open the QMScore dialog, MOE calculates the total charge of the
+receptor and ligand in the MOE window, and displays them in the
+<w>Charges</w> section.  You can press the <w>Calculate</w> button to
+recalculate the charges.
+<p>
+<object id="QMScoreWarnCharge" title="QMScore Charge Warning"
+data="images/qmscorewarncharge.png" type=image/png>
+QMScore Charge Warning
+</object>
+<p>
+The colored cirles next to the charges reflect the status of the charge
+calculation:
+<table border="1">
+<tr><th class="white">&#X25CF;<td>Uncalculated or user-entered charge.
+<tr><th class="green">&#X25CF;<td>Charge calculated by MOE.
+<tr><th class="yellow">&#X25CF;<td>Moe's charge was adjusted.
+<tr><th class="red">&#X25CF;<td>Problematic charge for Divcon.
+</table>
+<p>
+Note that the green circle doesn't mean that the charge is correct, only that
+it has been calculated and didn't need adjusting.  MOEDivcon automatically
+adjusts the charge (&plusmn;1) calculated by MOE to conform to Divcon's
+requirement that the molecular entity have an even number of electrons.
+<p>
+As with any other formal charge algorithm, MOE doesn't always get the
+total charge right.  You can edit the
+charges calculated by MOE if you think they are incorrect.  MOEDivcon
+will alert you if a charge you enter may cause problems with the Divcon
+calculations when you press <w>Run</w> or <w>Save</w>.
+The problematic charge will be marked with a red circle.
+<p>
+<object id="QMScoreBadCharge" title="QMScore Charge Error"
+data="images/qmscorebadcharge.png" type=image/png>
+QMScore Charge Error
+</object>
+<p>
+
+When in <w>One-to-Many</w> mode, you can choose
+to use the charge specified for the ligand as the charge for all the poses
+by selecting <w>All Poses</w>.  Otherwise, the charge is calculated for
+each pose as it is copied from the Ligand/Pose database to the
+QMScore database.  In either case, when the QMScore database is opened with
+the Database Viewer for verification, you can edit the charges stored in it
+(double click on the cell and edit the charge in the edit bar at the top of
+the window).  If a calculated charge was automatically adjusted, it is
+noted in the <w>Status</w> column (double click cell to see entire message).
+<p>
+When in <w>Many-to-Many</w> mode, the <w>Charges</w>
+section is disabled.  The charges for the receptors and ligands are calculated
+as they are copied from their respective databases into the QMScore
+database.  Again, you can verify and edit the charges using the MOE Database
+Viewer.
 
 <h2><a name="options"></a>Options</h2>
 <p>
@@ -384,7 +468,7 @@ of the data and parameters needed to execute QMScore are stored in the
 database.  The database can be moved to a working directory prior to
 execution time as long as the correct path is provided to the moebatch
 command (see the <a href="#parallel-moebatch">Running Moebatch</a>
-section for more information).  Another advantage is the suite of MOE 
+section for more information).  Another advantage is the suite of MOE
 data analysis tools designed to work with its database.
 
 <h3><a name="options-workdir"></a>Working Directory</h3>
@@ -395,7 +479,7 @@ be stored in the QMScore database and resolved at execution time.  If you are
 going to submit the QMScore job on a cluster, you can specify the absolute
 path to a scratch directory mounted on the cluster's file system.  Because of
 this possible scenerio, there is no check whether the directory actually
-exists.  If QMScore is executed using moebatch, a subdirectory under the 
+exists.  If QMScore is executed using moebatch, a subdirectory under the
 working directory named <inline>qb_out<em>N</em></inline>
 will be created for each numbered task <inline><em>N</em></inline>.
 <p>
@@ -414,10 +498,18 @@ the <w>CWD</w> option when executing in moebatch parallel mode, each child task
 will create a subdirectory under the current working directory of the moebatch
 process.
 
+
 <h3><a name="options-ham"></a>Hamiltonian</h3>
 <p>
 Several options are available in chosing the Hamiltonian algorithm to use
 with QMScore.  However, PM3, the default, has proved to be the most reliable.
+
+<h3><a name="options-stand"></a>Standard</h3>
+<todo>Describe standard.</todo>
+<p>
+<h3><a name="options-shift"></a>Shift</h3>
+<todo>Describe shift.</todo>
+<p>
 
 
 <h3><a name="options-opt"></a>Ligand Optimization</h3>
@@ -437,7 +529,7 @@ function.  Warning: may increase CPU cost of the calculation.
 
 <h2><a name="trouble"></a>Troubleshooting</h2>
 We list here potential problems using the MOEDivcon integration and possible
-solutions.  If your problem is not listed here or the proposed solution 
+solutions.  If your problem is not listed here or the proposed solution
 doesn't help, please <a href="#contact">contact</a> support.
 <ui>
   <li><p><prob>
@@ -446,7 +538,7 @@ doesn't help, please <a href="#contact">contact</a> support.
     <p><sol>MOE requires that custom menu files
     (<inline>moe_menus</inline>) reside in the user's home directory.
     See the <a href="#install-menu">installation</a> section.
-  </sol></li>
+  </sol>
   <li><p><prob>
     I get the MOE message:
     <pre>
@@ -454,10 +546,10 @@ run: Environment variable not found.
     </pre>
     </prob><p><sol>
     MOE's run is unable to find the MOEDivcon SVL scripts.  Make sure the
-    <inline>MOE_SVL_RUNPATH</inline> is 
+    <inline>MOE_SVL_RUNPATH</inline> is
     set up correctly (see the <a href="#install-path">installation</a>
     section).
-  </sol></li>
+  </sol>
   <li><p><prob>
     I get the MOE message:
     <pre>
@@ -468,7 +560,7 @@ No molecular complex loaded in MOE Window.
     open the molecule files (.pdb, .moe, etc.) of the complex (or receptor and
     ligand separately) into MOE.  MOEDivcon populates the QMScore database with
     the molecular data in the MOE Window.
-  </sol></li>
+  </sol>
   <li><p><prob>
     I get the MOE message:
     <pre>
@@ -480,19 +572,19 @@ No ligand was recognized.  Use LigX to define it.
     receptor has been cut, the ligand isn't always easily picked out.  You can
     assist the process with this quick guide to LigX.
     <ol>
-      <li> Select an atom in the ligand. </li>
+      <li> Select an atom in the ligand.
       <li> Extend the selection to entire molecule
-      (<w>Select</w>&rarr;<w>Extend </w>&rarr;<w>Molecule</w>). </li>
+      (<w>Select</w>&rarr;<w>Extend </w>&rarr;<w>Molecule</w>).
       <li> In <w>LigX</w>, select menu <w>Prepare</w> and submenu item
-           <w>Choose Ligand</w>.</li>
-      <li> <w>Quit LigX</w>. </li>
+           <w>Choose Ligand</w>.
+      <li> <w>Quit LigX</w>.
       <li> LigX alters the MOE View for pocket elucidation.  To clean up the
            View, select MOE menus <w>Show</w>&rarr;<w>All</w>
            and <w>Color</w>&rarr;<w>Element</w>.
-      </li>
+
     </ol>
     MOEDivcon should now be able to identify the ligand.
-  </sol></li>
+  </sol>
   <li><p><prob>
     I get the MOE message:
     <pre>
@@ -505,18 +597,18 @@ Ligand has to be a single molecule.
     same complex, we recommend you isolate each ligand for independent
     analysis.  Or <a href=#contact>contact</a> our scientific support group
     to resolve this issue in a future release.
-  </sol></li>
+  </sol>
   <li><p><prob>
     I get the MOE message:
     <pre>
     qb_QMScore: fwrite: Broken pipe.
     </pre>
     </prob><p><sol>
-    MOE is unable to find the MOEDivcon executables.  Make sure the 
-    <inline>PATH</inline> is 
+    MOE is unable to find the MOEDivcon executables.  Make sure the
+    <inline>PATH</inline> is
     set up correctly (see the <a href="#install-path">installation</a>
     section).
-  </sol></li>
+  </sol>
   <li><p><prob>
     I get the message in the <w>Status</w> field of the QMScore database:
     <pre>
@@ -526,7 +618,7 @@ Error:   LICENSE ERROR: Problem with license file. Error Code: 1003.
     MOEDivcon is distributed with an evaluation license which eventually
     expires.  See the <a href="#install-license">installation</a>
     section for more information on purchasing and installing a license.
-  </sol></li>
+  </sol>
   <li><p><prob>
     I get the MOE message:
     <pre>
@@ -536,14 +628,14 @@ The pose (or receptor) database has more than one molecule field.
     MOEDivcon cannot determine which is the correct molecule field for the
     poses (receptors) if there is more than one.  Copy the correct field into
     a new MOE database.
-  </sol></li>
+  </sol>
   <li><p><prob>
     Divcon isn't generating a log file (<inline><em>divcon.log</em></inline>).
     </prob><p><sol>
     A logging configuration file <inline>divcon-log.config</inline> has to be
-    in the working directory or in <inline>$QBHOME/etc</inline>.  The 
+    in the working directory or in <inline>$QBHOME/etc</inline>.  The
     configuration file in the working directory takes precendence.
-  </sol></li>
+  </sol>
   <li><p><prob>
     I submitted a parallel PBS (SGE, etc.) QMScore batch script and it returned
     immediately without executing any jobs.
@@ -555,7 +647,7 @@ The pose (or receptor) database has more than one molecule field.
     <p><sol>
     There may be configuration problems.  Please <a href=#contact>contact</a>
     our support staff to resolve the issue.
-  </sol></li>
+  </sol>
   <li><p><prob>
     How do I know when all jobs of a MOEDivcon batch run have completed, or
     more importantly, are likely to converge.
@@ -563,7 +655,7 @@ The pose (or receptor) database has more than one molecule field.
     Presently, MOEDivcon has no mechanism to show the user the progress of a
     calculation or whether it is converging.  This will be addressed in a future
     release of MOEDivcon.
-  </sol></li>
+  </sol>
 </ui>
 
 <h2><a name="contact"></a>Support Contact Information</h2>
