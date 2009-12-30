@@ -3,16 +3,16 @@
  // BEGIN COPYRIGHT
  /***********************************************************************
     Copyright (c) 1998-2009 QuantumBio Inc. and/or its affiliates.
-	
+
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
 
- This source code contains proprietary and Confidential Information, 
- including trade secrets, belonging to QuantumBio Inc. and/or its 
+ This source code contains proprietary and Confidential Information,
+ including trade secrets, belonging to QuantumBio Inc. and/or its
  affiliates.
 
- Use, duplication, or disclosure of this source code is strictly 
- prohibited without prior written authorization by the management of 
+ Use, duplication, or disclosure of this source code is strictly
+ prohibited without prior written authorization by the management of
  QuantumBio Inc. At no time are you authorized to repurpose the source
  code for use with software other then that which it was intended.
 
@@ -20,7 +20,7 @@
 
  ***********************************************************************/
  // END COPYRIGHT
-#endif      
+#endif
 
 //    qmsbatch.svl    Executes QMScore calculations in batch mode
 
@@ -33,7 +33,7 @@ function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetOptions;
 function qb_GetEnv;
-function qb_SaveStatus;
+function qb_SaveDivconStatus;
 function qb_SaveQMScore;
 function qb_QMScore;
 
@@ -100,19 +100,19 @@ write ['Rec chg:  {}    Lig chg:  {}\n', options.recchg, options.ligchg];//DEBUG
                 if errmess === [] or errmess === '' then
                     errmess = "Unknown error!";
                 endif
-                qb_SaveStatus [dbkey, indkey(1), 
+                qb_SaveDivconStatus [dbkey, indkey(1),
                   swrite ['Error:  {}', errmess]];
                 write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
             else
                 qb_SaveQMScore [dbkey, indkey(1), results];
-                qb_SaveStatus [dbkey, indkey(1), "Success"];
+                qb_SaveDivconStatus [dbkey, indkey(1), "Success"];
             endif
 
         elseif code === 'error' then
             if errmess === [] or errmess === '' then
                 errmess = "Unknown error!";
             endif
-            qb_SaveStatus [dbkey, indkey(1), 
+            qb_SaveDivconStatus [dbkey, indkey(1),
                 swrite ['Error:  {}', errmess]];
 
             write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
