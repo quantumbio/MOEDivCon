@@ -3,16 +3,16 @@
  // BEGIN COPYRIGHT
  /***********************************************************************
     Copyright (c) 1998-2009 QuantumBio Inc. and/or its affiliates.
-	
+
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
 
- This source code contains proprietary and Confidential Information, 
- including trade secrets, belonging to QuantumBio Inc. and/or its 
+ This source code contains proprietary and Confidential Information,
+ including trade secrets, belonging to QuantumBio Inc. and/or its
  affiliates.
 
- Use, duplication, or disclosure of this source code is strictly 
- prohibited without prior written authorization by the management of 
+ Use, duplication, or disclosure of this source code is strictly
+ prohibited without prior written authorization by the management of
  QuantumBio Inc. At no time are you authorized to repurpose the source
  code for use with software other then that which it was intended.
 
@@ -20,7 +20,7 @@
 
  ***********************************************************************/
  // END COPYRIGHT
-#endif      
+#endif
 
 #set title   'QuantumBio QMScore Interface'
 #set class   'QuantumBio'
@@ -49,8 +49,6 @@ const LIG_KEYS =
     ];
 
 global function qb_QMScore [receptor_mols, ligand_mol, opts]
-
-write ['{v}\n', opts];  //DEBUG
 
 local errmess = [];
 local subdirname;
