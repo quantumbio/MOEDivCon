@@ -1,0 +1,1446 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+	
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif      
+
+//    qbcore.svl    Core user-interface and utilities used by QB panels
+
+#set title   'QuantumBio Core'
+#set class   'QuantumBio'
+#set version '2010.02'
+
+function _Atoms;
+
+//  Charge status
+const CHG_COLOR = 
+    [
+    'white',
+    'green',
+    'yellow',
+    'red'
+    ];
+
+//  Data tags are in the order in which they are returned by Divcon.
+const QMS_DATA_TAGS =
+    [
+    "LIGAND",
+    "TOTAL SCORE",
+    "GAS PHASE HEAT OF FORMATION",
+    "ELECTROSTATIC SOLVATION",
+    "ATTRACTIVE LENNARD JONES",
+    "SOLVATION ENTROPY",
+    "VIBRATIONAL ENTROPY",
+    "ELECTRONIC INTERACTION ENERGY",
+    "MRM STERIC ENERGY",
+    "MRM ELECTROSTATIC ENERGY",
+    "MRM SOLVATION ENERGY",
+    "MRM TOTAL ENERGY"
+    ];
+ 
+//  Database Fields
+const POSE_FIELD = 'Ligand/Pose';
+const LIGCHG_FIELD = 'Lig Chg';
+const REC_FIELD = 'Receptor';
+const RECCHG_FIELD = 'Rec Chg';
+const STATUS_FIELD = 'Status';
+
+const QMS_NUM_FIELDS =
+    [
+    'QMScore',
+    'dHf_g',
+    'Solv_elec',
+    'LJ_att',
+    'S_solv',
+    'S_vib',
+    'E_eInt',
+    'MRMScore',
+    'E_stericMRM',
+    'E_elecMRM',
+    'E_solvMRM'
+    ];
+
+const NMR_NUM_FIELDS =
+    [
+    'NMRScore'
+    ];
+
+
+// Environment tags
+const COMPLEX = 'complex';
+const LIGAND = 'ligand';
+const TARGET = 'target';
+const OPTIONS = 'options';
+const STATUS = 'status';
+
+const DBTYPE = 'qb_dbtype';
+const QMSCORE = 'qb_qmscoredb';
+const NMRSCORE = 'qb_nmrscoredb';
+
+const STATUS_DEFAULTS =
+    [
+    ['prevwd',       ''            ],
+    ['calcchg',      0             ],
+    ['verifychg',    0             ],
+    ['ligchg',       1             ],
+    ['recchg',       1             ],
+    ['adjligchg',    0             ],
+    ['adjrecchg',    0             ],
+    ['moeligchg',    0             ],
+    ['moerecchg',    0             ]
+    ];
+
+/*  NOTE:  Non-GUI opt task must be the first tag.  */
+const QMSCORE_OPT_DEFAULTS =
+    [
+    ['task',         0             ],
+    ['mode',         'One-to-One'  ],  // Shared dialog defaults options
+    ['cwd',          0             ],
+    ['workdir',      '/tmp'        ],
+    ['scoredb',      'qmscore.mdb' ],
+    ['posedb',       ''            ],
+    ['recdb',        ''            ],
+    ['ligchg',       0             ],
+    ['recchg',       0             ],
+    ['poseschg',     0             ],
+    ['ham',          5             ],  // QMScore defaults start here
+    ['standard',     0             ],
+    ['freq',         0             ],
+    ['opt',          1             ],
+    ['shift',        0.0           ]
+    ];
+
+const NMRSCORE_OPT_DEFAULTS =
+    [
+    ['task',         0             ],
+    ['mode',         'One-to-One'  ],  // Shared dialog option defaults
+    ['cwd',          0             ],
+    ['workdir',      '/tmp'        ],
+    ['scoredb',      'nmrscore.mdb'],
+    ['posedb',       ''            ],
+    ['recdb',        ''            ],
+    ['ligchg',       0             ],
+    ['recchg',       0             ],
+    ['poseschg',     0             ],
+    ['guess',        0             ],  // NMRScore defaults start here
+    ['opt',          1             ],
+    ['cut',          0             ],
+    ['radius',       2.5           ]
+    ];
+
+const RUN_MODES =
+    [
+    'One-to-One',
+    'One-to-Many',
+    'Many-to-Many'
+    ];
+
+const CORE_PANEL =
+    [
+    Hbox :
+        [
+        extendH: 1,
+        FSBText :
+            [
+            name: 'scoredb', len: 40, extendH: 1, title: 'Output DB:',
+            mode: 'saveAs', allowBlank: 0,
+            bubbleHelp:
+                'The name of the output database that will hold\n'
+                'the run paramaters and scoring results.'
+            ],
+        Button : [ name: 'browse_scoredb', text: 'Browse...' ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
+    Hbox :
+        [
+        extendH: 1,
+        Text :
+            [
+            name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
+            type: 'char', allowBlank: 0,
+            shortcut: ['/tmp', '.', '~', '~/tmp', '/scratch'],
+            bubbleHelp:
+                'The name of the working directory for storing\n'
+                'QB Divcon intermediate calculations and logs.\n'
+                'The absolute path to the specified directory\n'
+                'will be stored and used at execution time.'
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+        Checkbox :
+            [
+            name: 'cwd', text: 'CWD', onTrigger: 'return', 
+            bubbleHelp:
+                'Set the current working directory using\n'
+                'the run time environment variable $PWD.'
+            ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
+    Hbox :
+        [
+        Radio :
+            [
+            name: 'mode', text: RUN_MODES, columns: 3, minWidth: 12, 
+            extendH: 1, onTrigger: 'return', title: 'Mapping Mode:',
+            type: 'char',
+            bubbleHelp:
+                'The mapping mode of receptors to ligand/poses:\n'
+                '  One ligand docked into one receptor.\n'
+                '  Many ligand poses docked into the same receptor.\n'
+                '  Many ligand poses, each docked into its own receptor.'
+            ]
+        ],
+
+    Hbox :
+        [
+        name: 'posebox', extendH: 1,
+        FSBText :
+            [
+            name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
+            mode: 'open', allowBlank: 0,
+            bubbleHelp:
+                'The name of the input database that holds\n'
+                'the ligand poses (and possibly scores).'
+            ],
+        Button : [ name: 'browse_posedb', text: 'Browse...' ]
+        ],
+
+    Hbox :
+        [
+        name: 'recbox', extendH: 1,
+        FSBText :
+            [
+            name: 'recdb', len: 40, extendH: 1, title: 'Receptor DB:',
+            mode: 'open', allowBlank: 0,
+            bubbleHelp:
+                'The name of the input database that holds\n'
+                'the receptors.'
+            ],
+        Button : [ name: 'browse_recdb', text: 'Browse...' ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
+    Hbox :
+        [
+        extendH: 1, name: 'chgbox', title: 'Charges:',
+        Button : [ name: 'calcchg', text: 'Calculate' ],
+        Vbox :
+            [
+            Hbox :
+                [
+                extendH: 1,
+                Label :
+                    [
+                    name: 'recflg', title: 'Receptor:',
+                        bubbleHelp:
+                        'Problems with the total charge of receptor?\n'
+                        '   White:   uncalculated or user-entered charge.\n'
+                        '   Green:   charge calculated by MOE.\n'
+                        '   Yellow:  MOE\'s charge was adjusted.\n'
+                        '   Red:      charge problematic for Divcon.'
+                    ],
+                Text :
+                    [
+                    name: 'recchg', allowBlank: 0,
+                    type: 'int', minWidth: 4,
+                    onTrigger: 'validate',
+                    bubbleHelp:
+                        'Total charge of receptor.'
+                    ]
+                ],
+            Hbox :
+                [
+                extendH: 1,
+                Label :
+                    [
+                    name: 'ligflg', title: 'Ligand:',
+                        bubbleHelp:
+                        'Problems with the total charge of ligand?\n'
+                        '   White:   uncalculated or user-entered charge.\n'
+                        '   Green:   charge calculated by MOE.\n'
+                        '   Yellow:  MOE\'s charge was adjusted.\n'
+                        '   Red:      charge problematic for Divcon.'
+
+                    ],
+                Text :
+                    [
+                    name: 'ligchg', allowBlank: 0,
+                    type: 'int', minWidth: 4, extendH: 1,
+                    onTrigger: 'validate',
+                    bubbleHelp:
+                        'Total charge of ligand.'
+                    ],
+                Checkbox :
+                    [
+                    name: 'poseschg', text: 'All Poses',
+                    bubbleHelp:
+                        'Use the ligand charge for all\n'
+                        'poses in the poses database.'
+                    ]
+                ]
+            ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1]
+    ];
+
+//***********************  Local Functions  *********************************
+
+function SplitComplex;
+function SplitReceptor;
+
+/****************************************************************************
+ *                          AtomsToMols
+ *
+ *  Given the set of atoms in the MOE Window, identify and separate the
+ *  ligand, then split up the receptor atoms into individual molecules.
+ *  Returns the extracted molecules.
+ *
+ ****************************************************************************/
+local function AtomsToMols []
+
+    local [recatoms, ligatoms, errmess] = SplitComplex [];
+
+    if recatoms === [] or ligatoms === [] then
+        return [[], [], errmess];
+    endif
+
+    local recsets = SplitReceptor [recatoms];
+
+    if recsets === [] then
+        return [[], [], 'No receptor was recognized.'];
+    endif
+
+    local ligmol = mol_Extract ligatoms;
+    local recmols = app mol_Extract recsets;
+
+    return [recmols, ligmol, []];
+
+endfunction
+
+/****************************************************************************
+ *                          CalcCharge
+ *
+ *  Determine the total charge of the molecule collection represented by 
+ * the set of atoms.  Return the adjusted flag along with the charge.
+ *     0)  Okay, no adjustment.
+ *     1)  Adjusted odd number of electrons.
+ *
+ ****************************************************************************/
+local function CalcCharge [atoms]
+
+    local charge = add aFCharge atoms;
+    local numelecs = add aAtomicNumber atoms;
+    if even (charge + numelecs) then
+      return [charge, 0];
+    endif
+
+    /*  Adjust the charge up or down one so that Divcon will be happy.  */
+    local adjchg = add aIon atoms;
+    if adjchg === charge then
+        adjchg = add aExplicitFCharge atoms;
+    endif
+
+    if adjchg > charge then
+      charge = charge + 1;
+    else
+      charge = charge - 1;
+    endif
+
+    return [charge, 1];
+endfunction
+
+/****************************************************************************
+ *                          CalcComplexCharge
+ *
+ *  Determine the total charge of the ligand and receptor in the MOE window.
+ *
+ ****************************************************************************/
+local function CalcComplexCharge []
+
+    local [recatoms, ligatoms, errmess] = SplitComplex [];
+    if recatoms === [] or ligatoms === [] then
+        return  [[], [], [], [], errmess];
+    endif
+
+    local [recchg, recadj] = CalcCharge [recatoms];
+    local [ligchg, ligadj] = CalcCharge [ligatoms];
+
+    return [recchg, recadj, ligchg, ligadj, []];
+
+endfunction
+
+/****************************************************************************
+ *                          ChargeOK
+ *
+ *  Determine whether the given total charge of the molecule collection 
+ *  represented by the set of atoms will result in a system with an even
+ *  number of electrons.
+ *
+ ****************************************************************************/
+local function ChargeOK [atoms, charge]
+
+    local numelecs = add aAtomicNumber atoms;
+    return even (charge + numelecs);
+
+endfunction
+
+function CheckComplexCharge;
+function SetChargeStatus;
+
+/****************************************************************************
+ *                          CheckCharge
+ *
+ *  Check user-defined charges for even number of electrons.
+ *
+ ****************************************************************************/
+local function CheckCharge [wkey, status, recchg, ligchg]
+
+    local [recok, ligok, errmess] = CheckComplexCharge [recchg, ligchg];
+    if recok === [] or ligok === [] then
+        Warning errmess;  //DEBUG
+        SetChargeStatus [wkey, status];
+        return status;
+    endif
+
+    if ligok then
+        if status.calcchg and ligchg === status.moeligchg then
+            if status.adjligchg then
+                status.ligchg = 3;
+            else
+                status.ligchg = 2;
+            endif
+        else
+            status.ligchg = 1;
+        endif
+    else
+        status.ligchg = 4;
+    endif
+
+    if recok then
+        if status.calcchg and recchg === status.moerecchg then
+            if status.adjrecchg then
+               status.recchg = 3;
+            else
+               status.recchg = 2;
+           endif
+        else
+          status.recchg = 1;
+        endif
+
+    else
+        status.recchg = 4;
+    endif
+
+    SetChargeStatus [wkey, status];
+    return status;
+endfunction
+
+/****************************************************************************
+ *                          CheckComplexCharge
+ *
+ *  Determine whether the given total charges of the ligand and receptor
+ *  in the MOE window will result in systems with an even number of electrons.
+ *
+ ****************************************************************************/
+local function CheckComplexCharge [recchg, ligchg]
+
+    local [recatoms, ligatoms, errmess] = SplitComplex [];
+    if recatoms === [] or ligatoms === [] then
+        return  [[], [], errmess];
+    endif
+
+    local recok = ChargeOK [recatoms, recchg];
+    local ligok = ChargeOK [ligatoms, ligchg];
+
+    return [recok, ligok, []];
+
+endfunction
+
+function DrawChgStatus;
+
+/****************************************************************************
+ *                          ClearChargeStatus
+ *
+ *  Clear charge status.
+ *
+ ****************************************************************************/
+local function ClearChargeStatus [wkey]
+
+    local ligkey = DrawChgStatus [1];
+    local reckey = DrawChgStatus [1];
+
+    WindowSetAttr [wkey, [ligflg: [graphics: ligkey],
+        recflg: [graphics: reckey]]];
+    
+    gr_destroy ligkey;
+    gr_destroy reckey;
+
+endfunction
+
+function qb_GetEnv;
+function GetStatusMessage;
+
+/****************************************************************************
+ *                          CopyPoseDB
+ *
+ *  Copy the Poses database into the QMScore output database.
+ *
+ ****************************************************************************/
+local function CopyPoseDB [resultskey, poseskey]
+
+    local mess = '';
+    local [fields, ftypes] = db_Fields poseskey;
+    local molfield = fields | (ftypes == 'molecule');
+
+    if 1 <> length molfield then
+        mess = 'The poses database has\n'
+            'more than one molecule field.';
+        return mess;
+    endif
+
+    local [recmols, l, status, opts, c] = qb_GetEnv [resultskey];
+
+    //  Check receptor charge
+    local recmess = GetStatusMessage ['Receptor', 
+        eqL [status.recchg, status.moerecchg], neL [status.recchg, 4],
+        status.adjrecchg];
+
+    //  HACK alert:  temporarily renames mol field to make copying easier
+    db_RenameField [resultskey, POSE_FIELD, molfield];
+    apt db_EnsureField [resultskey,  fields, ftypes];
+
+    local [osys, nsys] = SystemPush [];
+
+    local rowkey = 0, stsmess = "";
+    while rowkey = db_NextEntry [poseskey, rowkey] loop
+        local rowdata = db_Read [poseskey, rowkey];
+        local chgdata;
+        if opts.poseschg then
+            stsmess = cat [recmess, GetStatusMessage ['Ligand',
+                eqL [opts.ligchg, status.moeligchg],
+                neL [status.ligchg, 4], status.adjligchg]];
+            chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [opts.ligchg, stsmess]];
+        else
+            local ligmol = tagpeek [rowdata, molfield];
+            local ligch = mol_Create ligmol;
+            local ligatms = cat cAtoms ligch;
+            local [charge, chgadj] = CalcCharge [ligatms];
+            local chgok = ChargeOK [ligatms, charge];
+            stsmess = cat [recmess, GetStatusMessage ['Ligand', 1, chgok,
+                chgadj]];
+            chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [charge, stsmess]];
+            oDestroy ligch;
+        endif
+
+        rowdata = cat [chgdata, rowdata];
+        db_Write [resultskey, 0, rowdata];
+    endloop
+
+    SystemPop [osys, nsys];
+
+    db_RenameField [resultskey, molfield, POSE_FIELD];
+
+    return mess;
+endfunction
+
+/****************************************************************************
+ *                          CopyRecPoseDB
+ *
+ *  Copy the Receptors and Poses databases into the QMScore output database.
+ *
+ *  HACK alert:  temporarily renames mol fields to make copying easier.
+ *
+****************************************************************************/
+local function CopyRecPoseDB [resultskey, recskey, poseskey]
+
+    local mess = '';
+    if db_nEntries recskey <> db_nEntries poseskey then
+        mess = 'The receptor and pose databases\n'
+            'have different number of entries.';
+        return mess;
+    endif
+
+    local [recfields, recftypes] = db_Fields recskey;
+    local recmolfield = recfields | (recftypes == 'molecule');
+    if 1 <> length recmolfield then
+        mess = 'The receptor database has\n'
+            'more than one molecule field.';
+        return mess;
+    endif
+
+    db_RenameField [resultskey, REC_FIELD, recmolfield];
+    apt db_EnsureField [resultskey, recfields, recftypes];
+    local [osys, nsys] = SystemPush [];
+    local recrowkey = 0, recmsgs = [], stsmess = "";
+    while recrowkey = db_NextEntry [recskey, recrowkey] loop
+        local recrowdata = db_Read [recskey, recrowkey];
+        local recmol = tagpeek [recrowdata, recmolfield];
+        local recch = mol_Create recmol;
+        local recatms = cat cAtoms recch;
+        local [recchg, recadj] = CalcCharge [recatms];
+        local recok = ChargeOK [recatms, recchg];
+        stsmess = GetStatusMessage ['Receptor', 1, recok, recadj];
+        recmsgs = append [recmsgs, stsmess];
+        local recchgdata = tag [[RECCHG_FIELD], [recchg]];
+        recrowdata = cat [recchgdata, recrowdata];
+        db_Write [resultskey, 0, recrowdata];
+        oDestroy recch;
+    endloop
+
+    db_RenameField [resultskey, recmolfield, REC_FIELD];
+
+    local [posefields, poseftypes] = db_Fields poseskey;
+    local posemolfield = posefields | (poseftypes == 'molecule');
+    if 1 <> length posemolfield then
+        mess = 'The pose database has\n'
+            'more than one molecule field.';
+        SystemPop [osys, nsys];
+        return mess;
+    endif
+
+    db_RenameField [resultskey, POSE_FIELD, posemolfield];
+    apt db_EnsureField [resultskey, posefields, poseftypes];
+
+    local poserowkey = 0, resultrowkey = 0, ith = 1;
+    while poserowkey = db_NextEntry [poseskey, poserowkey] loop
+        resultrowkey = db_NextEntry [resultskey, resultrowkey];
+        local poserowdata = db_Read [poseskey, poserowkey];
+        local posemol = tagpeek [poserowdata, posemolfield];
+        local posech = mol_Create posemol;
+        local poseatms = cat cAtoms posech;
+        local [posechg, poseadj] = CalcCharge [poseatms];
+        local poseok = ChargeOK [poseatms, posechg];
+        stsmess = cat [recmsgs(ith), GetStatusMessage ['Pose', 1, poseok,
+            poseadj]];
+        local posechgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [posechg,
+            stsmess]];
+        poserowdata = cat [posechgdata, poserowdata];
+        db_Write [resultskey, resultrowkey, poserowdata];
+        oDestroy posech;
+        ith = ith + 1;
+    endloop
+
+    db_RenameField [resultskey, posemolfield, POSE_FIELD];
+
+    SystemPop [osys, nsys];
+    return mess;
+endfunction
+
+/****************************************************************************
+ *                          DrawChgStatus
+ *
+ *  Return the graphics key for the status label.
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawChgStatus [cidx]
+    local color = CHG_COLOR (cidx);
+    local key = gr_create [title: 'status', size: [13, 13], units: 'pt'];
+    gr_oval [key, [0, [6,6], [6,6], icolor color, 1, icolor color]];
+    return key;
+endfunction
+
+/****************************************************************************
+ *                          GetStatusMessage
+ *
+ *  Return a string message describing the charge status.
+ *
+ ****************************************************************************/
+local function GetStatusMessage [which, calc, ok, adj]
+
+    local mess = "";
+
+    if ok then
+        if calc and adj then
+            mess = swrite ['Warning: {} has an adjusted charge\n', which];
+        endif
+    else
+        mess = swrite ['Warning: {} has a bad charge\n', which];
+    endif
+
+    return mess;
+
+endfunction
+
+/****************************************************************************
+ *                          SaveEnv
+ *
+ *  Save the molecules (ligand and receptor) and options in the 
+ *  database.
+ *
+ ****************************************************************************/
+local function SaveEnv [dbkey, tgtmols, ligmol, status, options,
+        complex, type]
+
+    db_SetEnv [dbkey, TARGET, twrite ['{v}', tgtmols]];
+    db_SetEnv [dbkey, LIGAND, twrite ['{v}', ligmol]];
+    db_SetEnv [dbkey, STATUS, twrite ['{v}', status]];
+    db_SetEnv [dbkey, OPTIONS, twrite ['{v}', options]];
+    db_SetEnv [dbkey, COMPLEX, twrite ['{v}', complex]];
+
+    if type === 'nmrscore' then
+        db_SetEnv [dbkey, DBTYPE, NMRSCORE];
+    elseif type === 'qmscore' then
+        db_SetEnv [dbkey, DBTYPE, QMSCORE];
+    endif
+
+endfunction
+
+/****************************************************************************
+ *                          SetChargeStatus
+ *
+ *  Set charge status label.
+ *
+ ****************************************************************************/
+local function SetChargeStatus [wkey, status]
+
+    local ligkey = DrawChgStatus [status.ligchg];
+    local reckey = DrawChgStatus [status.recchg];
+
+    WindowSetAttr [wkey, [ligflg: [graphics: ligkey],
+        recflg: [graphics: reckey]]];
+    
+    gr_destroy ligkey;
+    gr_destroy reckey;
+
+endfunction
+
+/****************************************************************************
+ *                          SetScoreFields
+ *
+ *  Ensure that the required fields are present.
+ *
+ ****************************************************************************/
+local function SetScoreFields [dbkey, addreceptor, fields, dbtype]
+
+    if addreceptor then
+        db_EnsureField [dbkey, REC_FIELD, 'molecule'];
+        db_EnsureField [dbkey, RECCHG_FIELD, 'int'];
+    endif
+
+    db_EnsureField [dbkey, POSE_FIELD, 'molecule'];
+    db_EnsureField [dbkey, LIGCHG_FIELD, 'int'];
+    db_EnsureField [dbkey, STATUS_FIELD, 'char'];
+
+    if dbtype === 'qmscore' then
+        apt db_EnsureField [dbkey, QMS_NUM_FIELDS, 'double'];
+    elseif dbtype === 'nmrscore' then
+        apt db_EnsureField [dbkey, NMR_NUM_FIELDS , 'double'];
+        if fields === [] then
+            apt db_EnsureField [dbkey, fields, 'double'];
+        endif
+    endif
+endfunction
+
+/****************************************************************************
+ *                          SplitComplex
+ *
+ *  Split the set of atoms in the MOE Window into ligand and receptor atoms.
+ *
+ ****************************************************************************/
+local function SplitComplex []
+
+    local complexatoms = Atoms [];
+    if length complexatoms === 0 then
+        return [[], [], 'No molecular complex loaded in MOE Window.'];
+    endif
+
+    const COLLECTNAMES = ['QB_LIGAND', 'LIGX_LIGAND'];
+    local recatoms, ligatoms;
+    local cname, makecoll = 0;
+
+    local colnames = oCollections [];
+    for cname in COLLECTNAMES loop
+        if anytrue eqE [cname, colnames] then
+            ligatoms  = cat oAtoms oGetCollection cname;
+            ligatoms = join [ligatoms, complexatoms];
+            break;
+        endif
+    endloop
+
+    if length ligatoms === 0 then
+        ligatoms  = _Atoms '$$ligand';
+        makecoll = 1;
+    endif
+
+    if length ligatoms === 0 or length ligatoms >= length complexatoms then
+        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
+    endif
+
+    if 1 <> length uniq aMoleculeNumber ligatoms then
+        return [[], [], 'Ligand has to be a single molecule.'];
+    endif
+
+    if makecoll then
+        oSetCollection ['QB_LIGAND', ligatoms];
+     endif
+
+    recatoms = diff [complexatoms, ligatoms];
+
+    return [recatoms, ligatoms, []];
+
+endfunction
+
+/****************************************************************************
+ *                          SplitReceptor
+ *
+ *  Given a set of receptor atoms, returns subsets which represent
+ *  individual molecules (connected pieces) in the receptor.
+ *
+ ****************************************************************************/
+local function SplitReceptor [receptoratoms]
+
+    if receptoratoms === [] then return []; endif
+
+    local atomsets = [];
+    local [recidx, reccnt] = sac aMoleculeNumber receptoratoms;
+    if length reccnt > 1 then
+        receptoratoms = receptoratoms [recidx];
+        atomsets = split [receptoratoms, reccnt];
+    else
+        atomsets = [receptoratoms];
+    endif
+
+    return atomsets;
+
+endfunction
+
+/****************************************************************************
+ *                          UpdateCharge
+ *
+ *  Update the window based on new charge.
+ *
+ ****************************************************************************/
+local function UpdateCharge [wkey, status]
+
+    local [recchg, recadj, ligchg, ligadj, errmess] = CalcComplexCharge [];
+    if recchg === [] or ligchg === [] then
+        Warning  errmess;
+        SetChargeStatus [wkey, status];
+        return status;
+    endif
+
+    status.calcchg = 1;
+    status.moerecchg = recchg;
+    status.moeligchg = ligchg;
+    status.adjrecchg = recadj;
+    status.adjligchg = ligadj;
+
+    status.recchg = select [3, 2, recadj];
+    status.ligchg = select [3, 2, ligadj];
+
+    WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
+    SetChargeStatus [wkey, status];
+
+    return status;
+endfunction
+
+
+/****************************************************************************
+ *                          UpdateCWD
+ *
+ *  Update the window based on new CWD value.
+ *
+ ****************************************************************************/
+local function UpdateCWD [wkey, cwd, wd, prev]
+    if cwd === 1 then
+        WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
+        WindowSetData [wkey, [workdir: '']];
+        return wd;
+    else
+        WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0]]];
+        WindowSetData [wkey, [workdir: prev]];
+        return prev;
+    endif
+endfunction
+
+/****************************************************************************
+ *                          UpdateMode
+ *
+ *  Update the window based on new mode value.
+ *
+ ****************************************************************************/
+local function UpdateMode [wkey, mode, status]
+    if mode === 'One-to-One' then
+        WindowSetAttr [wkey, [posebox: [sensitive: 0],
+            posedb: [allowBlank: 1], recbox: [sensitive: 0], 
+            recdb: [allowBlank: 1], panel:[sensitive: [1,1,1,1]],
+            chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
+            recchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
+        SetChargeStatus [wkey, status];
+    elseif mode === 'One-to-Many' then
+        WindowSetAttr [wkey, [posebox: [sensitive: 1],
+            posedb: [allowBlank: 0],recbox: [sensitive: 0], 
+            recdb: [allowBlank: 1], panel:[sensitive: [0,1,1,1]],
+            chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
+            recchg: [allowBlank: 0], poseschg: [sensitive: 1]]];
+        SetChargeStatus [wkey, status];
+    elseif mode === 'Many-to-Many' then
+        WindowSetAttr [wkey, [posebox: [sensitive: 1],
+            posedb: [allowBlank: 0], recbox: [sensitive: 1], 
+            recdb: [allowBlank: 0], panel:[sensitive: [0,1,1,1]],
+            chgbox: [sensitive: 0], ligchg: [allowBlank: 1],
+            recchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
+        ClearChargeStatus [wkey];
+    endif
+endfunction
+
+//************************  Global Functions  *******************************
+
+/****************************************************************************
+ *
+ *                          qb_CoreHandler
+ *
+ *  Handle the triggers of the core panel.
+ *
+ ****************************************************************************/
+global function qb_CoreHandler [wkey, trig, status, vals, btasks]
+
+    local btid;
+    if trig === 'mode' then
+        UpdateMode [wkey, vals.mode, status];
+
+    elseif trig === 'cwd' then
+        status.prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir,
+            status.prevwd];
+
+    elseif trig === 'calcchg' then
+        if second task_fork [master: 'parent',
+                statics:'share'] === 'child' then
+            task_prio 0;
+
+            status = UpdateCharge [wkey, status];
+            exit [];
+        endif
+
+    elseif trig === 'ligchg' then
+        if second task_fork [master: 'parent',
+                statics:'share'] === 'child' then
+            task_prio 0;
+
+            status = CheckCharge [wkey, status, vals.recchg,
+                vals.ligchg];
+            exit [];
+        endif
+
+    elseif trig === 'recchg' then
+        if second task_fork [master: 'parent', 
+                statics:'share'] === 'child' then
+            task_prio 0;
+
+            status = CheckCharge [wkey, status, vals.recchg,
+                vals.ligchg];
+            exit [];
+        endif
+
+    elseif trig === 'browse_scoredb' then
+        btid = run ['fbrowse.svl', [trig, wkey, 'Select QMScore DB File', 
+            'none', '*.mdb', 'scoredb']];
+        if btid then btasks = append [btasks, btid]; endif
+
+    elseif trig === 'browse_posedb' then
+        btid = run ['fbrowse.svl', [trig, wkey, 'Select Pose DB File', 
+            'open', '*.mdb', 'posedb']];
+        if btid then btasks = append [btasks, btid]; endif
+
+    elseif trig === 'browse_recdb' then
+        btid = run ['fbrowse.svl', [trig, wkey, 'Select Receptor DB File', 
+            'open', '*.mdb', 'recdb']];
+        if btid then btasks = append [btasks, btid]; endif
+    endif
+
+    return [status, btasks];
+endfunction
+
+/****************************************************************************
+ *                          qb_CutReceptor
+ *
+ *  Given a pose database and radius, find all receptor atoms of the current
+ *  complex in the MOE window that are within the radius distance from each
+ *  pose, expand those atoms out to their respective residues, and return
+ *  the "molecules" formed by those atoms.
+ *
+ ****************************************************************************/
+global function qb_CutReceptor [posedbkey, radius]
+
+    if radius <= 0.0 then
+        return [[], [], 'Radius must be greater than zero.'];
+    endif
+
+    local [recatoms, ligatoms, errmess] = SplitComplex [];
+
+    if recatoms === [] or ligatoms === [] then
+        return [[], [], errmess];
+    endif
+
+    //  Find neighboring atoms within radius
+    local cutset = [];
+    local subset;
+    for subset in split [x_id recatoms, 50] loop
+        local key = prox_open [radius, aPos recatoms[subset], radius/2];
+        local cutidx = uniq second prox_find [key, aPos ligatoms, radius/2];
+        prox_close key;
+        cutset = cat [cutset, subset[cutidx]];
+    endloop
+
+    if length cutset === 0 then
+        return [[], [], twrite ['No receptor atoms within radius {n:.1f}\n'
+            'of the ligand pose atoms.', radius]];
+    endif
+
+    local cutatoms = recatoms [cutset];
+
+    print aMoleculeNumber cutatoms;  //DEBUG
+
+    local residues = uniq oParent (cutatoms);
+    local resatoms = cat oChildren residues;
+
+    print aMoleculeNumber resatoms;  //DEBUG
+
+    local delatoms = diff [recatoms, resatoms];
+    local delresidues = uniq oParent delatoms;
+    oDestroy delatoms;
+    delresidues = delresidues | rAtomCount delresidues == 0;
+    local delchains = uniq oParent delresidues;
+    oDestroy delresidues;
+    delchains = delchains | cResidueCount delchains == 0;
+    oDestroy delchains;
+
+	Add_H (resatoms | aLonePairs resatoms <= 0);
+	Add_HLP (resatoms | aLonePairs resatoms > 0);
+
+    print aMoleculeNumber resatoms;  //DEBUG
+
+    local recsets = SplitReceptor [resatoms];
+
+    local ligmol = mol_Extract ligatoms;
+    local recmols = app mol_Extract recsets;
+
+    return [recmols, ligmol, []];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          qb_GetCorePanel
+ *
+ *  Returns the vector defining the core panel.
+ *
+ ****************************************************************************/
+global function qb_GetCorePanel []
+    return CORE_PANEL;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetDefaultsNMRScore
+ *
+ *  Return the default options for NMRScore.
+ *
+ ****************************************************************************/
+global function qb_GetDefaultsNMRScore []
+    return tag tr NMRSCORE_OPT_DEFAULTS;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetDefaultsQMScore
+ *
+ *  Return the default options for QMScore.
+ *
+ ****************************************************************************/
+global function qb_GetDefaultsQMScore []
+    return tag tr QMSCORE_OPT_DEFAULTS;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetDefaultsStatus
+ *
+ *  Return the default options for the GUI status.
+ *
+ ****************************************************************************/
+global function qb_GetDefaultsStatus []
+    return tag tr STATUS_DEFAULTS;
+endfunction
+/****************************************************************************
+ *                          qb_GetEnv
+ *
+ *  Get the molecules (ligand and receptor) and options from the  
+ *  database.
+ *
+ ****************************************************************************/
+global function qb_GetEnv [dbkey]
+
+    local tgttok = db_GetEnv [dbkey, TARGET];
+    local [[tgtmols]] = sread [string tgttok, '{v}'];
+    local ligtok = db_GetEnv [dbkey, LIGAND];
+    local [[ligmol]] = sread [string ligtok, '{v}'];
+    local cpxtok = db_GetEnv [dbkey, COMPLEX];
+    local [[complex]] = sread [string cpxtok, '{v}'];
+
+    local ststok = db_GetEnv [dbkey, STATUS];
+    local [[status]] = sread [string ststok, '{v}'];
+    status = tagcat [status, tag tr STATUS_DEFAULTS];
+
+    local opttok = db_GetEnv [dbkey, OPTIONS];
+    local [[options]] = sread [string opttok, '{v}'];
+    local type = db_GetEnv [dbkey, DBTYPE];
+    if type === QMSCORE then
+        options = tagcat [options, tag tr QMSCORE_OPT_DEFAULTS];
+    elseif type === NMRSCORE then
+        options = tagcat [options, tag tr NMRSCORE_OPT_DEFAULTS];
+    endif
+
+    return [tgtmols, ligmol, status, options, complex];
+
+endfunction
+
+/****************************************************************************
+ *                          qb_GetPoseFields
+ *
+ ****************************************************************************/
+global function qb_GetPoseFields []
+
+    return [POSE_FIELD, LIGCHG_FIELD];
+
+endfunction
+
+/****************************************************************************
+ *                          qb_GetRecFields
+ *
+ ****************************************************************************/
+global function qb_GetRecFields []
+
+    return [REC_FIELD, RECCHG_FIELD];
+
+endfunction
+
+/****************************************************************************
+ *                          qb_GetTagsNMRScore
+ *
+ *  Return the tags for NMRScore.
+ *
+ ****************************************************************************/
+global function qb_GetTagsNMRScore []
+    return first tr NMRSCORE_OPT_DEFAULTS;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetTagsQMScore
+ *
+ *  Return the tags for QMScore.
+ *
+ ****************************************************************************/
+global function qb_GetTagsQMScore []
+    return first tr QMSCORE_OPT_DEFAULTS;
+endfunction
+
+/****************************************************************************
+ *
+ *                          qb_InitCorePanel
+ *
+ *  Initialize the core panel window.
+ *
+ ****************************************************************************/
+global function qb_InitCorePanel [wkey, status, defaults]
+    status.prevwd = defaults.workdir;
+    WindowSetData [wkey, defaults];
+    WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0],
+        posebox: [sensitive: 0], posedb: [allowBlank: 1],
+        recbox: [sensitive: 0], recdb: [allowBlank: 1],
+        poseschg: [sensitive: 0]]];
+    status = UpdateCharge [wkey, status];
+
+    return status;
+endfunction
+
+/****************************************************************************
+ *                          qb_LoadNMRScoreDB
+ *
+ ****************************************************************************/
+global function qb_LoadNMRScoreDB [dbpath]
+
+    local dbkey = db_Open [dbpath, 'read'];
+    local type = db_GetEnv [dbkey, DBTYPE];
+    if neL [type, NMRSCORE] then
+        db_Close dbkey;
+        return [[], [], [], [], [], twrite ['{}\nis not a NMRScore Database.',
+            dbpath]];
+    endif
+
+    local [cutrec, lig, status, opts, complex] = qb_GetEnv [dbkey];
+
+    if not MOE_BATCH then
+      dbv_Open db_Filename dbkey;
+    endif
+
+    db_Close dbkey;
+
+    return [cutrec, lig, status, opts, complex, []];
+
+endfunction
+
+/****************************************************************************
+ *                          qb_LoadQMScoreDB
+ *
+ ****************************************************************************/
+global function qb_LoadQMScoreDB [dbpath]
+
+    local dbkey = db_Open [dbpath, 'read'];
+    local type = db_GetEnv [dbkey, DBTYPE];
+    if neL [type, QMSCORE] then
+        db_Close dbkey;
+        return [[], [], [], [], twrite ['{}\nis not a QMScore Database.',
+            dbpath]];
+    endif
+
+    local [rec, lig, status, opts, c] = qb_GetEnv [dbkey];
+
+    if not MOE_BATCH then
+      dbv_Open db_Filename dbkey;
+    endif
+
+    db_Close dbkey;
+
+    return [rec, lig, status, opts, []];
+endfunction
+
+/****************************************************************************
+ *                          qb_MergeDB
+ *
+ *  Perform a naive merge of the two databases (that is, assume the first
+ *  row of data in srcname1 corresponds to the first row of data srcname2,
+ *  etc.).  Only the fields are merged, the environment is ignored.
+ *
+ ****************************************************************************/
+global function qb_MergeDB [srcname1, srcname2, dstname]
+
+    local dstkey = db_Open [dstname, 'create'];
+    local srckey1 = db_Open [srcname1, 'read'];
+    local srckey2 = db_Open [srcname2, 'read'];
+    local [fields1, ftypes1] = db_Fields srckey1;
+    local [fields2, ftypes2] = db_Fields srckey2;
+
+    apt db_EnsureField [dstkey,  fields1, ftypes1];
+    apt db_EnsureField [dstkey,  fields2, ftypes2];
+
+    local rowkey1 = 0, rowkey2 = 0;
+    while (rowkey1 = db_NextEntry [srckey1, rowkey1])
+        and (rowkey2 = db_NextEntry [srckey2, rowkey2]) loop
+        local rowdata1 = db_Read [srckey1, rowkey1];
+        local rowdata2 = db_Read [srckey2, rowkey2];
+        db_Write [dstkey, 0, cat [rowdata1, rowdata2]];
+    endloop
+
+    db_Close dstkey;
+    db_Close srckey1;
+    db_Close srckey2;
+endfunction
+
+/****************************************************************************
+ *                          qb_SaveDivconStatus
+ *
+ *  Save the error/status message for the given row.
+ *
+ ****************************************************************************/
+global function qb_SaveDivconStatus [dbkey, rowkey, message]
+
+    local [status] = db_ReadFields [dbkey, rowkey, [STATUS_FIELD]];
+    message = cat [status, message];
+    local fielddata = tag [STATUS_FIELD, [message]];
+    db_Write [dbkey, rowkey, fielddata];
+
+endfunction
+
+/****************************************************************************
+ *                          qb_SaveNMRScore
+ *
+ *  Save just the score data in the NMRScore database.
+ *
+ ****************************************************************************/
+global function qb_SaveNMRScore [mdbkey, rowkey, scoredata, atomdata]
+    scoredata = cat [tag [NMR_NUM_FIELDS, scoredata], atomdata];
+    db_Write [mdbkey, rowkey, scoredata];
+
+endfunction
+
+/****************************************************************************
+ *                          qb_SaveQMScore
+ *
+ *  Save just the score data in the QMScore database.
+ *
+ ****************************************************************************/
+global function qb_SaveQMScore [mdbkey, rowkey, scoredata]
+
+    if alltrue (QMS_DATA_TAGS === app first scoredata) then
+        db_Write [mdbkey, rowkey, tag [QMS_NUM_FIELDS, 
+            dropfirst app second scoredata]];
+    endif
+
+endfunction
+
+/****************************************************************************
+ *                          qb_SetUpScoreDB
+ *
+ *  Create the output database for storing Score results and ensure that
+ *  the required fields are present.  Store the molecules and run options 
+ *  in the DB environment.
+ *
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
+ *
+ ****************************************************************************/
+global function qb_SetUpScoreDB [status, opts, complex, fields, dbtype]
+
+    local dbkey = db_Open [opts.scoredb, 'create'];
+    SetScoreFields [dbkey, opts.mode === 'Many-to-Many', fields, dbtype];
+
+    if opts.mode === 'One-to-One' or opts.mode === 'One-to-Many' then
+        local [recset, ligand, errmess] = AtomsToMols [];
+        if recset === [] or ligand === [] then
+            Warning [errmess];
+            exit [];
+        endif
+
+        SaveEnv [dbkey, recset, ligand, status, opts, complex, dbtype];
+    else
+        SaveEnv [dbkey, [], [], status, opts, complex, dbtype];
+    endif
+
+    if opts.mode === 'One-to-One' then
+        local posedata = tag [qb_GetPoseFields [], [ligand, opts.ligchg]];
+        local stsmess = GetStatusMessage ['Receptor', 
+            eqL [opts.recchg, status.moerecchg],
+            neL [status.recchg, 4], status.adjrecchg];
+        stsmess = cat [stsmess, GetStatusMessage ['Ligand',
+            eqL [opts.ligchg, status.moeligchg],
+            neL [status.ligchg, 4], status.adjligchg]];
+        posedata = cat [posedata, tag [[STATUS_FIELD], [stsmess]]];
+        db_Write [dbkey, 0, posedata];
+
+    else
+        local posekey = db_Open [opts.posedb, 'read'];
+        if dbkey === posekey then
+            Warning twrite ['{} and {}\n are the same database', 
+                opts.scoredb, opts.posedb];
+            exit [];
+        endif
+
+        if opts.mode === 'One-to-Many' then
+            local pmess = CopyPoseDB [dbkey, posekey];
+            if neL [pmess, ''] then
+                db_Close posekey;
+                db_Close dbkey;
+                Warning pmess;
+                exit [];
+            endif
+        else
+            local reckey = db_Open [opts.recdb, 'read'];
+            if dbkey === reckey then
+                Warning twrite ['{} and {}\n are the same database', 
+                    opts.scoredb, opts.recdb];
+                exit [];
+            endif
+
+            local rmess = CopyRecPoseDB [dbkey, reckey, posekey];
+            if neL [rmess, ''] then
+                db_Close reckey;
+                db_Close posekey;
+                db_Close dbkey;
+                Warning rmess;
+                exit [];
+            endif
+
+            db_Close reckey;
+        endif
+
+        db_Close posekey;
+    endif
+
+    return dbkey;
+endfunction
+
+/****************************************************************************
+ *
+ *                          qb_UpdateCorePanel
+ *
+ *  Initialize the core panel window.
+ *
+ ****************************************************************************/
+global function qb_UpdateCorePanel [wkey, status, options]
+
+    WindowSetData [wkey, options];
+    status = CheckCharge [wkey, status, options.recchg, options.ligchg];
+    UpdateMode [wkey, options.mode, status];
+    status.prevwd = UpdateCWD [wkey, options.cwd, options.workdir, 
+        options.workdir];
+
+    return status;
+endfunction
+
+/****************************************************************************
+ *                          qb_VerifyCharges
+ *
+ *  Verify with the user that the current charges should be used even if
+ *  they are problematic for Divcon.
+ *
+ *  Assumption:  called from MOE gui, not moebatch.
+ *
+ *
+ ****************************************************************************/
+global function qb_VerifyCharges [wkey, status, vals]
+
+    if vals.mode === 'Many-to-Many' then
+        status.verifychg = 1;
+        return status;
+    endif
+
+    status = CheckCharge [wkey, status, vals.recchg, vals.ligchg];
+    if status.ligchg === 4 or status.recchg === 4 then
+        local which;
+        if status.ligchg === 4 and status.recchg === 4 then
+            which = 'receptor and ligand';
+        elseif status.ligchg === 4 then
+            which = 'ligand';
+        else
+            which = 'receptor';
+        endif
+        local ynmess = twrite [
+            'Divcon is going to have problems\n'
+            'with the {}.  Continue anyway?', which];
+        if YesNo ynmess then
+            status.verifychg = 1;
+            return status;
+        else
+            status.verifychg = 0;
+            return status;
+        endif
+    else
+        status.verifychg = 1;
+        return status;
+    endif
+endfunction
