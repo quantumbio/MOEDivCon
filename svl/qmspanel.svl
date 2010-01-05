@@ -2,7 +2,7 @@
 #if 0
  // BEGIN COPYRIGHT
  /***********************************************************************
-    Copyright (c) 1998-2009 QuantumBio Inc. and/or its affiliates.
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
 	
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
@@ -26,7 +26,7 @@
 
 #set title   'QuantumBio QMScore Panel'
 #set class   'QuantumBio'
-#set version '2009.01'
+#set version '2010.01'
 #set main    'qb_QMScoreSetupPanel'
 
 
@@ -101,7 +101,7 @@ local function CheckCharge [wkey, status, recchg, ligchg]
     endif
 
     if ligok then
-        if ligchg === status.moeligchg then
+        if status.calcchg and ligchg === status.moeligchg then
             if status.adjligchg then
                 status.ligchg = 3;
             else
@@ -115,7 +115,7 @@ local function CheckCharge [wkey, status, recchg, ligchg]
     endif
 
     if recok then
-        if recchg === status.moerecchg then
+        if status.calcchg and recchg === status.moerecchg then
             if status.adjrecchg then
                status.recchg = 3;
             else
@@ -187,7 +187,8 @@ local function RunCalc [dbkey]
         endif
     else
         qb_SaveQMScore [dbkey, rowkey, results];
-        qb_SaveDivconStatus [dbkey, rowkey, "Success"];
+        errmess = cat [ "Success\n", errmess];
+        qb_SaveDivconStatus [dbkey, rowkey, errmess];
     endif
 
     Message [msgkey, 'QMScore is done.'];
