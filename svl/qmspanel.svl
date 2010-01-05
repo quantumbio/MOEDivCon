@@ -26,42 +26,30 @@
 
 #set title   'QuantumBio QMScore Panel'
 #set class   'QuantumBio'
-#set version '2010.01'
+#set version '2010.02'
 #set main    'qb_QMScoreSetupPanel'
 
 
-function qb_AtomsToMols;
-function qb_CalcCharge;
-function qb_CheckCharge;
-function qb_CopyPoseDB;
-function qb_CopyRecPoseDB;
-function qb_DrawChgStatus;
+function qb_CoreHandler;
+function qb_GetCorePanel;
 function qb_GetDefaultsQMScore;
 function qb_GetDefaultsStatus;
-function qb_GetStatusField;
-function qb_GetStatusMessage;
 function qb_GetEnv;
-function qb_GetPoseFields;
 function qb_GetTagsQMScore;
+function qb_InitCorePanel;
 function qb_LoadQMScoreDB;
 function qb_SaveQMScore;
 function qb_SaveDivconStatus;
-function qb_SaveEnv;
-function qb_SetQMScoreFields;
+function qb_SetUpScoreDB;
+function qb_UpdateCorePanel;
+function qb_VerifyCharges;
 
 function qb_QMScore;
 function qb_QMScoreBatch;
 
 /*  NOTE:  If you change the Option lists here, you need to update the
- *         Defaults in qbutil.svl and the Keys in qmsinterface.svl.
+ *         Defaults in qbcore.svl and the Keys in qmsinterface.svl.
  */
-
-const RUN_MODES =
-    [
-    'One-to-One',
-    'One-to-Many',
-    'Many-to-Many'
-    ];
 
 const HAMILTONIANS =
     [
@@ -81,76 +69,92 @@ const LIG_OPTS =
     ];
 
 
+
+const HEADER = 
+    [
+    name: 'panel', 
+    title: 'QMScore',
+    windowName: 'QMScorePanel',
+    text: ['Run', 'Save', 'Load', 'Cancel'],
+    onTrigger: ['validate', 'validate', 'return', 'return'],
+    bubbleHelp: ['Execute QMScore from MOE Window.',
+        'Save run parameters in database\n'
+        'for later execution on cluster.', 
+        'Load run parameters from a QMScore database.', 
+        '']
+    ];
+
+const PANEL =
+    [
+    Vbox :
+        [
+        Hbox :
+            [
+            extendH: 1,
+            Option :
+                [
+                name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
+                type: 'int', minWidth: 11,
+                bubbleHelp:
+                    ''
+                ]
+            ],
+        Hbox :
+                [
+            Checkbox :
+                [
+                name: 'standard', title: 'Calculation:', text: 'Standard',
+                bubbleHelp:
+                    'Standard closed-shell calculation\n'
+                    '(no divide and conquer).'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 1, margin:1
+                ],
+            Text :
+                [
+                name: 'shift', title: 'Shift:', len: 15, extendH: 1, 
+                type: 'real', allowBlank: 0,
+                shortcut: ['0.0', '2.0', '4.0', '8.0', '16.0'],
+                bubbleHelp:
+                    'Initial dynamic level shift (eV).'
+                ]
+            ],
+        Hbox :
+            [
+            extendH: 1,
+            Option :
+                [
+                name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
+                type: 'int', minWidth: 5, extendH: 1,
+                bubbleHelp:
+                    'A QM-based ligand optimization can be performed\n'
+                    'prior to scoring. This optimization may occur\n'
+                    'either while the ligand is docked within the target\n'
+                    'or while the ligand is separate from the target.\n'
+                    'Warning: this optional step will significantly\n'
+                    'increase the CPU cost of the calculation.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 1, margin:1
+                ],
+            Checkbox :
+                [
+                name: 'freq', text: 'Frequency',
+                bubbleHelp:
+                    'Perform frequency calculation to determine ligand\n'
+                    'entropy in score function.  Warning: may increase\n'
+                    'CPU cost of the calculation.'
+                ]
+            ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1]
+    ];
+
 //  Local Functions
-
-
-function SetChargeStatus;
-
-/****************************************************************************
- *                          CheckCharge
- *
- *  Check user-defined charges for even number of electrons.
- *
- ****************************************************************************/
-local function CheckCharge [wkey, status, recchg, ligchg]
-    local [recok, ligok, errmess] = qb_CheckCharge [recchg, ligchg];
-    if recok === [] or ligok === [] then
-        Warning errmess;  //DEBUG
-        SetChargeStatus [wkey, status];
-        return status;
-    endif
-
-    if ligok then
-        if status.calcchg and ligchg === status.moeligchg then
-            if status.adjligchg then
-                status.ligchg = 3;
-            else
-                status.ligchg = 2;
-            endif
-        else
-            status.ligchg = 1;
-        endif
-    else
-        status.ligchg = 4;
-    endif
-
-    if recok then
-        if status.calcchg and recchg === status.moerecchg then
-            if status.adjrecchg then
-               status.recchg = 3;
-            else
-               status.recchg = 2;
-           endif
-        else
-          status.recchg = 1;
-        endif
-
-    else
-        status.recchg = 4;
-    endif
-
-    SetChargeStatus [wkey, status];
-    return status;
-endfunction
-
-/****************************************************************************
- *                          ClearChargeStatus
- *
- *  Clear charge status.
- *
- ****************************************************************************/
-local function ClearChargeStatus [wkey]
-
-    local ligkey = qb_DrawChgStatus [1];
-    local reckey = qb_DrawChgStatus [1];
-
-    WindowSetAttr [wkey, [ligflg: [graphics: ligkey],
-        recflg: [graphics: reckey]]];
-    
-    gr_destroy ligkey;
-    gr_destroy reckey;
-
-endfunction
 
 /****************************************************************************
  *                          RunCalc
@@ -196,186 +200,6 @@ local function RunCalc [dbkey]
     return;
 endfunction
 
-/****************************************************************************
- *                          SetChargeStatus
- *
- *  Set charge status label.
- *
- ****************************************************************************/
-local function SetChargeStatus [wkey, status]
-
-    local ligkey = qb_DrawChgStatus [status.ligchg];
-    local reckey = qb_DrawChgStatus [status.recchg];
-
-    WindowSetAttr [wkey, [ligflg: [graphics: ligkey],
-        recflg: [graphics: reckey]]];
-    
-    gr_destroy ligkey;
-    gr_destroy reckey;
-
-endfunction
-
-/****************************************************************************
- *                          SetUpDB
- *
- *  Create the output database for storing QMScore results and ensure that
- *  the required fields are present.  Store the molecules and run options 
- *  in the DB environment.
- *
- *  Note:  it is assumed that this function is called from a child process
- *  and will exit on an error.
- *
- ****************************************************************************/
-local function SetUpDB [status, opts]
-
-    local qmskey = db_Open [opts.scoredb, 'create'];
-    qb_SetQMScoreFields [qmskey, opts.mode === 'Many-to-Many'];
-
-    if opts.mode === 'One-to-One' or opts.mode === 'One-to-Many' then
-        local [recset, ligand, errmess] = qb_AtomsToMols [];
-        if recset === [] or ligand === [] then
-            Warning [errmess];
-            exit [];
-        endif
-
-        qb_SaveEnv [qmskey, recset, ligand, status, opts, [], 'qmscore'];
-    else
-        qb_SaveEnv [qmskey, [], [], status, opts, [], 'qmscore'];
-    endif
-
-    if opts.mode === 'One-to-One' then
-        local posedata = tag [qb_GetPoseFields [], [ligand, opts.ligchg]];
-        local stsmess = qb_GetStatusMessage ['Receptor', 
-            eqL [opts.recchg, status.moerecchg],
-            neL [status.recchg, 4], status.adjrecchg];
-        stsmess = cat [stsmess, qb_GetStatusMessage ['Ligand',
-            eqL [opts.ligchg, status.moeligchg],
-            neL [status.ligchg, 4], status.adjligchg]];
-        posedata = cat [posedata, tag [[qb_GetStatusField []], [stsmess]]];
-        db_Write [qmskey, 0, posedata];
-
-    else
-        local posekey = db_Open [opts.posedb, 'read'];
-        if qmskey === posekey then
-            Warning twrite ['{} and {}\n are the same database', 
-                opts.scoredb, opts.posedb];
-            exit [];
-        endif
-
-        if opts.mode === 'One-to-Many' then
-            local pmess = qb_CopyPoseDB [qmskey, posekey];
-            if neL [pmess, ''] then
-                db_Close posekey;
-                db_Close qmskey;
-                Warning pmess;
-                exit [];
-            endif
-        else
-            local reckey = db_Open [opts.recdb, 'read'];
-            if qmskey === reckey then
-                Warning twrite ['{} and {}\n are the same database', 
-                    opts.scoredb, opts.recdb];
-                exit [];
-            endif
-
-            local rmess = qb_CopyRecPoseDB [qmskey, reckey, posekey];
-            if neL [rmess, ''] then
-                db_Close reckey;
-                db_Close posekey;
-                db_Close qmskey;
-                Warning rmess;
-                exit [];
-            endif
-
-            db_Close reckey;
-        endif
-
-        db_Close posekey;
-    endif
-
-    return qmskey;
-endfunction
-
-/****************************************************************************
- *                          UpdateCharge
- *
- *  Update the window based on new charge.
- *
- ****************************************************************************/
-local function UpdateCharge [wkey, status]
-
-    local [recchg, recadj, ligchg, ligadj, errmess] = qb_CalcCharge [];
-    if recchg === [] or ligchg === [] then
-        Warning  errmess;
-        SetChargeStatus [wkey, status];
-        return status;
-    endif
-
-    status.calcchg = 1;
-    status.moerecchg = recchg;
-    status.moeligchg = ligchg;
-    status.adjrecchg = recadj;
-    status.adjligchg = ligadj;
-
-    status.recchg = select [3, 2, recadj];
-    status.ligchg = select [3, 2, ligadj];
-
-    WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
-    SetChargeStatus [wkey, status];
-
-    return status;
-endfunction
-
-
-/****************************************************************************
- *                          UpdateCWD
- *
- *  Update the window based on new CWD value.
- *
- ****************************************************************************/
-local function UpdateCWD [wkey, cwd, wd, prev]
-    if cwd === 1 then
-        WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
-        WindowSetData [wkey, [workdir: '']];
-        return wd;
-    else
-        WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0]]];
-        WindowSetData [wkey, [workdir: prev]];
-        return prev;
-    endif
-endfunction
-
-/****************************************************************************
- *                          UpdateMode
- *
- *  Update the window based on new mode value.
- *
- ****************************************************************************/
-local function UpdateMode [wkey, mode, status]
-    if mode === 'One-to-One' then
-        WindowSetAttr [wkey, [posebox: [sensitive: 0],
-            posedb: [allowBlank: 1], recbox: [sensitive: 0], 
-            recdb: [allowBlank: 1], panel:[sensitive: [1,1,1,1]],
-            chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
-            recchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
-        SetChargeStatus [wkey, status];
-    elseif mode === 'One-to-Many' then
-        WindowSetAttr [wkey, [posebox: [sensitive: 1],
-            posedb: [allowBlank: 0],recbox: [sensitive: 0], 
-            recdb: [allowBlank: 1], panel:[sensitive: [0,1,1,1]],
-            chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
-            recchg: [allowBlank: 0], poseschg: [sensitive: 1]]];
-        SetChargeStatus [wkey, status];
-    elseif mode === 'Many-to-Many' then
-        WindowSetAttr [wkey, [posebox: [sensitive: 1],
-            posedb: [allowBlank: 0], recbox: [sensitive: 1], 
-            recdb: [allowBlank: 0], panel:[sensitive: [0,1,1,1]],
-            chgbox: [sensitive: 0], ligchg: [allowBlank: 1],
-            recchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
-        ClearChargeStatus [wkey];
-    endif
-endfunction
-
 //  Global Functions
 
 /****************************************************************************
@@ -386,345 +210,24 @@ endfunction
 global function qb_QMScoreSetupPanel []
 
     static status;                     //  Shared with child tasks.
-    local wkey, vals, trig;
-
-        //  Nested Functions
-        local function VerifyCharges []
-            if vals.mode === 'Many-to-Many' then
-                return 1;
-            endif
-
-            status = CheckCharge [wkey, status, vals.recchg, vals.ligchg];
-            if status.ligchg === 4 or status.recchg === 4 then
-                local which;
-                if status.ligchg === 4 and status.recchg === 4 then
-                    which = 'receptor and ligand';
-                elseif status.ligchg === 4 then
-                    which = 'ligand';
-                else
-                    which = 'receptor';
-                endif
-                local ynmess = twrite [
-                    'Divcon is going to have problems\n'
-                    'with the {}.  Continue anyway?', which];
-                if YesNo ynmess then
-                    return 1;
-                else
-                    return 0;
-                endif
-            else
-                return 1;
-            endif
-        endfunction
-
 
     if MOE_BATCH then return; endif
     if WindowShow ['QMScorePanel', 1] then return; endif
 
-    wkey = WindowCreate
-        [
-        name: 'panel', 
-        title: 'QMScore',
-        windowName: 'QMScorePanel',
-        text: ['Run', 'Save', 'Load', 'Cancel'],
-        onTrigger: ['validate', 'validate', 'return', 'return'],
-        bubbleHelp: ['Execute QMScore from MOE Window.',
-            'Save run parameters in database\n'
-            'for later execution on cluster.', 
-            'Load run parameters from a NMRScore database.', 
-            ''],
-
-        Hbox :
-            [
-            extendH: 1,
-            FSBText :
-                [
-                name: 'scoredb', len: 40, extendH: 1, title: 'Output DB:',
-                mode: 'saveAs', allowBlank: 0,
-                bubbleHelp:
-                    'The name of the output database that will hold\n'
-                    'the run paramaters and scoring results.'
-                ],
-            Button : [ name: 'browse_scoredb', text: 'Browse...' ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            extendH: 1,
-            Text :
-                [
-                name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
-                type: 'char', allowBlank: 0,
-                shortcut: ['/tmp', '.', '~', '~/tmp', '/scratch'],
-                bubbleHelp:
-                    'The name of the working directory for storing\n'
-                    'QB Divcon intermediate calculations and logs.\n'
-                    'The absolute path to the specified directory\n'
-                    'will be stored and used at execution time.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Checkbox :
-                [
-                name: 'cwd', text: 'CWD', onTrigger: 'return', 
-                bubbleHelp:
-                    'Set the current working directory using\n'
-                    'the run time environment variable $PWD.'
-                ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            Radio :
-                [
-                name: 'mode', text: RUN_MODES, columns: 3, minWidth: 12, 
-                extendH: 1, onTrigger: 'return', title: 'Mapping Mode:',
-                type: 'char',
-                bubbleHelp:
-                    'The mapping mode of receptors to ligand/poses:\n'
-                    '  One ligand docked into one receptor.\n'
-                    '  Many ligand poses docked into the same receptor.\n'
-                    '  Many ligand poses, each docked into its own receptor.'
-                ]
-            ],
-
-        Hbox :
-            [
-            name: 'posebox', extendH: 1,
-            FSBText :
-                [
-                name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
-                mode: 'open', allowBlank: 0,
-                bubbleHelp:
-                    'The name of the input database that holds\n'
-                    'the ligand poses (and possibly scores).'
-                ],
-            Button : [ name: 'browse_posedb', text: 'Browse...' ]
-            ],
-
-        Hbox :
-            [
-            name: 'recbox', extendH: 1,
-            FSBText :
-                [
-                name: 'recdb', len: 40, extendH: 1, title: 'Receptor DB:',
-                mode: 'open', allowBlank: 0,
-                bubbleHelp:
-                    'The name of the input database that holds\n'
-                    'the receptors.'
-                ],
-            Button : [ name: 'browse_recdb', text: 'Browse...' ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            extendH: 1, name: 'chgbox', title: 'Charges:',
-            Button : [ name: 'calcchg', text: 'Calculate' ],
-            Vbox :
-                [
-                Hbox :
-                    [
-                    extendH: 1,
-                    Label :
-                        [
-                        name: 'recflg', title: 'Receptor:',
-                         bubbleHelp:
-                            'Problems with the total charge of receptor?\n'
-                            '   White:   uncalculated or user-entered charge.\n'
-                            '   Green:   charge calculated by MOE.\n'
-                            '   Yellow:  MOE\'s charge was adjusted.\n'
-                            '   Red:      Divcon will fail.'
-                       ],
-                    Text :
-                        [
-                        name: 'recchg', allowBlank: 0,
-                        type: 'int', minWidth: 4,
-                        onTrigger: 'validate',
-                        bubbleHelp:
-                            'Total charge of receptor.'
-                        ]
-                    ],
-                Hbox :
-                    [
-                    extendH: 1,
-                    Label :
-                        [
-                        name: 'ligflg', title: 'Ligand:',
-                         bubbleHelp:
-                            'Problems with the total charge of ligand?\n'
-                            '   White:   uncalculated or user-entered charge.\n'
-                            '   Green:   charge calculated by MOE.\n'
-                            '   Yellow:  MOE\'s charge was adjusted.\n'
-                            '   Red:      Divcon will fail.'
-
-                       ],
-                    Text :
-                        [
-                        name: 'ligchg', allowBlank: 0,
-                        type: 'int', minWidth: 4, extendH: 1,
-                        onTrigger: 'validate',
-                        bubbleHelp:
-                            'Total charge of ligand.'
-                        ],
-                    Checkbox :
-                        [
-                        name: 'poseschg', text: 'All Poses',
-                        bubbleHelp:
-                            'Use the ligand charge for all\n'
-                            'poses in the poses database.'
-                        ]
-                    ]
-                ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Vbox :
-            [
-            Hbox :
-                [
-                extendH: 1,
-                Option :
-                    [
-                    name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
-                    type: 'int', minWidth: 11,
-                    bubbleHelp:
-                        ''
-                    ]
-                ],
-            Hbox :
-                 [
-                Checkbox :
-                    [
-                    name: 'standard', title: 'Calculation:', text: 'Standard',
-                    bubbleHelp:
-                        'Standard closed-shell calculation\n'
-                        '(no divide and conquer).'
-                    ],
-                Separator : 
-                    [
-                    vertical:0, shadow:'noline', extendH: 1, margin:1
-                    ],
-                Text :
-                    [
-                    name: 'shift', title: 'Shift:', len: 15, extendH: 1, 
-                    type: 'real', allowBlank: 0,
-                    shortcut: ['0.0', '2.0', '4.0', '8.0', '16.0'],
-                    bubbleHelp:
-                        'Initial dynamic level shift (eV).'
-                    ]
-                ],
-            Hbox :
-                [
-                extendH: 1,
-                Option :
-                    [
-                    name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
-                    type: 'int', minWidth: 5, extendH: 1,
-                    bubbleHelp:
-                        'A QM-based ligand optimization can be performed\n'
-                        'prior to scoring. This optimization may occur\n'
-                        'either while the ligand is docked within the target\n'
-                        'or while the ligand is separate from the target.\n'
-                        'Warning: this optional step will significantly\n'
-                        'increase the CPU cost of the calculation.'
-                    ],
-                Separator : 
-                    [
-                    vertical:0, shadow:'noline', extendH: 1, margin:1
-                    ],
-                Checkbox :
-                    [
-                    name: 'freq', text: 'Frequency',
-                    bubbleHelp:
-                        'Perform frequency calculation to determine ligand\n'
-                        'entropy in score function.  Warning: may increase\n'
-                        'CPU cost of the calculation.'
-                    ]
-                ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1]
-        ];
-
-    local btid, browsetasks = [];
+    local vals, trig;
+    local options = [], browsetasks = [];
     local qmskey = 0;
-    local defaults = qb_GetDefaultsQMScore [];
-    local prevwd = defaults.workdir;
-    local options = [];
     status = qb_GetDefaultsStatus [];
+    local defaults = qb_GetDefaultsQMScore [];
 
-    WindowSetData [wkey, dropfirst defaults];
-    WindowSetAttr [wkey, [freq: [sensitive: 1],
-        workdir: [sensitive: 1, allowBlank: 0],
-        posebox: [sensitive: 0], posedb: [allowBlank: 1],
-        recbox: [sensitive: 0], recdb: [allowBlank: 1],
-        poseschg: [sensitive: 0]]];
-    status = UpdateCharge [wkey, status];
+    local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
+    status = qb_InitCorePanel [wkey, status, dropfirst defaults];
     WindowShow [wkey, 1];
 
     loop
         [vals, trig] = WindowWait wkey;
 
-        if trig === 'mode' then
-            UpdateMode [wkey, vals.mode, status];
-
-        elseif trig === 'cwd' then
-            prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir, prevwd];
-
-        elseif trig === 'calcchg' then
-            if second task_fork [master: 'parent',
-                    statics:'share'] === 'child' then
-                task_prio 0;
-
-                status = UpdateCharge [wkey, status];
-                exit [];
-            endif
-
-        elseif trig === 'ligchg' then
-            if second task_fork [master: 'parent',
-                    statics:'share'] === 'child' then
-                task_prio 0;
-
-                status = CheckCharge [wkey, status, vals.recchg,
-                    vals.ligchg];
-                exit [];
-            endif
-
-        elseif trig === 'recchg' then
-            if second task_fork [master: 'parent', 
-                    statics:'share'] === 'child' then
-                task_prio 0;
-
-                status = CheckCharge [wkey, status, vals.recchg,
-                    vals.ligchg];
-                exit [];
-            endif
-
-        elseif trig === 'browse_scoredb' then
-            btid = run ['fbrowse.svl', [trig, wkey, 'Select QMScore DB File', 
-                'none', '*.mdb', 'scoredb']];
-            if btid then browsetasks = append [browsetasks, btid]; endif
-
-        elseif trig === 'browse_posedb' then
-            btid = run ['fbrowse.svl', [trig, wkey, 'Select Pose DB File', 
-                'open', '*.mdb', 'posedb']];
-            if btid then browsetasks = append [browsetasks, btid]; endif
-
-        elseif trig === 'browse_recdb' then
-            btid = run ['fbrowse.svl', [trig, wkey, 'Select Receptor DB File', 
-                'open', '*.mdb', 'recdb']];
-            if btid then browsetasks = append [browsetasks, btid]; endif
-
-       elseif trig === 'panel' then
+       if trig === 'panel' then
             if vals.panel === 'Cancel' then 
                 break;
 
@@ -756,21 +259,17 @@ global function qb_QMScoreSetupPanel []
 
                         /*  Drop the task tagged value.  */
                         ldopts = dropfirst ldopts;
-                        WindowSetData [wkey, ldopts];
 
-                        status = CheckCharge [wkey, ldsts, ldopts.recchg,
-                            ldopts.ligchg];
-                        UpdateMode [wkey, ldopts.mode, status];
-                        prevwd = UpdateCWD [wkey, ldopts.cwd, ldopts.workdir, 
-                            ldopts.workdir];
-
+                        status = qb_UpdateCorePanel [wkey, ldsts, ldopts];
+//                        WindowSetData [wkey, ldopts];  //DEBUG SPLIT
                     endif
 
                     exit [];
                 endif
 
             elseif vals.panel === 'Run' then
-                if not VerifyCharges [] then continue; endif
+                status = qb_VerifyCharges [wkey, status, vals];
+                if not status.verifychg then continue; endif
 
                 if second task_fork [statics:'share',
                         prio:3, idle:0] === 'child' then
@@ -785,7 +284,8 @@ global function qb_QMScoreSetupPanel []
                         vals.ligchg, vals.recchg, vals.poseschg,
                         vals.ham, vals.standard, vals.freq, vals.opt,
                         vals.shift]];
-                    qmskey = SetUpDB [status, options];
+                    qmskey = qb_SetUpScoreDB [status, options, [], [],
+                        'qmscore'];
                     RunCalc [qmskey];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
@@ -795,7 +295,8 @@ global function qb_QMScoreSetupPanel []
                 endif
 
             elseif vals.panel === 'Save' then
-                if not VerifyCharges [] then continue; endif
+                status = qb_VerifyCharges [wkey, status, vals];
+                if not status.verifychg then continue; endif
 
                 if second task_fork [] === 'child' then
                     task_prio 0;
@@ -811,7 +312,8 @@ global function qb_QMScoreSetupPanel []
                         vals.ligchg, vals.recchg, vals.poseschg,
                         vals.ham, vals.standard, vals.freq, vals.opt,
                         vals.shift]];
-                    qmskey = SetUpDB [status, options];
+                    qmskey = qb_SetUpScoreDB [status, options, [], [],
+                        'qmscore'];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
                     exit [];
@@ -819,6 +321,9 @@ global function qb_QMScoreSetupPanel []
                     break;
                 endif
             endif
+        else
+           [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
+               browsetasks];
         endif
     endloop
 

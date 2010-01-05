@@ -24,7 +24,7 @@
 
 #set title   'QuantumBio QMScore Interface'
 #set class   'QuantumBio'
-#set version '2010.01'
+#set version '2010.02'
 #set main 'qb_QMScore'
 
 /*  NOTE:  If you change the Key lists here, you need to update the
