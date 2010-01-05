@@ -2,7 +2,7 @@
 #if 0
  // BEGIN COPYRIGHT
  /***********************************************************************
-    Copyright (c) 1998-2009 QuantumBio Inc. and/or its affiliates.
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
 
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
@@ -24,7 +24,7 @@
 
 #set title   'QuantumBio QMScore Interface'
 #set class   'QuantumBio'
-#set version '2009.01'
+#set version '2010.01'
 #set main 'qb_QMScore'
 
 /*  NOTE:  If you change the Key lists here, you need to update the
@@ -50,15 +50,16 @@ const LIG_KEYS =
 
 global function qb_QMScore [receptor_mols, ligand_mol, opts]
 
-local errmess = [];
-local subdirname;
+local errmess = "";
+local subdirname, delsubdir = 0;
 if opts.task === [] or opts.task === 0 then
     subdirname = opts.workdir;
 else
+    delsubdir = 1;
     subdirname = twrite ['{}/qb_out{n:}', opts.workdir, opts.task];
     local okay = _fmkdir subdirname;
     if okay === -1 then
-        errmess = swrite ['Unable to create subdirectory:  {}',
+        errmess = swrite ['Unable to create subdirectory:  {}\n',
             subdirname];
         return [[], errmess];
     endif
@@ -141,7 +142,7 @@ endloop
 
 const NUMRESULTS = 11;
 local results, return_statement;
-local sleep_time = 0.0;
+local sleep_time = -1;
 while exe_status process_key loop
     if not MOE_BATCH then
         sleep sleep_time;
@@ -168,7 +169,7 @@ while exe_status process_key loop
     elseif return_statement === "QBException" then
         [[return_statement]] = fread [stdout, '{c:*}'];
         while neL [return_statement, "Divcon done."] loop
-            errmess = cat [errmess, return_statement];
+            errmess = cat [errmess, return_statement, "\n"];
             [[return_statement]] = fread [stdout, '{c:*}'];
         endloop;
         fwrite [stdin, '{c:}\n', 'Ok'];
@@ -180,18 +181,29 @@ exe_kill  process_key;
 exe_close process_keys;
 
 //  Clean up working directory.
-local templist = flist [subdirname, 'MOE_AM1_*.dmx*'];
-templist = cat [templist, flist [subdirname, 'MOE_AM1_*.out']];
+if success === 1 then
+    local templist = flist [subdirname, 'MOE_*.dmx*'];
+    templist = cat [templist, flist [subdirname, 'MOE_*.row*']];
+    templist = cat [templist, flist [subdirname, 'MOE_*.rst*']];
+    templist = cat [templist, flist [subdirname, 'MOE_*.out']];
+    templist = cat [templist, flist [subdirname, 'divcon.log']];
+    templist = cat [templist, flist [subdirname, 'mtkpp.log']];
+    templist = cat [templist, flist [subdirname, 'divcon.hss']];
+    templist = cat [templist, flist [subdirname, 'fort.8']];
+    if delsubdir then
+        templist = cat [templist, subdirname];
+    endif
 
-local fname = twrite ['{}/fort.8', subdirname];
-if ftype fname === 'file' then
-    templist = cat [templist, fname];
+    local delerr = app _fdelete templist;
+    if anytrue delerr then
+        local errfiles = templist | neE [delerr, 0];
+        errmess = cat [errmess, swrite ['Unable to delete files: {v}\n',
+            errfiles]];
+    endif
 endif
 
-//fdelete templist;//DEBUG
-
 if success === 1 then
-    return [results, []];
+    return [results, errmess];
 else
     return [[], errmess];
 endif

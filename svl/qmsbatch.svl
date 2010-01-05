@@ -2,7 +2,7 @@
 #if 0
  // BEGIN COPYRIGHT
  /***********************************************************************
-    Copyright (c) 1998-2009 QuantumBio Inc. and/or its affiliates.
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
 
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
@@ -26,7 +26,7 @@
 
 #set title   'QuantumBio QMScore Batch'
 #set class   'QuantumBio'
-#set version '2009.01'
+#set version '2010.01'
 #set main    'qb_QMScoreBatch'
 
 function qb_GetPoseFields;
@@ -81,8 +81,6 @@ global function qb_QMScoreBatch [dbpath]
         options.ligchg = posechg;
         options.recchg = recchg;
 
-write ['Rec chg:  {}    Lig chg:  {}\n', options.recchg, options.ligchg];//DEBUG
-
         local [[results, errmess], code, seqno, indkey] = mpu_batch [
             select ['', 'call', rowkey === 0],
             'qb_QMScore', [recmols, posemol, options], [rowkey, tid]];
@@ -105,7 +103,8 @@ write ['Rec chg:  {}    Lig chg:  {}\n', options.recchg, options.ligchg];//DEBUG
                 write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
             else
                 qb_SaveQMScore [dbkey, indkey(1), results];
-                qb_SaveDivconStatus [dbkey, indkey(1), "Success"];
+                errmess = cat [ "Success\n", errmess];
+                qb_SaveDivconStatus [dbkey, indkey(1), errmess];
             endif
 
         elseif code === 'error' then
