@@ -29,29 +29,38 @@
 #set version '2010.02'
 #set main    'qb_NMRScoreSetupPanel'
 
-
-function qb_AtomsToMols;
-function qb_CalcCharge;
-function qb_CopyPoseDB;
-function qb_CopyRecPoseDB;
+function qb_CoreHandler;
 function qb_CutReceptor;
-function qb_GetDefaultsNMRScore;
+function qb_GetCorePanel;
+function qb_GetDefaultsCore;
+function qb_GetDefaultsStatus;
 function qb_GetEnv;
-function qb_GetPoseFields;
-function qb_GetTagsNMRScore;
+function qb_GetLigandAtomNames;
+function qb_InitCorePanel;
+function qb_LoadScoreDB;
 function qb_SaveNMRScore;
-function qb_SaveStatus;
-function qb_SaveEnv;
-function qb_SetNMRScoreFields;
-function qb_LoadNMRScoreDB;
+function qb_SaveDivconStatus;
+function qb_SetUpScoreDB;
+function qb_TagCoreVals;
+function qb_UpdateCorePanel;
+function qb_VerifyCharges;
 
 function qb_NMRScore;
 function qb_NMRScoreBatch;
 
 
 /*  NOTE:  If you change the Option lists here, you need to update the
- *         Defaults in qbutil.svl and the Keys in nmrinterface.svl.
+ *         Keys in nmrinterface.svl.
  */
+
+const NMRSCORE_OPT_DEFAULTS =
+    [
+    ['guess',        0             ],  // NMRScore defaults start here
+    ['opt',          1             ],
+    ['cut',          0             ],
+    ['radius',       2.5           ]
+    ];
+
 
 const RUN_MODES =
     [
@@ -68,6 +77,112 @@ const GEOM_OPTS =
     'all atoms'
     ];
 
+const HEADER = 
+    [
+    name: 'panel', 
+    title: 'NMRScore',
+    windowName: 'NMRScorePanel',
+    text: ['Run', 'Save', 'Load', 'Cancel'],
+    onTrigger: ['validate', 'validate', 'return', 'return'],
+    bubbleHelp: ['Execute NMRScore from MOE Window.',
+        'Save run parameters in database\n'
+        'for later execution on cluster.', 
+        'Load run parameters from a NMRScore database.', 
+        '']
+    ];
+
+const PANEL =
+    [
+    Hbox :
+        [
+        extendH: 1,
+        Checkbox :
+            [
+            name: 'cut', text: 'Cut Receptor?',
+            onTrigger: 'return',
+            bubbleHelp:
+                'Cut the receptor at the specified radius.'
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+        Text :
+            [
+            name: 'radius', len: 7, extendH: 1, title: 'Radius:',
+            type: 'real', allowBlank: 0,
+            shortcut: ['2.5', '3.0', '3.5', '4.0', '4.5', '5.0'],
+            bubbleHelp: 'Cut radius in angstrums.'
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+        Button :
+            [
+            name: 'showcut', text: 'Show Cut',
+            bubbleHelp: 'Perform cut and show in MOE Window.'
+            ],
+        Button :
+            [
+            name: 'original', text: 'Original',
+            bubbleHelp: 'Revert back to original receptor/ligand complex.'
+            ]
+        ],
+
+    Hbox :
+        [
+        Button :
+            [
+            name: 'experimental', text: 'Enter/Edit Experimental Data', 
+            extendH: 1,
+            bubbleHelp:
+                'Open dialog to enter the data\n'
+                'for the free and bound ligand.'
+            ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
+    Hbox :
+        [
+        extendH: 1,
+        Option :
+            [
+            name: 'opt', title: 'Geometry Optimization:', 
+            text: GEOM_OPTS, type: 'int', minWidth: 11, extendH: 1,
+            bubbleHelp:
+            'Geometry optimization will often improve chances\n'
+            'of convergence:\n'
+            ' * none:  no optimization step is performed.\n'
+            ' * H only:  all proton positions in the complex are\n'
+            '     quantum mechanically optimized.  Heavy atoms\n'
+            '     remain unchanged.\n'
+            ' * H and hetero:  all non-C atom positions in the complex\n'
+            '     are quantum mechanically optimized. NOTE: the ligand\n'
+            '     pose should be considered a new pose.\n'
+            ' * All atoms:  all atom positions in the complex are\n'
+            '     quantum mechanically optimized. NOTE:  the ligand\n'
+            '     pose should be considered a new pose.'
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 1, margin:1
+            ],
+        Checkbox :
+            [
+            name: 'guess', text: 'Guess',
+            bubbleHelp:
+                'Perform Single Point calculation to\n'
+                'initialize density matrix.\n'
+                'Warning: may not always\n'
+                'improve convergence.'
+            ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1]
+    ];
+
 //  Local Functions
 
 /****************************************************************************
@@ -76,30 +191,30 @@ const GEOM_OPTS =
  *  Run the One-to-One scoring from the MOE Window.
  *
  ****************************************************************************/
-function RunCalc [dbkey]
+function RunCalc [dbkey, moeatomnames]
     local msgkey = Message [0, 'NMRScore is running ...'];
     sleep -1;    // Allow parent to close input window.
 
-    local [recset, ligand, options] = qb_GetEnv [dbkey];
+    local [recset, ligand, status, coreopts, appopts, c] = qb_GetEnv [dbkey];
     local workdir;
-    if options.pwd === 1 then
+    if coreopts.pwd === 1 then
         workdir = getenv 'PWD';
     else
-        workdir = fabsname options.workdir;
+        workdir = fabsname coreopts.workdir;
     endif
 
-    options.workdir = workdir;
+    coreopts.workdir = workdir;
     write ['Work Dir:  {}\n', workdir];  //DEBUG
 
-    local [results, errmess] = qb_NMRScore [recset, ligand, options];
+    local [results, errmess] = qb_NMRScore [recset, ligand, coreopts, appopts];
 
     local rowkey = first db_Entries [dbkey];
     if results === [] then
         if errmess === [] or errmess === '' then
-            qb_SaveStatus [dbkey, rowkey, "Error:  Unknown error!"];
+            qb_SaveDivconStatus [dbkey, rowkey, "Error:  Unknown error!"];
             write ['NMRScore Error:  Unknown error!\n'];
         else
-            qb_SaveStatus [dbkey, rowkey, 
+            qb_SaveDivconStatus [dbkey, rowkey, 
                 swrite ['Error:  {}', errmess]];
             write ['NMRScore Error:  {}\n', errmess];
         endif
@@ -107,10 +222,14 @@ function RunCalc [dbkey]
         print results;  //DEBUG
         local atomindices = app first results;
         local atomnames = get [ligand(4)(MOL_ATOM_NAME), atomindices];
-        local cspvalues = app second results;
-        qb_SetNMRScoreFields [dbkey, 0, atomnames];
-        qb_SaveNMRScore [dbkey, rowkey, 9.99, tag [atomnames, cspvalues]];
-        qb_SaveStatus [dbkey, rowkey, "Success"];
+        if not alltrue eqE [atomnames, moeatomnames] then
+            Warning twrite ['Atom names are inconsistent:\nMOE: {v}\n'
+                'Divcon: {v}\n', moeatomnames, atomnames];
+        else
+            local cspvalues = app second results;
+            qb_SaveNMRScore [dbkey, rowkey, 9.99, tag [atomnames, cspvalues]];
+            qb_SaveDivconStatus [dbkey, rowkey, "Success"];
+        endif
     endif
 
     Message [msgkey, 'NMRScore is done.'];
@@ -118,115 +237,17 @@ function RunCalc [dbkey]
     return;
 endfunction
 
-    // ----------------------- embedded functions end -----------------------
-
-/****************************************************************************
- *                          SetUpDB
- *
- *  Create the output database for storing NMRScore results and ensure that
- *  the required fields are present.  Store the molecules and run options 
- *  in the DB environment.
- *
- *  Note:  it is assumed that this function is called from a child process
- *  and will exit on an error.
- *
- ****************************************************************************/
-local function SetUpDB [complex, opts]
-
-    local nmrkey = db_Open [opts.scoredb, 'create'];
-    qb_SetNMRScoreFields [nmrkey, opts.mode === 'Many-to-Many'];
-
-    if opts.mode === 'One-to-One' or opts.mode === 'One-to-Many' then
-        local [recset, ligand, errmess] = qb_AtomsToMols [];
-        if recset === [] or ligand === [] then
-            Warning [errmess];
-            exit [];
-        endif
-
-        qb_SaveEnv [nmrkey, recset, ligand, opts, complex, 'nmrscore'];
-    else
-        qb_SaveEnv [nmrkey, [], [], opts, complex, 'nmrscore'];
-    endif
-
-    if opts.mode === 'One-to-One' then
-        local posedata = tag [qb_GetPoseFields [], [ligand, opts.ligchg]];
-        db_Write [nmrkey, 0, posedata];
-
-    else
-        local posekey = db_Open [opts.posedb, 'read'];
-        if nmrkey === posekey then
-            Warning twrite ['{} and {}\n are the same database', 
-                opts.scoredb, opts.posedb];
-            exit [];
-        endif
-
-        if opts.mode === 'One-to-Many' then
-            qb_CopyPoseDB [nmrkey, posekey];
-        else
-            local reckey = db_Open [opts.recdb, 'read'];
-            if nmrkey === reckey then
-                Warning twrite ['{} and {}\n are the same database', 
-                    opts.scoredb, opts.recdb];
-                exit [];
-            endif
-
-            qb_CopyRecPoseDB [nmrkey, reckey, posekey];
-            db_Close reckey;
-        endif
-
-        db_Close posekey;
-    endif
-
-    return nmrkey;
-endfunction
-
-/****************************************************************************
- *                          UpdateCWD
- *
- *  Update the window based on new CWD value.
- *
- ****************************************************************************/
-local function UpdateCWD [wkey, cwd, wd, prev]
-    if cwd === 1 then
-        WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
-        WindowSetData [wkey, [workdir: '']];
-        return wd;
-    else
-        WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0]]];
-        WindowSetData [wkey, [workdir: prev]];
-        return prev;
-    endif
-endfunction
-
-/****************************************************************************
- *                          UpdateMode
- *
- *  Update the window based on new mode value.
- *
- ****************************************************************************/
-local function UpdateMode [wkey, mode]
-    if mode === 'One-to-One' then
-        WindowSetAttr [wkey, [posebox: [sensitive: 0],
-            posedb: [allowBlank: 1], recbox: [sensitive: 0], 
-            recdb: [allowBlank: 1], panel:[sensitive: [1,1,1,1]],
-            chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
-            recchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
-    elseif mode === 'One-to-Many' then
-        WindowSetAttr [wkey, [posebox: [sensitive: 1],
-            posedb: [allowBlank: 0],recbox: [sensitive: 0], 
-            recdb: [allowBlank: 1], panel:[sensitive: [0,1,1,1]],
-            chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
-            recchg: [allowBlank: 0], poseschg: [sensitive: 1]]];
-    elseif mode === 'Many-to-Many' then
-        WindowSetAttr [wkey, [posebox: [sensitive: 1],
-            posedb: [allowBlank: 0], recbox: [sensitive: 1], 
-            recdb: [allowBlank: 0], panel:[sensitive: [0,1,1,1]],
-            chgbox: [sensitive: 0], ligchg: [allowBlank: 1],
-            recchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
-    endif
-endfunction
-
 //  Global Functions
+
+/****************************************************************************
+ *                          qb_GetDefaultsNMRScore
+ *
+ *  Return the default options for NMRScore.
+ *
+ ****************************************************************************/
+global function qb_GetDefaultsNMRScore []
+    return tag tr NMRSCORE_OPT_DEFAULTS;
+endfunction
 
 /****************************************************************************
  *
@@ -235,291 +256,33 @@ endfunction
  ****************************************************************************/
 global function qb_NMRScoreSetupPanel []
 
+    static status;                     //  Shared with child tasks.
+    static complexmol;
+    static atomnames;
+
     if MOE_BATCH then return; endif
     if WindowShow ['NMRScorePanel', 1] then return; endif
 
-    local wkey = WindowCreate
-        [
-        name: 'panel', 
-        title: 'NMRScore',
-        windowName: 'NMRScorePanel',
-        text: ['Run', 'Save', 'Load', 'Cancel'],
-        onTrigger: ['validate', 'validate', 'return', 'return'],
-        bubbleHelp: ['Execute NMRScore from MOE Window.',
-            'Save run parameters in database\n'
-            'for later execution on cluster.', 
-            'Load run parameters from a NMRScore database.', 
-            ''],
-
-        Hbox :
-            [
-            extendH: 1,
-            FSBText :
-                [
-                name: 'scoredb', len: 40, extendH: 1, title: 'Output DB:',
-                mode: 'saveAs', allowBlank: 0,
-                bubbleHelp:
-                    'The name of the output database that will hold\n'
-                    'the run paramaters and scoring results.'
-                ],
-            Button : [ name: 'browse_scoredb', text: 'Browse...' ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            extendH: 1,
-            Checkbox :
-                [
-                name: 'cut', text: 'Cut Receptor?',
-                onTrigger: 'return',
-                bubbleHelp:
-                    'Cut the receptor at the specified radius.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Text :
-                [
-                name: 'radius', len: 7, extendH: 1, title: 'Radius:',
-                type: 'real', allowBlank: 0,
-                shortcut: ['2.5', '3.0', '3.5', '4.0', '4.5', '5.0'],
-                bubbleHelp: 'Cut radius in angstrums.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Button :
-                [
-                name: 'showcut', text: 'Show Cut',
-                bubbleHelp: 'Perform cut and show in MOE Window.'
-                ],
-            Button :
-                [
-                name: 'original', text: 'Original',
-                bubbleHelp: 'Revert back to original receptor/ligand complex.'
-                ]
-            ],
-
-        Hbox :
-            [
-            Button :
-                [
-                name: 'experimental', text: 'Enter/Edit Experimental Data', 
-                extendH: 1,
-                bubbleHelp:
-                    'Open dialog to enter the data\n'
-                    'for the free and bound ligand.'
-               ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            extendH: 1,
-            Text :
-                [
-                name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
-                type: 'char', allowBlank: 0,
-                shortcut: ['/tmp', '.', '~', '~/tmp', '/scratch'],
-                bubbleHelp:
-                    'The name of the working directory for storing\n'
-                    'QB Divcon intermediate calculations.  The\n'
-                    'absolute path to the specified directory will\n'
-                    'be stored and used at execution time.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Checkbox :
-                [
-                name: 'cwd', text: 'CWD', onTrigger: 'return', 
-                bubbleHelp:
-                    'Set the current working directory using\n'
-                    'the run time environment variable $PWD.'
-                ]
-            ],
-
-        Hbox :
-            [
-            extendH: 1,
-            Option :
-                [
-                name: 'opt', title: 'Geometry Optimization:', 
-                text: GEOM_OPTS, type: 'int', minWidth: 11, extendH: 1,
-                bubbleHelp:
-                'Geometry optimization will often improve chances\n'
-                'of convergence:\n'
-                ' * none:  no optimization step is performed.\n'
-                ' * H only:  all proton positions in the complex are\n'
-                '     quantum mechanically optimized.  Heavy atoms\n'
-                '     remain unchanged.\n'
-                ' * H and hetero:  all non-C atom positions in the complex\n'
-                '     are quantum mechanically optimized. NOTE: the ligand\n'
-                '     pose should be considered a new pose.\n'
-                ' * All atoms:  all atom positions in the complex are\n'
-                '     quantum mechanically optimized. NOTE:  the ligand\n'
-                '     pose should be considered a new pose.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 1, margin:1
-                ],
-            Checkbox :
-                [
-                name: 'guess', text: 'Guess',
-                bubbleHelp:
-                    'Perform Single Point calculation to\n'
-                    'initialize density matrix.\n'
-                    'Warning: may not always\n'
-                    'improve convergence.'
-                ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            Radio :
-                [
-                name: 'mode', text: RUN_MODES, columns: 3, minWidth: 12, 
-                extendH: 1, onTrigger: 'return', title: 'Mapping Mode:',
-                type: 'char',
-                bubbleHelp:
-                    'The mapping mode of receptors to ligand/poses:\n'
-                    '  One ligand docked into one receptor.\n'
-                    '  Many ligand poses docked into the same receptor.\n'
-                    '  Many ligand poses, each docked into its own receptor.'
-                ]
-            ],
-
-        Hbox :
-            [
-            name: 'posebox', extendH: 1,
-            FSBText :
-                [
-                name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
-                mode: 'open', allowBlank: 0,
-                bubbleHelp:
-                    'The name of the input database that holds\n'
-                    'the ligand poses (and possibly scores).'
-                ],
-            Button : [ name: 'browse_posedb', text: 'Browse...' ]
-            ],
-
-        Hbox :
-            [
-            name: 'recbox', extendH: 1,
-            FSBText :
-                [
-                name: 'recdb', len: 40, extendH: 1, title: 'Receptor DB:',
-                mode: 'open', allowBlank: 0,
-                bubbleHelp:
-                    'The name of the input database that holds\n'
-                    'the receptors.'
-                ],
-            Button : [ name: 'browse_recdb', text: 'Browse...' ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            extendH: 1, name: 'chgbox', title: 'Charges:',
-            Button : [ name: 'calcchg', text: 'Calculate' ],
-            Vbox :
-                [
-                Hbox :
-                    [
-                    extendH: 1,
-                    Text :
-                        [
-                        name: 'recchg', title: 'Receptor:', allowBlank: 0,
-                        type: 'int', minWidth: 4,
-                        bubbleHelp:
-                            'Total charge of receptor.'
-                        ]
-                    ],
-                Hbox :
-                    [
-                    extendH: 1,
-                    Text :
-                        [
-                        name: 'ligchg', title: 'Ligand:', allowBlank: 0,
-                        type: 'int', minWidth: 4, extendH: 1,
-                        bubbleHelp:
-                            'Total charge of ligand.'
-                        ],
-                    Checkbox :
-                        [
-                        name: 'poseschg', text: 'All Poses',
-                        bubbleHelp:
-                            'Use the ligand charge for all\n'
-                            'poses in the poses database.'
-                        ]
-                    ]
-                ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1]
-        ];
-
-    local btid, browsetasks = [];
-    local prio;
-    local options = []; 
+    local coreopts = [], appopts = [], browsetasks = []; 
     local nmrkey = 0;
-    local defs = qb_GetDefaultsNMRScore [];
-    local windefs = dropfirst defs;
-    local prevwd = defs.workdir;
-    local complexmol = mol_Extract Chains [];
+    local coredflts = qb_GetDefaultsCore [];
+    local appdflts = qb_GetDefaultsNMRScore [];
 
-    local [ligchg, recchg, errmess] = qb_CalcCharge [];
-    if ligchg === [] or recchg === [] then
-        Warning  errmess;
-    else
-        windefs.ligchg = ligchg;
-        windefs.recchg = recchg;
-    endif
+    complexmol = mol_Extract Chains [];
+    atomnames = [];
 
-    WindowSetData [wkey, windefs];
-    WindowSetAttr [wkey, [panel: [sensitive: [1,1,1,1]],
+    local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
+    status = qb_InitCorePanel [wkey, status, coredflts];
+    WindowSetData [wkey, appdflts];
+    WindowSetAttr [wkey, [
         radius: [sensitive: 0, allowBlank: 1],
         showcut: [sensitive: 0], original: [sensitive: 0],
-        guess: [sensitive: 1], opt: [sensitive:1], mode: [sensitive: 1],
-        workdir: [sensitive: 1, allowBlank: 0],
-        posebox: [sensitive: 0], posedb: [allowBlank: 1],
-        recbox: [sensitive: 0], recdb: [allowBlank: 1],
-        poseschg: [sensitive: 0]]];
+        guess: [sensitive: 1], opt: [sensitive:1]]];
     WindowShow [wkey, 1];
 
     loop
         local [vals, trig] = WindowWait wkey;
-        if trig === 'mode' then
-            UpdateMode [wkey, vals.mode];
-
-        elseif trig === 'cwd' then
-            prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir, prevwd];
-
-        elseif trig === 'calcchg' then
-            if second task_fork [master: 'parent'] === 'child' then
-                task_prio 0;
-
-                [ligchg, recchg, errmess] = qb_CalcCharge [];
-                if ligchg === [] or recchg === [] then
-                    Warning  errmess;
-                    exit [];
-                endif
-
-                WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
-                exit [];
-            endif
-
-        elseif trig === 'cut' then
+        if trig === 'cut' then
             if vals.cut === 0 then
                 WindowSetAttr [wkey, [radius: [sensitive: 0, allowBlank: 1],
                     showcut: [sensitive: 0]]];
@@ -529,8 +292,9 @@ global function qb_NMRScoreSetupPanel []
             endif
 
         elseif trig === 'showcut' then
-            if second task_fork [master: 'parent'] === 'child' then
-                prio = task_prio 0;
+            if second task_fork [statics:'share',
+                    master: 'parent'] === 'child' then
+                task_prio 0;
 
                 local [cutrecmols, cutligmol, crerrmess] = qb_CutReceptor [0, 
                     vals.radius];
@@ -552,8 +316,9 @@ global function qb_NMRScoreSetupPanel []
             endif
 
         elseif trig === 'original' then
-            if second task_fork [master: 'parent'] === 'child' then
-                prio = task_prio 0;
+            if second task_fork [statics:'share',
+                    master: 'parent'] === 'child' then
+                task_prio 0;
 
                 if complexmol === [] then
                     Warning 'No original complex.';
@@ -568,80 +333,73 @@ global function qb_NMRScoreSetupPanel []
             endif
 
         elseif trig === 'experimental' then
-            if second task_fork [master: 'parent'] === 'child' then
+            if second task_fork [statics:'share',
+                    master: 'parent'] === 'child' then
 
                 if complexmol === [] then
                     Warning 'No original complex.';
                     exit [];
                 endif
+                atomnames = qb_GetLigandAtomNames ['H'];
+write ['{v}', atomnames];//DEBUG
                 Warning 'Pop up experimental window.';
                 exit [];
             endif
-
-        elseif trig === 'browse_scoredb' then
-            btid = run ['fbrowse.svl', [trig, wkey, 'Select NMRScore DB File', 
-                'none', '*.mdb', 'scoredb']];
-            if btid then browsetasks = append [browsetasks, btid]; endif
-
-        elseif trig === 'browse_posedb' then
-            btid = run ['fbrowse.svl', [trig, wkey, 'Select Pose DB File', 
-                'open', '*.mdb', 'posedb']];
-            if btid then browsetasks = append [browsetasks, btid]; endif
-
-        elseif trig === 'browse_recdb' then
-            btid = run ['fbrowse.svl', [trig, wkey, 'Select Receptor DB File', 
-                'open', '*.mdb', 'recdb']];
-            if btid then browsetasks = append [browsetasks, btid]; endif
 
        elseif trig === 'panel' then
             if vals.panel === 'Cancel' then 
                 break;
 
             elseif vals.panel === 'Load' then 
-                if second task_fork [master: 'parent'] === 'child' then
+                if second task_fork [statics:'share',
+                        master: 'parent'] === 'child' then
                     task_prio 0;
-                    local dbpath = FilePrompt [title: 'Input Database', 
+                    local dbpath = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
                         write ['Load database: {}\n', dbpath];
-                        local [ldcutrec, ldlig, ldopts, ldcomplex, ldmess] = 
-                            qb_LoadNMRScoreDB [dbpath];
-                        if ldcutrec === [] or ldlig === [] or ldopts === []
-                                or ldcomplex === [] then
+                        local [ldcutrec, ldlig, ldsts, ldcoreopts, ldappopts,
+                            ldcomplex, ldmess] = qb_LoadScoreDB [dbpath,
+                            'nmrscore'];
+                        if ldsts === [] and ldcoreopts === []
+                                and ldappopts === [] then
                             Warning ldmess;
                             exit [];
                         endif
 
                         complexmol = ldcomplex;
-                        /*  Drop the task tagged value.  */
-                        ldopts = dropfirst ldopts;
-                        WindowSetData [wkey, ldopts];
-                        UpdateMode [wkey, ldopts.mode];
-                        prevwd = UpdateCWD [wkey, ldopts.cwd, ldopts.workdir, 
-                            ldopts.workdir];
-
     	                Close [force:1];
-                        local ldligmol = mol_Create ldlig;
-                        local ldligatoms = cat oAtoms ldligmol;
-                        oSetCollection ['QB_LIGAND', ldligatoms];
-                        aSetNucleusLook [ldligatoms, 'small-sphere'];
-                        aSetBondLook [ldligatoms, 'cylinder'];
-                        app mol_Create ldcutrec;
-    	                View [];
+                        if neL [ldcutrec, []] and neL [ldlig, []] then
+                            local ldligmol = mol_Create ldlig;
+                            local ldligatoms = cat oAtoms ldligmol;
+                            oSetCollection ['QB_LIGAND', ldligatoms];
+                            aSetNucleusLook [ldligatoms, 'small-sphere'];
+                            aSetBondLook [ldligatoms, 'cylinder'];
+                            app mol_Create ldcutrec;
+        	                View [];
+                        endif
+
+                        status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
+                        WindowSetData [wkey, ldappopts];
                     endif
 
                 exit [];
             endif
 
             elseif vals.panel === 'Run' then
-                if second task_fork [prio:3, idle:0] === 'child' then
-                    options = tag [qb_GetTagsNMRScore [], [vals.mode, vals.cwd,
-                        fabsname vals.workdir, fabsname vals.scoredb, [], [],
-                        vals.ligchg, vals.recchg, vals.poseschg,
-                        vals.guess, vals.opt, vals.cut, vals.radius, []]];
+                status = qb_VerifyCharges [wkey, status, vals];
+                if not status.verifychg then continue; endif
 
-                    nmrkey = SetUpDB [complexmol, options];
-                    RunCalc [nmrkey];
+                if second task_fork [statics:'share',
+                        prio:3, idle:0] === 'child' then
+                    coreopts = qb_TagCoreVals [vals];
+                    appopts = tag [first tr NMRSCORE_OPT_DEFAULTS, [
+                        vals.guess, vals.opt, vals.cut, vals.radius]];
+
+                    atomnames = qb_GetLigandAtomNames ['H'];
+                    nmrkey = qb_SetUpScoreDB [status, coreopts, appopts, 
+                        complexmol, atomnames, 'nmrscore'];
+                    RunCalc [nmrkey, atomnames];
                     dbv_Open db_Filename nmrkey;
                     db_Close nmrkey;
                     exit [];
@@ -650,17 +408,17 @@ global function qb_NMRScoreSetupPanel []
                 endif
 
             elseif vals.panel === 'Save' then
-                if second task_fork [] === 'child' then
-                    vals.posedb = select ['', fabsname vals.posedb, 
-                        vals.posedb === ''];
-                    vals.recdb = select ['', fabsname vals.recdb, 
-                        vals.recdb === ''];
-                    options = tag [qb_GetTagsNMRScore [], [vals.mode, vals.cwd,
-                        vals.workdir, fabsname vals.scoredb,
-                        vals.posedb, vals.recdb,
-                        vals.ligchg, vals.recchg, vals.poseschg,
-                        vals.guess, vals.opt, vals.cut, vals.radius, []]];
-                    nmrkey = SetUpDB [complexmol, options];
+                status = qb_VerifyCharges [wkey, status, vals];
+                if not status.verifychg then continue; endif
+
+                if second task_fork [statics:'share'] === 'child' then
+                    coreopts = qb_TagCoreVals [vals];
+                    appopts = tag [first tr NMRSCORE_OPT_DEFAULTS, [
+                        vals.guess, vals.opt, vals.cut, vals.radius]];
+
+                    atomnames = qb_GetLigandAtomNames ['H'];
+                    nmrkey = qb_SetUpScoreDB [status, coreopts, appopts, 
+                        complexmol, atomnames, 'nmrscore'];
                     dbv_Open db_Filename nmrkey;
                     db_Close nmrkey;
                     exit [];
@@ -668,6 +426,9 @@ global function qb_NMRScoreSetupPanel []
                     break;
                 endif
             endif
+        else
+           [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
+               browsetasks];
         endif
     endloop
 

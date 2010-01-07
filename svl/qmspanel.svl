@@ -32,15 +32,15 @@
 
 function qb_CoreHandler;
 function qb_GetCorePanel;
-function qb_GetDefaultsQMScore;
+function qb_GetDefaultsCore;
 function qb_GetDefaultsStatus;
 function qb_GetEnv;
-function qb_GetTagsQMScore;
 function qb_InitCorePanel;
-function qb_LoadQMScoreDB;
+function qb_LoadScoreDB;
 function qb_SaveQMScore;
 function qb_SaveDivconStatus;
 function qb_SetUpScoreDB;
+function qb_TagCoreVals;
 function qb_UpdateCorePanel;
 function qb_VerifyCharges;
 
@@ -48,8 +48,17 @@ function qb_QMScore;
 function qb_QMScoreBatch;
 
 /*  NOTE:  If you change the Option lists here, you need to update the
- *         Defaults in qbcore.svl and the Keys in qmsinterface.svl.
+ *         Keys in qmsinterface.svl.
  */
+const QMSCORE_OPT_DEFAULTS =
+    [
+    ['ham',          5             ],
+    ['standard',     0             ],
+    ['freq',         0             ],
+    ['opt',          1             ],
+    ['shift',        0.0           ]
+    ];
+
 
 const HAMILTONIANS =
     [
@@ -166,18 +175,18 @@ local function RunCalc [dbkey]
     local msgkey = Message [0, 'QMScore is running ...'];
     sleep -1;    // Allow parent to close input window.
 
-    local [recset, ligand, status, options, c] = qb_GetEnv [dbkey];
+    local [recset, ligand, status, coreopts, appopts, c] = qb_GetEnv [dbkey];
     local workdir;
-    if options.pwd === 1 then
+    if coreopts.pwd === 1 then
         workdir = getenv 'PWD';
     else
-        workdir = fabsname options.workdir;
+        workdir = fabsname coreopts.workdir;
     endif
 
-    options.workdir = workdir;
+    coreopts.workdir = workdir;
     write ['Work Dir:  {}\n', workdir];  //DEBUG
 
-    local [results, errmess] = qb_QMScore [recset, ligand, options];
+    local [results, errmess] = qb_QMScore [recset, ligand, coreopts, appopts];
 
     local rowkey = first db_Entries [dbkey];
     if results === [] then
@@ -203,6 +212,17 @@ endfunction
 //  Global Functions
 
 /****************************************************************************
+ *                          qb_GetDefaultsQMScore
+ *
+ *  Return the default options for QMScore.
+ *
+ ****************************************************************************/
+global function qb_GetDefaultsQMScore []
+    return tag tr QMSCORE_OPT_DEFAULTS;
+endfunction
+
+
+/****************************************************************************
  *
  *                          qb_QMScoreSetupPanel
  *
@@ -214,18 +234,19 @@ global function qb_QMScoreSetupPanel []
     if MOE_BATCH then return; endif
     if WindowShow ['QMScorePanel', 1] then return; endif
 
-    local vals, trig;
-    local options = [], browsetasks = [];
+    local coreopts = [], appopts = [], browsetasks = [];
     local qmskey = 0;
     status = qb_GetDefaultsStatus [];
-    local defaults = qb_GetDefaultsQMScore [];
+    local coredflts = qb_GetDefaultsCore [];
+    local appdflts = qb_GetDefaultsQMScore [];
 
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
-    status = qb_InitCorePanel [wkey, status, dropfirst defaults];
+    status = qb_InitCorePanel [wkey, status, coredflts];
+    WindowSetData [wkey, appdflts];
     WindowShow [wkey, 1];
 
     loop
-        [vals, trig] = WindowWait wkey;
+        local [vals, trig] = WindowWait wkey;
 
        if trig === 'panel' then
             if vals.panel === 'Cancel' then 
@@ -236,32 +257,31 @@ global function qb_QMScoreSetupPanel []
                         statics:'share'] === 'child' then
                     task_prio 0;
 
-                    local dbpath = FilePrompt [title: 'Input Database', 
+                    local dbpath = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
                         write ['Load database: {}\n', dbpath];
-                        local [ldrec, ldlig, ldsts, ldopts, ldmess] = 
-                            qb_LoadQMScoreDB [dbpath];
-                        if ldrec === [] or ldlig === [] or ldopts === []
-                                or ldsts === [] then
+                        local [ldrec, ldlig, ldsts, ldcoreopts, ldappopts,
+                            ldc, ldmess] = qb_LoadScoreDB [dbpath, 'qmscore'];
+                        if ldsts === [] and ldcoreopts === []
+                                and ldappopts === [] then
                             Warning ldmess;
                             exit [];
                         endif
 
     	                Close [force:1];
-                        local ldligmol = mol_Create ldlig;
-                        local ldligatoms = cat oAtoms ldligmol;
-                        oSetCollection ['QB_LIGAND', ldligatoms];
-                        aSetNucleusLook [ldligatoms, 'small-sphere'];
-                        aSetBondLook [ldligatoms, 'cylinder'];
-                        app mol_Create ldrec;
-    	                View [];
+                        if neL [ldrec, []] and neL [ldlig, []] then
+                            local ldligmol = mol_Create ldlig;
+                            local ldligatoms = cat oAtoms ldligmol;
+                            oSetCollection ['QB_LIGAND', ldligatoms];
+                            aSetNucleusLook [ldligatoms, 'small-sphere'];
+                            aSetBondLook [ldligatoms, 'cylinder'];
+                            app mol_Create ldrec;
+        	                View [];
+                        endif
 
-                        /*  Drop the task tagged value.  */
-                        ldopts = dropfirst ldopts;
-
-                        status = qb_UpdateCorePanel [wkey, ldsts, ldopts];
-//                        WindowSetData [wkey, ldopts];  //DEBUG SPLIT
+                        status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
+                        WindowSetData [wkey, ldappopts];
                     endif
 
                     exit [];
@@ -274,18 +294,12 @@ global function qb_QMScoreSetupPanel []
                 if second task_fork [statics:'share',
                         prio:3, idle:0] === 'child' then
 
-                    vals.workdir = fabsname vals.workdir;
-                    vals.scoredb = fabsname vals.scoredb;
-                    vals.posedb = '';
-                    vals.recdb = '';
-                    options = tag [qb_GetTagsQMScore [], [defaults.task,
-                        vals.mode, vals.cwd, vals.workdir,
-                        vals.scoredb, vals.posedb, vals.recdb,
-                        vals.ligchg, vals.recchg, vals.poseschg,
+                    coreopts = qb_TagCoreVals [vals];
+                    appopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.ham, vals.standard, vals.freq, vals.opt,
                         vals.shift]];
-                    qmskey = qb_SetUpScoreDB [status, options, [], [],
-                        'qmscore'];
+                    qmskey = qb_SetUpScoreDB [status, coreopts, appopts, 
+                        [], [], 'qmscore'];
                     RunCalc [qmskey];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
@@ -301,19 +315,12 @@ global function qb_QMScoreSetupPanel []
                 if second task_fork [] === 'child' then
                     task_prio 0;
 
-                    vals.scoredb = fabsname vals.scoredb;
-                    vals.posedb = select ['', fabsname vals.posedb, 
-                        vals.posedb === ''];
-                    vals.recdb = select ['', fabsname vals.recdb, 
-                        vals.recdb === ''];
-                    options = tag [qb_GetTagsQMScore [], [defaults.task,
-                        vals.mode, vals.cwd, vals.workdir,
-                        vals.scoredb, vals.posedb, vals.recdb,
-                        vals.ligchg, vals.recchg, vals.poseschg,
+                    coreopts = qb_TagCoreVals [vals];
+                    appopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.ham, vals.standard, vals.freq, vals.opt,
                         vals.shift]];
-                    qmskey = qb_SetUpScoreDB [status, options, [], [],
-                        'qmscore'];
+                    qmskey = qb_SetUpScoreDB [status, coreopts, appopts,
+                        [], [], 'qmscore'];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
                     exit [];

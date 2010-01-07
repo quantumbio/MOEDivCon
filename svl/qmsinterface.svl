@@ -48,15 +48,15 @@ const LIG_KEYS =
     'COMPLEXOPT'
     ];
 
-global function qb_QMScore [receptor_mols, ligand_mol, opts]
+global function qb_QMScore [receptor_mols, ligand_mol, coreopts, appopts]
 
 local errmess = "";
 local subdirname, delsubdir = 0;
-if opts.task === [] or opts.task === 0 then
-    subdirname = opts.workdir;
+if coreopts.task === [] or coreopts.task === 0 then
+    subdirname = coreopts.workdir;
 else
     delsubdir = 1;
-    subdirname = twrite ['{}/qb_out{n:}', opts.workdir, opts.task];
+    subdirname = twrite ['{}/qb_out{n:}', coreopts.workdir, coreopts.task];
     local okay = _fmkdir subdirname;
     if okay === -1 then
         errmess = swrite ['Unable to create subdirectory:  {}\n',
@@ -84,12 +84,12 @@ local stdout = exe_stdout process_keys;
 local retValue, success = 0;
 local mol, molIndex, residueIndex, residueCount, atomIndex, atomCount;
 local molCount = length receptor_mols;
-fwrite [stdin, '{c:}\n', HAM_KEYS(opts.ham)];
-fwrite [stdin, '{c:}\n', select ['STANDARD', 'NOSTANDARD', opts.standard]];
-fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', opts.freq]];
-fwrite [stdin, '{c:}\n', LIG_KEYS(opts.opt)];
-fwrite [stdin, '{n:}\n', opts.shift];
-fwrite [stdin, '{n:}\n', opts.recchg];
+fwrite [stdin, '{c:}\n', HAM_KEYS(appopts.ham)];
+fwrite [stdin, '{c:}\n', select ['STANDARD', 'NOSTANDARD', appopts.standard]];
+fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', appopts.freq]];
+fwrite [stdin, '{c:}\n', LIG_KEYS(appopts.opt)];
+fwrite [stdin, '{n:}\n', appopts.shift];
+fwrite [stdin, '{n:}\n', coreopts.recchg];
 fwrite [stdin, '{n:}\n', molCount];
 for molIndex = 1, molCount, 1 loop
     mol = receptor_mols(molIndex);
@@ -116,7 +116,7 @@ endloop
 [retValue] = fread [stdout, '{n:}\n'];
 
 //  There is only one molecule and one chain in the ligand/poses collection.
-fwrite [stdin, '{n:}\n', opts.ligchg];
+fwrite [stdin, '{n:}\n', coreopts.ligchg];
 fwrite [stdin, '{n:}\n', 1];
 mol = ligand_mol;
 atomIndex = 1;
