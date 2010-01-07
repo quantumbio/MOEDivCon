@@ -30,6 +30,9 @@
 
 function _Atoms;
 
+function qb_GetDefaultsNMRScore;
+function qb_GetDefaultsQMScore;
+
 //  Charge status
 const CHG_COLOR = 
     [
@@ -88,7 +91,8 @@ const NMR_NUM_FIELDS =
 const COMPLEX = 'complex';
 const LIGAND = 'ligand';
 const TARGET = 'target';
-const OPTIONS = 'options';
+const COREOPTS = 'coreoptions';
+const APPOPTS = 'applicationoptions';
 const STATUS = 'status';
 
 const DBTYPE = 'qb_dbtype';
@@ -109,7 +113,7 @@ const STATUS_DEFAULTS =
     ];
 
 /*  NOTE:  Non-GUI opt task must be the first tag.  */
-const QMSCORE_OPT_DEFAULTS =
+const CORE_OPT_DEFAULTS =
     [
     ['task',         0             ],
     ['mode',         'One-to-One'  ],  // Shared dialog defaults options
@@ -120,30 +124,7 @@ const QMSCORE_OPT_DEFAULTS =
     ['recdb',        ''            ],
     ['ligchg',       0             ],
     ['recchg',       0             ],
-    ['poseschg',     0             ],
-    ['ham',          5             ],  // QMScore defaults start here
-    ['standard',     0             ],
-    ['freq',         0             ],
-    ['opt',          1             ],
-    ['shift',        0.0           ]
-    ];
-
-const NMRSCORE_OPT_DEFAULTS =
-    [
-    ['task',         0             ],
-    ['mode',         'One-to-One'  ],  // Shared dialog option defaults
-    ['cwd',          0             ],
-    ['workdir',      '/tmp'        ],
-    ['scoredb',      'nmrscore.mdb'],
-    ['posedb',       ''            ],
-    ['recdb',        ''            ],
-    ['ligchg',       0             ],
-    ['recchg',       0             ],
-    ['poseschg',     0             ],
-    ['guess',        0             ],  // NMRScore defaults start here
-    ['opt',          1             ],
-    ['cut',          0             ],
-    ['radius',       2.5           ]
+    ['poseschg',     0             ]
     ];
 
 const RUN_MODES =
@@ -339,7 +320,7 @@ local function AtomsToMols []
     local ligmol = mol_Extract ligatoms;
     local recmols = app mol_Extract recsets;
 
-    return [recmols, ligmol, []];
+    return [recmols, ligmol, ''];
 
 endfunction
 
@@ -391,7 +372,7 @@ local function CalcComplexCharge []
     local [recchg, recadj] = CalcCharge [recatoms];
     local [ligchg, ligadj] = CalcCharge [ligatoms];
 
-    return [recchg, recadj, ligchg, ligadj, []];
+    return [recchg, recadj, ligchg, ligadj, ''];
 
 endfunction
 
@@ -478,7 +459,7 @@ local function CheckComplexCharge [recchg, ligchg]
     local recok = ChargeOK [recatoms, recchg];
     local ligok = ChargeOK [ligatoms, ligchg];
 
-    return [recok, ligok, []];
+    return [recok, ligok, ''];
 
 endfunction
 
@@ -524,7 +505,7 @@ local function CopyPoseDB [resultskey, poseskey]
         return mess;
     endif
 
-    local [recmols, l, status, opts, c] = qb_GetEnv [resultskey];
+    local [recmols, l, status, coreopts, a, c] = qb_GetEnv [resultskey];
 
     //  Check receptor charge
     local recmess = GetStatusMessage ['Receptor', 
@@ -541,11 +522,12 @@ local function CopyPoseDB [resultskey, poseskey]
     while rowkey = db_NextEntry [poseskey, rowkey] loop
         local rowdata = db_Read [poseskey, rowkey];
         local chgdata;
-        if opts.poseschg then
+        if coreopts.poseschg then
             stsmess = cat [recmess, GetStatusMessage ['Ligand',
-                eqL [opts.ligchg, status.moeligchg],
+                eqL [coreopts.ligchg, status.moeligchg],
                 neL [status.ligchg, 4], status.adjligchg]];
-            chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [opts.ligchg, stsmess]];
+            chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD],
+                [coreopts.ligchg, stsmess]];
         else
             local ligmol = tagpeek [rowdata, molfield];
             local ligch = mol_Create ligmol;
@@ -695,13 +677,14 @@ endfunction
  *  database.
  *
  ****************************************************************************/
-local function SaveEnv [dbkey, tgtmols, ligmol, status, options,
+local function SaveEnv [dbkey, tgtmols, ligmol, status, coreopts, appopts,
         complex, type]
 
     db_SetEnv [dbkey, TARGET, twrite ['{v}', tgtmols]];
     db_SetEnv [dbkey, LIGAND, twrite ['{v}', ligmol]];
     db_SetEnv [dbkey, STATUS, twrite ['{v}', status]];
-    db_SetEnv [dbkey, OPTIONS, twrite ['{v}', options]];
+    db_SetEnv [dbkey, COREOPTS, twrite ['{v}', coreopts]];
+    db_SetEnv [dbkey, APPOPTS, twrite ['{v}', appopts]];
     db_SetEnv [dbkey, COMPLEX, twrite ['{v}', complex]];
 
     if type === 'nmrscore' then
@@ -752,7 +735,7 @@ local function SetScoreFields [dbkey, addreceptor, fields, dbtype]
         apt db_EnsureField [dbkey, QMS_NUM_FIELDS, 'double'];
     elseif dbtype === 'nmrscore' then
         apt db_EnsureField [dbkey, NMR_NUM_FIELDS , 'double'];
-        if fields === [] then
+        if neL [fields, []] then
             apt db_EnsureField [dbkey, fields, 'double'];
         endif
     endif
@@ -803,7 +786,7 @@ local function SplitComplex []
 
     recatoms = diff [complexatoms, ligatoms];
 
-    return [recatoms, ligatoms, []];
+    return [recatoms, ligatoms, ''];
 
 endfunction
 
@@ -1042,7 +1025,7 @@ global function qb_CutReceptor [posedbkey, radius]
     local ligmol = mol_Extract ligatoms;
     local recmols = app mol_Extract recsets;
 
-    return [recmols, ligmol, []];
+    return [recmols, ligmol, ''];
 
 endfunction
 
@@ -1058,34 +1041,25 @@ global function qb_GetCorePanel []
 endfunction
 
 /****************************************************************************
- *                          qb_GetDefaultsNMRScore
+ *                          qb_GetDefaultsCore
  *
- *  Return the default options for NMRScore.
- *
- ****************************************************************************/
-global function qb_GetDefaultsNMRScore []
-    return tag tr NMRSCORE_OPT_DEFAULTS;
-endfunction
-
-/****************************************************************************
- *                          qb_GetDefaultsQMScore
- *
- *  Return the default options for QMScore.
+ *  Return the default values for the GUI core.
  *
  ****************************************************************************/
-global function qb_GetDefaultsQMScore []
-    return tag tr QMSCORE_OPT_DEFAULTS;
+global function qb_GetDefaultsCore []
+    return dropfirst tag tr CORE_OPT_DEFAULTS;
 endfunction
 
 /****************************************************************************
  *                          qb_GetDefaultsStatus
  *
- *  Return the default options for the GUI status.
+ *  Return the default values for the GUI status.
  *
  ****************************************************************************/
 global function qb_GetDefaultsStatus []
     return tag tr STATUS_DEFAULTS;
 endfunction
+
 /****************************************************************************
  *                          qb_GetEnv
  *
@@ -1106,17 +1080,41 @@ global function qb_GetEnv [dbkey]
     local [[status]] = sread [string ststok, '{v}'];
     status = tagcat [status, tag tr STATUS_DEFAULTS];
 
-    local opttok = db_GetEnv [dbkey, OPTIONS];
-    local [[options]] = sread [string opttok, '{v}'];
+    local coreopttok = db_GetEnv [dbkey, COREOPTS];
+    local [[coreopts]] = sread [string coreopttok, '{v}'];
+    coreopts = tagcat [coreopts, tag tr CORE_OPT_DEFAULTS];
+
+    local appopttok = db_GetEnv [dbkey, APPOPTS];
+    local [[appopts]] = sread [string appopttok, '{v}'];
     local type = db_GetEnv [dbkey, DBTYPE];
+
     if type === QMSCORE then
-        options = tagcat [options, tag tr QMSCORE_OPT_DEFAULTS];
+        appopts = tagcat [appopts, qb_GetDefaultsQMScore []];
     elseif type === NMRSCORE then
-        options = tagcat [options, tag tr NMRSCORE_OPT_DEFAULTS];
+        appopts = tagcat [appopts, qb_GetDefaultsNMRScore []];
     endif
 
-    return [tgtmols, ligmol, status, options, complex];
+    return [tgtmols, ligmol, status, coreopts, appopts, complex];
 
+endfunction
+
+/****************************************************************************
+ *                          qb_GetLigandAtomNames
+ *
+ *  Get the atom names of the given element ligand in the MOE Window.
+ *
+ ****************************************************************************/
+function qb_GetLigandAtomNames [type]
+    local [recset, ligand, errmess] = AtomsToMols [];
+    if recset === [] or ligand === [] then
+        Warning errmess;
+        exit [];
+    endif
+
+    local [atomindices] = indicesof [type, ligand(4)(MOL_ATOM_EL)];
+    local atomnames = get [ligand(4)(MOL_ATOM_NAME), atomindices];
+
+    return atomnames;
 endfunction
 
 /****************************************************************************
@@ -1140,26 +1138,6 @@ global function qb_GetRecFields []
 endfunction
 
 /****************************************************************************
- *                          qb_GetTagsNMRScore
- *
- *  Return the tags for NMRScore.
- *
- ****************************************************************************/
-global function qb_GetTagsNMRScore []
-    return first tr NMRSCORE_OPT_DEFAULTS;
-endfunction
-
-/****************************************************************************
- *                          qb_GetTagsQMScore
- *
- *  Return the tags for QMScore.
- *
- ****************************************************************************/
-global function qb_GetTagsQMScore []
-    return first tr QMSCORE_OPT_DEFAULTS;
-endfunction
-
-/****************************************************************************
  *
  *                          qb_InitCorePanel
  *
@@ -1168,7 +1146,7 @@ endfunction
  ****************************************************************************/
 global function qb_InitCorePanel [wkey, status, defaults]
     status.prevwd = defaults.workdir;
-    WindowSetData [wkey, defaults];
+    WindowSetData [wkey, dropfirst defaults];
     WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
         recbox: [sensitive: 0], recdb: [allowBlank: 1],
@@ -1179,20 +1157,27 @@ global function qb_InitCorePanel [wkey, status, defaults]
 endfunction
 
 /****************************************************************************
- *                          qb_LoadNMRScoreDB
+ *                          qb_LoadScoreDB
  *
  ****************************************************************************/
-global function qb_LoadNMRScoreDB [dbpath]
+global function qb_LoadScoreDB [dbpath, type]
 
-    local dbkey = db_Open [dbpath, 'read'];
-    local type = db_GetEnv [dbkey, DBTYPE];
-    if neL [type, NMRSCORE] then
+    local dbkey = db_Open [dbpath, 'read-write'];
+    local dbtype = db_GetEnv [dbkey, DBTYPE];
+
+    if type === 'nmrscore' and neL [dbtype, NMRSCORE] then
         db_Close dbkey;
-        return [[], [], [], [], [], twrite ['{}\nis not a NMRScore Database.',
-            dbpath]];
+        return [[], [], [], [], [], [],
+            twrite ['{}\nis not a NMRScore Database.', dbpath]];
     endif
 
-    local [cutrec, lig, status, opts, complex] = qb_GetEnv [dbkey];
+    if type === 'qmscore' and neL [dbtype, QMSCORE] then
+        db_Close dbkey;
+        return [[], [], [], [], [], [],
+            twrite ['{}\nis not a QMScore Database.', dbpath]];
+    endif
+
+    local [rec, lig, status, coreopts, appopts, complex] = qb_GetEnv [dbkey];
 
     if not MOE_BATCH then
       dbv_Open db_Filename dbkey;
@@ -1200,33 +1185,8 @@ global function qb_LoadNMRScoreDB [dbpath]
 
     db_Close dbkey;
 
-    return [cutrec, lig, status, opts, complex, []];
+    return [rec, lig, status, coreopts, appopts, complex, ''];
 
-endfunction
-
-/****************************************************************************
- *                          qb_LoadQMScoreDB
- *
- ****************************************************************************/
-global function qb_LoadQMScoreDB [dbpath]
-
-    local dbkey = db_Open [dbpath, 'read'];
-    local type = db_GetEnv [dbkey, DBTYPE];
-    if neL [type, QMSCORE] then
-        db_Close dbkey;
-        return [[], [], [], [], twrite ['{}\nis not a QMScore Database.',
-            dbpath]];
-    endif
-
-    local [rec, lig, status, opts, c] = qb_GetEnv [dbkey];
-
-    if not MOE_BATCH then
-      dbv_Open db_Filename dbkey;
-    endif
-
-    db_Close dbkey;
-
-    return [rec, lig, status, opts, []];
 endfunction
 
 /****************************************************************************
@@ -1314,43 +1274,45 @@ endfunction
  *  and will exit on an error.
  *
  ****************************************************************************/
-global function qb_SetUpScoreDB [status, opts, complex, fields, dbtype]
+global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
+        dbtype]
 
-    local dbkey = db_Open [opts.scoredb, 'create'];
-    SetScoreFields [dbkey, opts.mode === 'Many-to-Many', fields, dbtype];
+    local dbkey = db_Open [coreopts.scoredb, 'create'];
+    SetScoreFields [dbkey, coreopts.mode === 'Many-to-Many', fields, dbtype];
 
-    if opts.mode === 'One-to-One' or opts.mode === 'One-to-Many' then
+    if coreopts.mode === 'One-to-One' or coreopts.mode === 'One-to-Many' then
         local [recset, ligand, errmess] = AtomsToMols [];
         if recset === [] or ligand === [] then
-            Warning [errmess];
+            Warning errmess;
             exit [];
         endif
 
-        SaveEnv [dbkey, recset, ligand, status, opts, complex, dbtype];
+        SaveEnv [dbkey, recset, ligand, status, coreopts, appopts, complex, 
+            dbtype];
     else
-        SaveEnv [dbkey, [], [], status, opts, complex, dbtype];
+        SaveEnv [dbkey, [], [], status, coreopts, appopts, complex, dbtype];
     endif
 
-    if opts.mode === 'One-to-One' then
-        local posedata = tag [qb_GetPoseFields [], [ligand, opts.ligchg]];
+    if coreopts.mode === 'One-to-One' then
+        local posedata = tag [qb_GetPoseFields [], [ligand, coreopts.ligchg]];
         local stsmess = GetStatusMessage ['Receptor', 
-            eqL [opts.recchg, status.moerecchg],
+            eqL [coreopts.recchg, status.moerecchg],
             neL [status.recchg, 4], status.adjrecchg];
         stsmess = cat [stsmess, GetStatusMessage ['Ligand',
-            eqL [opts.ligchg, status.moeligchg],
+            eqL [coreopts.ligchg, status.moeligchg],
             neL [status.ligchg, 4], status.adjligchg]];
         posedata = cat [posedata, tag [[STATUS_FIELD], [stsmess]]];
         db_Write [dbkey, 0, posedata];
 
     else
-        local posekey = db_Open [opts.posedb, 'read'];
+        local posekey = db_Open [coreopts.posedb, 'read'];
         if dbkey === posekey then
             Warning twrite ['{} and {}\n are the same database', 
-                opts.scoredb, opts.posedb];
+                coreopts.scoredb, coreopts.posedb];
             exit [];
         endif
 
-        if opts.mode === 'One-to-Many' then
+        if coreopts.mode === 'One-to-Many' then
             local pmess = CopyPoseDB [dbkey, posekey];
             if neL [pmess, ''] then
                 db_Close posekey;
@@ -1359,10 +1321,10 @@ global function qb_SetUpScoreDB [status, opts, complex, fields, dbtype]
                 exit [];
             endif
         else
-            local reckey = db_Open [opts.recdb, 'read'];
+            local reckey = db_Open [coreopts.recdb, 'read'];
             if dbkey === reckey then
                 Warning twrite ['{} and {}\n are the same database', 
-                    opts.scoredb, opts.recdb];
+                    coreopts.scoredb, coreopts.recdb];
                 exit [];
             endif
 
@@ -1386,18 +1348,40 @@ endfunction
 
 /****************************************************************************
  *
+ *                          qb_TagCoreVals
+ *
+ *  Tag the values from the core panel window.
+ *
+ ****************************************************************************/
+global function qb_TagCoreVals [vals]
+
+    vals.scoredb = fabsname vals.scoredb;
+    vals.posedb = select ['', fabsname vals.posedb, vals.posedb === ''];
+    vals.recdb = select ['', fabsname vals.recdb, vals.recdb === ''];
+
+    local coreopts = tag [first tr CORE_OPT_DEFAULTS, [
+        second first CORE_OPT_DEFAULTS,
+        vals.mode, vals.cwd, vals.workdir,
+        vals.scoredb, vals.posedb, vals.recdb,
+        vals.ligchg, vals.recchg, vals.poseschg]];
+
+    return coreopts;
+endfunction
+
+/****************************************************************************
+ *
  *                          qb_UpdateCorePanel
  *
  *  Initialize the core panel window.
  *
  ****************************************************************************/
-global function qb_UpdateCorePanel [wkey, status, options]
+global function qb_UpdateCorePanel [wkey, status, coreopts]
 
-    WindowSetData [wkey, options];
-    status = CheckCharge [wkey, status, options.recchg, options.ligchg];
-    UpdateMode [wkey, options.mode, status];
-    status.prevwd = UpdateCWD [wkey, options.cwd, options.workdir, 
-        options.workdir];
+    WindowSetData [wkey, dropfirst coreopts];
+    status = CheckCharge [wkey, status, coreopts.recchg, coreopts.ligchg];
+    UpdateMode [wkey, coreopts.mode, status];
+    status.prevwd = UpdateCWD [wkey, coreopts.cwd, coreopts.workdir, 
+        coreopts.workdir];
 
     return status;
 endfunction

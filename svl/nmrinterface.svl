@@ -38,15 +38,15 @@ const GEOM_KEYS =
     'ALLOPT'
     ];
 
-global function qb_NMRScore [receptor_mols, ligand_mol, opts]
+global function qb_NMRScore [receptor_mols, ligand_mol, coreopts, appopts]
 
 local errmess = [];
 local subdirname;
 
-if opts.task === [] or opts.task === 0 then
-    subdirname = opts.workdir;
+if coreopts.task === [] or coreopts.task === 0 then
+    subdirname = coreopts.workdir;
 else
-    subdirname = twrite ['{}/qb_out{n:}', opts.workdir, opts.task];
+    subdirname = twrite ['{}/qb_out{n:}', coreopts.workdir, coreopts.task];
     local okay = _fmkdir subdirname;
     if okay === -1 then
         errmess = swrite ['Unable to create subdirectory:  {}',
@@ -74,7 +74,7 @@ local stdout = exe_stdout process_keys;
 local retValue, success = 0;
 local mol, molIndex, residueIndex, residueCount, atomIndex, atomCount;
 local molCount = length receptor_mols;
-fwrite [stdin, '{n:}\n', opts.recchg];
+fwrite [stdin, '{n:}\n', coreopts.recchg];
 fwrite [stdin, '{n:}\n', molCount];
 for molIndex = 1, molCount, 1 loop
     mol = receptor_mols(molIndex);
@@ -101,7 +101,7 @@ endloop
 [retValue] = fread [stdout, '{n:}\n'];
 
 //  There is only one molecule and one chain in the ligand/poses collection.
-fwrite [stdin, '{n:}\n', opts.ligchg];
+fwrite [stdin, '{n:}\n', coreopts.ligchg];
 fwrite [stdin, '{n:}\n', 1];
 mol = ligand_mol;
 atomIndex = 1;
@@ -129,7 +129,7 @@ local ligatmels = ligand_mol(4)(MOL_ATOM_EL);
 local numligH = add eqE [ligatmels, 'H'];
 
 local results, return_statement;
-local sleep_time = 0.0;
+local sleep_time = -1;
 while exe_status process_key loop
     if not MOE_BATCH then
         sleep sleep_time;
