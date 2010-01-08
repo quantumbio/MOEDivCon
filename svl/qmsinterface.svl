@@ -51,6 +51,12 @@ const LIG_KEYS =
 global function qb_QMScore [receptor_mols, ligand_mol, coreopts, appopts]
 
 local errmess = "";
+
+if not qb_MolsChargeOK [receptor_mols, coreopts.recchg, 
+        ligand_mol, coreopts.ligchg] then
+    return [[], "Problematic charge, skipping."];
+endif
+
 local subdirname, delsubdir = 0;
 if coreopts.task === [] or coreopts.task === 0 then
     subdirname = coreopts.workdir;
