@@ -35,6 +35,7 @@ function qb_GetCorePanel;
 function qb_GetDefaultsCore;
 function qb_GetDefaultsStatus;
 function qb_GetEnv;
+function qb_GetStatusFlags;
 function qb_InitCorePanel;
 function qb_LoadScoreDB;
 function qb_SaveQMScore;
@@ -53,7 +54,7 @@ function qb_QMScoreBatch;
 const QMSCORE_OPT_DEFAULTS =
     [
     ['ham',          5             ],
-    ['standard',     0             ],
+    ['scaling',      1             ],
     ['freq',         0             ],
     ['opt',          1             ],
     ['shift',        0.0           ]
@@ -77,6 +78,12 @@ const LIG_OPTS =
     'bound'
     ];
 
+const ALG_OPTS =
+    [
+    'Linear Scaling',
+    'Cubic Scaling'
+    ];
+
 
 
 const HEADER = 
@@ -84,7 +91,7 @@ const HEADER =
     name: 'panel', 
     title: 'QMScore',
     windowName: 'QMScorePanel',
-    text: ['Run', 'Save', 'Load', 'Cancel'],
+    text: ['Run', 'Save', 'Load', 'Close'],
     onTrigger: ['validate', 'validate', 'return', 'return'],
     bubbleHelp: ['Execute QMScore from MOE Window.',
         'Save run parameters in database\n'
@@ -103,19 +110,24 @@ const PANEL =
             Option :
                 [
                 name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
-                type: 'int', minWidth: 11,
+                type: 'int', minWidth: 8,
                 bubbleHelp:
                     ''
                 ]
             ],
         Hbox :
                 [
-            Checkbox :
+            Option :
                 [
-                name: 'standard', title: 'Calculation:', text: 'Standard',
+                name: 'scaling', title: 'Calculation:', text: ALG_OPTS,
+                type: 'int', minWidth: 8, extendH: 1,
                 bubbleHelp:
-                    'Standard closed-shell calculation\n'
-                    '(no divide and conquer).'
+                    'Linear vs. Cubic referrs to the scaling factor of the\n'
+                    'calculation where Linear scales accordingly to O(n)\n'
+                    'and Cubic scaling is the more conventional variety\n'
+                    '(e.g. O(n^3) or worse) where n corresponds to the number\n'
+                    'of electrons in the system. The cross over point is at\n'
+                    'approximately 450 atoms.'
                 ],
             Separator : 
                 [
@@ -177,13 +189,10 @@ local function RunCalc [dbkey]
 
     local rowkey = first db_Entries [dbkey];
     local [recset, ligand, status, coreopts, appopts, c] = qb_GetEnv [dbkey];
-    local recmolsoktok = db_GetFieldEnv [dbkey, REC_FIELD, RECOK_FLDENV];
-    local [[recmolsok]] = sread [string recmolsoktok, '{v}'];
-    local ligmolsoktok = db_GetFieldEnv [dbkey, POSE_FIELD, POSEOK_FLDENV];
-    local [[ligmolsok]] = sread [string ligmolsoktok, '{v}'];
-
+    local [recmolsok, ligmolsok] = qb_GetStatusFlags dbkey;
     if not recmolsok(1) or not ligmolsok(1) then
-        qb_SaveDivconStatus [dbkey, rowkey, "Error:  Bad molecule, skipping!"];
+        qb_SaveDivconStatus [dbkey, rowkey, 
+            "Error:  Bad molecule, skipping!\n"];
         write ['QMScore Error: Bad molecule, skipping!\n'];
         Message [msgkey, 'QMScore Error: Bad molecule, skipping!'];
         return;
@@ -203,11 +212,11 @@ local function RunCalc [dbkey]
 
     if results === [] then
         if errmess === [] or errmess === '' then
-            qb_SaveDivconStatus [dbkey, rowkey, "Error:  Unknown error!"];
+            qb_SaveDivconStatus [dbkey, rowkey, "Error:  Unknown error!\n"];
             write ['QMScore Error:  Unknown error!\n'];
         else
             qb_SaveDivconStatus [dbkey, rowkey, 
-                swrite ['Error:  {}', errmess]];
+                swrite ['Error:  {}\n', errmess]];
             write ['QMScore Error:  {}\n', errmess];
         endif
     else
@@ -242,18 +251,19 @@ endfunction
 global function qb_QMScoreSetupPanel []
 
     static status;                     //  Shared with child tasks.
+    static qmskey;
 
     if MOE_BATCH then return; endif
     if WindowShow ['QMScorePanel', 1] then return; endif
 
     local coreopts = [], appopts = [], browsetasks = [];
-    local qmskey = 0;
     status = qb_GetDefaultsStatus [];
     local coredflts = qb_GetDefaultsCore [];
     local appdflts = qb_GetDefaultsQMScore [];
 
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
+    qmskey = 0;
     WindowSetData [wkey, appdflts];
     WindowShow [wkey, 1];
 
@@ -261,7 +271,7 @@ global function qb_QMScoreSetupPanel []
         local [vals, trig] = WindowWait wkey;
 
        if trig === 'panel' then
-            if vals.panel === 'Cancel' then 
+            if vals.panel === 'Close' then 
                 break;
 
             elseif vals.panel === 'Load' then 
@@ -273,9 +283,10 @@ global function qb_QMScoreSetupPanel []
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
                         write ['Load database: {}\n', dbpath];
-                        local [ldrec, ldlig, ldsts, ldcoreopts, ldappopts,
-                            ldc, ldmess] = qb_LoadScoreDB [dbpath, 'qmscore'];
-                        if ldsts === [] and ldcoreopts === []
+                        local [ldkey, ldrec, ldlig, ldsts, ldcoreopts,
+                            ldappopts, ldc, ldmess] = qb_LoadScoreDB [dbpath,
+                            'qmscore'];
+                        if ldkey === 0 and ldsts === [] and ldcoreopts === []
                                 and ldappopts === [] then
                             Warning ldmess;
                             exit [];
@@ -293,6 +304,9 @@ global function qb_QMScoreSetupPanel []
                         endif
 
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
+                        qmskey = ldkey;
+                        dbv_Open db_Filename qmskey;
+                        db_Close qmskey;
                         WindowSetData [wkey, ldappopts];
                     endif
 
@@ -308,7 +322,7 @@ global function qb_QMScoreSetupPanel []
 
                     coreopts = qb_TagCoreVals [vals];
                     appopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
-                        vals.ham, vals.standard, vals.freq, vals.opt,
+                        vals.ham, vals.scaling, vals.freq, vals.opt,
                         vals.shift]];
                     qmskey = qb_SetUpScoreDB [status, coreopts, appopts, 
                         [], [], 'qmscore'];
@@ -324,25 +338,23 @@ global function qb_QMScoreSetupPanel []
                 status = qb_VerifyCharges [wkey, status, vals];
                 if not status.verifychg then continue; endif
 
-                if second task_fork [] === 'child' then
+                if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
 
                     coreopts = qb_TagCoreVals [vals];
                     appopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
-                        vals.ham, vals.standard, vals.freq, vals.opt,
+                        vals.ham, vals.scaling, vals.freq, vals.opt,
                         vals.shift]];
                     qmskey = qb_SetUpScoreDB [status, coreopts, appopts,
                         [], [], 'qmscore'];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
                     exit [];
-                else
-                    break;
                 endif
             endif
         else
            [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
-               browsetasks];
+               browsetasks, qmskey];
         endif
     endloop
 
