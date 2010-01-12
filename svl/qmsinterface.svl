@@ -27,6 +27,8 @@
 #set version '2010.02'
 #set main 'qb_QMScore'
 
+function qb_MolsChargeOK;
+
 /*  NOTE:  If you change the Key lists here, you need to update the
  *         Option lists and default indices in qmspanel.svl.
  */
@@ -51,10 +53,9 @@ const LIG_KEYS =
 global function qb_QMScore [receptor_mols, ligand_mol, coreopts, appopts]
 
 local errmess = "";
-
-if not qb_MolsChargeOK [receptor_mols, coreopts.recchg, 
+if not alltrue qb_MolsChargeOK [receptor_mols, coreopts.recchg, 
         ligand_mol, coreopts.ligchg] then
-    return [[], "Problematic charge, skipping."];
+    return [[], "Problematic charge, skipping!\n"];
 endif
 
 local subdirname, delsubdir = 0;
@@ -70,12 +71,12 @@ else
         return [[], errmess];
     endif
 endif
-
+/*
 local scorepath = coreopts.scoredb;
 scorepath = fbase scorepath;
 scorepath = twrite ['{}.h5', scorepath];
 print scorepath; //DEBUG
-
+*/
 //  exe_open child process inherits parent's environment.
 local process_key = exe_open ['moedivconscoring', subdirname, [], 1];
 local process_keys = [process_key];
@@ -95,9 +96,13 @@ local stdout = exe_stdout process_keys;
 local retValue, success = 0;
 local mol, molIndex, residueIndex, residueCount, atomIndex, atomCount;
 local molCount = length receptor_mols;
-fwrite [stdin, '{c:}\n', scorepath];
+//fwrite [stdin, '{c:}\n', scorepath];
 fwrite [stdin, '{c:}\n', HAM_KEYS(appopts.ham)];
-fwrite [stdin, '{c:}\n', select ['STANDARD', 'NOSTANDARD', appopts.standard]];
+fwrite [stdin, '{c:}\n', select ['STANDARD', 'NOSTANDARD',
+    appopts.scaling === 1]];
+write ['{c:}\n', select ['STANDARD', 'NOSTANDARD',//DEBUG
+    appopts.scaling === 1]];//DEBUG
+
 fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', appopts.freq]];
 fwrite [stdin, '{c:}\n', LIG_KEYS(appopts.opt)];
 fwrite [stdin, '{n:}\n', appopts.shift];
@@ -217,6 +222,8 @@ endif
 if success === 1 then
     return [results, errmess];
 else
+    errmess = cat [errmess, swrite ['Log file:  {}:{}/divcon.log\n',
+        getenv 'HOSTNAME', coreopts.workdir]];
     return [[], errmess];
 endif
 endfunction

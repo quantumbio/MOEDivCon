@@ -18,8 +18,10 @@ h4 {font: bold 1.00em Helvetica, sans-serif; color: #0099DD;
 h4:before {content: counter(h4n, decimal) ".  "}
 body {font: 12pt "Times New Roman", serif; margin: 3em;
     background-color: #F0F7FF;}
+ol  {list-style-type: decimal;}
+ol ol {list-style-type: lower-latin;}
 ol#tocl {list-style-type: upper-roman;}
-ol ol {list-style-type: upper-latin;}
+ol ol#tocl {list-style-type: upper-latin;}
 th.white {font: bold 2.0em Helvetica, sans-serif; color: white}
 th.green {font: bold 2.0em Helvetica, sans-serif; color: green}
 th.yellow {font: bold 2.0em Helvetica, sans-serif; color: yellow}
@@ -65,16 +67,16 @@ QuantumBio Homepage
   <li><a href="#charge">Charges</a>
   <li><a href="#load">Load</a>
   <li><a href="#parallel">Batch and Parallel Execution</a>
-  <ol>
+  <ol  id=tocl>
     <li><a href="#parallel-mode">Parallel Mapping Mode</a>
     <li><a href="#parallel-moebatch">Running Moebatch</a>
   </ol>
   <li><a href="#options">Options</a>
-  <ol>
+  <ol id=tocl>
     <li><a href="#options-outdb">Output MOE Database</a>
     <li><a href="#options-workdir">Working Directory</a>
     <li><a href="#options-ham">Hamiltonian</a>
-    <li><a href="#options-stand">Standard</a>
+    <li><a href="#options-scaling">Scaling</a>
     <li><a href="#options-shift">Shift</a>
     <li><a href="#options-opt">Ligand Optimization</a>
     <li><a href="#options-freq">Frequency</a>
@@ -212,7 +214,7 @@ Ensure that the <w>Working Dir</w> is
 <inline>/tmp</inline> (files for storing intermediate calculations and logs
  will be written here).  Press the <w>Run</w> button.  If all goes
 well, QMScore will execute using the receptor and ligand complex shown in
-the MOE Window.  After several seconds, the MOE database viewer should open
+the MOE Window.  After several seconds, the MOE database Viewer should open
 the QMScore database showing the results.
 <p>
 <object id="QMScoreDatabase" title="QMScore Database" width=1000
@@ -234,59 +236,56 @@ After the QMScore runs have completed, one can use MOE to open the QMScore
 database to view and analyze the collated results.
 
 <h2><a name="charge"></a>Charges</h2>
-<todo>Consistent Examples</todo>
 <p>
 When you open the QMScore dialog, MOE calculates the total charge of the
 receptor and ligand in the MOE window, and displays them in the
 <w>Charges</w> section.  You can press the <w>Calculate</w> button to
 recalculate the charges.
-<p>
-<object id="QMScoreWarnCharge" title="QMScore Charge Warning"
-data="images/qmscorewarncharge.png" type=image/png>
-QMScore Charge Warning
-</object>
+
 <p>
 The colored cirles next to the charges reflect the status of the charge
 calculation:
 <table border="1">
 <tr><th class="white">&#X25CF;<td>Uncalculated or user-entered charge.
 <tr><th class="green">&#X25CF;<td>Charge calculated by MOE.
-<tr><th class="yellow">&#X25CF;<td>Moe's charge was adjusted.
 <tr><th class="red">&#X25CF;<td>Problematic charge for Divcon.
 </table>
 <p>
 Note that the green circle doesn't mean that the charge is correct, only that
-it has been calculated and didn't need adjusting.  MOEDivcon automatically
-adjusts the charge (&plusmn;1) calculated by MOE to conform to Divcon's
-requirement that the molecular entity have an even number of electrons.
-<p>
-As with any other formal charge algorithm, MOE doesn't always get the
-total charge right.  You can edit the
-charges calculated by MOE if you think they are incorrect.  MOEDivcon
-will alert you if a charge you enter may cause problems with the Divcon
+it has been calculated.  As with any other formal charge algorithm, MOE 
+doesn't always get the total charge right.  You can edit the
+charges calculated by MOE if you think they are incorrect or they are marked
+as problematic for Divcon.  If you edit the charges, MOEDivcon
+will alert you if a charge you entered may cause problems with the Divcon
 calculations when you press <w>Run</w> or <w>Save</w>.
-The problematic charge will be marked with a red circle.
 <p>
 <object id="QMScoreBadCharge" title="QMScore Charge Error"
 data="images/qmscorebadcharge.png" type=image/png>
 QMScore Charge Error
 </object>
-<p>
+<p><a name="charge-onetomany"></a>
 When in <w>One-to-Many</w> mode, you can choose
 to use the charge specified for the ligand as the charge for all the poses
 by selecting <w>All Poses</w>.  Otherwise, the charge is calculated for
 each pose as it is copied from the Ligand/Pose database to the
 QMScore database.  In either case, when the QMScore database is opened with
-the Database Viewer for verification, you can edit the charges stored in it
+the MOE Database Viewer for verification, you can edit the charges stored in it
 (double click on the cell and edit the charge in the edit bar at the top of
-the window).  If a calculated charge was automatically adjusted, it is
+the window).  If a calculated charge is problematic for Divcon, it is
 noted in the <w>Status</w> column (double click cell to see entire message).
-<p>
+Before passing the run parameters to Divcon
+during execution, MOEDivcon checks again whether the charges are
+going to be problematic.  If so, it skips the calculation and places a
+message in the <w>Status</w> column.
+<p><a name="charge-manytomany"></a>
 When in <w>Many-to-Many</w> mode, the <w>Charges</w>
 section is disabled.  The charges for the receptors and ligands are calculated
 as they are copied from their respective databases into the QMScore
 database.  Again, you can verify and edit the charges using the MOE Database
-Viewer.
+Viewer.  Before passing the run parameters to Divcon
+during execution, MOEDivcon checks again whether the charges are
+going to be problematic.  If so, it skips the calculation and place a
+message in the <w>Status</w> column.
 
 <h2><a name="load"></a>Load</h2>
 <p>
@@ -297,6 +296,10 @@ sure it is a QMScore database.  The receptor/ligand complex stored in the
 database is then loaded into the MOE window, the QMScore dialog is updated with
 the settings stored in the database, and then the database itself is opened
 using the MOE Database Viewer.
+<p>
+ If you load an existing QMScore database, change the options or edit the
+receptor or ligand using MOE's Builder, then press <w>Save</w>, the updated
+options, molecules and charges will be saved in the output database.
 <p>
 <warn>Warning:  The current settings in the QMScore dialog and the molecules
 in the MOE Window are replaced and may be lost if not saved beforehand.</warn>
@@ -327,8 +330,8 @@ steps.
 Next, open the QMScore dialog and select your options, and then choose
 <w>Save</w> rather than <w>Run</w>.  MOEDivcon will store your receptor,
 ligand, and
-options in the QMScore database, and then open the MOE DB viewer so you can
-verify the ligand/pose data.  See the
+options in the QMScore database, and then open the MOE Database Viewer so you
+can verify the ligand/pose data.  See the
 <a href="#parallel-moebatch">Running Moebatch</a> section
 to learn how to execute the job.
 
@@ -352,11 +355,17 @@ data="images/qmscoreonetomany.png" type=image/png >
 QMScore One-to-Many Mode
 </object>
 <p>
+You can choose
+to use the charge specified for the ligand as the charge for all the poses
+by selecting <w>All Poses</w>.  See the <a href="#charge-onetomany">Charge</a>
+section to learn more details about how MOEDivcon handles charges.
+<p>
 When you choose <w>Save</w>,  MOEDivcon will store your receptor, ligand, and
 options in the QMScore database, and it will copy the ligand/pose database into
 the QMScore database including any data fields (e.g., results from other scoring
 algorithms).  The MOE Database Viewer will then open the QMScore database so
-you can verify the ligand/pose data.  See the
+you can verify the ligand/pose data, especially the charge values and status.
+See the
 <a href="#parallel-moebatch">Running Moebatch</a>
 section to learn how to execute the job.
 
@@ -377,9 +386,11 @@ When you choose <w>Save</w>,  MOEDivcon will store your options in the
 QMScore database, and it will copy the receptor and ligand databases, row
 by row, into the QMScore database including any data fields.  The MOE
 Database Viewer will then open the QMScore database so you can verify the
-receptor and ligand data.
+receptor and ligand data, especially the charge values and status.
 See the <a href="#parallel-moebatch">Running Moebatch</a> section
-to learn how to execute the job.
+to learn how to execute the job.  See the
+<a href="#charge-manytomany">Charge</a>
+section to learn more details about how MOEDivcon handles charges.
 
 <h3><a name="parallel-moebatch"></a>Running Moebatch</h3>
 <p>
@@ -493,9 +504,12 @@ process.
 Several options are available in chosing the Hamiltonian algorithm to use
 with QMScore.  However, PM3, the default, has proved to be the most reliable.
 
-<h3><a name="options-stand"></a>Standard</h3>
+<h3><a name="options-scaling"></a>Scaling</h3>
 <p>
-Perform a standard closed-shell calculation (no divide and conquer).
+Linear vs. Cubic referrs to the scaling factor of the calculation where
+Linear scales accordingly to O(n) and Cubic scaling is the more conventional
+variety (e.g. O(n&sup3;) or worse) where n corresponds to the number of
+electrons in the system. The cross over point is at approximately 450 atoms.
 
 <h3><a name="options-shift"></a>Shift</h3>
 <p>
@@ -559,15 +573,23 @@ No ligand was recognized.  Use LigX to define it.
     receptor has been cut, the ligand isn't always easily picked out.  You can
     assist the process with this quick guide to LigX.
     <ol>
+      <li> Start LigX by pressing the <w>LigX</w> button in the right button
+           bar.
       <li> Select an atom in the ligand.
-      <li> Extend the selection to entire molecule
-      (<w>Select</w>&rarr;<w>Extend </w>&rarr;<w>Molecule</w>).
-      <li> In <w>LigX</w>, select menu <w>Prepare</w> and submenu item
-           <w>Choose Ligand</w>.
-      <li> <w>Quit LigX</w>.
-      <li> LigX alters the MOE View for pocket elucidation.  To clean up the
-           View, select MOE menus <w>Show</w>&rarr;<w>All</w>
-           and <w>Color</w>&rarr;<w>Element</w>.
+      <li> Extend the selection to entire molecule by using the main or pop-up
+           menu:
+      <w>Selection</w> or <w>Select</w>&rarr;<w>Extend</w>&rarr;<w>Molecule</w>.
+      <li> Tell LigX to mark the selected molecule as the ligand. In the right
+           button bar, select <w>Prepare</w>&rarr;<w>Choose Ligand</w>.
+      <li> Press the <w>Quit LigX</w> to exit from LigX.
+      <li> Note that LigX alters the MOE View for pocket elucidation.  To 
+           clean up the View, perform the following steps:
+            <ol>
+                <li> From the right button bar, 
+                     select <w>Show</w>&rarr;<w>All</w>.
+                <li> From the right button bar,
+                     select <w>Color</w>&rarr;<w>Element</w>.
+            </ol>
     </ol>
     MOEDivcon should now be able to identify the ligand.
   </sol>

@@ -32,10 +32,21 @@
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetEnv;
+function qb_GetStatusFlags;
 function qb_SaveDivconStatus;
 function qb_SaveQMScore;
 function qb_QMScore;
 
+
+/****************************************************************************
+ *                          qb_QMScoreBatch
+ *
+ *  Execute QMScore for each row of the scoring database.
+ *
+ *  HACK alert:  an extra flag was added to the LIGOK and RECOK flag vectors
+ *  in order to force moe to treat is as them as vectors, not as scalars.
+ *
+ ****************************************************************************/
 global function qb_QMScoreBatch [dbpath]
 
     if not MOE_BATCH then return; endif
@@ -43,10 +54,27 @@ global function qb_QMScoreBatch [dbpath]
     //  Extract molecules and run options from the database environment
     local dbkey = db_Open [dbpath, 'read-write'];
     local [recmols, ligmol, s, coreopts, appopts, c] = qb_GetEnv [dbkey];
-    local recmolsoktok = db_GetFieldEnv [dbkey, REC_FIELD, RECOK_FLDENV];
-    local [[recmolsok]] = sread [string recmolsoktok, '{v}'];
-    local ligmolsoktok = db_GetFieldEnv [dbkey, POSE_FIELD, POSEOK_FLDENV];
-    local [[ligmolsok]] = sread [string ligmolsoktok, '{v}'];
+    local [recmolsok, ligmolsok] = qb_GetStatusFlags dbkey;
+    local recoklen = length recmolsok - 1;
+    local ligoklen = length ligmolsok - 1;
+    local nrows = db_nEntries dbkey;
+
+    //  Have rows been added or deleted?
+    if coreopts.mode === 'One-to-Many' then
+        if neL [recoklen, 1] or neL [ligoklen, nrows] then
+            exit 'QMScore database has been modified'
+                    ' and is not longer consistent.\n';
+        endif
+    else
+        if neL [recoklen, ligoklen, nrows] then
+            exit 'QMScore database has been modified'
+                    ' and is not longer consistent.\n';
+        endif
+    endif
+
+    if neL [recoklen, ligoklen, nrows] then
+        exit 'QMScore database has been modified and is not longer constent.\n';
+    endif
 
     local recchg;
     local workdir;
@@ -61,7 +89,6 @@ global function qb_QMScoreBatch [dbpath]
 
     //  For each ligand pose in the database, calculate QM score.
     local rowkey = 0, count = 0;
-    local total = db_nEntries (dbkey);
     local poseflds = qb_GetPoseFields [dbkey];
     local recflds = qb_GetRecFields [dbkey];
     local tid = task_key -1;
@@ -74,7 +101,7 @@ global function qb_QMScoreBatch [dbpath]
             count = count + 1;
             if not recmolsok(count) or not ligmolsok (count) then
                 qb_SaveDivconStatus [dbkey, rowkey, 
-                    "Error:  Bad molecule, skipping!"];
+                    "Error:  Bad molecule, skipping!\n"];
                 continue;
             endif
 
@@ -96,7 +123,7 @@ global function qb_QMScoreBatch [dbpath]
             'qb_QMScore', [recmols, posemol, coreopts, appopts], [rowkey, tid]];
 
         if rowkey <> 0 then
-            write ['Scoring pose {} of {}\n', count, total];
+            write ['Scoring pose {} of {}\n', count, nrows];
         endif
 
         if code === '' then
@@ -109,7 +136,7 @@ global function qb_QMScoreBatch [dbpath]
                     errmess = "Unknown error!";
                 endif
                 qb_SaveDivconStatus [dbkey, indkey(1),
-                  swrite ['Error:  {}', errmess]];
+                    swrite ['Error:  {}\n', errmess]];
                 write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
             else
                 qb_SaveQMScore [dbkey, indkey(1), results];
@@ -122,7 +149,7 @@ global function qb_QMScoreBatch [dbpath]
                 errmess = "Unknown error!";
             endif
             qb_SaveDivconStatus [dbkey, indkey(1),
-                swrite ['Error:  {}', errmess]];
+                swrite ['Error:  {}\n', errmess]];
 
             write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
         endif
