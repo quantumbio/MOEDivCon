@@ -38,7 +38,6 @@ const CHG_COLOR =
     [
     'white',
     'green',
-    'yellow',
     'red'
     ];
 
@@ -62,8 +61,12 @@ const QMS_DATA_TAGS =
 //  Database Fields
 const POSE_FIELD = 'Ligand/Pose';
 const LIGCHG_FIELD = 'Lig Chg';
+const POSEOK_FLDENV = 'IsPoseOkay';
+
 const REC_FIELD = 'Receptor';
 const RECCHG_FIELD = 'Rec Chg';
+const RECOK_FLDENV = 'IsRecOkay';
+
 const STATUS_FIELD = 'Status';
 
 const QMS_NUM_FIELDS =
@@ -104,12 +107,10 @@ const STATUS_DEFAULTS =
     ['prevwd',       ''            ],
     ['calcchg',      0             ],
     ['verifychg',    0             ],
-    ['ligchg',       1             ],
     ['recchg',       1             ],
-    ['adjligchg',    0             ],
-    ['adjrecchg',    0             ],
-    ['moeligchg',    0             ],
-    ['moerecchg',    0             ]
+    ['ligchg',       1             ],
+    ['moerecchg',    0             ],
+    ['moeligchg',    0             ]
     ];
 
 /*  NOTE:  Non-GUI opt task must be the first tag.  */
@@ -120,10 +121,10 @@ const CORE_OPT_DEFAULTS =
     ['cwd',          0             ],
     ['workdir',      '/tmp'        ],
     ['scoredb',      'qmscore.mdb' ],
-    ['posedb',       ''            ],
     ['recdb',        ''            ],
-    ['ligchg',       0             ],
+    ['posedb',       ''            ],
     ['recchg',       0             ],
+    ['ligchg',       0             ],
     ['poseschg',     0             ]
     ];
 
@@ -198,20 +199,6 @@ const CORE_PANEL =
 
     Hbox :
         [
-        name: 'posebox', extendH: 1,
-        FSBText :
-            [
-            name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
-            mode: 'open', allowBlank: 0,
-            bubbleHelp:
-                'The name of the input database that holds\n'
-                'the ligand poses (and possibly scores).'
-            ],
-        Button : [ name: 'browse_posedb', text: 'Browse...' ]
-        ],
-
-    Hbox :
-        [
         name: 'recbox', extendH: 1,
         FSBText :
             [
@@ -222,6 +209,20 @@ const CORE_PANEL =
                 'the receptors.'
             ],
         Button : [ name: 'browse_recdb', text: 'Browse...' ]
+        ],
+
+    Hbox :
+        [
+        name: 'posebox', extendH: 1,
+        FSBText :
+            [
+            name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
+            mode: 'open', allowBlank: 0,
+            bubbleHelp:
+                'The name of the input database that holds\n'
+                'the ligand poses (and possibly scores).'
+            ],
+        Button : [ name: 'browse_posedb', text: 'Browse...' ]
         ],
 
     Separator : [flushLeft:1, extendH:1, margin:1],
@@ -328,32 +329,14 @@ endfunction
  *                          CalcCharge
  *
  *  Determine the total charge of the molecule collection represented by 
- * the set of atoms.  Return the adjusted flag along with the charge.
- *     0)  Okay, no adjustment.
- *     1)  Adjusted odd number of electrons.
+ * the set of atoms.
  *
  ****************************************************************************/
 local function CalcCharge [atoms]
 
     local charge = add aFCharge atoms;
-    local numelecs = add aAtomicNumber atoms;
-    if even (charge + numelecs) then
-      return [charge, 0];
-    endif
 
-    /*  Adjust the charge up or down one so that Divcon will be happy.  */
-    local adjchg = add aIon atoms;
-    if adjchg === charge then
-        adjchg = add aExplicitFCharge atoms;
-    endif
-
-    if adjchg > charge then
-      charge = charge + 1;
-    else
-      charge = charge - 1;
-    endif
-
-    return [charge, 1];
+    return charge;
 endfunction
 
 /****************************************************************************
@@ -369,10 +352,13 @@ local function CalcComplexCharge []
         return  [[], [], [], [], errmess];
     endif
 
-    local [recchg, recadj] = CalcCharge [recatoms];
-    local [ligchg, ligadj] = CalcCharge [ligatoms];
+    local recchg = CalcCharge [recatoms];
+    local ligchg = CalcCharge [ligatoms];
 
-    return [recchg, recadj, ligchg, ligadj, ''];
+    local recok = ChargeOK [recatoms, recchg];
+    local ligok = ChargeOK [ligatoms, ligchg];
+
+    return [recchg, recok, ligchg, ligok, ''];
 
 endfunction
 
@@ -409,33 +395,25 @@ local function CheckCharge [wkey, status, recchg, ligchg]
         return status;
     endif
 
-    if ligok then
-        if status.calcchg and ligchg === status.moeligchg then
-            if status.adjligchg then
-                status.ligchg = 3;
-            else
-                status.ligchg = 2;
-            endif
-        else
-            status.ligchg = 1;
-        endif
-    else
-        status.ligchg = 4;
-    endif
-
     if recok then
         if status.calcchg and recchg === status.moerecchg then
-            if status.adjrecchg then
-               status.recchg = 3;
-            else
-               status.recchg = 2;
-           endif
+          status.recchg = 2;
         else
           status.recchg = 1;
         endif
 
     else
-        status.recchg = 4;
+        status.recchg = 3;
+    endif
+
+    if ligok then
+        if status.calcchg and ligchg === status.moeligchg then
+            status.ligchg = 2;
+        else
+            status.ligchg = 1;
+        endif
+    else
+        status.ligchg = 3;
     endif
 
     SetChargeStatus [wkey, status];
@@ -505,12 +483,11 @@ local function CopyPoseDB [resultskey, poseskey]
         return mess;
     endif
 
-    local [recmols, l, status, coreopts, a, c] = qb_GetEnv [resultskey];
+    local [r, l, status, coreopts, a, c] = qb_GetEnv [resultskey];
+    local ligmolok = [];
 
     //  Check receptor charge
-    local recmess = GetStatusMessage ['Receptor', 
-        eqL [status.recchg, status.moerecchg], neL [status.recchg, 4],
-        status.adjrecchg];
+    local recmess = GetStatusMessage ['Receptor', neL [status.recchg, 3]];
 
     //  HACK alert:  temporarily renames mol field to make copying easier
     db_RenameField [resultskey, POSE_FIELD, molfield];
@@ -524,18 +501,26 @@ local function CopyPoseDB [resultskey, poseskey]
         local chgdata;
         if coreopts.poseschg then
             stsmess = cat [recmess, GetStatusMessage ['Ligand',
-                eqL [coreopts.ligchg, status.moeligchg],
-                neL [status.ligchg, 4], status.adjligchg]];
+                neL [status.ligchg, 3]]];
             chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD],
                 [coreopts.ligchg, stsmess]];
         else
             local ligmol = tagpeek [rowdata, molfield];
             local ligch = mol_Create ligmol;
             local ligatms = cat cAtoms ligch;
-            local [charge, chgadj] = CalcCharge [ligatms];
-            local chgok = ChargeOK [ligatms, charge];
-            stsmess = cat [recmess, GetStatusMessage ['Ligand', 1, chgok,
-                chgadj]];
+            local charge = 0;
+
+            if 1 <> length uniq aMoleculeNumber ligatms then
+                stsmess = cat [recmess, 
+                    'Error:  Ligand has to be a single molecule.'];
+                ligmolok = append [ligmolok, 0];
+            else
+                local charge = CalcCharge [ligatms];
+                local chgok = ChargeOK [ligatms, charge];
+                stsmess = cat [recmess, GetStatusMessage ['Ligand', chgok]];
+                ligmolok = append [ligmolok, 1];
+            endif
+
             chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [charge, stsmess]];
             oDestroy ligch;
         endif
@@ -547,6 +532,8 @@ local function CopyPoseDB [resultskey, poseskey]
     SystemPop [osys, nsys];
 
     db_RenameField [resultskey, molfield, POSE_FIELD];
+    db_SetFieldEnv [resultskey, POSE_FIELD, POSEOK_FLDENV, 
+        twrite ['{v}', ligmolok]];
 
     return mess;
 endfunction
@@ -576,6 +563,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
         return mess;
     endif
 
+    local posemolsok = [], recmolsok = [];
     db_RenameField [resultskey, REC_FIELD, recmolfield];
     apt db_EnsureField [resultskey, recfields, recftypes];
     local [osys, nsys] = SystemPush [];
@@ -585,17 +573,23 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
         local recmol = tagpeek [recrowdata, recmolfield];
         local recch = mol_Create recmol;
         local recatms = cat cAtoms recch;
-        local [recchg, recadj] = CalcCharge [recatms];
+        local recchg = CalcCharge [recatms];
         local recok = ChargeOK [recatms, recchg];
-        stsmess = GetStatusMessage ['Receptor', 1, recok, recadj];
+        stsmess = GetStatusMessage ['Receptor', recok];
         recmsgs = append [recmsgs, stsmess];
         local recchgdata = tag [[RECCHG_FIELD], [recchg]];
+        recatms = SplitReceptor [recatms];
+        local recmols = app mol_Extract recsets;
+        recmolsok = append [recmolsok, 1];
+        recrowdata = tagpoke [recrowdata, recmolfield, recmols];
         recrowdata = cat [recchgdata, recrowdata];
         db_Write [resultskey, 0, recrowdata];
         oDestroy recch;
     endloop
 
     db_RenameField [resultskey, recmolfield, REC_FIELD];
+    db_SetFieldEnv [resultskey, REC_FIELD, RECOK_FLDENV, 
+        twrite ['{v}', recmolsok]];
 
     local [posefields, poseftypes] = db_Fields poseskey;
     local posemolfield = posefields | (poseftypes == 'molecule');
@@ -609,6 +603,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
     db_RenameField [resultskey, POSE_FIELD, posemolfield];
     apt db_EnsureField [resultskey, posefields, poseftypes];
 
+    local posechgdata;
     local poserowkey = 0, resultrowkey = 0, ith = 1;
     while poserowkey = db_NextEntry [poseskey, poserowkey] loop
         resultrowkey = db_NextEntry [resultskey, resultrowkey];
@@ -616,10 +611,18 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
         local posemol = tagpeek [poserowdata, posemolfield];
         local posech = mol_Create posemol;
         local poseatms = cat cAtoms posech;
-        local [posechg, poseadj] = CalcCharge [poseatms];
-        local poseok = ChargeOK [poseatms, posechg];
-        stsmess = cat [recmsgs(ith), GetStatusMessage ['Pose', 1, poseok,
-            poseadj]];
+        local posechg = 0;
+        if 1 <> length uniq aMoleculeNumber poseatms then
+            stsmess = cat [recmsgs(ith), 
+                'Error:  Ligand has to be a single molecule.'];
+            posemolsok = append [posemolsok, 0];
+        else
+            posechg = CalcCharge [poseatms];
+            local poseok = ChargeOK [poseatms, posechg];
+            stsmess = cat [recmsgs(ith), GetStatusMessage ['Pose', poseok]];
+            posemolsok = append [posemolsok, 1];
+        endif
+
         local posechgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [posechg,
             stsmess]];
         poserowdata = cat [posechgdata, poserowdata];
@@ -629,6 +632,9 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
     endloop
 
     db_RenameField [resultskey, posemolfield, POSE_FIELD];
+    db_SetFieldEnv [resultskey, POSE_FIELD, POSEOK_FLDENV, 
+        twrite ['{v}', posemolsok]];
+
 
     SystemPop [osys, nsys];
     return mess;
@@ -654,16 +660,12 @@ endfunction
  *  Return a string message describing the charge status.
  *
  ****************************************************************************/
-local function GetStatusMessage [which, calc, ok, adj]
+local function GetStatusMessage [which, ok]
 
     local mess = "";
 
-    if ok then
-        if calc and adj then
-            mess = swrite ['Warning: {} has an adjusted charge\n', which];
-        endif
-    else
-        mess = swrite ['Warning: {} has a bad charge\n', which];
+    if not ok then
+        mess = swrite ['Warning: {} has a problematic charge\n', which];
     endif
 
     return mess;
@@ -822,8 +824,8 @@ endfunction
  ****************************************************************************/
 local function UpdateCharge [wkey, status]
 
-    local [recchg, recadj, ligchg, ligadj, errmess] = CalcComplexCharge [];
-    if recchg === [] or ligchg === [] then
+    local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
+    if recchg === [] or recok === [] or ligchg === [] or ligok === [] then
         Warning  errmess;
         SetChargeStatus [wkey, status];
         return status;
@@ -832,18 +834,15 @@ local function UpdateCharge [wkey, status]
     status.calcchg = 1;
     status.moerecchg = recchg;
     status.moeligchg = ligchg;
-    status.adjrecchg = recadj;
-    status.adjligchg = ligadj;
 
-    status.recchg = select [3, 2, recadj];
-    status.ligchg = select [3, 2, ligadj];
+    status.recchg = select [2, 3, recok];
+    status.ligchg = select [2, 3, ligok];
 
     WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
     SetChargeStatus [wkey, status];
 
     return status;
 endfunction
-
 
 /****************************************************************************
  *                          UpdateCWD
@@ -871,25 +870,30 @@ endfunction
  ****************************************************************************/
 local function UpdateMode [wkey, mode, status]
     if mode === 'One-to-One' then
-        WindowSetAttr [wkey, [posebox: [sensitive: 0],
-            posedb: [allowBlank: 1], recbox: [sensitive: 0], 
-            recdb: [allowBlank: 1], panel:[sensitive: [1,1,1,1]],
-            chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
-            recchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
+        WindowSetAttr [wkey, [
+            recbox: [sensitive: 0], recdb: [allowBlank: 1], 
+            posebox: [sensitive: 0], posedb: [allowBlank: 1], 
+            panel:[sensitive: [1,1,1,1]],
+            chgbox: [sensitive: 1], recchg: [allowBlank: 0],
+            ligchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
         SetChargeStatus [wkey, status];
     elseif mode === 'One-to-Many' then
-        WindowSetAttr [wkey, [posebox: [sensitive: 1],
-            posedb: [allowBlank: 0],recbox: [sensitive: 0], 
-            recdb: [allowBlank: 1], panel:[sensitive: [0,1,1,1]],
-            chgbox: [sensitive: 1], ligchg: [allowBlank: 0],
-            recchg: [allowBlank: 0], poseschg: [sensitive: 1]]];
+        WindowSetAttr [wkey, [
+            recbox: [sensitive: 0], recdb: [allowBlank: 1],
+            posebox: [sensitive: 1], posedb: [allowBlank: 0],
+            panel:[sensitive: [0,1,1,1]],
+            chgbox: [sensitive: 1], recchg: [allowBlank: 0],
+            ligchg: [allowBlank: 0],
+            poseschg: [sensitive: 1]]];
         SetChargeStatus [wkey, status];
     elseif mode === 'Many-to-Many' then
-        WindowSetAttr [wkey, [posebox: [sensitive: 1],
-            posedb: [allowBlank: 0], recbox: [sensitive: 1], 
-            recdb: [allowBlank: 0], panel:[sensitive: [0,1,1,1]],
-            chgbox: [sensitive: 0], ligchg: [allowBlank: 1],
-            recchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
+        WindowSetAttr [wkey, [
+            recbox: [sensitive: 1], recdb: [allowBlank: 0],
+            posebox: [sensitive: 1], posedb: [allowBlank: 0],
+            panel:[sensitive: [0,1,1,1]],
+            chgbox: [sensitive: 0], recchg: [allowBlank: 1],
+            ligchg: [allowBlank: 1],
+            poseschg: [sensitive: 0]]];
         ClearChargeStatus [wkey];
     endif
 endfunction
@@ -922,8 +926,8 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
             exit [];
         endif
 
-    elseif trig === 'ligchg' then
-        if second task_fork [master: 'parent',
+    elseif trig === 'recchg' then
+        if second task_fork [master: 'parent', 
                 statics:'share'] === 'child' then
             task_prio 0;
 
@@ -932,8 +936,8 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
             exit [];
         endif
 
-    elseif trig === 'recchg' then
-        if second task_fork [master: 'parent', 
+    elseif trig === 'ligchg' then
+        if second task_fork [master: 'parent',
                 statics:'share'] === 'child' then
             task_prio 0;
 
@@ -947,14 +951,14 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
             'none', '*.mdb', 'scoredb']];
         if btid then btasks = append [btasks, btid]; endif
 
-    elseif trig === 'browse_posedb' then
-        btid = run ['fbrowse.svl', [trig, wkey, 'Select Pose DB File', 
-            'open', '*.mdb', 'posedb']];
-        if btid then btasks = append [btasks, btid]; endif
-
     elseif trig === 'browse_recdb' then
         btid = run ['fbrowse.svl', [trig, wkey, 'Select Receptor DB File', 
             'open', '*.mdb', 'recdb']];
+        if btid then btasks = append [btasks, btid]; endif
+
+    elseif trig === 'browse_posedb' then
+        btid = run ['fbrowse.svl', [trig, wkey, 'Select Pose DB File', 
+            'open', '*.mdb', 'posedb']];
         if btid then btasks = append [btasks, btid]; endif
     endif
 
@@ -1148,8 +1152,8 @@ global function qb_InitCorePanel [wkey, status, defaults]
     status.prevwd = defaults.workdir;
     WindowSetData [wkey, dropfirst defaults];
     WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0],
-        posebox: [sensitive: 0], posedb: [allowBlank: 1],
         recbox: [sensitive: 0], recdb: [allowBlank: 1],
+        posebox: [sensitive: 0], posedb: [allowBlank: 1],
         poseschg: [sensitive: 0]]];
     status = UpdateCharge [wkey, status];
 
@@ -1219,6 +1223,37 @@ global function qb_MergeDB [srcname1, srcname2, dstname]
     db_Close dstkey;
     db_Close srckey1;
     db_Close srckey2;
+endfunction
+
+/****************************************************************************
+ *                          qb_MolsChargeOK
+ *
+ *  Determine whether the given total charge of the molecules will result
+ *  in a system with an even number of electrons.
+ *
+ ****************************************************************************/
+local function qb_MolsChargeOK [recmols, recchg, lig, ligchg]
+
+    local [osys, nsys] = SystemPush [];
+
+    local ligchn = mol_Create ligmol;
+    local ligatms = cat cAtoms ligchn;
+    local chgok = ChargeOK [ligatms, ligchg];
+    oDestroy ligch;
+
+    if not ligok then SystemPop [osys, nsys]; return 0; endif
+
+    local reccnhs = app mol_Create recmols;
+    local recatms = cat cAtoms recchns;
+    local recok = ChargeOK [recatms, recchg];
+    oDestroy recch;
+
+    SystemPop [osys, nsys];
+
+    if not recok then return 0; endif
+
+    return 1;
+
 endfunction
 
 /****************************************************************************
@@ -1296,11 +1331,9 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
     if coreopts.mode === 'One-to-One' then
         local posedata = tag [qb_GetPoseFields [], [ligand, coreopts.ligchg]];
         local stsmess = GetStatusMessage ['Receptor', 
-            eqL [coreopts.recchg, status.moerecchg],
-            neL [status.recchg, 4], status.adjrecchg];
-        stsmess = cat [stsmess, GetStatusMessage ['Ligand',
-            eqL [coreopts.ligchg, status.moeligchg],
-            neL [status.ligchg, 4], status.adjligchg]];
+            neL [status.recchg, 3]];
+        stsmess = cat [stsmess, GetStatusMessage ['Ligand', 
+            neL [status.ligchg, 3]]];
         posedata = cat [posedata, tag [[STATUS_FIELD], [stsmess]]];
         db_Write [dbkey, 0, posedata];
 
@@ -1356,14 +1389,14 @@ endfunction
 global function qb_TagCoreVals [vals]
 
     vals.scoredb = fabsname vals.scoredb;
-    vals.posedb = select ['', fabsname vals.posedb, vals.posedb === ''];
     vals.recdb = select ['', fabsname vals.recdb, vals.recdb === ''];
+    vals.posedb = select ['', fabsname vals.posedb, vals.posedb === ''];
 
     local coreopts = tag [first tr CORE_OPT_DEFAULTS, [
         second first CORE_OPT_DEFAULTS,
         vals.mode, vals.cwd, vals.workdir,
-        vals.scoredb, vals.posedb, vals.recdb,
-        vals.ligchg, vals.recchg, vals.poseschg]];
+        vals.scoredb,  vals.recdb, vals.posedb,
+        vals.recchg, vals.ligchg, vals.poseschg]];
 
     return coreopts;
 endfunction
@@ -1404,11 +1437,11 @@ global function qb_VerifyCharges [wkey, status, vals]
     endif
 
     status = CheckCharge [wkey, status, vals.recchg, vals.ligchg];
-    if status.ligchg === 4 or status.recchg === 4 then
+    if status.ligchg === 3 or status.recchg === 3 then
         local which;
-        if status.ligchg === 4 and status.recchg === 4 then
+        if status.ligchg === 3 and status.recchg === 3 then
             which = 'receptor and ligand';
-        elseif status.ligchg === 4 then
+        elseif status.ligchg === 3 then
             which = 'ligand';
         else
             which = 'receptor';

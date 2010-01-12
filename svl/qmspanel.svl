@@ -175,7 +175,20 @@ local function RunCalc [dbkey]
     local msgkey = Message [0, 'QMScore is running ...'];
     sleep -1;    // Allow parent to close input window.
 
+    local rowkey = first db_Entries [dbkey];
     local [recset, ligand, status, coreopts, appopts, c] = qb_GetEnv [dbkey];
+    local recmolsoktok = db_GetFieldEnv [dbkey, REC_FIELD, RECOK_FLDENV];
+    local [[recmolsok]] = sread [string recmolsoktok, '{v}'];
+    local ligmolsoktok = db_GetFieldEnv [dbkey, POSE_FIELD, POSEOK_FLDENV];
+    local [[ligmolsok]] = sread [string ligmolsoktok, '{v}'];
+
+    if not recmolsok(1) or not ligmolsok(1) then
+        qb_SaveDivconStatus [dbkey, rowkey, "Error:  Bad molecule, skipping!"];
+        write ['QMScore Error: Bad molecule, skipping!\n'];
+        Message [msgkey, 'QMScore Error: Bad molecule, skipping!'];
+        return;
+    endif
+
     local workdir;
     if coreopts.pwd === 1 then
         workdir = getenv 'PWD';
@@ -188,7 +201,6 @@ local function RunCalc [dbkey]
 
     local [results, errmess] = qb_QMScore [recset, ligand, coreopts, appopts];
 
-    local rowkey = first db_Entries [dbkey];
     if results === [] then
         if errmess === [] or errmess === '' then
             qb_SaveDivconStatus [dbkey, rowkey, "Error:  Unknown error!"];
