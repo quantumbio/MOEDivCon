@@ -65,7 +65,14 @@ QuantumBio Homepage
   <li><a href="#install">Installation</a>
   <li><a href="#start">Getting Started</a>
   <li><a href="#charge">Charges</a>
-  <li><a href="#load">Load</a>
+  <ol  id=tocl>
+    <li><a href="#charge-status">Status</a>
+    <li><a href="#charge-onetomany">One-To-Many Mode</a>
+    <li><a href="#charge-manytomany">Many-To-Many Mode</a>
+    <li><a href="#charge-editing">Editing</a>
+  </ol>
+  <li><a href="#load">Load and Save</a>
+  <li><a href="#clean">Postexecution Cleanup</a>
   <li><a href="#parallel">Batch and Parallel Execution</a>
   <ol  id=tocl>
     <li><a href="#parallel-mode">Parallel Mapping Mode</a>
@@ -236,12 +243,14 @@ After the QMScore runs have completed, one can use MOE to open the QMScore
 database to view and analyze the collated results.
 
 <h2><a name="charge"></a>Charges</h2>
+<todo>Add Lance's description of problematic charges.</todo>
 <p>
 When you open the QMScore dialog, MOE calculates the total charge of the
 receptor and ligand in the MOE window, and displays them in the
 <w>Charges</w> section.  You can press the <w>Calculate</w> button to
 recalculate the charges.
 
+<h3><a name="charge-status"></a>Status</h3>
 <p>
 The colored cirles next to the charges reflect the status of the charge
 calculation:
@@ -255,39 +264,53 @@ Note that the green circle doesn't mean that the charge is correct, only that
 it has been calculated.  As with any other formal charge algorithm, MOE 
 doesn't always get the total charge right.  You can edit the
 charges calculated by MOE if you think they are incorrect or they are marked
-as problematic for Divcon.  If you edit the charges, MOEDivcon
-will alert you if a charge you entered may cause problems with the Divcon
-calculations when you press <w>Run</w> or <w>Save</w>.
+as problematic for Divcon.  If you modify the charges in the QMScore dialog,
+MOEDivcon will alert you if a charge you entered may cause problems with the
+Divcon calculations when you press <w>Run</w> or <w>Save</w>.
 <p>
 <object id="QMScoreBadCharge" title="QMScore Charge Error"
 data="images/qmscorebadcharge.png" type=image/png>
 QMScore Charge Error
 </object>
-<p><a name="charge-onetomany"></a>
+
+<h3><a name="charge-onetomany"></a>One-To-Many</h3>
+<p>
 When in <w>One-to-Many</w> mode, you can choose
 to use the charge specified for the ligand as the charge for all the poses
 by selecting <w>All Poses</w>.  Otherwise, the charge is calculated for
 each pose as it is copied from the Ligand/Pose database to the
 QMScore database.  In either case, when the QMScore database is opened with
-the MOE Database Viewer for verification, you can edit the charges stored in it
-(double click on the cell and edit the charge in the edit bar at the top of
-the window).  If a calculated charge is problematic for Divcon, it is
-noted in the <w>Status</w> column (double click cell to see entire message).
-Before passing the run parameters to Divcon
-during execution, MOEDivcon checks again whether the charges are
-going to be problematic.  If so, it skips the calculation and places a
-message in the <w>Status</w> column.
-<p><a name="charge-manytomany"></a>
+the MOE Database Viewer for verification.  If a calculated charge is
+problematic for Divcon, it is noted in the <w>Status</w> column (double 
+click cell to see entire message).  Divcon calculations for molecules with
+problematic charges are skipped.
+
+<h3><a name="charge-manytomany"></a>Many-To-Many</h3>
+<p>
 When in <w>Many-to-Many</w> mode, the <w>Charges</w>
 section is disabled.  The charges for the receptors and ligands are calculated
 as they are copied from their respective databases into the QMScore
 database.  Again, you can verify and edit the charges using the MOE Database
-Viewer.  Before passing the run parameters to Divcon
-during execution, MOEDivcon checks again whether the charges are
-going to be problematic.  If so, it skips the calculation and place a
-message in the <w>Status</w> column.
+Viewer.  Divcon calculations for molecules with problematic charges are skipped.
 
-<h2><a name="load"></a>Load</h2>
+<h3><a name="charge-editing"></a>Editing</h3>
+<p>
+You can edit the charges stored in the QMScore database by double clicking
+on the cell and edit the charge in the edit bar at the top of the window.
+Afterwards, you can press the <w>Check</w> button in the <w>Charges</w>
+section of the dialog to ask MOEDivcon to recheck the charges in the QMScore
+database.  If a charge is still problematic, a warning message appears in
+the <w>Status</w> column.  Otherwise, an okay message is written.
+<p>
+Before passing the run parameters to Divcon
+during execution, MOEDivcon checks again whether the charges are
+going to be problematic.  If so, it skips the calculation and places a
+message in the <w>Status</w> column.
+<p>
+<warn>When you edit a cell in a MOE database, the new value is directly
+written to disk and the previous value is lost.</warn>
+
+<h2><a name="load"></a>Load and Save</h2>
 <p>
 You can load an existing QMScore database into the QMScore dialog by pressing
 the <w>Load</w> button.  A file dialog will open allowing you to browse for
@@ -301,8 +324,34 @@ using the MOE Database Viewer.
 receptor or ligand using MOE's Builder, then press <w>Save</w>, the updated
 options, molecules and charges will be saved in the output database.
 <p>
-<warn>Warning:  The current settings in the QMScore dialog and the molecules
-in the MOE Window are replaced and may be lost if not saved beforehand.</warn>
+If you load an existing QMScore database and only edit some of the
+<w>Rec Chg</w> or <w>Lig Chg</w> fields, you shouldn't press the
+QMScore <w>Save</w> button.  This would regenerate the original charges
+calculated from the molecules in the MOE Window, and/or those stored in the
+recepter and pose database specified in QMScore dialog.  When you edit an
+entry in a MOE database, it is written directly to disk.  See the
+<a href="#charge-edit">Editing</a> charge section for more information.
+<p>
+<warn>Warning:  When you load a database, the current settings in the QMScore
+dialog and the molecules in the MOE Window are replaced and may be lost if not
+saved beforehand.</warn>
+
+<h2><a name="clean"></a>Postexecution Cleanup</h2>
+<p>
+If a Divcon job runs successfully, MOEDivcon automatically deletes
+temporary files in the working directory.  This prevents Divcon from attempting
+to reuse files from an earlier run and avoids wasting disk space. However,
+if an error is reported the files are not deleted and the location of the
+Divcon log file is written to the <w>Status</w> column of the QMScore database
+along with the error message.  The location has the format:
+<pre>
+        hostname:/path/to/working/directory/divcon.log
+</pre>
+The hostname is useful if the job ran on a cluster and you are not sure on
+which particular machine.  This allows you to examine the Divcon output and
+logs if you need more information about why the error occurred.  It also makes
+it easier for you to find the working directory in order to delete the
+temporary files post-mortem.
 
 <h2><a name="parallel"></a>Batch and Parallel Execution</h2>
 <p>

@@ -31,7 +31,7 @@
 
 function qb_GetPoseFields;
 function qb_GetRecFields;
-function qb_GetEnv;
+function qb_GetQMSEnv;
 function qb_GetStatusFlags;
 function qb_SaveDivconStatus;
 function qb_SaveQMScore;
@@ -53,7 +53,7 @@ global function qb_QMScoreBatch [dbpath]
 
     //  Extract molecules and run options from the database environment
     local dbkey = db_Open [dbpath, 'read-write'];
-    local [recmols, ligmol, s, coreopts, appopts, c] = qb_GetEnv [dbkey];
+    local [recmols, ligmol, s, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
     local [recmolsok, ligmolsok] = qb_GetStatusFlags dbkey;
     local recoklen = length recmolsok - 1;
     local ligoklen = length ligmolsok - 1;
@@ -63,17 +63,13 @@ global function qb_QMScoreBatch [dbpath]
     if coreopts.mode === 'One-to-Many' then
         if neL [recoklen, 1] or neL [ligoklen, nrows] then
             exit 'QMScore database has been modified'
-                    ' and is not longer consistent.\n';
+                 ' and is not longer consistent.\n';
         endif
     else
         if neL [recoklen, ligoklen, nrows] then
             exit 'QMScore database has been modified'
-                    ' and is not longer consistent.\n';
+                 ' and is not longer consistent.\n';
         endif
-    endif
-
-    if neL [recoklen, ligoklen, nrows] then
-        exit 'QMScore database has been modified and is not longer constent.\n';
     endif
 
     local recchg;
@@ -88,24 +84,30 @@ global function qb_QMScoreBatch [dbpath]
     write ['Work Dir:  {}\n', workdir];  //DEBUG
 
     //  For each ligand pose in the database, calculate QM score.
-    local rowkey = 0, count = 0;
+    local rowkey = 0, , reccnt = 1, rowcnt = 0;
     local poseflds = qb_GetPoseFields [dbkey];
     local recflds = qb_GetRecFields [dbkey];
     local tid = task_key -1;
     loop
-        if count === 0 or rowkey <> 0 then
+        if rowcnt === 0 or rowkey <> 0 then
             rowkey = db_NextEntry [dbkey, rowkey];
         endif
 
         if rowkey <> 0 then
-            count = count + 1;
-            if not recmolsok(count) or not ligmolsok (count) then
-                qb_SaveDivconStatus [dbkey, rowkey, 
-                    "Error:  Bad molecule, skipping!\n"];
+            rowcnt = rowcnt + 1;
+            if coreopts.mode === 'Many-to-Many' then
+                reccnt = rowcnt;
+            endif
+
+            if not recmolsok(reccnt) or not ligmolsok (rowcnt) then
+                qb_SaveDivconStatus [dbkey, rowkey, swrite [
+                    'Error:  Bad {}, skipping computation!\n',
+                    qb_GetWhich [not recmolsok(reccnt),
+                    not ligmolsok (rowcnt)]]];
                 continue;
             endif
 
-            coreopts.task = count;
+            coreopts.task = rowcnt;
             local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
 
             if coreopts.mode === 'Many-to-Many' then
@@ -123,7 +125,7 @@ global function qb_QMScoreBatch [dbpath]
             'qb_QMScore', [recmols, posemol, coreopts, appopts], [rowkey, tid]];
 
         if rowkey <> 0 then
-            write ['Scoring pose {} of {}\n', count, nrows];
+            write ['Scoring pose {} of {}\n', rowcnt, nrows];
         endif
 
         if code === '' then
