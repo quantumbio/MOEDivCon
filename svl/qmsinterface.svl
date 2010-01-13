@@ -100,9 +100,6 @@ local molCount = length receptor_mols;
 fwrite [stdin, '{c:}\n', HAM_KEYS(appopts.ham)];
 fwrite [stdin, '{c:}\n', select ['STANDARD', 'NOSTANDARD',
     appopts.scaling === 1]];
-write ['{c:}\n', select ['STANDARD', 'NOSTANDARD',//DEBUG
-    appopts.scaling === 1]];//DEBUG
-
 fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', appopts.freq]];
 fwrite [stdin, '{c:}\n', LIG_KEYS(appopts.opt)];
 fwrite [stdin, '{n:}\n', appopts.shift];

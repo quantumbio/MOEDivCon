@@ -30,34 +30,6 @@
 
 function _Atoms;
 
-function qb_GetDefaultsNMRScore;
-function qb_GetDefaultsQMScore;
-
-//  Charge status
-const CHG_COLOR = 
-    [
-    'white',
-    'green',
-    'red'
-    ];
-
-//  Data tags are in the order in which they are returned by Divcon.
-const QMS_DATA_TAGS =
-    [
-    "LIGAND",
-    "TOTAL SCORE",
-    "GAS PHASE HEAT OF FORMATION",
-    "ELECTROSTATIC SOLVATION",
-    "ATTRACTIVE LENNARD JONES",
-    "SOLVATION ENTROPY",
-    "VIBRATIONAL ENTROPY",
-    "ELECTRONIC INTERACTION ENERGY",
-    "MRM STERIC ENERGY",
-    "MRM ELECTROSTATIC ENERGY",
-    "MRM SOLVATION ENERGY",
-    "MRM TOTAL ENERGY"
-    ];
- 
 //  Database Fields
 const POSE_FIELD = 'Ligand/Pose';
 const LIGCHG_FIELD = 'Lig Chg';
@@ -67,39 +39,27 @@ const RECCHG_FIELD = 'Rec Chg';
 
 const STATUS_FIELD = 'Status';
 
-const QMS_NUM_FIELDS =
-    [
-    'QMScore',
-    'dHf_g',
-    'Solv_elec',
-    'LJ_att',
-    'S_solv',
-    'S_vib',
-    'E_eInt',
-    'MRMScore',
-    'E_stericMRM',
-    'E_elecMRM',
-    'E_solvMRM'
-    ];
-
-const NMR_NUM_FIELDS =
-    [
-    'NMRScore'
-    ];
-
 // Environment tags
 const COMPLEX = 'complex';
 const RECEPTOR = 'receptor';
 const RECOK = 'IsRecOkay';
 const LIGAND = 'ligand';
 const LIGOK = 'IsLigOkay';
+const STATUS = 'status';
 const COREOPTS = 'coreoptions';
 const APPOPTS = 'applicationoptions';
-const STATUS = 'status';
 
 const DBTYPE = 'qb_dbtype';
 const QMSCORE = 'qb_qmscoredb';
 const NMRSCORE = 'qb_nmrscoredb';
+
+//  Charge status
+const CHG_COLOR = 
+    [
+    'white',
+    'green',
+    'red'
+    ];
 
 const STATUS_DEFAULTS =
     [
@@ -461,13 +421,13 @@ local function CheckComplexCharge [recchg, ligchg]
 
 endfunction
 
-function qb_GetEnv;
+function qb_GetEnvTag;
 function qb_GetStatusFlags;
 function qb_GetPoseFields;
 function qb_GetRecFields;
+function qb_GetWhich;
 function qb_SaveDivconStatus;
 function qb_MolsChargeOK;
-function GetWhich;
 
 /****************************************************************************
  *                          CheckDBCharges
@@ -493,7 +453,7 @@ local function CheckDBCharges [oldkey]
     endif
 
     local dbkey = db_Open [oldkey, 'read-write'];
-    local [r, l, s, coreopts, a, c] = qb_GetEnv [dbkey];
+    local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
     local [recmolsok, ligmolsok] = qb_GetStatusFlags dbkey;
     local recoklen = length recmolsok - 1;
     local ligoklen = length ligmolsok - 1;
@@ -502,13 +462,13 @@ local function CheckDBCharges [oldkey]
     //  Have rows been added or deleted?
     if coreopts.mode === 'One-to-Many' then
         if neL [recoklen, 1] or neL [ligoklen, nrows] then
-            Warning 'QMScore database has been modified\n'
+            Warning 'MOEDivcon database has been modified\n'
                     'and is not longer consistent.';
             return;
         endif
     else
         if neL [recoklen, ligoklen, nrows] then
-            Warning 'QMScore database has been modified\n'
+            Warning 'MOEDivcon database has been modified\n'
                     'and is not longer consistent.';
             return;
         endif
@@ -524,8 +484,9 @@ local function CheckDBCharges [oldkey]
         endif
 
         if not recmolsok(reccnt) or not ligmolsok (rowcnt) then
-            qb_SaveDivconStatus [dbkey, rowkey, 
-                "Error:  Bad molecule, skipping!\n"];
+            qb_SaveDivconStatus [dbkey, rowkey, swrite [
+                'Error:  Bad {}, skipping computation!\n',
+                qb_GetWhich [not recmolsok(reccnt), not ligmolsok (rowcnt)]]];
             continue;
         endif
 
@@ -546,7 +507,7 @@ local function CheckDBCharges [oldkey]
                 qb_SaveDivconStatus [dbkey, rowkey, "Charge is okay.\n"];
             endif
         else
-            local which = GetWhich [not recok, not ligok];
+            local which = qb_GetWhich [not recok, not ligok];
             qb_SaveDivconStatus [dbkey, rowkey, 
                 swrite ['Warning: problematic charge for {}.\n', which]];
         endif
@@ -576,7 +537,7 @@ local function ClearChargeStatus [wkey]
 
 endfunction
 
-function qb_GetEnv;
+function qb_GetEnvTag;
 function GetStatusMessage;
 
 /****************************************************************************
@@ -600,7 +561,8 @@ local function CopyPoseDB [resultskey, poseskey]
         return mess;
     endif
 
-    local [r, l, status, coreopts, a, c] = qb_GetEnv [resultskey];
+    local status = qb_GetEnvTag [resultskey, STATUS];
+    local coreopts = qb_GetEnvTag [resultskey, COREOPTS];
     local ligmolok = [];
 
     //  Check receptor charge
@@ -788,25 +750,6 @@ local function GetStatusMessage [which, ok]
 
     return mess;
 
-endfunction
-
-/****************************************************************************
- *                          GetWhich
- *
- *  Return a token message describing which molecules are faulty.
- *
- ****************************************************************************/
-local function GetWhich [recbad, ligbad]
-    local which = '';
-    if recbad and ligbad then
-        which = 'receptor and ligand';
-    elseif recbad then
-        which = 'receptor';
-    else
-        which = 'ligand';
-    endif
-
-    return which;
 endfunction
 
 /****************************************************************************
@@ -1211,40 +1154,53 @@ global function qb_GetDefaultsStatus []
 endfunction
 
 /****************************************************************************
- *                          qb_GetEnv
+ *                          qb_GetEnvApp
  *
- *  Get the molecules (ligand and receptor) and options from the  
- *  database.
+ *  Get the environment value for the application options.
  *
  ****************************************************************************/
-global function qb_GetEnv [dbkey]
+global function qb_GetEnvApp [dbkey]
 
-    local tgttok = db_GetEnv [dbkey, RECEPTOR];
-    local [[tgtmols]] = sread [string tgttok, '{v}'];
-    local ligtok = db_GetEnv [dbkey, LIGAND];
-    local [[ligmol]] = sread [string ligtok, '{v}'];
-    local cpxtok = db_GetEnv [dbkey, COMPLEX];
-    local [[complex]] = sread [string cpxtok, '{v}'];
+    local tagtok = db_GetEnv [dbkey, APPOPTS];
+    local [[tagval]] = sread [string tagtok, '{v}'];
 
-    local ststok = db_GetEnv [dbkey, STATUS];
-    local [[status]] = sread [string ststok, '{v}'];
+    return tagval;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetEnvTag
+ *
+ *  Get the environment value for the given tag.
+ *
+ ****************************************************************************/
+global function qb_GetEnvTag [dbkey, envtag]
+
+    local tagtok = db_GetEnv [dbkey, envtag];
+    local [[tagval]] = sread [string tagtok, '{v}'];
+
+    return tagval;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetCoreEnv
+ *
+ *  Get the molecules (receptor, ligand and optional complex), the status,
+ *  and the core options from the database.
+ *
+ ****************************************************************************/
+global function qb_GetCoreEnv [dbkey]
+
+    local recmols = qb_GetEnvTag [dbkey, RECEPTOR];
+    local ligmol = qb_GetEnvTag [dbkey, LIGAND];
+    local complex = qb_GetEnvTag [dbkey, COMPLEX];
+
+    local status = qb_GetEnvTag [dbkey, STATUS];
     status = tagcat [status, tag tr STATUS_DEFAULTS];
 
-    local coreopttok = db_GetEnv [dbkey, COREOPTS];
-    local [[coreopts]] = sread [string coreopttok, '{v}'];
+    local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
     coreopts = tagcat [coreopts, tag tr CORE_OPT_DEFAULTS];
 
-    local appopttok = db_GetEnv [dbkey, APPOPTS];
-    local [[appopts]] = sread [string appopttok, '{v}'];
-    local type = db_GetEnv [dbkey, DBTYPE];
-
-    if type === QMSCORE then
-        appopts = tagcat [appopts, qb_GetDefaultsQMScore []];
-    elseif type === NMRSCORE then
-        appopts = tagcat [appopts, qb_GetDefaultsNMRScore []];
-    endif
-
-    return [tgtmols, ligmol, status, coreopts, appopts, complex];
+    return [recmols, ligmol, status, coreopts, complex];
 
 endfunction
 
@@ -1304,6 +1260,25 @@ write ['R: {v}\nL: {v}\n', recmolsok, ligmolsok];//DEBUG
 endfunction
 
 /****************************************************************************
+ *                          qb_GetWhich
+ *
+ *  Return a token message describing which molecules are faulty.
+ *
+ ****************************************************************************/
+global function qb_GetWhich [recbad, ligbad]
+    local which = '';
+    if recbad and ligbad then
+        which = 'receptor and ligand';
+    elseif recbad then
+        which = 'receptor';
+    else
+        which = 'ligand';
+    endif
+
+    return which;
+endfunction
+
+/****************************************************************************
  *
  *                          qb_InitCorePanel
  *
@@ -1323,29 +1298,29 @@ global function qb_InitCorePanel [wkey, status, defaults]
 endfunction
 
 /****************************************************************************
- *                          qb_LoadScoreDB
+ *                          qb_LoadCoreScoreDB
  *
  ****************************************************************************/
-global function qb_LoadScoreDB [dbpath, type]
+global function qb_LoadCoreScoreDB [dbpath, type]
 
     local dbkey = db_Open [dbpath, 'read-write'];
     local dbtype = db_GetEnv [dbkey, DBTYPE];
 
     if type === 'nmrscore' and neL [dbtype, NMRSCORE] then
         db_Close dbkey;
-        return [0, [], [], [], [], [], [],
+        return [0, [], [], [], [], [],
             twrite ['{}\nis not a NMRScore Database.', dbpath]];
     endif
 
     if type === 'qmscore' and neL [dbtype, QMSCORE] then
         db_Close dbkey;
-        return [0, [], [], [], [], [], [],
+        return [0, [], [], [], [], [],
             twrite ['{}\nis not a QMScore Database.', dbpath]];
     endif
 
-    local [rec, lig, status, coreopts, appopts, complex] = qb_GetEnv [dbkey];
+    local [rec, lig, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
 
-    return [dbkey, rec, lig, status, coreopts, appopts, complex, ''];
+    return [dbkey, rec, lig, status, coreopts, complex, ''];
 
 endfunction
 
@@ -1421,33 +1396,6 @@ global function qb_SaveDivconStatus [dbkey, rowkey, message]
     message = cat [message, sep, status];
     local fielddata = tag [STATUS_FIELD, [message]];
     db_Write [dbkey, rowkey, fielddata];
-
-endfunction
-
-/****************************************************************************
- *                          qb_SaveNMRScore
- *
- *  Save just the score data in the NMRScore database.
- *
- ****************************************************************************/
-global function qb_SaveNMRScore [mdbkey, rowkey, scoredata, atomdata]
-    scoredata = cat [tag [NMR_NUM_FIELDS, scoredata], atomdata];
-    db_Write [mdbkey, rowkey, scoredata];
-
-endfunction
-
-/****************************************************************************
- *                          qb_SaveQMScore
- *
- *  Save just the score data in the QMScore database.
- *
- ****************************************************************************/
-global function qb_SaveQMScore [mdbkey, rowkey, scoredata]
-
-    if alltrue (QMS_DATA_TAGS === app first scoredata) then
-        db_Write [mdbkey, rowkey, tag [QMS_NUM_FIELDS, 
-            dropfirst app second scoredata]];
-    endif
 
 endfunction
 
@@ -1596,7 +1544,7 @@ global function qb_VerifyCharges [wkey, status, vals]
 
     status = CheckCharge [wkey, status, vals.recchg, vals.ligchg];
     if status.ligchg === 3 or status.recchg === 3 then
-        local which = GetWhich [status.recchg === 3, status.ligchg === 3];
+        local which = qb_GetWhich [status.recchg === 3, status.ligchg === 3];
         local ynmess = twrite [
             'Divcon is going to have problems\n'
             'with the {}.  Continue anyway?', which];

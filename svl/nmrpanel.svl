@@ -31,13 +31,15 @@
 
 function qb_CoreHandler;
 function qb_CutReceptor;
+function qb_GetCoreEnv;
 function qb_GetCorePanel;
 function qb_GetDefaultsCore;
 function qb_GetDefaultsStatus;
-function qb_GetEnv;
+function qb_GetEnvApp;
+function qb_GetEnvTag;
 function qb_GetLigandAtomNames;
 function qb_InitCorePanel;
-function qb_LoadScoreDB;
+function qb_LoadCoreScoreDB;
 function qb_SaveNMRScore;
 function qb_SaveDivconStatus;
 function qb_SetUpScoreDB;
@@ -47,6 +49,11 @@ function qb_VerifyCharges;
 
 function qb_NMRScore;
 function qb_NMRScoreBatch;
+
+const NMR_NUM_FIELDS =
+    [
+    'NMRScore'
+    ];
 
 
 /*  NOTE:  If you change the Option lists here, you need to update the
@@ -82,7 +89,7 @@ const HEADER =
     name: 'panel', 
     title: 'NMRScore',
     windowName: 'NMRScorePanel',
-    text: ['Run', 'Save', 'Load', 'Cancel'],
+    text: ['Run', 'Save', 'Load', 'Close'],
     onTrigger: ['validate', 'validate', 'return', 'return'],
     bubbleHelp: ['Execute NMRScore from MOE Window.',
         'Save run parameters in database\n'
@@ -186,6 +193,29 @@ const PANEL =
 //  Local Functions
 
 /****************************************************************************
+ *                          LoadDB
+ *
+ *  Get the core enviroment and application environment.
+ *
+ ****************************************************************************/
+local function LoadDB [dbkey]
+
+    local [dbkey, recset, ligand, status, coreopts, complex, mess] = 
+        qb_LoadCoreScoreDB [dbpath, 'nmrscore'];
+    if dbkey === 0 and status === [] and coreopts === [] then
+        Warning mess;
+        exit [];
+    endif
+
+    local nrmsopts = qb_GetEnvApp [dbkey];
+    nrmsopts = tagcat [nrmsopts, tag tr NMRSCORE_OPT_DEFAULTS];
+
+    return [dbkey, recset, ligand, status, coreopts, nrmsopts, complex];
+endfunction
+
+function qb_GetNMRSEnv;
+
+/****************************************************************************
  *                          RunCalc
  *
  *  Run the One-to-One scoring from the MOE Window.
@@ -195,7 +225,18 @@ function RunCalc [dbkey, moeatomnames]
     local msgkey = Message [0, 'NMRScore is running ...'];
     sleep -1;    // Allow parent to close input window.
 
-    local [recset, ligand, status, coreopts, appopts, c] = qb_GetEnv [dbkey];
+    local rowkey = first db_Entries [dbkey];
+    local [recset, ligand, status, coreopts, nmrsopts, c] = qb_GetEnv [dbkey];
+    local [recmolsok, ligmolsok] = qb_GetStatusFlags dbkey;
+    if not recmolsok(1) or not ligmolsok(1) then
+        local mess = twrite ['Error:  Bad {}, skipping computation!\n',
+            qb_GetWhich [not recmolsok(1), not ligmolsok(1)]];
+        qb_SaveDivconStatus [dbkey, rowkey, string mess];
+        write [mess];
+        Message [msgkey, mess];
+        return;
+    endif
+
     local workdir;
     if coreopts.pwd === 1 then
         workdir = getenv 'PWD';
@@ -206,9 +247,9 @@ function RunCalc [dbkey, moeatomnames]
     coreopts.workdir = workdir;
     write ['Work Dir:  {}\n', workdir];  //DEBUG
 
-    local [results, errmess] = qb_NMRScore [recset, ligand, coreopts, appopts];
+    local [results, errmess] = qb_NMRScore [recset, ligand, coreopts, nmrsopts];
 
-    local rowkey = first db_Entries [dbkey];
+
     if results === [] then
         if errmess === [] or errmess === '' then
             qb_SaveDivconStatus [dbkey, rowkey, "Error:  Unknown error!"];
@@ -240,13 +281,30 @@ endfunction
 //  Global Functions
 
 /****************************************************************************
- *                          qb_GetDefaultsNMRScore
+ *                          qb_GetNMRSEnv
  *
- *  Return the default options for NMRScore.
+ *  Get the core enviroment and application environment.
  *
  ****************************************************************************/
-global function qb_GetDefaultsNMRScore []
-    return tag tr NMRSCORE_OPT_DEFAULTS;
+local function qb_GetNMRSEnv [dbkey]
+
+    local [recset, ligand, status, coreopts, complex] = qb_GetEnv [dbkey];
+    local nmrsopts = qb_GetEnvApp [dbkey];
+    nmrsopts = tagcat [nmrsopts, tag tr NMRSCORE_OPT_DEFAULTS];
+
+    return [recset, ligand, status, coreopts, nmrsopts, complex];
+endfunction
+
+/****************************************************************************
+ *                          qb_SaveNMRScore
+ *
+ *  Save just the score data in the NMRScore database.
+ *
+ ****************************************************************************/
+global function qb_SaveNMRScore [mdbkey, rowkey, scoredata, atomdata]
+    scoredata = cat [tag [NMR_NUM_FIELDS, scoredata], atomdata];
+    db_Write [mdbkey, rowkey, scoredata];
+
 endfunction
 
 /****************************************************************************
@@ -257,17 +315,19 @@ endfunction
 global function qb_NMRScoreSetupPanel []
 
     static status;                     //  Shared with child tasks.
+    static nmrskey;
     static complexmol;
     static atomnames;
 
     if MOE_BATCH then return; endif
     if WindowShow ['NMRScorePanel', 1] then return; endif
 
-    local coreopts = [], appopts = [], browsetasks = []; 
-    local nmrkey = 0;
+    local coreopts = [], nmrsopts = [], browsetasks = []; 
+    status = qb_GetDefaultsStatus [];
     local coredflts = qb_GetDefaultsCore [];
     local appdflts = qb_GetDefaultsNMRScore [];
 
+    nmrskey = 0;
     complexmol = mol_Extract Chains [];
     atomnames = [];
 
@@ -347,27 +407,21 @@ write ['{v}', atomnames];//DEBUG
             endif
 
        elseif trig === 'panel' then
-            if vals.panel === 'Cancel' then 
+            if vals.panel === 'Close' then 
                 break;
 
             elseif vals.panel === 'Load' then 
                 if second task_fork [statics:'share',
                         master: 'parent'] === 'child' then
                     task_prio 0;
+
                     local dbpath = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
-                        write ['Load database: {}\n', dbpath];
-                        local [ldcutrec, ldlig, ldsts, ldcoreopts, ldappopts,
-                            ldcomplex, ldmess] = qb_LoadScoreDB [dbpath,
-                            'nmrscore'];
-                        if ldsts === [] and ldcoreopts === []
-                                and ldappopts === [] then
-                            Warning ldmess;
-                            exit [];
-                        endif
+                        write ['Load database: {}\n', dbpath]; //DEBUG
+                        local [ldkey, ldcutrec, ldlig, ldsts, ldcoreopts,
+                            ldnmrsopts, ldcomplex, ldmess] = LoadDB [dbpath];
 
-                        complexmol = ldcomplex;
     	                Close [force:1];
                         if neL [ldcutrec, []] and neL [ldlig, []] then
                             local ldligmol = mol_Create ldlig;
@@ -380,7 +434,11 @@ write ['{v}', atomnames];//DEBUG
                         endif
 
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
-                        WindowSetData [wkey, ldappopts];
+                        complexmol = ldcomplex;
+                        nmrskey = ldkey;
+                        dbv_Open db_Filename nmrskey;
+                        db_Close ldkey;
+                        WindowSetData [wkey, ldnmrsopts];
                     endif
 
                 exit [];
@@ -393,15 +451,15 @@ write ['{v}', atomnames];//DEBUG
                 if second task_fork [statics:'share',
                         prio:3, idle:0] === 'child' then
                     coreopts = qb_TagCoreVals [vals];
-                    appopts = tag [first tr NMRSCORE_OPT_DEFAULTS, [
+                    nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS, [
                         vals.guess, vals.opt, vals.cut, vals.radius]];
 
                     atomnames = qb_GetLigandAtomNames ['H'];
-                    nmrkey = qb_SetUpScoreDB [status, coreopts, appopts, 
+                    nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         complexmol, atomnames, 'nmrscore'];
-                    RunCalc [nmrkey, atomnames];
-                    dbv_Open db_Filename nmrkey;
-                    db_Close nmrkey;
+                    RunCalc [nmrskey, atomnames];
+                    dbv_Open db_Filename nmrskey;
+                    db_Close nmrskey;
                     exit [];
                 else
                     break;
@@ -412,15 +470,16 @@ write ['{v}', atomnames];//DEBUG
                 if not status.verifychg then continue; endif
 
                 if second task_fork [statics:'share'] === 'child' then
-                    coreopts = qb_TagCoreVals [vals];
-                    appopts = tag [first tr NMRSCORE_OPT_DEFAULTS, [
-                        vals.guess, vals.opt, vals.cut, vals.radius]];
+                    task_prio 0;
 
                     atomnames = qb_GetLigandAtomNames ['H'];
-                    nmrkey = qb_SetUpScoreDB [status, coreopts, appopts, 
+                    coreopts = qb_TagCoreVals [vals];
+                    nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS, [
+                        vals.guess, vals.opt, vals.cut, vals.radius]];
+                    nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         complexmol, atomnames, 'nmrscore'];
-                    dbv_Open db_Filename nmrkey;
-                    db_Close nmrkey;
+                    dbv_Open db_Filename nmrskey;
+                    db_Close nmrskey;
                     exit [];
                 else
                     break;
