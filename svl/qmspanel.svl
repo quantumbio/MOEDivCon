@@ -38,9 +38,9 @@ function qb_GetDefaultsStatus;
 function qb_GetEnvApp;
 function qb_GetEnvTag;
 function qb_GetStatusFlags;
+function qb_GetWhich;
 function qb_InitCorePanel;
 function qb_LoadCoreScoreDB;
-function qb_SaveQMScore;
 function qb_SaveDivconStatus;
 function qb_SetUpScoreDB;
 function qb_TagCoreVals;
@@ -216,7 +216,7 @@ const PANEL =
  *  Get the core enviroment and application environment.
  *
  ****************************************************************************/
-local function LoadDB [dbkey]
+local function LoadDB [dbpath]
 
     local [dbkey, recset, ligand, status, coreopts, c, mess] = 
         qb_LoadCoreScoreDB [dbpath, 'qmscore'];
@@ -232,6 +232,7 @@ local function LoadDB [dbkey]
 endfunction
 
 function qb_GetQMSEnv;
+function qb_SaveQMScore;
 
 /****************************************************************************
  *                          RunCalc
@@ -245,15 +246,6 @@ local function RunCalc [dbkey]
 
     local rowkey = first db_Entries [dbkey];
     local [recset, ligand, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
-    local [recmolsok, ligmolsok] = qb_GetStatusFlags dbkey;
-    if not recmolsok(1) or not ligmolsok(1) then
-        local mess = twrite ['Error:  Bad {}, skipping computation!\n',
-            qb_GetWhich [not recmolsok(1), not ligmolsok(1)]];
-        qb_SaveDivconStatus [dbkey, rowkey, string mess];
-        write [mess];
-        Message [msgkey, mess];
-        return;
-    endif
 
     local workdir;
     if coreopts.pwd === 1 then
@@ -295,9 +287,9 @@ endfunction
  *  Get the core enviroment and application environment.
  *
  ****************************************************************************/
-local function qb_GetQMSEnv [dbkey]
+global function qb_GetQMSEnv [dbkey]
 
-    local [recset, ligand, status, coreopts, c] = qb_GetEnv [dbkey];
+    local [recset, ligand, status, coreopts, c] = qb_GetCoreEnv [dbkey];
     local qmsopts = qb_GetEnvApp [dbkey];
     qmsopts = tagcat [qmsopts, tag tr QMSCORE_OPT_DEFAULTS];
 
@@ -335,7 +327,7 @@ global function qb_QMScoreSetupPanel []
     local coreopts = [], qmsopts = [], browsetasks = [];
     status = qb_GetDefaultsStatus [];
     local coredflts = qb_GetDefaultsCore [];
-    local appdflts = qb_GetDefaultsQMScore [];
+    local appdflts = tag tr QMSCORE_OPT_DEFAULTS;
 
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
@@ -369,7 +361,7 @@ global function qb_QMScoreSetupPanel []
                             oSetCollection ['QB_LIGAND', ldligatoms];
                             aSetNucleusLook [ldligatoms, 'small-sphere'];
                             aSetBondLook [ldligatoms, 'cylinder'];
-                            app mol_Create ldrec;
+                            mol_Create ldrec;
         	                View [];
                         endif
 
@@ -395,7 +387,7 @@ global function qb_QMScoreSetupPanel []
                         vals.ham, vals.scaling, vals.freq, vals.opt,
                         vals.shift]];
                     qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
-                        [], [], 'qmscore'];
+                        [], QMS_NUM_FIELDS, 'qmscore'];
                     RunCalc [qmskey];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
@@ -415,7 +407,7 @@ global function qb_QMScoreSetupPanel []
                         vals.ham, vals.scaling, vals.freq, vals.opt,
                         vals.shift]];
                     qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts,
-                        [], [], 'qmscore'];
+                        [], QMS_NUM_FIELDS, 'qmscore'];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
                     exit [];

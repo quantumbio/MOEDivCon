@@ -188,7 +188,7 @@ const CORE_PANEL =
 
     Hbox :
         [
-        extendH: 1, name: 'chgbox', title: 'Charges:',
+        extendH: 1, title: 'Charges:',
         Vbox :
             [
             Button :
@@ -212,6 +212,7 @@ const CORE_PANEL =
             ],
         Vbox :
             [
+            name: 'chgbox',
             Hbox :
                 [
                 extendH: 1,
@@ -272,14 +273,12 @@ const CORE_PANEL =
 //***********************  Local Functions  *********************************
 
 function SplitComplex;
-function SplitReceptor;
 
 /****************************************************************************
  *                          AtomsToMols
  *
  *  Given the set of atoms in the MOE Window, identify and separate the
- *  ligand, then split up the receptor atoms into individual molecules.
- *  Returns the extracted molecules.
+ *  ligand and the receptor atoms.  Returns the extracted molecules.
  *
  ****************************************************************************/
 local function AtomsToMols []
@@ -290,16 +289,10 @@ local function AtomsToMols []
         return [[], [], errmess];
     endif
 
-    local recsets = SplitReceptor [recatoms];
-
-    if recsets === [] then
-        return [[], [], 'No receptor was recognized.'];
-    endif
-
     local ligmol = mol_Extract ligatoms;
-    local recmols = app mol_Extract recsets;
+    local recmol = mol_Extract recatoms;
 
-    return [recmols, ligmol, ''];
+    return [recmol, ligmol, ''];
 
 endfunction
 
@@ -421,25 +414,25 @@ local function CheckComplexCharge [recchg, ligchg]
 
 endfunction
 
+function qb_CheckDivconLig;
+function qb_CheckDivconRec;
 function qb_GetEnvTag;
 function qb_GetStatusFlags;
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetWhich;
 function qb_SaveDivconStatus;
-function qb_MolsChargeOK;
 
 /****************************************************************************
- *                          CheckDBCharges
+ *                          CheckDBMols
  *
- *  Check the charges store in the Rec Chg and Lig Chg fields of the Score
- *  Database and store the charge status in the Status field.
+ *  Check the molecules and their charges stored in the Score
+ *  Database and store their status in the Status field.
  *
- *  HACK alert:  an extra flag was added to the LIGOK and RECOK flag vectors
- *  in order to force moe to treat is as them as vectors, not as scalars.
+ *  Note:  this only checks the receptors and ligands in the molecule fields.
  *
  ****************************************************************************/
-local function CheckDBCharges [oldkey]
+local function CheckDBMols [oldkey]
 
     if oldkey === 0 then
         Warning 'The MOEDivcon database hasn\'t been created.';
@@ -454,62 +447,42 @@ local function CheckDBCharges [oldkey]
 
     local dbkey = db_Open [oldkey, 'read-write'];
     local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
-    local [recmolsok, ligmolsok] = qb_GetStatusFlags dbkey;
-    local recoklen = length recmolsok - 1;
-    local ligoklen = length ligmolsok - 1;
-    local nrows = db_nEntries dbkey;
-
-    //  Have rows been added or deleted?
-    if coreopts.mode === 'One-to-Many' then
-        if neL [recoklen, 1] or neL [ligoklen, nrows] then
-            Warning 'MOEDivcon database has been modified\n'
-                    'and is not longer consistent.';
-            return;
-        endif
-    else
-        if neL [recoklen, ligoklen, nrows] then
-            Warning 'MOEDivcon database has been modified\n'
-                    'and is not longer consistent.';
-            return;
-        endif
-    endif
-
-    local rowkey = 0, reccnt = 1, rowcnt = 0;
+    local rowkey = 0;
     local recflds = qb_GetRecFields [dbkey];
     local ligflds = qb_GetPoseFields [dbkey];
+
     while rowkey = db_NextEntry [dbkey, rowkey] loop
-        rowcnt = rowcnt + 1;
-        if coreopts.mode === 'Many-to-Many' then
-            reccnt = rowcnt;
-        endif
-
-        if not recmolsok(reccnt) or not ligmolsok (rowcnt) then
-            qb_SaveDivconStatus [dbkey, rowkey, swrite [
-                'Error:  Bad {}, skipping computation!\n',
-                qb_GetWhich [not recmolsok(reccnt), not ligmolsok (rowcnt)]]];
-            continue;
-        endif
-
-        local recok, ligok;
+        local recok = 1, recchgok = 1, recmess = '';
         local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
+        local [ligok, ligchgok, ligmess] = qb_CheckDivconLig [ligmol, ligchg];
         if coreopts.mode === 'Many-to-Many' then
-            local [recmols, recchg] = db_ReadFields [dbkey, rowkey,
+            local [recmol, recchg] = db_ReadFields [dbkey, rowkey,
                 recflds];
-            [recok, ligok] = qb_MolsChargeOK [recmols, recchg, ligmol,
-                ligchg];
-        else
-            [recok, ligok] = qb_MolsChargeOK [[], 0, ligmol, ligchg];
+            [recok, recchgok, recmess] = qb_CheckDivconRec [recmol, recchg];
         endif
 
-        if recok and ligok then
+        if alltrue [recok, recchgok, ligok, ligchgok] then
             local [oldstatus] = db_ReadFields [dbkey, rowkey, STATUS_FIELD];
             if not isnull oldstatus then
-                qb_SaveDivconStatus [dbkey, rowkey, "Charge is okay.\n"];
+                qb_SaveDivconStatus [dbkey, rowkey,
+                    "Everything is compatible with Divcon.\n"];
             endif
         else
-            local which = qb_GetWhich [not recok, not ligok];
-            qb_SaveDivconStatus [dbkey, rowkey, 
-                swrite ['Warning: problematic charge for {}.\n', which]];
+            local errmess = "";
+            if not alltrue [recok, ligok] then
+                errmess = cat [errmess, 
+                    swrite ['Warning:  Problematic molecule in {}.\n{}\n', 
+                    qb_GetWhich [not recok, not ligok], 
+                    tok_cat [recmess, ligmess]]];
+            endif
+
+            if not alltrue [recchgok, ligchgok] then
+                errmess =  cat [errmess, 
+                    swrite ['Warning:  Problematic charge for {}.\n', 
+                    qb_GetWhich [not recchgok, not ligchgok]]];
+            endif
+
+            qb_SaveDivconStatus [dbkey, rowkey, errmess];
         endif
     endloop
 
@@ -545,9 +518,6 @@ function GetStatusMessage;
  *
  *  Copy the Poses database into the QMScore output database.
  *
- *  HACK alert:  add an extra flag to the LIGOK and RECOK flag vector
- *  in order to force moe to treat them as vectors, not as scalars.
- *
  ****************************************************************************/
 local function CopyPoseDB [resultskey, poseskey]
 
@@ -563,7 +533,6 @@ local function CopyPoseDB [resultskey, poseskey]
 
     local status = qb_GetEnvTag [resultskey, STATUS];
     local coreopts = qb_GetEnvTag [resultskey, COREOPTS];
-    local ligmolok = [];
 
     //  Check receptor charge
     local recmess = GetStatusMessage ['Receptor', neL [status.recchg, 3]];
@@ -581,8 +550,7 @@ local function CopyPoseDB [resultskey, poseskey]
         if coreopts.poseschg then
             stsmess = cat [recmess, GetStatusMessage ['Ligand',
                 neL [status.ligchg, 3]]];
-            chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD],
-                [coreopts.ligchg, stsmess]];
+            chgdata = tag [[LIGCHG_FIELD], [coreopts.ligchg]];
         else
             local ligmol = tagpeek [rowdata, molfield];
             local ligch = mol_Create ligmol;
@@ -591,28 +559,27 @@ local function CopyPoseDB [resultskey, poseskey]
 
             if 1 <> length uniq aMoleculeNumber ligatms then
                 stsmess = cat [recmess, 
-                    'Error:  Ligand has to be a single molecule.'];
-                ligmolok = append [ligmolok, 0];
+                    'Warning:  Ligand must to be a single molecule.\n'];
             else
                 charge = CalcCharge [ligatms];
                 local chgok = ChargeOK [ligatms, charge];
                 stsmess = cat [recmess, GetStatusMessage ['Ligand', chgok]];
-                ligmolok = append [ligmolok, 1];
             endif
 
-            chgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [charge, stsmess]];
+            chgdata = tag [[LIGCHG_FIELD], [charge]];
             oDestroy ligch;
         endif
 
         rowdata = cat [chgdata, rowdata];
-        db_Write [resultskey, 0, rowdata];
+        local resultrowkey = db_Write [resultskey, 0, rowdata];
+        if not isnull stsmess then
+            qb_SaveDivconStatus [resultskey, resultrowkey, stsmess];
+        endif
     endloop
 
     SystemPop [osys, nsys];
 
     db_RenameField [resultskey, molfield, POSE_FIELD];
-    ligmolok = append [ligmolok, 0];
-    db_SetEnv [resultskey, LIGOK, twrite ['{v}', ligmolok]];
 
     return mess;
 endfunction
@@ -623,9 +590,6 @@ endfunction
  *  Copy the Receptors and Poses databases into the QMScore output database.
  *
  *  HACK alert:  temporarily renames mol fields to make copying easier.
- *
- *  HACK alert:  add an extra flag to the LIGOK and RECOK flag vectors
- *  in order to force moe to treat is as them as vectors, not as scalars.
  *
  ****************************************************************************/
 local function CopyRecPoseDB [resultskey, recskey, poseskey]
@@ -645,10 +609,21 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
         return mess;
     endif
 
-    local posemolsok = [], recmolsok = [];
+    local [posefields, poseftypes] = db_Fields poseskey;
+    local posemolfield = posefields | (poseftypes == 'molecule');
+    if 1 <> length posemolfield then
+        mess = 'The pose database has\n'
+            'more than one molecule field.';
+        return mess;
+    endif
+
     db_RenameField [resultskey, REC_FIELD, recmolfield];
     apt db_EnsureField [resultskey, recfields, recftypes];
-    local [osys, nsys] = SystemPush [];
+
+    if not MOE_BATCH then
+        local [osys, nsys] = SystemPush [];
+    endif
+
     local recrowkey = 0, recmsgs = [], stsmess = "";
     while recrowkey = db_NextEntry [recskey, recrowkey] loop
         local recrowdata = db_Read [recskey, recrowkey];
@@ -660,27 +635,12 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
         stsmess = GetStatusMessage ['Receptor', recok];
         recmsgs = append [recmsgs, stsmess];
         local recchgdata = tag [[RECCHG_FIELD], [recchg]];
-        local recsets = SplitReceptor [recatms];
-        local recmols = app mol_Extract recsets;
-        recmolsok = append [recmolsok, 1];
-        recrowdata = tagpoke [recrowdata, recmolfield, recmols];
         recrowdata = cat [recchgdata, recrowdata];
         db_Write [resultskey, 0, recrowdata];
         oDestroy recchs;
     endloop
 
     db_RenameField [resultskey, recmolfield, REC_FIELD];
-    recmolsok = append [recmolsok, 0];
-    db_SetEnv [resultskey, RECOK, twrite ['{v}', recmolsok]];
-
-    local [posefields, poseftypes] = db_Fields poseskey;
-    local posemolfield = posefields | (poseftypes == 'molecule');
-    if 1 <> length posemolfield then
-        mess = 'The pose database has\n'
-            'more than one molecule field.';
-        SystemPop [osys, nsys];
-        return mess;
-    endif
 
     db_RenameField [resultskey, POSE_FIELD, posemolfield];
     apt db_EnsureField [resultskey, posefields, poseftypes];
@@ -695,28 +655,29 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
         local posechg = 0;
         if 1 <> length uniq aMoleculeNumber poseatms then
             stsmess = cat [recmsgs(ith), 
-                'Error:  Ligand has to be a single molecule.'];
-            posemolsok = append [posemolsok, 0];
+                'Warning:  Ligand has to be a single molecule.'];
         else
             posechg = CalcCharge [poseatms];
             local poseok = ChargeOK [poseatms, posechg];
             stsmess = cat [recmsgs(ith), GetStatusMessage ['Pose', poseok]];
-            posemolsok = append [posemolsok, 1];
         endif
 
-        local posechgdata = tag [[LIGCHG_FIELD, STATUS_FIELD], [posechg,
-            stsmess]];
+        local posechgdata = tag [[LIGCHG_FIELD], [posechg]];
         poserowdata = cat [posechgdata, poserowdata];
         db_Write [resultskey, resultrowkey, poserowdata];
+        if not isnull stsmess then
+            qb_SaveDivconStatus [resultskey, resultrowkey, stsmess];
+        endif
         oDestroy posech;
         ith = ith + 1;
     endloop
 
     db_RenameField [resultskey, posemolfield, POSE_FIELD];
-    posemolsok = append [posemolsok, 0];
-    db_SetEnv [resultskey, LIGOK, twrite ['{v}', posemolsok]];
 
-    SystemPop [osys, nsys];
+    if not MOE_BATCH then
+        SystemPop [osys, nsys];
+    endif
+
     return mess;
 endfunction
 
@@ -813,14 +774,10 @@ local function SetScoreFields [dbkey, addreceptor, fields, dbtype]
     db_EnsureField [dbkey, LIGCHG_FIELD, 'int'];
     db_EnsureField [dbkey, STATUS_FIELD, 'char'];
 
-    if dbtype === 'qmscore' then
-        apt db_EnsureField [dbkey, QMS_NUM_FIELDS, 'double'];
-    elseif dbtype === 'nmrscore' then
-        apt db_EnsureField [dbkey, NMR_NUM_FIELDS , 'double'];
-        if neL [fields, []] then
-            apt db_EnsureField [dbkey, fields, 'double'];
-        endif
+    if neL [fields, []] then
+        apt db_EnsureField [dbkey, fields, 'double'];
     endif
+
 endfunction
 
 /****************************************************************************
@@ -953,7 +910,7 @@ local function UpdateMode [wkey, mode, status]
         WindowSetAttr [wkey, [
             recbox: [sensitive: 0], recdb: [allowBlank: 1], 
             posebox: [sensitive: 0], posedb: [allowBlank: 1], 
-            panel:[sensitive: [1,1,1,1]],
+            panel:[sensitive: [1,1,1,1]], calcchg: [sensitive: 1],
             chgbox: [sensitive: 1], recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
         SetChargeStatus [wkey, status];
@@ -961,7 +918,7 @@ local function UpdateMode [wkey, mode, status]
         WindowSetAttr [wkey, [
             recbox: [sensitive: 0], recdb: [allowBlank: 1],
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
-            panel:[sensitive: [0,1,1,1]],
+            panel:[sensitive: [0,1,1,1]], calcchg: [sensitive: 1],
             chgbox: [sensitive: 1], recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0],
             poseschg: [sensitive: 1]]];
@@ -970,7 +927,7 @@ local function UpdateMode [wkey, mode, status]
         WindowSetAttr [wkey, [
             recbox: [sensitive: 1], recdb: [allowBlank: 0],
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
-            panel:[sensitive: [0,1,1,1]],
+            panel:[sensitive: [0,1,1,1]], calcchg: [sensitive: 0],
             chgbox: [sensitive: 0], recchg: [allowBlank: 1],
             ligchg: [allowBlank: 1],
             poseschg: [sensitive: 0]]];
@@ -979,6 +936,111 @@ local function UpdateMode [wkey, mode, status]
 endfunction
 
 //************************  Global Functions  *******************************
+
+/****************************************************************************
+ *                          qb_CheckDivconLig
+ *
+ *  Determine whether the ligand and its total charge is problematic
+ *  for Divcon.
+ *
+ ****************************************************************************/
+global function qb_CheckDivconLig [ligmol, ligchg]
+
+    if not MOE_BATCH then
+        local [osys, nsys] = SystemPush [];
+    endif
+
+    local mess = '';
+    local ligchn = mol_Create ligmol;
+    local ligatms = cat cAtoms ligchn;
+    local ligok = 1 === length uniq aMoleculeNumber ligatms;
+    if not ligok then
+        mess = 'Ligand must be a single molecule.';
+    endif
+
+    local ligchgok = ChargeOK [ligatms, ligchg];
+    oDestroy ligchn;
+
+    if not MOE_BATCH then
+        SystemPop [osys, nsys];
+    endif
+
+    return [ligok, ligchgok, mess];
+
+endfunction
+
+/****************************************************************************
+ *                          qb_CheckDivconMols
+ *
+ *  Determine whether the given molecules and their total charges are
+ *  problematic for Divcon.  Return the receptor collection separated
+ *  into individual molecules to be compatible with Divcon's backbone.
+ *
+ ****************************************************************************/
+global function qb_CheckDivconMols [recmol, recchg, ligmol, ligchg]
+
+    if not MOE_BATCH then
+        local [osys, nsys] = SystemPush [];
+    endif
+
+    local mess = '';
+    local recchns = mol_Create recmol;
+    local recatms = cat cAtoms recchns;
+    local recatmsets = SplitReceptor [recatms];
+    local recmolset = app mol_Extract recatmsets;
+    local recok = 1;
+    local recchgok = ChargeOK [recatms, recchg];
+    oDestroy recchns;
+
+    local ligchn = mol_Create ligmol;
+    local ligatms = cat cAtoms ligchn;
+    local ligok = 1 === length uniq aMoleculeNumber ligatms;
+    if not ligok then
+        mess = tok_cat [mess, 'Ligand must be a single molecule.\n'];
+    endif
+
+    local ligchgok = ChargeOK [ligatms, ligchg];
+    oDestroy ligchn;
+
+    if not MOE_BATCH then
+        SystemPop [osys, nsys];
+    endif
+
+    return [recmolset, recok, recchgok, ligok, ligchgok, mess];
+
+endfunction
+
+/****************************************************************************
+ *                          qb_CheckDivconRec
+ *
+ *  Determine whether the receptor and its total charge is problematic
+ *  for Divcon.
+ *
+ ****************************************************************************/
+global function qb_CheckDivconRec [recmol, recchg]
+
+    if not MOE_BATCH then
+        local [osys, nsys] = SystemPush [];
+    endif
+
+    local mess = '';
+    local recchns = mol_Create recmol;
+    local recatms = cat cAtoms recchns;
+    local recok = 1;                             // Future receptor test?
+    if not recok then
+        mess = 'Receptor is bad, bad, bad.';
+    endif
+
+    local recchgok = ChargeOK [recatms, recchg];
+    oDestroy recchns;
+
+    if not MOE_BATCH then
+        SystemPop [osys, nsys];
+    endif
+
+    return [recok, recchgok, mess];
+
+endfunction
 
 /****************************************************************************
  *
@@ -1011,7 +1073,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
                 statics:'share'] === 'child' then
             task_prio 0;
 
-            CheckDBCharges [dbkey];
+            CheckDBMols [dbkey];
             exit [];
         endif
 
@@ -1113,12 +1175,10 @@ global function qb_CutReceptor [posedbkey, radius]
 
     print aMoleculeNumber resatoms;  //DEBUG
 
-    local recsets = SplitReceptor [resatoms];
-
     local ligmol = mol_Extract ligatoms;
-    local recmols = app mol_Extract recsets;
+    local recmol = mol_Extract resatoms;
 
-    return [recmols, ligmol, ''];
+    return [recmol, ligmol, ''];
 
 endfunction
 
@@ -1190,7 +1250,7 @@ endfunction
  ****************************************************************************/
 global function qb_GetCoreEnv [dbkey]
 
-    local recmols = qb_GetEnvTag [dbkey, RECEPTOR];
+    local recmol = qb_GetEnvTag [dbkey, RECEPTOR];
     local ligmol = qb_GetEnvTag [dbkey, LIGAND];
     local complex = qb_GetEnvTag [dbkey, COMPLEX];
 
@@ -1200,7 +1260,7 @@ global function qb_GetCoreEnv [dbkey]
     local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
     coreopts = tagcat [coreopts, tag tr CORE_OPT_DEFAULTS];
 
-    return [recmols, ligmol, status, coreopts, complex];
+    return [recmol, ligmol, status, coreopts, complex];
 
 endfunction
 
@@ -1211,8 +1271,8 @@ endfunction
  *
  ****************************************************************************/
 global function qb_GetLigandAtomNames [type]
-    local [recset, ligand, errmess] = AtomsToMols [];
-    if recset === [] or ligand === [] then
+    local [receptor, ligand, errmess] = AtomsToMols [];
+    if receptor === [] or ligand === [] then
         Warning errmess;
         exit [];
     endif
@@ -1241,22 +1301,6 @@ global function qb_GetRecFields []
 
     return [REC_FIELD, RECCHG_FIELD];
 
-endfunction
-
-/****************************************************************************
- *                          qb_GetStatusFlags
- *
- *  Get the receptor and ligand molecule status flags.
- *
- ****************************************************************************/
-global function qb_GetStatusFlags [dbkey]
-    local recmolsoktok = db_GetEnv [dbkey, RECOK];
-    local [[recmolsok]] = sread [string recmolsoktok, '{v}'];
-    local ligmolsoktok = db_GetEnv [dbkey, LIGOK];
-    local [[ligmolsok]] = sread [string ligmolsoktok, '{v}'];
-
-write ['R: {v}\nL: {v}\n', recmolsok, ligmolsok];//DEBUG
-    return [recmolsok, ligmolsok];
 endfunction
 
 /****************************************************************************
@@ -1356,32 +1400,6 @@ global function qb_MergeDB [srcname1, srcname2, dstname]
     db_Close srckey2;
 endfunction
 
-/****************************************************************************
- *                          qb_MolsChargeOK
- *
- *  Determine whether the given total charge of the molecules will result
- *  in a system with an even number of electrons.
- *
- ****************************************************************************/
-global function qb_MolsChargeOK [recmols, recchg, ligmol, ligchg]
-
-    local [osys, nsys] = SystemPush [];
-
-    local ligchn = mol_Create ligmol;
-    local ligatms = cat cAtoms ligchn;
-    local ligok = ChargeOK [ligatms, ligchg];
-    oDestroy ligchn;
-
-    local recchns = app mol_Create recmols;
-    local recatms = cat cAtoms recchns;
-    local recok = ChargeOK [recatms, recchg];
-    oDestroy recchns;
-
-    SystemPop [osys, nsys];
-
-    return [recok, ligok];
-
-endfunction
 
 /****************************************************************************
  *                          qb_SaveDivconStatus
@@ -1393,7 +1411,7 @@ global function qb_SaveDivconStatus [dbkey, rowkey, message]
 
     local sep = "------------------------------------------------------------\n";
     local [status] = db_ReadFields [dbkey, rowkey, [STATUS_FIELD]];
-    message = cat [message, sep, status];
+    message = cat [message, asctime [], "\n", sep, status];
     local fielddata = tag [STATUS_FIELD, [message]];
     db_Write [dbkey, rowkey, fielddata];
 
@@ -1420,14 +1438,14 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
     SetScoreFields [dbkey, coreopts.mode === 'Many-to-Many', fields, dbtype];
 
     if coreopts.mode === 'One-to-One' or coreopts.mode === 'One-to-Many' then
-        local [recset, ligand, errmess] = AtomsToMols [];
-        if recset === [] or ligand === [] then
+        local [receptor, ligand, errmess] = AtomsToMols [];
+        if receptor === [] or ligand === [] then
             Warning errmess;
             exit [];
         endif
 
         db_SetEnv [dbkey, RECOK, twrite ['{v}', [1, 0]]];
-        SaveEnv [dbkey, recset, ligand, status, coreopts, appopts, complex, 
+        SaveEnv [dbkey, receptor, ligand, status, coreopts, appopts, complex, 
             dbtype];
     else
         SaveEnv [dbkey, [], [], status, coreopts, appopts, complex, dbtype];
@@ -1439,8 +1457,11 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
             neL [status.recchg, 3]];
         stsmess = cat [stsmess, GetStatusMessage ['Ligand', 
             neL [status.ligchg, 3]]];
-        posedata = cat [posedata, tag [[STATUS_FIELD], [stsmess]]];
-        db_Write [dbkey, 0, posedata];
+        local rowkey = db_Write [dbkey, 0, posedata];
+        if not isnull stsmess then
+            qb_SaveDivconStatus [dbkey, rowkey, stsmess];
+        endif
+
         db_SetEnv [dbkey, LIGOK, twrite ['{v}', [1, 0]]];
 
     else

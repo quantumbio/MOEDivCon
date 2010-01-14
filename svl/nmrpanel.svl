@@ -38,9 +38,10 @@ function qb_GetDefaultsStatus;
 function qb_GetEnvApp;
 function qb_GetEnvTag;
 function qb_GetLigandAtomNames;
+function qb_GetStatusFlags;
+function qb_GetWhich;
 function qb_InitCorePanel;
 function qb_LoadCoreScoreDB;
-function qb_SaveNMRScore;
 function qb_SaveDivconStatus;
 function qb_SetUpScoreDB;
 function qb_TagCoreVals;
@@ -198,7 +199,7 @@ const PANEL =
  *  Get the core enviroment and application environment.
  *
  ****************************************************************************/
-local function LoadDB [dbkey]
+local function LoadDB [dbpath]
 
     local [dbkey, recset, ligand, status, coreopts, complex, mess] = 
         qb_LoadCoreScoreDB [dbpath, 'nmrscore'];
@@ -214,6 +215,7 @@ local function LoadDB [dbkey]
 endfunction
 
 function qb_GetNMRSEnv;
+function qb_SaveNMRScore;
 
 /****************************************************************************
  *                          RunCalc
@@ -226,16 +228,8 @@ function RunCalc [dbkey, moeatomnames]
     sleep -1;    // Allow parent to close input window.
 
     local rowkey = first db_Entries [dbkey];
-    local [recset, ligand, status, coreopts, nmrsopts, c] = qb_GetEnv [dbkey];
-    local [recmolsok, ligmolsok] = qb_GetStatusFlags dbkey;
-    if not recmolsok(1) or not ligmolsok(1) then
-        local mess = twrite ['Error:  Bad {}, skipping computation!\n',
-            qb_GetWhich [not recmolsok(1), not ligmolsok(1)]];
-        qb_SaveDivconStatus [dbkey, rowkey, string mess];
-        write [mess];
-        Message [msgkey, mess];
-        return;
-    endif
+    local [recset, ligand, status, coreopts, nmrsopts, c]
+        = qb_GetNMRSEnv [dbkey];
 
     local workdir;
     if coreopts.pwd === 1 then
@@ -288,7 +282,7 @@ endfunction
  ****************************************************************************/
 local function qb_GetNMRSEnv [dbkey]
 
-    local [recset, ligand, status, coreopts, complex] = qb_GetEnv [dbkey];
+    local [recset, ligand, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
     local nmrsopts = qb_GetEnvApp [dbkey];
     nmrsopts = tagcat [nmrsopts, tag tr NMRSCORE_OPT_DEFAULTS];
 
@@ -325,7 +319,7 @@ global function qb_NMRScoreSetupPanel []
     local coreopts = [], nmrsopts = [], browsetasks = []; 
     status = qb_GetDefaultsStatus [];
     local coredflts = qb_GetDefaultsCore [];
-    local appdflts = qb_GetDefaultsNMRScore [];
+    local appdflts = tag tr NMRSCORE_OPT_DEFAULTS;
 
     nmrskey = 0;
     complexmol = mol_Extract Chains [];
@@ -356,9 +350,9 @@ global function qb_NMRScoreSetupPanel []
                     master: 'parent'] === 'child' then
                 task_prio 0;
 
-                local [cutrecmols, cutligmol, crerrmess] = qb_CutReceptor [0, 
+                local [cutrecmol, cutligmol, crerrmess] = qb_CutReceptor [0, 
                     vals.radius];
-                if cutrecmols === [] or cutligmol === [] then
+                if cutrecmol === [] or cutligmol === [] then
                     Warning crerrmess;
                     exit [];
                 endif
@@ -370,7 +364,7 @@ global function qb_NMRScoreSetupPanel []
                 oSetCollection ['QB_LIGAND', cutligatoms];
                 aSetNucleusLook [cutligatoms, 'small-sphere'];
                 aSetBondLook [cutligatoms, 'cylinder'];
-                app mol_Create cutrecmols;
+                mol_Create cutrecmol;
 	            View [];
                 exit [];
             endif
@@ -429,7 +423,7 @@ write ['{v}', atomnames];//DEBUG
                             oSetCollection ['QB_LIGAND', ldligatoms];
                             aSetNucleusLook [ldligatoms, 'small-sphere'];
                             aSetBondLook [ldligatoms, 'cylinder'];
-                            app mol_Create ldcutrec;
+                            mol_Create ldcutrec;
         	                View [];
                         endif
 
@@ -456,7 +450,8 @@ write ['{v}', atomnames];//DEBUG
 
                     atomnames = qb_GetLigandAtomNames ['H'];
                     nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
-                        complexmol, atomnames, 'nmrscore'];
+                        complexmol, cat [NMR_NUM_FIELDS, atomnames],
+                        'nmrscore'];
                     RunCalc [nmrskey, atomnames];
                     dbv_Open db_Filename nmrskey;
                     db_Close nmrskey;
@@ -477,7 +472,8 @@ write ['{v}', atomnames];//DEBUG
                     nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS, [
                         vals.guess, vals.opt, vals.cut, vals.radius]];
                     nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
-                        complexmol, atomnames, 'nmrscore'];
+                        complexmol, cat [NMR_NUM_FIELDS, atomnames],
+                        'nmrscore'];
                     dbv_Open db_Filename nmrskey;
                     db_Close nmrskey;
                     exit [];
