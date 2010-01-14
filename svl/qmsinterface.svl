@@ -27,7 +27,8 @@
 #set version '2010.02'
 #set main 'qb_QMScore'
 
-function qb_MolsChargeOK;
+function qb_CheckDivconMols;
+function qb_GetWhich;
 
 /*  NOTE:  If you change the Key lists here, you need to update the
  *         Option lists and default indices in qmspanel.svl.
@@ -50,12 +51,27 @@ const LIG_KEYS =
     'COMPLEXOPT'
     ];
 
-global function qb_QMScore [receptor_mols, ligand_mol, coreopts, appopts]
+global function qb_QMScore [recmol, ligmol, coreopts, appopts]
 
 local errmess = "";
-if not alltrue qb_MolsChargeOK [receptor_mols, coreopts.recchg, 
-        ligand_mol, coreopts.ligchg] then
-    return [[], "Problematic charge, skipping!\n"];
+
+local [recmolset, recok, recchgok, ligok, ligchgok, ckmsg]
+    = qb_CheckDivconMols [recmol, coreopts.recchg, ligmol, coreopts.ligchg];
+
+if not alltrue [recok, recchgok, ligok, ligchgok] then
+    if not alltrue [recok, ligok] then
+        errmess = cat [errmess, 
+            swrite ['Problematic molecule in {}, skipping!\n{}\n', 
+            qb_GetWhich [not recok, not ligok], ckmsg]];
+    endif
+
+    if not alltrue [recchgok, ligchgok] then
+        errmess =  cat [errmess, 
+            swrite ['Problematic charge for {}, skipping!\n{}\n', 
+            qb_GetWhich [not recchgok, not ligchgok], ckmsg]];
+    endif
+
+    return [[], errmess];
 endif
 
 local subdirname, delsubdir = 0;
@@ -95,7 +111,7 @@ local stdout = exe_stdout process_keys;
 
 local retValue, success = 0;
 local mol, molIndex, residueIndex, residueCount, atomIndex, atomCount;
-local molCount = length receptor_mols;
+local molCount = length recmolset;
 //fwrite [stdin, '{c:}\n', scorepath];
 fwrite [stdin, '{c:}\n', HAM_KEYS(appopts.ham)];
 fwrite [stdin, '{c:}\n', select ['STANDARD', 'NOSTANDARD',
@@ -106,7 +122,7 @@ fwrite [stdin, '{n:}\n', appopts.shift];
 fwrite [stdin, '{n:}\n', coreopts.recchg];
 fwrite [stdin, '{n:}\n', molCount];
 for molIndex = 1, molCount, 1 loop
-    mol = receptor_mols(molIndex);
+    mol = recmolset(molIndex);
     atomIndex = 1;
     residueCount = mol(2)(MOL_CHAIN_NRES)(1);
     fwrite [stdin, '{n:}\n', residueCount];
@@ -132,7 +148,7 @@ endloop
 //  There is only one molecule and one chain in the ligand/poses collection.
 fwrite [stdin, '{n:}\n', coreopts.ligchg];
 fwrite [stdin, '{n:}\n', 1];
-mol = ligand_mol;
+mol = ligmol;
 atomIndex = 1;
 residueCount = mol(2)(MOL_CHAIN_NRES)(1);
 fwrite [stdin, '{n:}\n', residueCount];
@@ -219,6 +235,7 @@ endif
 if success === 1 then
     return [results, errmess];
 else
+    if isnull errmess then errmess = "Unkownn error!\n"; endif
     errmess = cat [errmess, swrite ['Log file:  {}:{}/divcon.log\n',
         getenv 'HOSTNAME', coreopts.workdir]];
     return [[], errmess];
