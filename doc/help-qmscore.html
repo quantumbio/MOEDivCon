@@ -417,6 +417,10 @@ you can verify the ligand/pose data, especially the charge values and status.
 See the
 <a href="#parallel-moebatch">Running Moebatch</a>
 section to learn how to execute the job.
+<p>
+<warn>If the receptor and pose databases have fields&ndash;other than the
+molecule field&ndash;with the same name, the pose data will overwrite the
+receptor data for those fields.</warn>
 
 <h4><a name="parallel-mode-MtoM"></a>Many Receptors--Many Ligands</h4>
 <p>
@@ -679,6 +683,81 @@ Error:   LICENSE ERROR: Problem with license file. Error Code: 1003.
   <li><p><prob>
     I get the MOE message:
     <pre>
+The MOEDivcon database hasn't been created.
+    </pre>
+    </prob><p><sol>
+  </sol>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+The MOEDivcon database isn't open.
+    </pre>
+    </prob><p><sol>
+  </sol>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+No molecular complex loaded in MOE Window.
+    </pre>
+    </prob><p><sol>
+  </sol>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+Divcon is going to have problems with the receptor (and/or ligand).  Continue anyway?
+    </pre>
+    </prob><p><sol>
+  </sol>
+  <li><p><prob>
+    In the <w>Status</w> field of the QMScore database, I get the message:
+    <pre>
+Warning:  Problematic molecule in {}.
+    </pre>
+or
+    <pre>
+Error:  Problematic molecule in {}.
+    </pre>
+    </prob><p><sol>
+  </sol>
+  <li><p><prob>
+    In the <w>Status</w> field of the QMScore database, I get the message:
+    <pre>
+Warning:  Problematic charge for {}.
+    </pre>
+or
+    <pre>
+Error:  Problematic charge for {}.
+    </pre>
+    </prob><p><sol>
+  </sol>
+  <li><p><prob>
+    In the <w>Status</w> field of the QMScore database, I get the message:
+    <pre>
+Warning:  Ligand must to be a single molecule.
+    </pre>
+or
+    <pre>
+Error:  Ligand must to be a single molecule.
+    </pre>
+    </prob><p><sol>
+  </sol>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+{} and {} are the same database.
+    </pre>
+    </prob><p><sol>
+  </sol>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+{}is not a QMScore Database.
+    </pre>
+    </prob><p><sol>
+  </sol>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
 The pose (or receptor) database has more than one molecule field.
     </pre>
     </prob><p><sol>
@@ -686,6 +765,24 @@ The pose (or receptor) database has more than one molecule field.
     poses (receptors) if there is more than one.  Copy the correct field into
     a new MOE database.
   </sol>
+  <li><p><prob>
+    When setting up QMScore in <w>Many-to-Many</w> mode, I get the MOE message:
+    <pre>
+The receptor and pose databases have different number of entries.
+    </pre>
+    </prob><p><sol>
+  </sol>
+  <li><p><prob>
+    MOEDivcon doesn't always include the hostname in the location for the 
+    log file written in the <w>Status</w> field of the QMScore database.
+    </prob><p><sol>
+    Moebatch uses a ssh command to remotely execute MOEDivcon job, which doesn't
+    set the <inline>HOSTNAME</inline> environment variable.  To ensure that the
+    hostname always appears, add the following line to your .bashrc file:
+    <pre>
+export HOSTNAME=`hostname`
+    </pre>
+    </sol>
   <li><p><prob>
     Divcon isn't generating a log file (<inline><em>divcon.log</em></inline>).
     </prob><p><sol>

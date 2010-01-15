@@ -38,7 +38,6 @@ function qb_GetDefaultsStatus;
 function qb_GetEnvApp;
 function qb_GetEnvTag;
 function qb_GetLigandAtomNames;
-function qb_GetStatusFlags;
 function qb_GetWhich;
 function qb_InitCorePanel;
 function qb_LoadCoreScoreDB;
@@ -246,11 +245,11 @@ function RunCalc [dbkey, moeatomnames]
 
     if results === [] then
         if errmess === [] or errmess === '' then
-            qb_SaveDivconStatus [dbkey, rowkey, "Error:  Unknown error!"];
+            qb_SaveDivconStatus [dbkey, rowkey, "Error:  Unknown error!\n"];
             write ['NMRScore Error:  Unknown error!\n'];
         else
             qb_SaveDivconStatus [dbkey, rowkey, 
-                swrite ['Error:  {}', errmess]];
+                swrite ['Error:  {}\n', errmess]];
             write ['NMRScore Error:  {}\n', errmess];
         endif
     else
@@ -263,7 +262,12 @@ function RunCalc [dbkey, moeatomnames]
         else
             local cspvalues = app second results;
             qb_SaveNMRScore [dbkey, rowkey, 9.99, tag [atomnames, cspvalues]];
-            qb_SaveDivconStatus [dbkey, rowkey, "Success"];
+            local sucmess = cat [ "Success\n", errmess];
+            if not isnull errmess then
+                sucmess = cat [sucmess, errmess, "\n"];
+            endif
+            qb_SaveDivconStatus [dbkey, rowkey, sucmess];
+
         endif
     endif
 
@@ -320,7 +324,7 @@ global function qb_NMRScoreSetupPanel []
     status = qb_GetDefaultsStatus [];
     local coredflts = qb_GetDefaultsCore [];
     local appdflts = tag tr NMRSCORE_OPT_DEFAULTS;
-
+    coredflts = tagpoke [coredflts, 'scoredb', 'nmrscore.mdb'];
     nmrskey = 0;
     complexmol = mol_Extract Chains [];
     atomnames = [];
