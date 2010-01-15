@@ -61,14 +61,20 @@ local [recmolset, recok, recchgok, ligok, ligchgok, ckmsg]
 if not alltrue [recok, recchgok, ligok, ligchgok] then
     if not alltrue [recok, ligok] then
         errmess = cat [errmess, 
-            swrite ['Problematic molecule in {}, skipping!\n{}\n', 
+            swrite ['Problematic molecule in {}, skipping!{}', 
             qb_GetWhich [not recok, not ligok], ckmsg]];
+        if tok_length ckmsg > 0 then
+            errmess = cat [errmess, swrite ['\n{}', ckmsg]];
+        endif
     endif
 
     if not alltrue [recchgok, ligchgok] then
         errmess =  cat [errmess, 
-            swrite ['Problematic charge for {}, skipping!\n{}\n', 
+            swrite ['Problematic charge for {}, skipping!{}', 
             qb_GetWhich [not recchgok, not ligchgok], ckmsg]];
+        if tok_length ckmsg > 0 then
+            errmess = cat [errmess, swrite ['\n{}', ckmsg]];
+        endif
     endif
 
     return [[], errmess];
@@ -82,7 +88,7 @@ else
     subdirname = twrite ['{}/qb_out{n:}', coreopts.workdir, coreopts.task];
     local okay = _fmkdir subdirname;
     if okay === -1 then
-        errmess = swrite ['Unable to create subdirectory:  {}\n',
+        errmess = swrite ['Unable to create subdirectory:  {}',
             subdirname];
         return [[], errmess];
     endif
@@ -91,7 +97,6 @@ endif
 local scorepath = coreopts.scoredb;
 scorepath = fbase scorepath;
 scorepath = twrite ['{}.h5', scorepath];
-print scorepath; //DEBUG
 */
 //  exe_open child process inherits parent's environment.
 local process_key = exe_open ['moedivconscoring', subdirname, [], 1];
@@ -198,8 +203,11 @@ while exe_status process_key loop
 
     elseif return_statement === "QBException" then
         [[return_statement]] = fread [stdout, '{c:*}'];
+        if neL [return_statement, "Divcon done."] then
+            errmess = cat [errmess, return_statement];
+        endif
         while neL [return_statement, "Divcon done."] loop
-            errmess = cat [errmess, return_statement, "\n"];
+            errmess = cat [errmess, "\n", return_statement];
             [[return_statement]] = fread [stdout, '{c:*}'];
         endloop;
         fwrite [stdin, '{c:}\n', 'Ok'];
@@ -227,7 +235,7 @@ if success === 1 then
     local delerr = app _fdelete templist;
     if anytrue delerr then
         local errfiles = templist | neE [delerr, 0];
-        errmess = cat [errmess, swrite ['Unable to delete files: {v}\n',
+        errmess = cat [errmess, swrite ['Unable to delete files: {v}',
             errfiles]];
     endif
 endif
@@ -235,8 +243,8 @@ endif
 if success === 1 then
     return [results, errmess];
 else
-    if isnull errmess then errmess = "Unkownn error!\n"; endif
-    errmess = cat [errmess, swrite ['Log file:  {}:{}/divcon.log\n',
+    if isnull errmess then errmess = "Unknown error!"; endif
+    errmess = cat [errmess, swrite ['\nLog file:  {}:{}/divcon.log',
         getenv 'HOSTNAME', coreopts.workdir]];
     return [[], errmess];
 endif

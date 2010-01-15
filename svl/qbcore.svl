@@ -42,9 +42,7 @@ const STATUS_FIELD = 'Status';
 // Environment tags
 const COMPLEX = 'complex';
 const RECEPTOR = 'receptor';
-const RECOK = 'IsRecOkay';
 const LIGAND = 'ligand';
-const LIGOK = 'IsLigOkay';
 const STATUS = 'status';
 const COREOPTS = 'coreoptions';
 const APPOPTS = 'applicationoptions';
@@ -79,7 +77,7 @@ const CORE_OPT_DEFAULTS =
     ['mode',         'One-to-One'  ],  // Shared dialog defaults options
     ['cwd',          0             ],
     ['workdir',      '/tmp'        ],
-    ['scoredb',      'qmscore.mdb' ],
+    ['scoredb',      'qbscore.mdb' ],
     ['recdb',        ''            ],
     ['posedb',       ''            ],
     ['recchg',       0             ],
@@ -363,7 +361,7 @@ local function CheckCharge [wkey, status, recchg, ligchg]
 
     local [recok, ligok, errmess] = CheckComplexCharge [recchg, ligchg];
     if recok === [] or ligok === [] then
-        Warning errmess;  //DEBUG
+        Warning errmess;                                //DEBUG-Always alert?
         SetChargeStatus [wkey, status];
         return status;
     endif
@@ -469,17 +467,23 @@ local function CheckDBMols [oldkey]
             endif
         else
             local errmess = "";
+            local submess = tok_cat [recmess, ligmess];
             if not alltrue [recok, ligok] then
                 errmess = cat [errmess, 
-                    swrite ['Warning:  Problematic molecule in {}.\n{}\n', 
-                    qb_GetWhich [not recok, not ligok], 
-                    tok_cat [recmess, ligmess]]];
+                    swrite ['Warning:  Problematic molecule in {}.\n', 
+                    qb_GetWhich [not recok, not ligok]]];
+                if tok_length submess > 0 then
+                    errmess = cat [errmess, swrite ['{}\n', submess]];
+                endif
             endif
 
             if not alltrue [recchgok, ligchgok] then
                 errmess =  cat [errmess, 
                     swrite ['Warning:  Problematic charge for {}.\n', 
                     qb_GetWhich [not recchgok, not ligchgok]]];
+                if tok_length submess > 0 then
+                    errmess = cat [errmess, swrite ['{}\n', submess]];
+                endif
             endif
 
             qb_SaveDivconStatus [dbkey, rowkey, errmess];
@@ -655,7 +659,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
         local posechg = 0;
         if 1 <> length uniq aMoleculeNumber poseatms then
             stsmess = cat [recmsgs(ith), 
-                'Warning:  Ligand has to be a single molecule.'];
+                'Warning:  Ligand must to be a single molecule.\n'];
         else
             posechg = CalcCharge [poseatms];
             local poseok = ChargeOK [poseatms, posechg];
@@ -706,7 +710,7 @@ local function GetStatusMessage [which, ok]
     local mess = "";
 
     if not ok then
-        mess = swrite ['Warning: {} has a problematic charge.\n', which];
+        mess = swrite ['Warning:  Problematic charge for {}.\n', which];
     endif
 
     return mess;
@@ -816,7 +820,7 @@ local function SplitComplex []
     endif
 
     if 1 <> length uniq aMoleculeNumber ligatoms then
-        return [[], [], 'Ligand has to be a single molecule.'];
+        return [[], [], 'Ligand must to be a single molecule.'];
     endif
 
     if makecoll then
@@ -863,7 +867,7 @@ local function UpdateCharge [wkey, status]
 
     local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
     if recchg === [] or recok === [] or ligchg === [] or ligok === [] then
-        Warning  errmess;
+        Warning  errmess;                                //DEBUG-Always alert?
         SetChargeStatus [wkey, status];
         return status;
     endif
@@ -988,7 +992,11 @@ global function qb_CheckDivconMols [recmol, recchg, ligmol, ligchg]
     local recatms = cat cAtoms recchns;
     local recatmsets = SplitReceptor [recatms];
     local recmolset = app mol_Extract recatmsets;
-    local recok = 1;
+    local recok = 1;                             // Future receptor test?
+    if not recok then
+        mess = 'Receptor is bad, bad, bad.';
+    endif
+
     local recchgok = ChargeOK [recatms, recchg];
     oDestroy recchns;
 
@@ -996,7 +1004,7 @@ global function qb_CheckDivconMols [recmol, recchg, ligmol, ligchg]
     local ligatms = cat cAtoms ligchn;
     local ligok = 1 === length uniq aMoleculeNumber ligatms;
     if not ligok then
-        mess = tok_cat [mess, 'Ligand must be a single molecule.\n'];
+        mess = tok_cat [mess, 'Ligand must be a single molecule.'];
     endif
 
     local ligchgok = ChargeOK [ligatms, ligchg];
@@ -1427,9 +1435,6 @@ endfunction
  *  Note:  it is assumed that this function is called from a child process
  *  and will exit on an error.
  *
- *  HACK alert:  add an extra flag to the LIGOK and RECOK flag vectors
- *  in order to force moe to treat is as them as vectors, not as scalars.
- *
  ****************************************************************************/
 global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         dbtype]
@@ -1444,7 +1449,6 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
             exit [];
         endif
 
-        db_SetEnv [dbkey, RECOK, twrite ['{v}', [1, 0]]];
         SaveEnv [dbkey, receptor, ligand, status, coreopts, appopts, complex, 
             dbtype];
     else
@@ -1461,8 +1465,6 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         if not isnull stsmess then
             qb_SaveDivconStatus [dbkey, rowkey, stsmess];
         endif
-
-        db_SetEnv [dbkey, LIGOK, twrite ['{v}', [1, 0]]];
 
     else
         local posekey = db_Open [coreopts.posedb, 'read'];

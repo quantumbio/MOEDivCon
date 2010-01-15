@@ -44,9 +44,6 @@ function qb_QMScore;
  *
  *  Execute QMScore for each row of the scoring database.
  *
- *  HACK alert:  an extra flag was added to the LIGOK and RECOK flag vectors
- *  in order to force moe to treat is as them as vectors, not as scalars.
- *
  ****************************************************************************/
 global function qb_QMScoreBatch [dbpath]
 
@@ -64,7 +61,7 @@ global function qb_QMScoreBatch [dbpath]
     endif
 
     coreopts.workdir = workdir;
-    write ['Work Dir:  {}\n', workdir];  //DEBUG
+    write ['Work Dir:  {}\n', workdir];
 
     //  For each ligand pose in the database, calculate QM score.
     local nrows = db_nEntries dbkey;
@@ -115,8 +112,11 @@ global function qb_QMScoreBatch [dbpath]
                 write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
             else
                 qb_SaveQMScore [dbkey, indkey(1), results];
-                errmess = cat [ "Success\n", errmess];
-                qb_SaveDivconStatus [dbkey, indkey(1), errmess];
+                local sucmess = cat [ "Success\n", errmess];
+                if not isnull errmess then
+                    sucmess = cat [sucmess, errmess, "\n"];
+                endif
+                qb_SaveDivconStatus [dbkey, indkey(1), sucmess];
             endif
 
         elseif code === 'error' then
