@@ -307,7 +307,7 @@ during execution, MOEDivcon checks again whether the charges are
 going to be problematic.  If so, it skips the calculation and places a
 message in the <w>Status</w> column.
 <p>
-<warn>When you edit a cell in a MOE database, the new value is directly
+<warn>Warning:  When you edit a cell in a MOE database, the new value is directly
 written to disk and the previous value is lost.</warn>
 
 <h2><a name="load"></a>Load and Save</h2>
@@ -418,8 +418,8 @@ See the
 <a href="#parallel-moebatch">Running Moebatch</a>
 section to learn how to execute the job.
 <p>
-<warn>If the receptor and pose databases have fields&ndash;other than the
-molecule field&ndash;with the same name, the pose data will overwrite the
+<warn>Warning:  If the receptor and pose databases have fields&ndash;other than
+the molecule field&ndash;with the same name, the pose data will overwrite the
 receptor data for those fields.</warn>
 
 <h4><a name="parallel-mode-MtoM"></a>Many Receptors--Many Ligands</h4>
@@ -472,7 +472,14 @@ localhost ssh hostname03 'moebatch -mpu -'
 localhost ssh hostname03 'moebatch -mpu -'
 $eof
 </pre>
-See the MOE/smp documentation for more details on the machine file.
+The first hostname must be the host from where you launch the
+<inline>moebatch -mpu moedivcon_machinefile</inline> command.
+You may repeat a hostname in the MOE machine file if you wish to use more
+than one processor on that compute node.  In the above example, two processors
+are used on the three compute nodes.  The MOE maching file must end with
+<inline>$eof</inline>.  The number of processors should not exceed the number
+of available MOE licenses.  See the MOE/smp documentation
+for more details on the machine file.
 <p>
 You can
 also execute moebatch by submitting the job to a cluster queue.  Example
@@ -599,10 +606,58 @@ doesn't help, please <a href="#contact">contact</a> support.
 run: Environment variable not found.
     </pre>
     </prob><p><sol>
-    MOE's run is unable to find the MOEDivcon SVL scripts.  Make sure the
-    <inline>MOE_SVL_RUNPATH</inline> is
+    MOE's <inline>run</inline> function is unable to find the MOEDivcon SVL
+    scripts.  Make sure the <inline>MOE_SVL_RUNPATH</inline> is
     set up correctly (see the <a href="#install-path">installation</a>
     section).
+  </sol>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+    qb_QMScore: fwrite: Broken pipe.
+    </pre>
+    </prob><p><sol>
+    MOE is unable to find the MOEDivcon executables.  Make sure the
+    <inline>PATH</inline> is
+    set up correctly (see the <a href="#install-path">installation</a>
+    section).
+  </sol>
+  <li><p><prob>
+    I get the message in the <w>Status</w> field of the QMScore database:
+    <pre>
+Error:   LICENSE ERROR: Problem with license file. Error Code: 1003.
+    </pre>
+    </prob><p><sol>
+    MOEDivcon is distributed with an evaluation license which eventually
+    expires.  See the <a href="#install-license">installation</a>
+    section for more information on purchasing and installing a license.
+  </sol>
+  <li><p><prob>
+    Divcon isn't generating a log file (<inline><em>divcon.log</em></inline>).
+    </prob><p><sol>
+    A logging configuration file <inline>divcon-log.config</inline> has to be
+    in the working directory or in <inline>$QBHOME/etc</inline>.  The
+    configuration file in the working directory takes precendence.
+  </sol>
+  <li><p><prob>
+    MOEDivcon doesn't always include the hostname in the location for the 
+    log file written in the <w>Status</w> field of the QMScore database.
+    </prob><p><sol>
+    Moebatch uses a ssh command to remotely execute MOEDivcon jobs, which
+    doesn't always set the <inline>HOSTNAME</inline> environment variable.
+    To ensure that the hostname always appears, add the following line to your 
+    .bashrc file:
+    <pre>
+export HOSTNAME=`hostname`
+    </pre>
+    </sol>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+"filename.mdb" is not a QMScore Database.
+    </pre>
+    </prob><p><sol>
+    The MOE database that you are attempting to load isn't a QMScore database.
   </sol>
   <li><p><prob>
     I get the MOE message:
@@ -662,23 +717,55 @@ Ligand has to be a single molecule.
   <li><p><prob>
     I get the MOE message:
     <pre>
-    qb_QMScore: fwrite: Broken pipe.
+Divcon is going to have problems with the receptor and/or ligand.  Continue anyway?
     </pre>
     </prob><p><sol>
-    MOE is unable to find the MOEDivcon executables.  Make sure the
-    <inline>PATH</inline> is
-    set up correctly (see the <a href="#install-path">installation</a>
-    section).
+    MOEDivcon has detected that there is a problem with the structure or charge
+    of either the receptor or ligand.  The problematic molecule should be marked
+    red.  You should try to address the problem before
+    running or saving the QMScore database.  MOEDivcon will skip the calculation
+    of molecules with problematic structures or charges.
   </sol>
   <li><p><prob>
-    I get the message in the <w>Status</w> field of the QMScore database:
+    In the <w>Status</w> field of the QMScore database, I get the message:
     <pre>
-Error:   LICENSE ERROR: Problem with license file. Error Code: 1003.
+Warning:  Problematic molecule in receptor and/or ligand.
+    </pre>
+or
+    <pre>
+Error:  Problematic molecule in receptor and/or ligand.
     </pre>
     </prob><p><sol>
-    MOEDivcon is distributed with an evaluation license which eventually
-    expires.  See the <a href="#install-license">installation</a>
-    section for more information on purchasing and installing a license.
+You should get a warning about a problematic molecule when creating or saving
+a QMScore
+database.  An error message is stored when MOE/moebatch attempts to run a
+job and detects there are still problems with the molecules.  You should also
+get another message clarifying the problem detected, such as:
+    <pre>
+Ligand must to be a single molecule.
+    </pre>
+You can use your favorite molecule editor to fix the problem using the original
+molecule file, then rebuild the QMScore database using the modified molecule
+file.
+  </sol>
+  <li><p><prob>
+    In the <w>Status</w> field of the QMScore database, I get the message:
+    <pre>
+Warning:  Problematic charge for receptor and/or ligand.
+    </pre>
+or
+    <pre>
+Error:  Problematic charge for receptor and/or ligand.
+    </pre>
+    </prob><p><sol>
+You should get a warning about a problematic charge when creating or saving a
+QMScore
+database.  An error message is stored when MOE/moebatch attempts to run a
+job and detects there are still problems with the charges.  You can address the
+charge problem by correcting the molecule using your favorite molecule editor
+and rebuilding the QMScore database using the modified molecule file.  Or you
+can simply edit the charge in the MOE database (see the
+<a href="#charge-editing">charge</a> section).
   </sol>
   <li><p><prob>
     I get the MOE message:
@@ -686,73 +773,18 @@ Error:   LICENSE ERROR: Problem with license file. Error Code: 1003.
 The MOEDivcon database hasn't been created.
     </pre>
     </prob><p><sol>
+    You are attempting to check the charges in the current QMScore database
+    that hasn't been saved yet.  From the QMScore dialog, ether save or load
+    the QMScore database before continuing.
   </sol>
   <li><p><prob>
     I get the MOE message:
     <pre>
 The MOEDivcon database isn't open.
     </pre>
-    </prob><p><sol>
-  </sol>
-  <li><p><prob>
-    I get the MOE message:
-    <pre>
-No molecular complex loaded in MOE Window.
-    </pre>
-    </prob><p><sol>
-  </sol>
-  <li><p><prob>
-    I get the MOE message:
-    <pre>
-Divcon is going to have problems with the receptor (and/or ligand).  Continue anyway?
-    </pre>
-    </prob><p><sol>
-  </sol>
-  <li><p><prob>
-    In the <w>Status</w> field of the QMScore database, I get the message:
-    <pre>
-Warning:  Problematic molecule in {}.
-    </pre>
-or
-    <pre>
-Error:  Problematic molecule in {}.
-    </pre>
-    </prob><p><sol>
-  </sol>
-  <li><p><prob>
-    In the <w>Status</w> field of the QMScore database, I get the message:
-    <pre>
-Warning:  Problematic charge for {}.
-    </pre>
-or
-    <pre>
-Error:  Problematic charge for {}.
-    </pre>
-    </prob><p><sol>
-  </sol>
-  <li><p><prob>
-    In the <w>Status</w> field of the QMScore database, I get the message:
-    <pre>
-Warning:  Ligand must to be a single molecule.
-    </pre>
-or
-    <pre>
-Error:  Ligand must to be a single molecule.
-    </pre>
-    </prob><p><sol>
-  </sol>
-  <li><p><prob>
-    I get the MOE message:
-    <pre>
-{} and {} are the same database.
-    </pre>
-    </prob><p><sol>
-  </sol>
-  <li><p><prob>
-    I get the MOE message:
-    <pre>
-{}is not a QMScore Database.
-    </pre>
+    You are attempting to check the charges in the current QMScore database
+    that isn't open.  From the QMScore dialog, ether save or load
+    the QMScore database before continuing.
     </prob><p><sol>
   </sol>
   <li><p><prob>
@@ -766,29 +798,23 @@ The pose (or receptor) database has more than one molecule field.
     a new MOE database.
   </sol>
   <li><p><prob>
+    I get the MOE message:
+    <pre>
+"filename1.mdb"  and "filename2.mdb"  are the same database.
+    </pre>
+    </prob><p><sol>
+The QMScore database needs to a different database than the receptor and pose
+databases.
+  </sol>
+  <li><p><prob>
     When setting up QMScore in <w>Many-to-Many</w> mode, I get the MOE message:
     <pre>
 The receptor and pose databases have different number of entries.
     </pre>
     </prob><p><sol>
-  </sol>
-  <li><p><prob>
-    MOEDivcon doesn't always include the hostname in the location for the 
-    log file written in the <w>Status</w> field of the QMScore database.
-    </prob><p><sol>
-    Moebatch uses a ssh command to remotely execute MOEDivcon job, which doesn't
-    set the <inline>HOSTNAME</inline> environment variable.  To ensure that the
-    hostname always appears, add the following line to your .bashrc file:
-    <pre>
-export HOSTNAME=`hostname`
-    </pre>
-    </sol>
-  <li><p><prob>
-    Divcon isn't generating a log file (<inline><em>divcon.log</em></inline>).
-    </prob><p><sol>
-    A logging configuration file <inline>divcon-log.config</inline> has to be
-    in the working directory or in <inline>$QBHOME/etc</inline>.  The
-    configuration file in the working directory takes precendence.
+    In <w>Many-to-Many</w> mode, there should be a separate ligand/pose in the
+    ligand/pose database for each receptor in the receptor database.  Verify
+    that the databases specified in the QMScore dialog are the correct ones.
   </sol>
   <li><p><prob>
     I submitted a parallel PBS (SGE, etc.) QMScore batch script and it returned

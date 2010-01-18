@@ -863,11 +863,12 @@ endfunction
  *  Update the window based on new charge.
  *
  ****************************************************************************/
-local function UpdateCharge [wkey, status]
+local function UpdateCharge [wkey, status, warn]
 
     local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
-    if recchg === [] or recok === [] or ligchg === [] or ligok === [] then
-        Warning  errmess;                                //DEBUG-Always alert?
+    if (recchg === [] or recok === [] or ligchg === [] or ligok === [])
+            and warn then
+        Warning  errmess;
         SetChargeStatus [wkey, status];
         return status;
     endif
@@ -1072,7 +1073,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
                 statics:'share'] === 'child' then
             task_prio 0;
 
-            status = UpdateCharge [wkey, status];
+            status = UpdateCharge [wkey, status, 1];
             exit [];
         endif
 
@@ -1273,22 +1274,34 @@ global function qb_GetCoreEnv [dbkey]
 endfunction
 
 /****************************************************************************
+ *                          qb_GetLigandAtoms
+ *
+ *  Get the atoms of the given element ligand in the MOE Window.
+ *
+ ****************************************************************************/
+global function qb_GetLigandAtoms []
+    local [r, ligatms, errmess] = SplitComplex [];
+
+    return [ligatms, errmess];
+endfunction
+
+/****************************************************************************
  *                          qb_GetLigandAtomNames
  *
  *  Get the atom names of the given element ligand in the MOE Window.
  *
  ****************************************************************************/
 global function qb_GetLigandAtomNames [type]
-    local [receptor, ligand, errmess] = AtomsToMols [];
-    if receptor === [] or ligand === [] then
+    local [atoms, errmess] = qb_GetLigandAtoms [];
+    if atoms === [] then
         Warning errmess;
         exit [];
     endif
 
-    local [atomindices] = indicesof [type, ligand(4)(MOL_ATOM_EL)];
-    local atomnames = get [ligand(4)(MOL_ATOM_NAME), atomindices];
+    local [atomindices] = indicesof [type, aElement atoms];
+    local atomnames = get [aName atoms, atomindices];
 
-    return atomnames;
+    return [atoms, atomindices, atomnames];
 endfunction
 
 /****************************************************************************
@@ -1344,7 +1357,7 @@ global function qb_InitCorePanel [wkey, status, defaults]
         recbox: [sensitive: 0], recdb: [allowBlank: 1],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
         poseschg: [sensitive: 0]]];
-    status = UpdateCharge [wkey, status];
+    status = UpdateCharge [wkey, status, 0];
 
     return status;
 endfunction

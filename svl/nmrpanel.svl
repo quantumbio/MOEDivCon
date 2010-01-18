@@ -190,6 +190,65 @@ const PANEL =
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
+
+
+const EXP_HEADER = 
+    [
+    name: 'exppanel', 
+    title: 'NMR Experimental Data',
+    windowName: 'NMRExperimentalData',
+    text: ['Okay', 'Cancel'],
+    onTrigger: ['validate', 'return']
+    ];
+
+const EXP_BOXHDR = 
+    [
+    columnMajor: 1, columns: 3,
+    uniformRows: 1, uniformRows: 1
+    ];
+
+const EXP_NAMELBL =
+    [
+    Label :
+        [
+        text: 'Name'
+        ]
+    ];
+
+const EXP_FREELBL =
+    [
+    Label :
+        [
+        text: 'Free'
+        ]
+    ];
+
+const EXP_BNDLBL =
+    [
+    Label :
+        [
+        text: 'Bound'
+        ]
+    ];
+
+const EXP_BUTTONCELL =
+    [
+    Button :
+        [
+        name: 'name', text: 'H', extendH:1
+        ]
+    ];
+
+const EXP_TEXTCELL =
+    [
+    Text :
+        [
+        name: 'name',
+        len: 11, type: 'real', allowBlank: 0
+        ]
+    ];
+
+
 //  Local Functions
 
 /****************************************************************************
@@ -276,6 +335,67 @@ function RunCalc [dbkey, moeatomnames]
     return;
 endfunction
 
+/****************************************************************************
+ *
+ *                          SetupExpDataPanel
+ *
+ ****************************************************************************/
+global function SetupExpDataPanel [atomindices, atomnames]
+
+    if MOE_BATCH then return; endif
+    if WindowShow ['NMRExperimentalData', 1] then return; endif
+
+write['{v}\n', atomnames];//DEBUG
+
+    local buttons = EXP_NAMELBL;
+    local freetexts = EXP_FREELBL;
+    local boundtexts = EXP_BNDLBL;
+    local ith = 0;
+    for length atomnames loop
+        ith = ith + 1;
+        local butname = twrite ['name{}', ith];
+        local freename = twrite ['free{}', ith];
+        local bndname = twrite ['bound{}', ith];
+
+        local newbutton = tagpoke [EXP_BUTTONCELL, ['Button', 'name'], butname];
+        newbutton = tagpoke [newbutton, ['Button', 'text'], atomnames(ith)];
+        buttons = cat [buttons, newbutton];
+
+        local newfreetext = tagpoke [EXP_TEXTCELL, ['Text', 'name'], freename];
+        freetexts = cat [freetexts, newfreetext];
+
+        local newbndtext = tagpoke [EXP_TEXTCELL, ['Text', 'name'], bndname];
+        boundtexts = cat [boundtexts, newbndtext];
+    endloop
+
+    local box = [Mbox: cat [EXP_BOXHDR, cat [buttons, freetexts, boundtexts]]];
+    local expwkey = WindowCreate cat [EXP_HEADER, box];
+    WindowShow [expwkey, 1];
+
+    local free = [], bound = [];
+    loop
+        local [vals, trig] = WindowWait expwkey;
+        if trig === 'exppanel' then
+            if vals.exppanel === 'Cancel' then 
+                break;
+
+            elseif vals.exppanel === 'Okay' then
+write['{v}\n', vals];//DEBUG
+                break;
+            endif
+        elseif 'name' === tok_keep [trig, 4] then
+            local numtok = tok_drop [trig, 4];
+            local atmidx = atoi numtok;
+write['{}th:  {}\n', atmidx, atomnames(atmidx)];
+            continue;
+        endif
+    endloop
+
+    WindowDestroy expwkey;
+
+    return [free, bound];
+endfunction
+
 //  Global Functions
 
 /****************************************************************************
@@ -316,6 +436,9 @@ global function qb_NMRScoreSetupPanel []
     static nmrskey;
     static complexmol;
     static atomnames;
+    static atomindices;
+    static atomfree;
+    static atombound;
 
     if MOE_BATCH then return; endif
     if WindowShow ['NMRScorePanel', 1] then return; endif
@@ -328,6 +451,8 @@ global function qb_NMRScoreSetupPanel []
     nmrskey = 0;
     complexmol = mol_Extract Chains [];
     atomnames = [];
+    atomfree = [];
+    atombound = [];
 
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
@@ -398,9 +523,10 @@ global function qb_NMRScoreSetupPanel []
                     Warning 'No original complex.';
                     exit [];
                 endif
-                atomnames = qb_GetLigandAtomNames ['H'];
-write ['{v}', atomnames];//DEBUG
-                Warning 'Pop up experimental window.';
+                [atomindices, atomnames] = qb_GetLigandAtomNames ['H'];
+write ['{v}\n', atomnames];//DEBUG
+                [atomfree, atombound] = SetupExpDataPanel [atomindices, 
+                    atomnames];
                 exit [];
             endif
 
