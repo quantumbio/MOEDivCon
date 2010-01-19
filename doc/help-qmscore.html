@@ -64,8 +64,13 @@ QuantumBio Homepage
   <li><a href="#intro">QMScore Introduction</a>
   <li><a href="#install">Installation</a>
   <li><a href="#start">Getting Started</a>
+  <ol id=tocl>
+    <li><a href="#start-onetoone">One-To-One Mode</a>
+    <li><a href="#start-onetomany">One-To-Many Mode</a>
+    <li><a href="#start-manytomany">Many-To-Many Mode</a>
+  </ol>
   <li><a href="#charge">Charges</a>
-  <ol  id=tocl>
+  <ol id=tocl>
     <li><a href="#charge-status">Status</a>
     <li><a href="#charge-onetomany">One-To-Many Mode</a>
     <li><a href="#charge-manytomany">Many-To-Many Mode</a>
@@ -185,25 +190,25 @@ If you are having difficulties with the installation, see the
 
 <h2><a name="start"></a>Getting Started</h2>
 <p>
-To verify that the installation was successful, let's work through a
-simple example.  If you run into any problems, see the <a href="#trouble">
+To verify that the installation was successful, let's work through a few
+simple examples.  If you run into any problems, see the <a href="#trouble">
 Troubleshooting</a> section.
 <p>
 The workflow of MOEDivcon QMScoring involves five steps:
 <ol>
   <li>Prepping the receptors and ligands/poses involved in the calculation.
-
   <li>Verify the formal charges calculated by MOE.
   <li>Setting up the run parameters to QMScore.
   <li>Executing QMScore either on a local machine or in parallel on a cluster.
-
   <li>Analyzing the QMScore results.
 </ol>
+
+<h3><a name="start-onetoone"></a>One-To-One Mode</h3>
 <p>
 First, start MOE and open
 <inline>${QBHOME}/examples/simplecomplex.moe</inline>.  Then,
-select the MOE menu <w>Compute</w>, submenu <w>Simulations</w>, submenu
-<w>QuantumBio</w>, and menu item <w>QMScore</w>.
+select the MOE menu
+<w>Compute</w>&rarr;<w>Simulations</w>&rarr;<w>QuantumBio</w>&rarr;<w>QMScore</w>.
 <p>
 <object id="MOEwithMenu" title="Moe Window with QuantumBio Menu" width=1000
 data="images/mainwithmenu.png" type=image/png>
@@ -222,9 +227,10 @@ Ensure that the <w>Working Dir</w> is
  will be written here).  Press the <w>Run</w> button.  If all goes
 well, QMScore will execute using the receptor and ligand complex shown in
 the MOE Window.  After several seconds, the MOE database Viewer should open
-the QMScore database showing the results.
+the QMScore database showing the results.  Note that the Divcon temporary
+files in <inline>/tmp</inline> are deleted when Divcon returns successfully.
 <p>
-<object id="QMScoreDatabase" title="QMScore Database" width=1000
+<object id="QMScoreDatabase" title="QMScore Database" width=1000 
 data="images/qmscoredatabase.png" type=image/png>
 QMScore Database
 </object>
@@ -233,15 +239,76 @@ In this simple example, you were able to perform all four workflow steps
 in one session within the MOE Window, probably not something you would wish
 to do with a large protein receptor for which the execution time may take
 several hours.
+<h3><a name="start-onetomany"></a>One-To-Many Mode</h3>
 <p>
 The real power of MOEDivcon QMScore
 is the ability to use moebatch to execute tasks in parallel on a cluster
-and collate the results in a MOE database.  In this case, one would prep
-the molecules with MOE and set up the QMScore parameters in one
-session, then use moebatch to execute the tasks in parallel on a cluster.
-After the QMScore runs have completed, one can use MOE to open the QMScore
-database to view and analyze the collated results.
-
+and collate the results in a MOE database.  In this case, start MOE and open
+<inline>${QBHOME}/examples/simplecomplex.moe</inline> and select the MOE menu
+<w>Compute</w>&rarr;<w>Simulations</w>&rarr;<w>QuantumBio</w>&rarr;<w>QMScore</w>.
+Select the <w>One-to-Many</w> mapping mode.  Browse for the poses database
+and select <inline>${QBHOME}/examples/simpleposes.mdb</inline>.  In the
+<w>Charges</w> section, select <w>All Poses</w> since the database contains 
+different poses of the same ligand.  Your settings should look like:
+<p>
+<object id="QMScoreOptionsOneToMany" title="QMScore One-to-Many Options"
+data="images/qmscoredefault.png" type=image/png>
+QMScore One-to-Many Options
+</object>
+<p>
+Press <w>Save</w> and verify that the charges and other data for the poses
+are okay (the
+<w>Status</w> field is empty).  Close the MOE Database Viewer and execute
+the following command from the directory where <inline>qmscore.mdb</inline>
+is located (assuming you have 4 processors on your workstation):
+<pre>
+&gt; moebatch -mpu 4 -exec "run ['qmsbatch.svl', ['qmscore.mdb']]" -exit
+</pre>
+MOEDivcon will print out progress messages for one of the jobs.  When all
+four jobs are completed, open <inline>qmscore.mdb</inline> in the MOE
+Database Viewer.  You should see results similar to these:
+<p>
+<object id="QMScoreDatabaseOneToMany" title="QMScore One-to-Many Database" width=1000 
+data="images/qmscoredatabase.png" type=image/png>
+QMScore Database
+</object>
+See the <a href="#parallel">Batch and Parallel Execution</a> section for more
+information.
+<h3><a name="start-manytomany"></a>Many-To-Many Mode</h3>
+<p>
+In Many-To-Many Mode, MOEDivcon doesn't use the molecules in the MOE Window,
+so after starting MOE, selecting <w>QMScore</w> from the menu system,
+and selecting
+<w>Many-to-Many</w> mapping mode, and you can proceed directly to browsing
+for the receptor database (<inline>${QBHOME}/examples/simplerecs.mdb</inline>) 
+and ligand database (<inline>${QBHOME}/examples/simpleligands.mdb</inline>).
+Your settings should look like:
+<p>
+<object id="QMScoreOptionsManyToMany" title="QMScore Many-to-Many Options"
+data="images/qmscoredefault.png" type=image/png>
+QMScore One-to-Many Options
+</object>
+<p>
+Note that the <w>Charges</w> section is inactivated; the charges are
+calculated as the receptors and ligands are copied to the QMScore database.
+Press <w>Save</w> and verify that the charges and other data for both 
+the receptors and ligands are okay (the
+<w>Status</w> field is empty).  Close the MOE Database Viewer and execute
+the following command from the directory where <inline>qmscore.mdb</inline>
+is located (assuming you have 4 processors on your workstation):
+<pre>
+&gt; moebatch -mpu 4 -exec "run ['qmsbatch.svl', ['qmscore.mdb']]" -exit
+</pre>
+The execution will take longer since there are twelve jobs to run.  When all
+twelve jobs are completed, open <inline>qmscore.mdb</inline> in the MOE
+Database Viewer.  You should see results similar to these:
+<p>
+<object id="QMScoreDatabaseManyToMany" title="QMScore Many-to-Many Database" width=1000 
+data="images/qmscoredatabase.png" type=image/png>
+QMScore Database
+</object>
+See the <a href="#parallel">Batch and Parallel Execution</a> section for more
+information.
 <h2><a name="charge"></a>Charges</h2>
 <todo>Add Lance's description of problematic charges.</todo>
 <p>

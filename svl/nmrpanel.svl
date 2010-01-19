@@ -37,7 +37,7 @@ function qb_GetDefaultsCore;
 function qb_GetDefaultsStatus;
 function qb_GetEnvApp;
 function qb_GetEnvTag;
-function qb_GetLigandAtomNames;
+function qb_GetLigandAtomsIndices;
 function qb_GetWhich;
 function qb_InitCorePanel;
 function qb_LoadCoreScoreDB;
@@ -55,7 +55,6 @@ const NMR_NUM_FIELDS =
     'NMRScore'
     ];
 
-
 /*  NOTE:  If you change the Option lists here, you need to update the
  *         Keys in nmrinterface.svl.
  */
@@ -66,14 +65,6 @@ const NMRSCORE_OPT_DEFAULTS =
     ['opt',          1             ],
     ['cut',          0             ],
     ['radius',       2.5           ]
-    ];
-
-
-const RUN_MODES =
-    [
-    'One-to-One',
-    'One-to-Many',
-    'Many-to-Many'
     ];
 
 const GEOM_OPTS =
@@ -190,8 +181,6 @@ const PANEL =
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
-
-
 const EXP_HEADER = 
     [
     name: 'exppanel', 
@@ -248,7 +237,6 @@ const EXP_TEXTCELL =
         ]
     ];
 
-
 //  Local Functions
 
 /****************************************************************************
@@ -281,7 +269,7 @@ function qb_SaveNMRScore;
  *  Run the One-to-One scoring from the MOE Window.
  *
  ****************************************************************************/
-function RunCalc [dbkey, moeatomnames]
+function RunCalc [dbkey, moeatomindices, moeatomnames]
     local msgkey = Message [0, 'NMRScore is running ...'];
     sleep -1;    // Allow parent to close input window.
 
@@ -314,13 +302,14 @@ function RunCalc [dbkey, moeatomnames]
     else
         print results;  //DEBUG
         local atomindices = app first results;
-        local atomnames = get [ligand(4)(MOL_ATOM_NAME), atomindices];
-        if not alltrue eqE [atomnames, moeatomnames] then
-            Warning twrite ['Atom names are inconsistent:\nMOE: {v}\n'
-                'Divcon: {v}\n', moeatomnames, atomnames];
+
+        if not alltrue eqE [atomindices, moeatomindices] then
+            Warning twrite ['Atom indices are inconsistent:\nMOE: {v}\n'
+                'Divcon: {v}\n', moeatomindices, atomindices];
         else
-            local cspvalues = app second results;
-            qb_SaveNMRScore [dbkey, rowkey, 9.99, tag [atomnames, cspvalues]];
+            local cspvalues = second tr results;
+            qb_SaveNMRScore [dbkey, rowkey, 9.99,
+                tag [moeatomnames, cspvalues]];
             local sucmess = cat [ "Success\n", errmess];
             if not isnull errmess then
                 sucmess = cat [sucmess, errmess, "\n"];
@@ -340,18 +329,21 @@ endfunction
  *                          SetupExpDataPanel
  *
  ****************************************************************************/
-global function SetupExpDataPanel [atomindices, atomnames]
+global function SetupExpDataPanel [ligatoms, atomindices]
 
     if MOE_BATCH then return; endif
     if WindowShow ['NMRExperimentalData', 1] then return; endif
 
-write['{v}\n', atomnames];//DEBUG
+    local atomnames = get [aName ligatoms, atomindices];
 
+write['{v}\n{v}\n{v}\n', ligatoms, atomindices, atomnames];//DEBUG
+
+    local curratom = 0;
     local buttons = EXP_NAMELBL;
     local freetexts = EXP_FREELBL;
     local boundtexts = EXP_BNDLBL;
     local ith = 0;
-    for length atomnames loop
+    for length atomindices loop
         ith = ith + 1;
         local butname = twrite ['name{}', ith];
         local freename = twrite ['free{}', ith];
@@ -376,17 +368,33 @@ write['{v}\n', atomnames];//DEBUG
     loop
         local [vals, trig] = WindowWait expwkey;
         if trig === 'exppanel' then
-            if vals.exppanel === 'Cancel' then 
+            if vals.exppanel === 'Cancel' then
                 break;
 
             elseif vals.exppanel === 'Okay' then
 write['{v}\n', vals];//DEBUG
+
+                ith = 0;
+                for length atomindices loop
+                    ith = ith + 1;
+                    freename = twrite ['free{}', ith];
+                    free = append [free, peek [vals, freename]];
+                    bndname = twrite ['bound{}', ith];
+                    bound = append [bound, peek [vals, bndname]];
                 break;
             endif
+
         elseif 'name' === tok_keep [trig, 4] then
             local numtok = tok_drop [trig, 4];
             local atmidx = atoi numtok;
-write['{}th:  {}\n', atmidx, atomnames(atmidx)];
+write['{}th:  {}\n', atmidx, atomnames(atmidx)];//DEBUG
+
+            if curratom > 0 then
+                aSetLabelName [curratom, 0];
+            endif
+
+            curratom = ligatoms(atomindices(atmidx));
+            aSetLabelName [curratom, 1];
             continue;
         endif
     endloop
@@ -435,7 +443,8 @@ global function qb_NMRScoreSetupPanel []
     static status;                     //  Shared with child tasks.
     static nmrskey;
     static complexmol;
-    static atomnames;
+    static elem;
+    static ligatoms;
     static atomindices;
     static atomfree;
     static atombound;
@@ -443,14 +452,17 @@ global function qb_NMRScoreSetupPanel []
     if MOE_BATCH then return; endif
     if WindowShow ['NMRScorePanel', 1] then return; endif
 
-    local coreopts = [], nmrsopts = [], browsetasks = []; 
+    local coreopts = [], nmrsopts = [], browsetasks = [];
+    local atomnames = [], indextoks = [];
     status = qb_GetDefaultsStatus [];
     local coredflts = qb_GetDefaultsCore [];
     local appdflts = tag tr NMRSCORE_OPT_DEFAULTS;
     coredflts = tagpoke [coredflts, 'scoredb', 'nmrscore.mdb'];
     nmrskey = 0;
     complexmol = mol_Extract Chains [];
-    atomnames = [];
+    elem = 'H';
+    ligatoms = [];
+    indices = [];
     atomfree = [];
     atombound = [];
 
@@ -519,14 +531,11 @@ global function qb_NMRScoreSetupPanel []
             if second task_fork [statics:'share',
                     master: 'parent'] === 'child' then
 
-                if complexmol === [] then
-                    Warning 'No original complex.';
-                    exit [];
-                endif
-                [atomindices, atomnames] = qb_GetLigandAtomNames ['H'];
-write ['{v}\n', atomnames];//DEBUG
-                [atomfree, atombound] = SetupExpDataPanel [atomindices, 
-                    atomnames];
+                ViewSave 1;
+                [ligatoms, indices] = qb_GetLigandAtomsIndices [elem];
+                View [ligatoms];
+                [atomfree, atombound] = SetupExpDataPanel [ligatoms, indices];
+                ViewLoad 1;
                 exit [];
             endif
 
@@ -542,7 +551,6 @@ write ['{v}\n', atomnames];//DEBUG
                     local dbpath = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
-                        write ['Load database: {}\n', dbpath]; //DEBUG
                         local [ldkey, ldcutrec, ldlig, ldsts, ldcoreopts,
                             ldnmrsopts, ldcomplex, ldmess] = LoadDB [dbpath];
 
@@ -569,20 +577,37 @@ write ['{v}\n', atomnames];//DEBUG
             endif
 
             elseif vals.panel === 'Run' then
+                if isnull atomfree or isnull atombound then
+                    Warning 'Enter experimental values before runnning.';
+                    continue;
+                endif
+
+                [curligatoms, curindices] = qb_GetLigandAtomsIndices [elem];
+                if not alltrue eqE [curligatoms, ligatoms]
+                        or not alltrue eqE [curindices, indices] then
+                    Warning 'Ligand has been modified.\n
+                            'Reenter experimental values before runnning.';
+                    continue;
+                endif
+
                 status = qb_VerifyCharges [wkey, status, vals];
                 if not status.verifychg then continue; endif
 
                 if second task_fork [statics:'share',
                         prio:3, idle:0] === 'child' then
-                    coreopts = qb_TagCoreVals [vals];
-                    nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS, [
-                        vals.guess, vals.opt, vals.cut, vals.radius]];
 
-                    atomnames = qb_GetLigandAtomNames ['H'];
+                    coreopts = qb_TagCoreVals [vals];
+                    nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,
+                        [vals.guess, vals.opt, vals.cut, vals.radius]];
+
+                    //  Make sure atom names are unique for DB fields.
+                    atomnames = get [aName ligatoms, atomindices];
+                    indextoks = totok atomindices;
+                    atomnames = tok_cat [indextoks, '-', atomnames];//TEST
                     nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         complexmol, cat [NMR_NUM_FIELDS, atomnames],
                         'nmrscore'];
-                    RunCalc [nmrskey, atomnames];
+                    RunCalc [nmrskey, atomindices];
                     dbv_Open db_Filename nmrskey;
                     db_Close nmrskey;
                     exit [];
@@ -591,16 +616,32 @@ write ['{v}\n', atomnames];//DEBUG
                 endif
 
             elseif vals.panel === 'Save' then
+                if isnull atomfree or isnull atombound then
+                    Warning 'Enter experimental values before saving.';
+                    continue;
+
+                [curligatoms, curindices] = qb_GetLigandAtomsIndices [elem];
+                if not alltrue eqE [curligatoms, ligatoms]
+                        or not alltrue eqE [curindices, indices] then
+                    Warning 'Ligand has been modified.\n
+                            'Reenter experimental values before saving.';
+                    continue;
+                endif
+
                 status = qb_VerifyCharges [wkey, status, vals];
                 if not status.verifychg then continue; endif
 
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
 
-                    atomnames = qb_GetLigandAtomNames ['H'];
                     coreopts = qb_TagCoreVals [vals];
-                    nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS, [
-                        vals.guess, vals.opt, vals.cut, vals.radius]];
+                    nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,
+                        [vals.guess, vals.opt, vals.cut, vals.radius]];
+
+                    //  Make sure atom names are unique for DB fields.
+                    atomnames = get [aName ligatoms, atomindices];
+                    indextoks = totok atomindices;
+                    atomnames = tok_cat [indextoks, '-', atomnames];//TEST
                     nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         complexmol, cat [NMR_NUM_FIELDS, atomnames],
                         'nmrscore'];
