@@ -1276,7 +1276,7 @@ endfunction
 /****************************************************************************
  *                          qb_GetLigandAtoms
  *
- *  Get the atoms of the given element ligand in the MOE Window.
+ *  Get the atoms of the ligand in the MOE Window.
  *
  ****************************************************************************/
 global function qb_GetLigandAtoms []
@@ -1286,22 +1286,29 @@ global function qb_GetLigandAtoms []
 endfunction
 
 /****************************************************************************
- *                          qb_GetLigandAtomNames
+ *                          qb_GetLigandAtomsIndices
  *
- *  Get the atom names of the given element ligand in the MOE Window.
+ *  For the complex in the MOE Window, get the ligand atoms
+ *  and the indices of the given element.
+ *
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
  *
  ****************************************************************************/
-global function qb_GetLigandAtomNames [type]
+global function qb_GetLigandAtomsIndices [elem]
     local [atoms, errmess] = qb_GetLigandAtoms [];
     if atoms === [] then
-        Warning errmess;
+        if MOE_BATCH then
+            write ['Error:  {}\n', errmess];
+        else
+            Warning errmess;
+        endif
         exit [];
     endif
 
-    local [atomindices] = indicesof [type, aElement atoms];
-    local atomnames = get [aName atoms, atomindices];
+    local [atomindices] = indicesof [elem, aElement atoms];
 
-    return [atoms, atomindices, atomnames];
+    return [atoms, atomindices];
 endfunction
 
 /****************************************************************************
