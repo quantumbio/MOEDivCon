@@ -65,15 +65,15 @@ QuantumBio Homepage
   <li><a href="#install">Installation</a>
   <li><a href="#start">Getting Started</a>
   <ol id=tocl>
-    <li><a href="#start-onetoone">One-To-One Mode</a>
-    <li><a href="#start-onetomany">One-To-Many Mode</a>
-    <li><a href="#start-manytomany">Many-To-Many Mode</a>
+    <li><a href="#start-onetoone">One-to-One Mode</a>
+    <li><a href="#start-onetomany">One-to-Many Mode</a>
+    <li><a href="#start-manytomany">Many-to-Many Mode</a>
   </ol>
   <li><a href="#charge">Charges</a>
   <ol id=tocl>
     <li><a href="#charge-status">Status</a>
-    <li><a href="#charge-onetomany">One-To-Many Mode</a>
-    <li><a href="#charge-manytomany">Many-To-Many Mode</a>
+    <li><a href="#charge-onetomany">One-to-Many Mode</a>
+    <li><a href="#charge-manytomany">Many-to-Many Mode</a>
     <li><a href="#charge-editing">Editing</a>
   </ol>
   <li><a href="#load">Load and Save</a>
@@ -203,7 +203,7 @@ The workflow of MOEDivcon QMScoring involves five steps:
   <li>Analyzing the QMScore results.
 </ol>
 
-<h3><a name="start-onetoone"></a>One-To-One Mode</h3>
+<h3><a name="start-onetoone"></a>One-to-One Mode</h3>
 <p>
 First, start MOE and open
 <inline>${QBHOME}/examples/simplecomplex.moe</inline>.  Then,
@@ -239,7 +239,7 @@ In this simple example, you were able to perform all four workflow steps
 in one session within the MOE Window, probably not something you would wish
 to do with a large protein receptor for which the execution time may take
 several hours.
-<h3><a name="start-onetomany"></a>One-To-Many Mode</h3>
+<h3><a name="start-onetomany"></a>One-to-Many Mode</h3>
 <p>
 The real power of MOEDivcon QMScore
 is the ability to use moebatch to execute tasks in parallel on a cluster
@@ -252,7 +252,7 @@ and select <inline>${QBHOME}/examples/simpleposes.mdb</inline>.  In the
 different poses of the same ligand.  Your settings should look like:
 <p>
 <object id="QMScoreOptionsOneToMany" title="QMScore One-to-Many Options"
-data="images/qmscoredefault.png" type=image/png>
+data="images/qmscoreoptionsonetomany.png" type=image/png>
 QMScore One-to-Many Options
 </object>
 <p>
@@ -269,14 +269,14 @@ four jobs are completed, open <inline>qmscore.mdb</inline> in the MOE
 Database Viewer.  You should see results similar to these:
 <p>
 <object id="QMScoreDatabaseOneToMany" title="QMScore One-to-Many Database" width=1000 
-data="images/qmscoredatabase.png" type=image/png>
+data="images/qmscoredatabaseonetomany.png" type=image/png>
 QMScore Database
 </object>
 See the <a href="#parallel">Batch and Parallel Execution</a> section for more
-information.
-<h3><a name="start-manytomany"></a>Many-To-Many Mode</h3>
+information on executing moebatch in parallel on a cluster.
+<h3><a name="start-manytomany"></a>Many-to-Many Mode</h3>
 <p>
-In Many-To-Many Mode, MOEDivcon doesn't use the molecules in the MOE Window,
+In Many-to-Many Mode, MOEDivcon doesn't use the molecules in the MOE Window,
 so after starting MOE, selecting <w>QMScore</w> from the menu system,
 and selecting
 <w>Many-to-Many</w> mapping mode, and you can proceed directly to browsing
@@ -285,7 +285,7 @@ and ligand database (<inline>${QBHOME}/examples/simpleligands.mdb</inline>).
 Your settings should look like:
 <p>
 <object id="QMScoreOptionsManyToMany" title="QMScore Many-to-Many Options"
-data="images/qmscoredefault.png" type=image/png>
+data="images/qmscoreoptionsmanytomany.png" type=image/png>
 QMScore One-to-Many Options
 </object>
 <p>
@@ -304,11 +304,12 @@ twelve jobs are completed, open <inline>qmscore.mdb</inline> in the MOE
 Database Viewer.  You should see results similar to these:
 <p>
 <object id="QMScoreDatabaseManyToMany" title="QMScore Many-to-Many Database" width=1000 
-data="images/qmscoredatabase.png" type=image/png>
+data="images/qmscoredatabasemanytomany.png" type=image/png>
 QMScore Database
 </object>
 See the <a href="#parallel">Batch and Parallel Execution</a> section for more
-information.
+information on executing moebatch in parallel on a cluster.
+
 <h2><a name="charge"></a>Charges</h2>
 <todo>Add Lance's description of problematic charges.</todo>
 <p>
@@ -340,7 +341,7 @@ data="images/qmscorebadcharge.png" type=image/png>
 QMScore Charge Error
 </object>
 
-<h3><a name="charge-onetomany"></a>One-To-Many</h3>
+<h3><a name="charge-onetomany"></a>One-to-Many</h3>
 <p>
 When in <w>One-to-Many</w> mode, you can choose
 to use the charge specified for the ligand as the charge for all the poses
@@ -352,7 +353,7 @@ problematic for Divcon, it is noted in the <w>Status</w> column (double
 click cell to see entire message).  Divcon calculations for molecules with
 problematic charges are skipped.
 
-<h3><a name="charge-manytomany"></a>Many-To-Many</h3>
+<h3><a name="charge-manytomany"></a>Many-to-Many</h3>
 <p>
 When in <w>Many-to-Many</w> mode, the <w>Charges</w>
 section is disabled.  The charges for the receptors and ligands are calculated
