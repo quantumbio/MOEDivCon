@@ -865,10 +865,14 @@ endfunction
  ****************************************************************************/
 local function UpdateCharge [wkey, status, warn]
 
+write ['S:  {v}\n', status];//DEBUG
+
     local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
-    if (recchg === [] or recok === [] or ligchg === [] or ligok === [])
-            and warn then
-        Warning  errmess;
+    if (recchg === [] or recok === [] or ligchg === [] or ligok === []) then
+        if warn then
+            Warning  errmess;
+        endif
+
         SetChargeStatus [wkey, status];
         return status;
     endif
