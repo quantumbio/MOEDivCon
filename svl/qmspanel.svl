@@ -167,7 +167,7 @@ const PANEL =
                 ],
             Text :
                 [
-                name: 'shift', title: 'Shift:', len: 15, extendH: 1, 
+                name: 'shift', title: 'Shift:', len: 20, extendH: 1, 
                 type: 'real', allowBlank: 0,
                 shortcut: ['0.0', '2.0', '4.0', '8.0', '16.0'],
                 bubbleHelp:
