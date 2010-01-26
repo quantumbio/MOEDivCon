@@ -311,7 +311,19 @@ See the <a href="#parallel">Batch and Parallel Execution</a> section for more
 information on executing moebatch in parallel on a cluster.
 
 <h2><a name="charge"></a>Charges</h2>
-<todo>Add Lance's description of problematic charges.</todo>
+<p>
+After correct coordinates, the second most important molecular descriptor on
+which Divcon depends is the total charge. Divcon calculations
+rely on an accurate total charge in order to properly characterize a molecule.
+Improper or incorrect charges can result in poor energies, convergence problems,
+questionable geometries, and incorrect partial charges. The total charge can
+also yield a system with an odd number of electrons. Such systems are not only
+highly unusual in biological problems, they are also incompatible the with
+underlying Restricted Hatree Fock (RHF) algorithm within Divcon. 
+MOE is capable of determining the charge based upon bond order, protonation,
+and analogous characteristics. In the event that the charge is incorrectly 
+determined, it is suggested that the user edit the structure using MOE's
+molecule Builder. Please see the MOE documentation for more information. 
 <p>
 When you open the QMScore dialog, MOE calculates the total charge of the
 receptor and ligand in the MOE window, and displays them in the
