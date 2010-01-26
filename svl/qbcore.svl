@@ -357,11 +357,14 @@ function SetChargeStatus;
  *  Check user-defined charges for even number of electrons.
  *
  ****************************************************************************/
-local function CheckCharge [wkey, status, recchg, ligchg]
+local function CheckCharge [wkey, status, recchg, ligchg, warn]
 
     local [recok, ligok, errmess] = CheckComplexCharge [recchg, ligchg];
     if recok === [] or ligok === [] then
-        Warning errmess;                                //DEBUG-Always alert?
+        if warn then
+            Warning errmess;
+        endif
+
         SetChargeStatus [wkey, status];
         return status;
     endif
@@ -865,8 +868,6 @@ endfunction
  ****************************************************************************/
 local function UpdateCharge [wkey, status, warn]
 
-write ['S:  {v}\n', status];//DEBUG
-
     local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
     if (recchg === [] or recok === [] or ligchg === [] or ligok === []) then
         if warn then
@@ -945,6 +946,143 @@ local function UpdateMode [wkey, mode, status]
 endfunction
 
 //************************  Global Functions  *******************************
+
+/****************************************************************************
+ *                          qb_CheckDivcon
+ *
+ *  Determine whether the molecule represented by the set of atoms is
+ *  problematic for Divcon.
+ *
+ *  Returns:
+ *    0     Fail
+ *    1     Warn
+ *    2     Okay
+ *
+ *  H counts:  ignore amines (MOE treats terminal amines as ammonium cations).
+ *
+ ****************************************************************************/
+global function qb_CheckDivcon [atoms]
+
+    local warn = 0, error = 0, mess = '';
+        local indices, residues, rnames, rnums, anames, ith; 
+ 
+    local elements = aElement atoms;
+    local ions = aIon atoms;
+
+    //  Look for explicit lone pairs (MOE parsing errors)
+    [indices] = indicesof [1, (elements == 'LP')];
+    if length indices > 0 then
+        residues = oParent atoms [indices];
+        rnames = rName residues;
+        rnums = rNumber residues;
+        anames = aName atoms [indices];
+        ith = 0; 
+        mess = tok_cat [mess, 'Error!  LP atoms:\n'];
+        for length indices loop
+            ith = ith + 1;
+            mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
+                indices(ith), anames(ith), rnames(ith), rnums(ith)]];
+        endloop
+
+        error = 1;
+    endif
+
+    //  Look for implicit H
+    [indices] = indicesof [1, pot_Parm_uh atoms];
+    if length indices > 0 then
+        residues = oParent atoms [indices];
+        rnames = rName residues;
+        rnums = rNumber residues;
+        anames = aName atoms [indices];
+        ith = 0; 
+        mess = tok_cat [mess, 'Warning!  Implicit (united) H on atoms:\n'];
+        for length indices loop
+            ith = ith + 1;
+            mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
+                indices(ith), anames(ith), rnames(ith), rnums(ith)]];
+        endloop
+
+        warn = 1;
+    endif
+
+    //  Look for missing/too  many H
+    local hcount = aHCount atoms;
+    local explicit = aExplicitHCount atoms;
+    [indices] = indicesof [1, (hcount <> explicit)
+        and not ((elements == 'N') and (ions == 1)
+        and (hcount - explicit == 1))];
+    if length indices > 0 then
+        residues = oParent atoms [indices];
+        rnames = rName residues;
+        rnums = rNumber residues;
+        anames = aName atoms [indices];
+        ith = 0; 
+        mess = tok_cat [mess, 'Warning!  Check H on atoms:\n'];
+        for length indices loop
+            ith = ith + 1;
+            mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
+                indices(ith), anames(ith), rnames(ith), rnums(ith)]];
+        endloop
+
+        warn = 1;
+    endif
+
+    //  Look for overlapping atoms
+    indices = [];
+    local atom, atm_i = 1;
+    for atom in atoms loop
+        local dists = aDist [atom, atoms];
+        local [subindices] = indicesof [1, (dists < 0.5)];
+        subindices = subindices | (subindices < atm_i);
+        indices = cat [indices, cat apt cat [subindices, atm_i]];
+        atm_i = atm_i + 1;
+    endloop
+
+    if length indices > 0 then
+        residues = oParent atoms [indices];
+        rnames = rName residues;
+        rnums = rNumber residues;
+        anames = aName atoms [indices];
+        ith = 0; 
+        mess = tok_cat [mess, 'Error!  Overlapping atoms:\n'];
+        for ith = 1, length indices, 2 loop
+            mess = tok_cat [mess, twrite ['    {}:  {} in {} {}'
+                 ' with {}:  {} in {} {}\n', 
+                indices(ith), anames(ith), rnames(ith), rnums(ith),
+                indices(ith+1), anames(ith+1), rnames(ith+1), rnums(ith+1)]];
+        endloop
+
+        error = 1;
+    endif
+
+    //  Look for unknown MM atom types
+    local mmtypes = aMMType atoms;
+    [indices] = indicesof [1, (mmtypes == '??')];
+    if length indices > 0 then
+        residues = oParent atoms [indices];
+        rnames = rName residues;
+        rnums = rNumber residues;
+        anames = aName atoms [indices];
+        ith = 0; 
+        mess = tok_cat [mess, 'Warning!  Unknown MM types for atoms:\n'];
+        for length indices loop
+            ith = ith + 1;
+            mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
+                indices(ith), anames(ith), rnames(ith), rnums(ith)]];
+        endloop
+
+        warn = 1;
+    endif
+
+
+    if error then
+        return [0, mess];
+    elseif warn then
+        return [1, mess];
+    else
+        return [2, ''];
+    endif
+endfunction
 
 /****************************************************************************
  *                          qb_CheckDivconLig
@@ -1564,7 +1702,8 @@ endfunction
 global function qb_UpdateCorePanel [wkey, status, coreopts]
 
     WindowSetData [wkey, dropfirst coreopts];
-    status = CheckCharge [wkey, status, coreopts.recchg, coreopts.ligchg];
+    status = CheckCharge [wkey, status, coreopts.recchg, coreopts.ligchg,
+        neL [coreopts.mode, 'Many-to-Many']];
     UpdateMode [wkey, coreopts.mode, status];
     status.prevwd = UpdateCWD [wkey, coreopts.cwd, coreopts.workdir, 
         coreopts.workdir];
