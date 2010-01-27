@@ -80,6 +80,11 @@ const CORE_OPT_DEFAULTS =
     ['scoredb',      'qbscore.mdb' ],
     ['recdb',        ''            ],
     ['posedb',       ''            ],
+    ['testChg'       1             ],
+    ['testLP'        1             ],
+    ['testOverlap'   1             ],
+    ['testH'         1             ],
+    ['testMM'        1             ],
     ['recchg',       0             ],
     ['ligchg',       0             ],
     ['poseschg',     0             ]
@@ -184,6 +189,61 @@ const CORE_PANEL =
 
     Separator : [flushLeft:1, extendH:1, margin:1],
 
+    Vbox :
+        [
+        Hbox :
+            [
+            extendH: 1, title: 'Error Tests:',
+            bubbleHelp:
+                'These are tests for problems with the receptor(s)\n'
+                'and ligand(s) that will cause Divcon to fail.'
+            Checkbox :
+                [
+                name: 'testChg', text: 'Charges',
+                bubbleHelp:
+                    'Check to ensure that the total charges\n'
+                    'calculated by MOE are compatible with Divcon.'
+                ],
+            Checkbox :
+                [
+                name: 'testLP', text: 'Lone Pairs',
+                bubbleHelp:
+                    'Check to ensure that there are no lone pairs\n'
+                    '(often the result of MOE misparsing a PDB file).'
+                ],
+            Checkbox :
+                [
+                name: 'testOverlap', text: 'Atom Overlap',
+                bubbleHelp:
+                    'Check to ensure that there are no\n'
+                    'overlapping atoms (this can be time consuming).'
+                ]
+            ],
+        Hbox :
+            [
+            extendH: 1, title: 'Warning Tests:',
+            bubbleHelp:
+                'These are tests for problems with the receptor(s)\n'
+                'and ligand(s) that may or may not cause Divcon to fail,\n'
+                'but the results will probably be questionable.'
+            Checkbox :
+                [
+                name: 'testH', text: 'Missing/Extra H',
+                bubbleHelp:
+                    'Check to ensure that there are no missing or\n'
+                    'extra H (e.g., truncated residue, C=OH, etc.).'
+                ],
+            Checkbox :
+                [
+                name: 'testMM', text: 'No MM Type',
+                bubbleHelp:
+                    'Check to ensure that all atoms\n'
+                    'have a defined MM atom type.'
+                ]
+            ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1],
     Hbox :
         [
         extendH: 1, title: 'Charges:',
