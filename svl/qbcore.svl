@@ -80,11 +80,10 @@ const CORE_OPT_DEFAULTS =
     ['scoredb',      'qbscore.mdb' ],
     ['recdb',        ''            ],
     ['posedb',       ''            ],
-    ['testChg'       1             ],
-    ['testLP'        1             ],
-    ['testOverlap'   1             ],
-    ['testH'         1             ],
-    ['testMM'        1             ],
+    ['testLP',       1             ],
+    ['testOverlap',  1             ],
+    ['testH',        1             ],
+    ['testMM',       1             ],
     ['recchg',       0             ],
     ['ligchg',       0             ],
     ['poseschg',     0             ]
@@ -189,57 +188,71 @@ const CORE_PANEL =
 
     Separator : [flushLeft:1, extendH:1, margin:1],
 
-    Vbox :
+    Hbox :
         [
-        Hbox :
+        Vbox :
             [
-            extendH: 1, title: 'Error Tests:',
-            bubbleHelp:
-                'These are tests for problems with the receptor(s)\n'
-                'and ligand(s) that will cause Divcon to fail.'
-            Checkbox :
+            extendH: 1, title: 'Molecule Tests:',
+            Button :
                 [
-                name: 'testChg', text: 'Charges',
+                name: 'performtests', text: 'Perform', extendH:1, 
                 bubbleHelp:
-                    'Check to ensure that the total charges\n'
-                    'calculated by MOE are compatible with Divcon.'
-                ],
-            Checkbox :
-                [
-                name: 'testLP', text: 'Lone Pairs',
-                bubbleHelp:
-                    'Check to ensure that there are no lone pairs\n'
-                    '(often the result of MOE misparsing a PDB file).'
-                ],
-            Checkbox :
-                [
-                name: 'testOverlap', text: 'Atom Overlap',
-                bubbleHelp:
-                    'Check to ensure that there are no\n'
-                    'overlapping atoms (this can be time consuming).'
+                    'Perform the selected tests on the molecules\n'
+                    'in the MOE Window and/or those stored in\n'
+                    'the opened corresponding QMScore database.'
                 ]
             ],
-        Hbox :
+        Separator : 
             [
-            extendH: 1, title: 'Warning Tests:',
-            bubbleHelp:
-                'These are tests for problems with the receptor(s)\n'
-                'and ligand(s) that may or may not cause Divcon to fail,\n'
-                'but the results will probably be questionable.'
-            Checkbox :
-                [
-                name: 'testH', text: 'Missing/Extra H',
-                bubbleHelp:
-                    'Check to ensure that there are no missing or\n'
-                    'extra H (e.g., truncated residue, C=OH, etc.).'
-                ],
-            Checkbox :
-                [
-                name: 'testMM', text: 'No MM Type',
-                bubbleHelp:
-                    'Check to ensure that all atoms\n'
-                    'have a defined MM atom type.'
-                ]
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+        Mbox :
+            [
+            columns: 3, spacingH: 'medium',
+            extendH: 1, name: 'moltests',
+                Label :
+                    [
+                    font: 'mediumBold', text: 'Error:', 
+                    bubbleHelp:
+                        'These are tests for problems with the receptor(s)\n'
+                        'and ligand(s) that will cause Divcon to fail.'
+                    ],
+                Checkbox :
+                    [
+                    name: 'testLP', text: 'Lone Pairs',
+                    bubbleHelp:
+                        'Check to ensure that there are no lone pairs\n'
+                        '(often the result of MOE misparsing a PDB file).'
+                    ],
+                Checkbox :
+                    [
+                    name: 'testOverlap', text: 'Atom Overlap',
+                    bubbleHelp:
+                        'Check to ensure that there are no\n'
+                        'overlapping atoms (this can be time consuming).'
+                    ],
+                Label :
+                    [
+                    font: 'mediumBold', text: 'Warning:',
+                    bubbleHelp:
+                        'These are tests for problems with the receptor(s) and\n'
+                        'ligand(s) that may or may not cause Divcon to fail,\n'
+                        'but the results will probably be questionable.'
+                    ],
+                Checkbox :
+                    [
+                    name: 'testH', text: 'Missing/Extra H',
+                    bubbleHelp:
+                        'Check to ensure that there are no missing or\n'
+                        'extra H (e.g., truncated residue, C=OH, etc.).'
+                    ],
+                Checkbox :
+                    [
+                    name: 'testMM', text: 'No MM Type',
+                    bubbleHelp:
+                        'Check to ensure that all atoms\n'
+                        'have a defined MM atom type.'
+                    ]
             ]
         ],
 
@@ -579,6 +592,7 @@ endfunction
 
 function qb_GetEnvTag;
 function GetStatusMessage;
+function SingleMol;
 
 /****************************************************************************
  *                          CopyPoseDB
@@ -624,7 +638,7 @@ local function CopyPoseDB [resultskey, poseskey]
             local ligatms = cat cAtoms ligch;
             local charge = 0;
 
-            if 1 <> length uniq aMoleculeNumber ligatms then
+            if not SingleMol [ligatms] then
                 stsmess = cat [recmess, 
                     'Warning:  Ligand must to be a single molecule.\n'];
             else
@@ -720,7 +734,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
         local posech = mol_Create posemol;
         local poseatms = cat cAtoms posech;
         local posechg = 0;
-        if 1 <> length uniq aMoleculeNumber poseatms then
+        if not SingleMol [poseatms] then
             stsmess = cat [recmsgs(ith), 
                 'Warning:  Ligand must to be a single molecule.\n'];
         else
@@ -848,6 +862,16 @@ local function SetScoreFields [dbkey, addreceptor, fields, dbtype]
 endfunction
 
 /****************************************************************************
+ *                          SingleMol
+ *
+ *  Does the atom set represent a single molecule?
+ *
+ ****************************************************************************/
+local function SingleMol [atoms]
+    return 1 === length uniq aMoleculeNumber atoms;
+endfunction
+
+/****************************************************************************
  *                          SplitComplex
  *
  *  Split the set of atoms in the MOE Window into ligand and receptor atoms.
@@ -882,7 +906,7 @@ local function SplitComplex []
         return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
     endif
 
-    if 1 <> length uniq aMoleculeNumber ligatoms then
+    if not SingleMol [ligatoms] then
         return [[], [], 'Ligand must to be a single molecule.'];
     endif
 
@@ -1008,143 +1032,6 @@ endfunction
 //************************  Global Functions  *******************************
 
 /****************************************************************************
- *                          qb_CheckDivcon
- *
- *  Determine whether the molecule represented by the set of atoms is
- *  problematic for Divcon.
- *
- *  Returns:
- *    0     Fail
- *    1     Warn
- *    2     Okay
- *
- *  H counts:  ignore amines (MOE treats terminal amines as ammonium cations).
- *
- ****************************************************************************/
-global function qb_CheckDivcon [atoms]
-
-    local warn = 0, error = 0, mess = '';
-        local indices, residues, rnames, rnums, anames, ith; 
- 
-    local elements = aElement atoms;
-    local ions = aIon atoms;
-
-    //  Look for explicit lone pairs (MOE parsing errors)
-    [indices] = indicesof [1, (elements == 'LP')];
-    if length indices > 0 then
-        residues = oParent atoms [indices];
-        rnames = rName residues;
-        rnums = rNumber residues;
-        anames = aName atoms [indices];
-        ith = 0; 
-        mess = tok_cat [mess, 'Error!  LP atoms:\n'];
-        for length indices loop
-            ith = ith + 1;
-            mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
-                indices(ith), anames(ith), rnames(ith), rnums(ith)]];
-        endloop
-
-        error = 1;
-    endif
-
-    //  Look for implicit H
-    [indices] = indicesof [1, pot_Parm_uh atoms];
-    if length indices > 0 then
-        residues = oParent atoms [indices];
-        rnames = rName residues;
-        rnums = rNumber residues;
-        anames = aName atoms [indices];
-        ith = 0; 
-        mess = tok_cat [mess, 'Warning!  Implicit (united) H on atoms:\n'];
-        for length indices loop
-            ith = ith + 1;
-            mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
-                indices(ith), anames(ith), rnames(ith), rnums(ith)]];
-        endloop
-
-        warn = 1;
-    endif
-
-    //  Look for missing/too  many H
-    local hcount = aHCount atoms;
-    local explicit = aExplicitHCount atoms;
-    [indices] = indicesof [1, (hcount <> explicit)
-        and not ((elements == 'N') and (ions == 1)
-        and (hcount - explicit == 1))];
-    if length indices > 0 then
-        residues = oParent atoms [indices];
-        rnames = rName residues;
-        rnums = rNumber residues;
-        anames = aName atoms [indices];
-        ith = 0; 
-        mess = tok_cat [mess, 'Warning!  Check H on atoms:\n'];
-        for length indices loop
-            ith = ith + 1;
-            mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
-                indices(ith), anames(ith), rnames(ith), rnums(ith)]];
-        endloop
-
-        warn = 1;
-    endif
-
-    //  Look for overlapping atoms
-    indices = [];
-    local atom, atm_i = 1;
-    for atom in atoms loop
-        local dists = aDist [atom, atoms];
-        local [subindices] = indicesof [1, (dists < 0.5)];
-        subindices = subindices | (subindices < atm_i);
-        indices = cat [indices, cat apt cat [subindices, atm_i]];
-        atm_i = atm_i + 1;
-    endloop
-
-    if length indices > 0 then
-        residues = oParent atoms [indices];
-        rnames = rName residues;
-        rnums = rNumber residues;
-        anames = aName atoms [indices];
-        ith = 0; 
-        mess = tok_cat [mess, 'Error!  Overlapping atoms:\n'];
-        for ith = 1, length indices, 2 loop
-            mess = tok_cat [mess, twrite ['    {}:  {} in {} {}'
-                 ' with {}:  {} in {} {}\n', 
-                indices(ith), anames(ith), rnames(ith), rnums(ith),
-                indices(ith+1), anames(ith+1), rnames(ith+1), rnums(ith+1)]];
-        endloop
-
-        error = 1;
-    endif
-
-    //  Look for unknown MM atom types
-    local mmtypes = aMMType atoms;
-    [indices] = indicesof [1, (mmtypes == '??')];
-    if length indices > 0 then
-        residues = oParent atoms [indices];
-        rnames = rName residues;
-        rnums = rNumber residues;
-        anames = aName atoms [indices];
-        ith = 0; 
-        mess = tok_cat [mess, 'Warning!  Unknown MM types for atoms:\n'];
-        for length indices loop
-            ith = ith + 1;
-            mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
-                indices(ith), anames(ith), rnames(ith), rnums(ith)]];
-        endloop
-
-        warn = 1;
-    endif
-
-
-    if error then
-        return [0, mess];
-    elseif warn then
-        return [1, mess];
-    else
-        return [2, ''];
-    endif
-endfunction
-
-/****************************************************************************
  *                          qb_CheckDivconLig
  *
  *  Determine whether the ligand and its total charge is problematic
@@ -1160,7 +1047,7 @@ global function qb_CheckDivconLig [ligmol, ligchg]
     local mess = '';
     local ligchn = mol_Create ligmol;
     local ligatms = cat cAtoms ligchn;
-    local ligok = 1 === length uniq aMoleculeNumber ligatms;
+    local ligok = SingleMol [ligatms];
     if not ligok then
         mess = 'Ligand must be a single molecule.';
     endif
@@ -1205,7 +1092,7 @@ global function qb_CheckDivconMols [recmol, recchg, ligmol, ligchg]
 
     local ligchn = mol_Create ligmol;
     local ligatms = cat cAtoms ligchn;
-    local ligok = 1 === length uniq aMoleculeNumber ligatms;
+    local ligok = SingleMol [ligatms];
     if not ligok then
         mess = tok_cat [mess, 'Ligand must be a single molecule.'];
     endif
@@ -1269,6 +1156,19 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
     elseif trig === 'cwd' then
         status.prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir,
             status.prevwd];
+
+    elseif trig === 'performtests' then
+        if allfalse [vals.testLP, vals.testOverlap, vals.testH, vals.testMM] then
+            Warning 'No tests selected.';
+        elseif second task_fork [master: 'parent',
+                statics:'share'] === 'child' then
+            task_prio 0;
+
+            if neL [vals.mode, 'Many-to-Many'] then
+            endif
+
+            exit [];
+        endif
 
     elseif trig === 'calcchg' then
         if second task_fork [master: 'parent',
@@ -1747,9 +1647,138 @@ global function qb_TagCoreVals [vals]
         second first CORE_OPT_DEFAULTS,
         vals.mode, vals.cwd, vals.workdir,
         vals.scoredb,  vals.recdb, vals.posedb,
+        vals.testLP, vals.testOverlap,
+        vals.testH, vals.testMM,
         vals.recchg, vals.ligchg, vals.poseschg]];
 
     return coreopts;
+endfunction
+
+/****************************************************************************
+ *                          qb_TestDivcon
+ *
+ *  Determine whether the molecule represented by the set of atoms is
+ *  problematic for Divcon.
+ *
+ *  Returns:
+ *    0     Fail
+ *    1     Warn
+ *    2     Okay
+ *
+ *  H counts:  ignore amines (MOE treats terminal amines as ammonium cations).
+ *
+ ****************************************************************************/
+global function qb_TestDivcon [atoms, lonepair, overlap, missextraH, MMtype]
+
+    local warn = 0, error = 0, mess = '';
+        local indices, residues, rnames, rnums, anames, ith; 
+ 
+    local elements = aElement atoms;
+    local ions = aIon atoms;
+
+    //  Look for explicit lone pairs (MOE parsing errors)
+    if lonepair then
+        [indices] = indicesof [1, (elements == 'LP')];
+        if length indices > 0 then
+            residues = oParent atoms [indices];
+            rnames = rName residues;
+            rnums = rNumber residues;
+            anames = aName atoms [indices];
+            ith = 0; 
+            mess = tok_cat [mess, 'Error!  LP atoms:\n'];
+            for length indices loop
+                ith = ith + 1;
+                mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
+                    indices(ith), anames(ith), rnames(ith), rnums(ith)]];
+            endloop
+
+            error = 1;
+        endif
+    endif
+
+    //  Look for overlapping atoms
+    if overlap then
+        indices = [];
+        local atom, atm_i = 1;
+        for atom in atoms loop
+            local dists = aDist [atom, atoms];
+            local [subindices] = indicesof [1, (dists < 0.5)];
+            subindices = subindices | (subindices < atm_i);
+            indices = cat [indices, cat apt cat [subindices, atm_i]];
+            atm_i = atm_i + 1;
+        endloop
+
+        if length indices > 0 then
+            residues = oParent atoms [indices];
+            rnames = rName residues;
+            rnums = rNumber residues;
+            anames = aName atoms [indices];
+            ith = 0; 
+            mess = tok_cat [mess, 'Error!  Overlapping atoms:\n'];
+            for ith = 1, length indices, 2 loop
+                mess = tok_cat [mess, twrite ['    {}:  {} in {} {}'
+                     ' with {}:  {} in {} {}\n', 
+                    indices(ith), anames(ith), rnames(ith), rnums(ith),
+                    indices(ith+1), anames(ith+1), rnames(ith+1),
+                    rnums(ith+1)]];
+            endloop
+
+            error = 1;
+        endif
+    endif
+
+    //  Look for missing/extra H
+    if missextraH then
+        local hcount = aHCount atoms;
+        local explicit = aExplicitHCount atoms;
+        [indices] = indicesof [1, (hcount <> explicit)
+            and not ((elements == 'N') and (ions == 1)
+            and (hcount - explicit == 1))];
+        if length indices > 0 then
+            residues = oParent atoms [indices];
+            rnames = rName residues;
+            rnums = rNumber residues;
+            anames = aName atoms [indices];
+            ith = 0; 
+            mess = tok_cat [mess, 'Warning!  Check H on atoms:\n'];
+            for length indices loop
+                ith = ith + 1;
+                mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
+                    indices(ith), anames(ith), rnames(ith), rnums(ith)]];
+            endloop
+
+            warn = 1;
+        endif
+    endif
+
+    //  Look for unknown MM atom types
+    if MMtype then
+        local mmtypes = aMMType atoms;
+        [indices] = indicesof [1, (mmtypes == '??')];
+        if length indices > 0 then
+            residues = oParent atoms [indices];
+            rnames = rName residues;
+            rnums = rNumber residues;
+            anames = aName atoms [indices];
+            ith = 0; 
+            mess = tok_cat [mess, 'Warning!  Unknown MM types for atoms:\n'];
+            for length indices loop
+                ith = ith + 1;
+                mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
+                    indices(ith), anames(ith), rnames(ith), rnums(ith)]];
+            endloop
+
+            warn = 1;
+        endif
+    endif
+
+    if error then
+        return [0, mess];
+    elseif warn then
+        return [1, mess];
+    else
+        return [2, ''];
+    endif
 endfunction
 
 /****************************************************************************
