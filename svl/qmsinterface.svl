@@ -63,18 +63,16 @@ if not alltrue [recok, recchgok, ligok, ligchgok] then
         errmess = cat [errmess, 
             swrite ['Problematic molecule in {}, skipping!{}', 
             qb_GetWhich [not recok, not ligok], ckmsg]];
-        if tok_length ckmsg > 0 then
-            errmess = cat [errmess, swrite ['\n{}', ckmsg]];
-        endif
+    endif
+
+    if tok_length ckmsg > 0 then
+        errmess = cat [errmess, swrite ['\n{}', ckmsg]];
     endif
 
     if not alltrue [recchgok, ligchgok] then
         errmess =  cat [errmess, 
             swrite ['Problematic charge for {}, skipping!{}', 
             qb_GetWhich [not recchgok, not ligchgok], ckmsg]];
-        if tok_length ckmsg > 0 then
-            errmess = cat [errmess, swrite ['\n{}', ckmsg]];
-        endif
     endif
 
     return [[], errmess];
