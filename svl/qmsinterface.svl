@@ -27,7 +27,7 @@
 #set version '2010.02'
 #set main 'qb_QMScore'
 
-function qb_CheckDivconMols;
+function qb_CheckChgTestDivconMols;
 function qb_GetWhich;
 
 /*  NOTE:  If you change the Key lists here, you need to update the
@@ -56,7 +56,9 @@ global function qb_QMScore [recmol, ligmol, coreopts, appopts]
 local errmess = "";
 
 local [recmolset, recok, recchgok, ligok, ligchgok, ckmsg]
-    = qb_CheckDivconMols [recmol, coreopts.recchg, ligmol, coreopts.ligchg];
+    = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
+        coreopts.ligchg, coreopts.testLP, coreopts.testOverlap,
+        coreopts.testH, coreopts.testMM];
 
 if not alltrue [recok, recchgok, ligok, ligchgok] then
     if not alltrue [recok, ligok] then
