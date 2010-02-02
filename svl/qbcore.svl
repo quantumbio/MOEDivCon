@@ -3,7 +3,7 @@
  // BEGIN COPYRIGHT
  /***********************************************************************
     Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
-	
+    
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
 
@@ -341,6 +341,19 @@ const CORE_PANEL =
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
+const MESS_WINDOW =
+    [
+    name: 'mpanel', 
+    title: 'Test Information',
+    windowName: 'MessWindow',
+    text: ['Close'],
+    onTrigger: ['return'],
+    Edit :
+        [
+        name:'mess', len: 40, width: 80
+        ]
+    ];
+
 //***********************  Local Functions  *********************************
 
 function SplitComplex;
@@ -488,8 +501,7 @@ local function CheckComplexCharge [recchg, ligchg]
 
 endfunction
 
-function qb_CheckDivconLig;
-function qb_CheckDivconRec;
+function qb_CheckChgDivconMol;
 function qb_GetEnvTag;
 function qb_GetStatusFlags;
 function qb_GetPoseFields;
@@ -498,7 +510,7 @@ function qb_GetWhich;
 function qb_SaveDivconStatus;
 
 /****************************************************************************
- *                          CheckDBMols
+ *                          CheckChgDBMols
  *
  *  Check the molecules and their charges stored in the Score
  *  Database and store their status in the Status field.
@@ -506,7 +518,7 @@ function qb_SaveDivconStatus;
  *  Note:  this only checks the receptors and ligands in the molecule fields.
  *
  ****************************************************************************/
-local function CheckDBMols [oldkey]
+local function CheckChgDBMols [oldkey]
 
     if oldkey === 0 then
         Warning 'The MOEDivcon database hasn\'t been created.';
@@ -525,28 +537,34 @@ local function CheckDBMols [oldkey]
     local recflds = qb_GetRecFields [dbkey];
     local ligflds = qb_GetPoseFields [dbkey];
 
+    if not MOE_BATCH then
+        local [osys, nsys] = SystemPush [];
+    endif
+
     while rowkey = db_NextEntry [dbkey, rowkey] loop
         local recok = 1, recchgok = 1, recmess = '';
         local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
-        local [ligok, ligchgok, ligmess] = qb_CheckDivconLig [ligmol, ligchg];
+        local [ligok, ligchgok, ligmess] = qb_CheckChgDivconMol [ligmol,
+            ligchg, 1];
         if coreopts.mode === 'Many-to-Many' then
             local [recmol, recchg] = db_ReadFields [dbkey, rowkey,
                 recflds];
-            [recok, recchgok, recmess] = qb_CheckDivconRec [recmol, recchg];
+            [recok, recchgok, recmess] = qb_CheckChgDivconMol [recmol,
+                recchg, 0];
         endif
 
         if alltrue [recok, recchgok, ligok, ligchgok] then
             local [oldstatus] = db_ReadFields [dbkey, rowkey, STATUS_FIELD];
             if not isnull oldstatus then
                 qb_SaveDivconStatus [dbkey, rowkey,
-                    "Everything is compatible with Divcon.\n"];
+                    "Charges are compatible with Divcon.\n"];
             endif
         else
             local errmess = "";
             local submess = tok_cat [recmess, ligmess];
             if not alltrue [recok, ligok] then
                 errmess = cat [errmess, 
-                    swrite ['Warning:  Problematic molecule in {}.\n', 
+                    swrite ['Error!  Problematic molecule in {}.\n', 
                     qb_GetWhich [not recok, not ligok]]];
                 if tok_length submess > 0 then
                     errmess = cat [errmess, swrite ['{}\n', submess]];
@@ -555,7 +573,7 @@ local function CheckDBMols [oldkey]
 
             if not alltrue [recchgok, ligchgok] then
                 errmess =  cat [errmess, 
-                    swrite ['Warning:  Problematic charge for {}.\n', 
+                    swrite ['Error!  Problematic charge for {}.\n', 
                     qb_GetWhich [not recchgok, not ligchgok]]];
                 if tok_length submess > 0 then
                     errmess = cat [errmess, swrite ['{}\n', submess]];
@@ -565,6 +583,10 @@ local function CheckDBMols [oldkey]
             qb_SaveDivconStatus [dbkey, rowkey, errmess];
         endif
     endloop
+
+    if not MOE_BATCH then
+        SystemPop [osys, nsys];
+    endif
 
     db_Close dbkey;
 endfunction
@@ -591,6 +613,7 @@ local function ClearChargeStatus [wkey]
 endfunction
 
 function qb_GetEnvTag;
+function qb_TestDivcon;
 function GetStatusMessage;
 function SingleMol;
 
@@ -600,7 +623,7 @@ function SingleMol;
  *  Copy the Poses database into the QMScore output database.
  *
  ****************************************************************************/
-local function CopyPoseDB [resultskey, poseskey]
+local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM]
 
     local mess = '';
     local [fields, ftypes] = db_Fields poseskey;
@@ -622,7 +645,9 @@ local function CopyPoseDB [resultskey, poseskey]
     db_RenameField [resultskey, POSE_FIELD, molfield];
     apt db_EnsureField [resultskey,  fields, ftypes];
 
-    local [osys, nsys] = SystemPush [];
+    if not MOE_BATCH then
+        local [osys, nsys] = SystemPush [];
+    endif
 
     local rowkey = 0, stsmess = "";
     while rowkey = db_NextEntry [poseskey, rowkey] loop
@@ -638,14 +663,18 @@ local function CopyPoseDB [resultskey, poseskey]
             local ligatms = cat cAtoms ligch;
             local charge = 0;
 
+            stsmess = recmess;
             if not SingleMol [ligatms] then
-                stsmess = cat [recmess, 
-                    'Warning:  Ligand must to be a single molecule.\n'];
-            else
-                charge = CalcCharge [ligatms];
-                local chgok = ChargeOK [ligatms, charge];
-                stsmess = cat [recmess, GetStatusMessage ['Ligand', chgok]];
+                stsmess = cat [stsmess,
+                    "Error!  Ligand must to be a single molecule.\n"];
             endif
+
+            charge = CalcCharge [ligatms];
+            local chgok = ChargeOK [ligatms, charge];
+            local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms, 
+                lp, overlap, missH, MM];
+            stsmess = cat [stsmess, GetStatusMessage ['Ligand', chgok],
+                string ligmess];
 
             chgdata = tag [[LIGCHG_FIELD], [charge]];
             oDestroy ligch;
@@ -658,7 +687,9 @@ local function CopyPoseDB [resultskey, poseskey]
         endif
     endloop
 
-    SystemPop [osys, nsys];
+    if not MOE_BATCH then
+        SystemPop [osys, nsys];
+    endif
 
     db_RenameField [resultskey, molfield, POSE_FIELD];
 
@@ -673,9 +704,10 @@ endfunction
  *  HACK alert:  temporarily renames mol fields to make copying easier.
  *
  ****************************************************************************/
-local function CopyRecPoseDB [resultskey, recskey, poseskey]
+local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
+        missH, MM]
 
-    local mess = '';
+    local mess = '', msgkey;
     if db_nEntries recskey <> db_nEntries poseskey then
         mess = 'The receptor and pose databases\n'
             'have different number of entries.';
@@ -702,6 +734,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
     apt db_EnsureField [resultskey, recfields, recftypes];
 
     if not MOE_BATCH then
+        msgkey = Message [0, 'Saving database ...'];
         local [osys, nsys] = SystemPush [];
     endif
 
@@ -712,8 +745,11 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
         local recchs = mol_Create recmol;
         local recatms = cat cAtoms recchs;
         local recchg = CalcCharge [recatms];
-        local recok = ChargeOK [recatms, recchg];
-        stsmess = GetStatusMessage ['Receptor', recok];
+        local recchgok = ChargeOK [recatms, recchg];
+        local [recok, recmess] = qb_TestDivcon ['receptor', recatms, 
+            lp, overlap, missH, MM];
+        stsmess = cat [GetStatusMessage ['Receptor', recchgok],
+            string recmess];
         recmsgs = append [recmsgs, stsmess];
         local recchgdata = tag [[RECCHG_FIELD], [recchg]];
         recrowdata = cat [recchgdata, recrowdata];
@@ -734,15 +770,18 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
         local posech = mol_Create posemol;
         local poseatms = cat cAtoms posech;
         local posechg = 0;
+        stsmess = recmsgs(ith);
         if not SingleMol [poseatms] then
-            stsmess = cat [recmsgs(ith), 
-                'Warning:  Ligand must to be a single molecule.\n'];
-        else
-            posechg = CalcCharge [poseatms];
-            local poseok = ChargeOK [poseatms, posechg];
-            stsmess = cat [recmsgs(ith), GetStatusMessage ['Pose', poseok]];
+            stsmess = cat [stsmess,
+                "Error!  Ligand must to be a single molecule.\n"];
         endif
 
+        posechg = CalcCharge [poseatms];
+        local posechgok = ChargeOK [poseatms, posechg];
+        local [poseok, posemess] = qb_TestDivcon ['ligand', poseatms,
+            lp, overlap, missH, MM];
+        stsmess = cat [stsmess, GetStatusMessage ['Ligand', posechgok],
+            string posemess];
         local posechgdata = tag [[LIGCHG_FIELD], [posechg]];
         poserowdata = cat [posechgdata, poserowdata];
         db_Write [resultskey, resultrowkey, poserowdata];
@@ -757,6 +796,8 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey]
 
     if not MOE_BATCH then
         SystemPop [osys, nsys];
+        Message [msgkey, 'Saving database ... done.'];
+        sleep 5;
     endif
 
     return mess;
@@ -787,7 +828,7 @@ local function GetStatusMessage [which, ok]
     local mess = "";
 
     if not ok then
-        mess = swrite ['Warning:  Problematic charge for {}.\n', which];
+        mess = swrite ['Error!  Problematic charge for {}.\n', which];
     endif
 
     return mess;
@@ -945,6 +986,94 @@ local function SplitReceptor [receptoratoms]
 endfunction
 
 /****************************************************************************
+ *                          TestComplex
+ *
+ *  Determine whether the ligand and receptor in the MOE window have any
+ *  detectable problems.
+ *
+ ****************************************************************************/
+local function TestComplex [lonepairs, overlap, missextraH, MMtype]
+
+    local [recatoms, ligatoms, errmess] = SplitComplex [];
+    if recatoms === [] or ligatoms === [] then
+        return  [[], [], errmess];
+    endif
+
+    local [recok, recmess] = qb_TestDivcon ['receptor', recatoms, 
+        lonepairs, overlap, missextraH,MMtype];
+    local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatoms,
+        lonepairs, overlap, missextraH, MMtype];
+
+    return [recok, ligok, tok_cat [recmess, ligmess]];
+
+endfunction
+
+function qb_TestDivconMol;
+
+/****************************************************************************
+ *                          TestDBMols
+ *
+ *  Test the molecules stored in the Score Database and store their status
+ *  in the Status field.
+ *
+ *  Note:  this only checks the receptors and ligands in the molecule fields.
+ *
+ ****************************************************************************/
+local function TestDBMols [oldkey, testLP, testOverlap, testH, testMM]
+
+    if oldkey === 0 then
+        Warning 'The MOEDivcon database hasn\'t been created.';
+        return;
+    endif
+
+    local dblist = dbv_KeyList [];
+    if isnull dblist or isnull indexof [oldkey, dblist] then
+        Warning 'The MOEDivcon database isn\'t open.';
+        return;
+    endif
+
+    local dbkey = db_Open [oldkey, 'read-write'];
+    local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
+    local rowkey = 0;
+    local recflds = qb_GetRecFields [dbkey];
+    local ligflds = qb_GetPoseFields [dbkey];
+
+    if not MOE_BATCH then
+        local [osys, nsys] = SystemPush [];
+    endif
+
+    while rowkey = db_NextEntry [dbkey, rowkey] loop
+        local recok = 1, recchgok = 1, recmess = '';
+        local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
+        local [ligok, ligmess] = qb_TestDivconMol ['ligand', ligmol,
+            testLP, testOverlap, testH, testMM];
+        if coreopts.mode === 'Many-to-Many' then
+            local [recmol, recchg] = db_ReadFields [dbkey, rowkey,
+                recflds];
+            [recok, recmess] = qb_TestDivconMol ['receptor', recmol,
+                testLP, testOverlap, testH, testMM];
+        endif
+
+        if recok === 2 and ligok === 2 then
+            local [oldstatus] = db_ReadFields [dbkey, rowkey, STATUS_FIELD];
+            if not isnull oldstatus then
+                qb_SaveDivconStatus [dbkey, rowkey, "No problems detected.\n"];
+            endif
+        else
+            qb_SaveDivconStatus [dbkey, rowkey, 
+                cat [string recmess, string ligmess]];
+        endif
+    endloop
+
+    if not MOE_BATCH then
+        SystemPop [osys, nsys];
+    endif
+
+    db_Close dbkey;
+    return;
+endfunction
+
+/****************************************************************************
  *                          UpdateCharge
  *
  *  Update the window based on new charge.
@@ -1032,111 +1161,77 @@ endfunction
 //************************  Global Functions  *******************************
 
 /****************************************************************************
- *                          qb_CheckDivconLig
+ *                          qb_CheckChgDivconMol
  *
- *  Determine whether the ligand and its total charge is problematic
- *  for Divcon.
+ *  Determine whether the molecule and its total charge is problematic
+ *  for Divcon.  Also checks if it is a single molecule when flagged.
+ *
+ *  Assume that SystemPush [] and SystemPop [] have already been called,
+ *  if necessary.
  *
  ****************************************************************************/
-global function qb_CheckDivconLig [ligmol, ligchg]
+global function qb_CheckChgDivconMol [mol, chg, single]
 
-    if not MOE_BATCH then
-        local [osys, nsys] = SystemPush [];
+    local molok = 1, mess = '';
+    local chn = mol_Create mol;
+    local atms = cat cAtoms chn;
+    if single then
+        molok = SingleMol [atms];
     endif
 
-    local mess = '';
-    local ligchn = mol_Create ligmol;
-    local ligatms = cat cAtoms ligchn;
-    local ligok = SingleMol [ligatms];
-    if not ligok then
+    if not molok then
         mess = 'Ligand must be a single molecule.';
     endif
 
-    local ligchgok = ChargeOK [ligatms, ligchg];
-    oDestroy ligchn;
+    local chgok = ChargeOK [atms, chg];
+    oDestroy chn;
 
-    if not MOE_BATCH then
-        SystemPop [osys, nsys];
-    endif
-
-    return [ligok, ligchgok, mess];
+    return [molok, chgok, mess];
 
 endfunction
 
 /****************************************************************************
- *                          qb_CheckDivconMols
+ *                          qb_CheckChgTestDivconMols
  *
  *  Determine whether the given molecules and their total charges are
  *  problematic for Divcon.  Return the receptor collection separated
  *  into individual molecules to be compatible with Divcon's backbone.
  *
+ *  Assume that SystemPush [] and SystemPop [] have already been called,
+ *  if necessary.
+ *
  ****************************************************************************/
-global function qb_CheckDivconMols [recmol, recchg, ligmol, ligchg]
-
-    if not MOE_BATCH then
-        local [osys, nsys] = SystemPush [];
-    endif
+global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
+        lonepair, overlap, missextraH, MMtype]
 
     local mess = '';
     local recchns = mol_Create recmol;
     local recatms = cat cAtoms recchns;
     local recatmsets = SplitReceptor [recatms];
     local recmolset = app mol_Extract recatmsets;
-    local recok = 1;                             // Future receptor test?
-    if not recok then
-        mess = 'Receptor is bad, bad, bad.';
-    endif
-
+    local [recok, recmess] = qb_TestDivcon ['receptor', recatms, 
+        lonepair, overlap, missextraH, MMtype];
+    mess = tok_cat [mess, recmess];
     local recchgok = ChargeOK [recatms, recchg];
     oDestroy recchns;
 
     local ligchn = mol_Create ligmol;
     local ligatms = cat cAtoms ligchn;
-    local ligok = SingleMol [ligatms];
-    if not ligok then
+    local ligsingle = SingleMol [ligatms];
+    if not ligsingle then
         mess = tok_cat [mess, 'Ligand must be a single molecule.'];
     endif
+
+    local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms,
+        lonepair, overlap, missextraH, MMtype];
+    mess = tok_cat [mess, ligmess];
+
+    if not ligsingle then ligok = 0; endif
 
     local ligchgok = ChargeOK [ligatms, ligchg];
     oDestroy ligchn;
 
-    if not MOE_BATCH then
-        SystemPop [osys, nsys];
-    endif
-
     return [recmolset, recok, recchgok, ligok, ligchgok, mess];
-
-endfunction
-
-/****************************************************************************
- *                          qb_CheckDivconRec
- *
- *  Determine whether the receptor and its total charge is problematic
- *  for Divcon.
- *
- ****************************************************************************/
-global function qb_CheckDivconRec [recmol, recchg]
-
-    if not MOE_BATCH then
-        local [osys, nsys] = SystemPush [];
-    endif
-
-    local mess = '';
-    local recchns = mol_Create recmol;
-    local recatms = cat cAtoms recchns;
-    local recok = 1;                             // Future receptor test?
-    if not recok then
-        mess = 'Receptor is bad, bad, bad.';
-    endif
-
-    local recchgok = ChargeOK [recatms, recchg];
-    oDestroy recchns;
-
-    if not MOE_BATCH then
-        SystemPop [osys, nsys];
-    endif
-
-    return [recok, recchgok, mess];
 
 endfunction
 
@@ -1158,13 +1253,44 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
             status.prevwd];
 
     elseif trig === 'performtests' then
-        if allfalse [vals.testLP, vals.testOverlap, vals.testH, vals.testMM] then
+        if allfalse [vals.testLP, vals.testOverlap, vals.testH,
+                vals.testMM] then
             Warning 'No tests selected.';
+
         elseif second task_fork [master: 'parent',
                 statics:'share'] === 'child' then
             task_prio 0;
+            local msgkey;
 
             if neL [vals.mode, 'Many-to-Many'] then
+                msgkey = Message [0, 'Running tests ...'];
+                local [recok, ligok, cmess] = TestComplex [vals.testLP,
+                    vals.testOverlap, vals.testH, vals.testMM];
+                Message [msgkey, 'Running tests ... done.'];
+
+                if [recok and ligok and cmess === ''] then
+                    Warning 'No problems detected.';
+                    exit [];
+                else
+                    local messwin = WindowCreate MESS_WINDOW;
+                    WindowSetData [messwin, [mess: string cmess]];
+                    WindowShow [messwin, 1];
+                    loop
+                        local [v, t] = WindowWait messwin;
+                        if t === 'mpanel' and v.mpanel === 'Close' then
+                            WindowDestroy messwin;
+                            exit [];
+                        endif
+                    endloop
+                endif
+            endif
+
+            if neL [vals.mode, 'One-to-One'] then
+                msgkey = Message [0, 'Running tests ...'];
+                TestDBMols [dbkey, vals.testLP, vals.testOverlap,
+                    vals.testH, vals.testMM];
+                Message [msgkey, 'Running tests ... done.'];
+                sleep 5;
             endif
 
             exit [];
@@ -1184,7 +1310,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
                 statics:'share'] === 'child' then
             task_prio 0;
 
-            CheckDBMols [dbkey];
+            CheckChgDBMols [dbkey];
             exit [];
         endif
 
@@ -1281,8 +1407,8 @@ global function qb_CutReceptor [posedbkey, radius]
     delchains = delchains | cResidueCount delchains == 0;
     oDestroy delchains;
 
-	Add_H (resatoms | aLonePairs resatoms <= 0);
-	Add_HLP (resatoms | aLonePairs resatoms > 0);
+    Add_H (resatoms | aLonePairs resatoms <= 0);
+    Add_HLP (resatoms | aLonePairs resatoms > 0);
 
     print aMoleculeNumber resatoms;  //DEBUG
 
@@ -1401,7 +1527,7 @@ global function qb_GetLigandAtomsIndices [elem]
     local [atoms, errmess] = qb_GetLigandAtoms [];
     if atoms === [] then
         if MOE_BATCH then
-            write ['Error:  {}\n', errmess];
+            write ['Error!  {}\n', errmess];
         else
             Warning errmess;
         endif
@@ -1597,7 +1723,8 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         endif
 
         if coreopts.mode === 'One-to-Many' then
-            local pmess = CopyPoseDB [dbkey, posekey];
+            local pmess = CopyPoseDB [dbkey, posekey, coreopts.testLP,
+                coreopts.testOverlap, coreopts.testH, coreopts.testMM];
             if neL [pmess, ''] then
                 db_Close posekey;
                 db_Close dbkey;
@@ -1612,7 +1739,9 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
                 exit [];
             endif
 
-            local rmess = CopyRecPoseDB [dbkey, reckey, posekey];
+            local rmess = CopyRecPoseDB [dbkey, reckey, posekey, 
+                coreopts.testLP, coreopts.testOverlap, coreopts.testH, 
+                coreopts.testMM];
             if neL [rmess, ''] then
                 db_Close reckey;
                 db_Close posekey;
@@ -1657,8 +1786,8 @@ endfunction
 /****************************************************************************
  *                          qb_TestDivcon
  *
- *  Determine whether the molecule represented by the set of atoms is
- *  problematic for Divcon.
+ *  Determine whether the molecule represented by the set of atoms has any
+ *  problems by performing the flagged tests.
  *
  *  Returns:
  *    0     Fail
@@ -1668,10 +1797,11 @@ endfunction
  *  H counts:  ignore amines (MOE treats terminal amines as ammonium cations).
  *
  ****************************************************************************/
-global function qb_TestDivcon [atoms, lonepair, overlap, missextraH, MMtype]
+global function qb_TestDivcon [which, atoms, lonepair, overlap, 
+        missextraH, MMtype]
 
     local warn = 0, error = 0, mess = '';
-        local indices, residues, rnames, rnums, anames, ith; 
+    local indices, residues, rnames, rnums, anames, ith; 
  
     local elements = aElement atoms;
     local ions = aIon atoms;
@@ -1685,10 +1815,10 @@ global function qb_TestDivcon [atoms, lonepair, overlap, missextraH, MMtype]
             rnums = rNumber residues;
             anames = aName atoms [indices];
             ith = 0; 
-            mess = tok_cat [mess, 'Error!  LP atoms:\n'];
+            mess = tok_cat [mess, '    Error!  LP atoms:\n'];
             for length indices loop
                 ith = ith + 1;
-                mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
+                mess = tok_cat [mess, twrite ['        {}:  {} in {} {}\n', 
                     indices(ith), anames(ith), rnames(ith), rnums(ith)]];
             endloop
 
@@ -1714,9 +1844,9 @@ global function qb_TestDivcon [atoms, lonepair, overlap, missextraH, MMtype]
             rnums = rNumber residues;
             anames = aName atoms [indices];
             ith = 0; 
-            mess = tok_cat [mess, 'Error!  Overlapping atoms:\n'];
+            mess = tok_cat [mess, '    Error!  Overlapping atoms:\n'];
             for ith = 1, length indices, 2 loop
-                mess = tok_cat [mess, twrite ['    {}:  {} in {} {}'
+                mess = tok_cat [mess, twrite ['        {}:  {} in {} {}'
                      ' with {}:  {} in {} {}\n', 
                     indices(ith), anames(ith), rnames(ith), rnums(ith),
                     indices(ith+1), anames(ith+1), rnames(ith+1),
@@ -1740,10 +1870,10 @@ global function qb_TestDivcon [atoms, lonepair, overlap, missextraH, MMtype]
             rnums = rNumber residues;
             anames = aName atoms [indices];
             ith = 0; 
-            mess = tok_cat [mess, 'Warning!  Check H on atoms:\n'];
+            mess = tok_cat [mess, '    Warning!  Check H on atoms:\n'];
             for length indices loop
                 ith = ith + 1;
-                mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
+                mess = tok_cat [mess, twrite ['        {}:  {} in {} {}\n', 
                     indices(ith), anames(ith), rnames(ith), rnums(ith)]];
             endloop
 
@@ -1761,15 +1891,21 @@ global function qb_TestDivcon [atoms, lonepair, overlap, missextraH, MMtype]
             rnums = rNumber residues;
             anames = aName atoms [indices];
             ith = 0; 
-            mess = tok_cat [mess, 'Warning!  Unknown MM types for atoms:\n'];
+            mess = tok_cat [mess, '    Warning!  Unknown MM types for atoms:\n'];
             for length indices loop
                 ith = ith + 1;
-                mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
+                mess = tok_cat [mess, twrite ['        {}:  {} in {} {}\n', 
                     indices(ith), anames(ith), rnames(ith), rnums(ith)]];
             endloop
 
             warn = 1;
         endif
+    endif
+
+    if error then
+        mess = tok_cat [twrite ['Error!  Problematic {}:\n', which], mess];
+    elseif warn then
+        mess = tok_cat [twrite ['Warning!  Problematic {}:\n', which], mess];
     endif
 
     if error then
@@ -1779,6 +1915,39 @@ global function qb_TestDivcon [atoms, lonepair, overlap, missextraH, MMtype]
     else
         return [2, ''];
     endif
+endfunction
+
+/****************************************************************************
+ *                          qb_TestDivconMol
+ *
+ *  Determine whether there are any detectable problems with the molecule.
+ *
+ *  Assume that SystemPush [] and SystemPop [] have already been called,
+ *  if necessary.
+ *
+ ****************************************************************************/
+global function qb_TestDivconMol [which, mol, lonepair, overlap,
+        missextraH, MMtype]
+
+    local chn = mol_Create mol;
+    local atms = cat cAtoms chn;
+
+
+    local [molok, mess] = qb_TestDivcon [which, atms, lonepair, overlap,
+        missextraH, MMtype];
+
+    if which === 'ligand' then
+        if not SingleMol [atms] then
+            mess = tok_cat ['Error!  Ligand must be a single molecule.\n',
+                mess];
+            molok = 0;
+        endif
+    endif
+
+    oDestroy chn;
+
+    return [molok, mess];
+
 endfunction
 
 /****************************************************************************
