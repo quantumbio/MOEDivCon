@@ -55,29 +55,34 @@ global function qb_QMScore [recmol, ligmol, coreopts, appopts]
 
 local errmess = "";
 
+//  If there are any errors, return immediately.  Run all tests.
 local [recmolset, recok, recchgok, ligok, ligchgok, ckmsg]
     = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
-        coreopts.ligchg, coreopts.testLP, coreopts.testOverlap,
-        coreopts.testH, coreopts.testMM];
+        coreopts.ligchg, 1, 1, 1, 1];
 
 if not alltrue [recok, recchgok, ligok, ligchgok] then
     if not alltrue [recok, ligok] then
-        errmess = cat [errmess, 
-            swrite ['Problematic molecule in {}, skipping!{}', 
-            qb_GetWhich [not recok, not ligok], ckmsg]];
-    endif
-
-    if tok_length ckmsg > 0 then
-        errmess = cat [errmess, swrite ['\n{}', ckmsg]];
+        if tok_length ckmsg > 0 then
+            errmess = cat [errmess, swrite ['Skipping!\n{}Skipping!', ckmsg]];
+        else
+            errmess = cat [errmess, 
+                swrite ['Problematic molecule in {}, skipping!\n',
+                qb_GetWhich [not recok, not ligok]]];
+        endif
     endif
 
     if not alltrue [recchgok, ligchgok] then
         errmess =  cat [errmess, 
-            swrite ['Problematic charge for {}, skipping!{}', 
-            qb_GetWhich [not recchgok, not ligchgok], ckmsg]];
+            swrite ['Problematic charge for {}, skipping!', 
+            qb_GetWhich [not recchgok, not ligchgok]]];
     endif
 
     return [[], errmess];
+endif
+
+//  If there are any warnings, pass them up.
+if tok_length ckmsg > 0 then
+    errmess = string ckmsg;
 endif
 
 local subdirname, delsubdir = 0;
@@ -88,8 +93,8 @@ else
     subdirname = twrite ['{}/qb_out{n:}', coreopts.workdir, coreopts.task];
     local okay = _fmkdir subdirname;
     if okay === -1 then
-        errmess = swrite ['Unable to create subdirectory:  {}',
-            subdirname];
+        errmess = cat [swrite ['Unable to create subdirectory:  {}',
+            subdirname], errmess];
         return [[], errmess];
     endif
 endif
@@ -178,6 +183,7 @@ endloop
 const NUMRESULTS = 11;
 local results, return_statement;
 local sleep_time = -1;
+local divconerrmess = "";
 while exe_status process_key loop
     if not MOE_BATCH then
         sleep sleep_time;
@@ -204,10 +210,11 @@ while exe_status process_key loop
     elseif return_statement === "QBException" then
         [[return_statement]] = fread [stdout, '{c:*}'];
         if neL [return_statement, "Divcon done."] then
-            errmess = cat [errmess, return_statement];
+            divconerrmess = cat [divconerrmess, return_statement];
+            [[return_statement]] = fread [stdout, '{c:*}'];
         endif
         while neL [return_statement, "Divcon done."] loop
-            errmess = cat [errmess, "\n", return_statement];
+            divconerrmess = cat [divconerrmess, "\n", return_statement];
             [[return_statement]] = fread [stdout, '{c:*}'];
         endloop;
         fwrite [stdin, '{c:}\n', 'Ok'];
@@ -235,17 +242,22 @@ if success === 1 then
     local delerr = app _fdelete templist;
     if anytrue delerr then
         local errfiles = templist | neE [delerr, 0];
-        errmess = cat [errmess, swrite ['Unable to delete files: {v}',
-            errfiles]];
+        errmess = cat [swrite ['Unable to delete files: {v}',
+            errfiles], errmess];
     endif
 endif
 
 if success === 1 then
     return [results, errmess];
 else
-    if isnull errmess then errmess = "Unknown error!"; endif
-    errmess = cat [errmess, swrite ['\nLog file:  {}:{}/divcon.log',
-        getenv 'HOSTNAME', coreopts.workdir]];
+    if isnull divconerrmess then divconerrmess = "Unknown error!"; endif
+    if isnull errmess then
+        errmess = cat [divconerrmess, swrite ['\nLog file:  {}:{}/divcon.log',
+            getenv 'HOSTNAME', coreopts.workdir]];
+    else
+        errmess = cat [divconerrmess, swrite ['\nLog file:  {}:{}/divcon.log\n',
+            getenv 'HOSTNAME', coreopts.workdir], errmess];
+    endif
     return [[], errmess];
 endif
 endfunction

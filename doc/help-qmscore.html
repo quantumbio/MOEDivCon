@@ -69,6 +69,13 @@ QuantumBio Homepage
     <li><a href="#start-onetomany">One-to-Many Mode</a>
     <li><a href="#start-manytomany">Many-to-Many Mode</a>
   </ol>
+  <li><a href="#test">Molecule Tests</a>
+  <ol id=tocl>
+    <li><a href="#test-lp">Lone Pairs</a>
+    <li><a href="#test-overlap">Atom Overlap</a>
+    <li><a href="#test-h">Missing/Extra H</a>
+    <li><a href="#test-mm">Undefined MM Atom Type</a>
+  </ol>
   <li><a href="#charge">Charges</a>
   <ol id=tocl>
     <li><a href="#charge-status">Status</a>
@@ -309,6 +316,76 @@ QMScore Database
 </object>
 See the <a href="#parallel">Batch and Parallel Execution</a> section for more
 information on executing moebatch in parallel on a cluster.
+
+<h2><a name="test"></a>Molecule Tests</h2>
+<p>
+MOEDivcon is able to perform several tests on the receptor(s) and ligand(s) to
+determine if there are possible problems with the molecular structures.  The 
+"Error" tests check whether there are problems that will definitely cause Divcon
+to fail and the "Warning" tests check for other possible problems that may or
+may not cause Divcon to fail (or not converge), but may cause questionable
+calculation results.
+<p>
+Because the tests can be computationally intensive on large proteins
+(especially the atom overlap test) and sometimes report false positives,
+you are able to select which tests are performed during setup.
+You should turn off the tests only if you are sure the receptor(s) and ligand(s)
+have been cleaned up and are correctly parsed by MOE.
+<p>
+The selected tests are performed on the receptor and ligand in the MOE Window
+when you click <w>Run</w> or <w>Save</w> in <w>One-to-One</w> or
+<w>One-to-Many</w> mode.  If any problems  that will cause Divcon to fail are
+detected, you are asked whether you wish to continue.  The selected tests are
+also performed on any receptors and/or ligands/poses as they are copied into
+the QMScore database in <w>One-to-Many</w> or <w>Many-to-Many</w> mode.  The
+results of the tests are stored in the <w>Status</w> field of the QMScore
+database allowing you to verify them.
+<p>
+The tests are always performed by MOEDivcon before passing the receptor and
+ligand to Divcon for calculation.  If any of the "Error" tests fail, the
+calculation will be skipped.  The "Error" and "Warning" test results are stored
+in the <w>Status</w> field of the QMScore database.
+
+<todo>Explain format of error/warning messages.</todo>
+
+<h3><a name="test-lp"></a>Lone Pairs</h3>
+<p>
+This is an "Error" test.
+Divcon doesn't recognize MOE's <inline>LP</inline> (lone pair) atom element and
+will immediately abort the calculation of a molecule that contains one.  The
+most likely reason for a lone pair appearing in a molecule is that MOE had
+problems parsing a PDB file, in particular the <w>Atom Name</w> field.
+
+<h3><a name="test-overlap"></a>Atom Overlap</h3>
+<p>
+This is an "Error" test.
+Not unexpectedly, Divcon has serious convergence problems if there are atoms
+that are overlapping (&lt; 0.5 &#197;).  This test checks for intramolecular
+atom overlap; that is, whether any two atoms in the ligand are too close to 
+each other, or any two atoms in the receptor collection, which may include 
+solvents, cofactors, etc.  This test detects structural problems that may be
+difficult to see with a 3D molecular viewer.
+
+<h3><a name="test-h"></a>Missing/Extra H</h3>
+<p>
+This is a "Warning" test.
+The most common reasons for a missing H is a truncated residue in a protein
+and a misinterpreted bond order in ligands.  The most common reason for an
+extra protein is a carbonyl (C=O) misinterpreted as an alcohol (COH).   Other
+problems are caused by incorrect charges, covalent bonds generated in metal
+coordinations, etc.
+<p>
+This test can also generate false positives.  MOEDivcon already filters out
+the most common source of false positives:  terminal amines in proteins
+treated by MOE as ammonion cations. 
+<p>
+It is recommended that you verify the correctness of the molecular structure
+if you receive this warning.
+
+<h3><a name="test-mm"></a>Undefined MM Atom Type</h3>
+<p>
+This is a "Warning" test.
+
 
 <h2><a name="charge"></a>Charges</h2>
 <p>
