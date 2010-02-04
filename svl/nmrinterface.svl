@@ -27,7 +27,7 @@
 #set version '2010.02'
 #set main 'qb_NMRScore'
 
-function qb_CheckDivconMols;
+function qb_CheckChgTestDivconMols;
 function qb_GetWhich;
 
 /*  NOTE:  If you change the Key lists here, you need to update the
