@@ -55,15 +55,16 @@ global function qb_QMScore [recmol, ligmol, coreopts, appopts]
 
 local errmess = "";
 
-//  If there are any errors, return immediately.  Run all tests.
+//  If there are any errors, return immediately.  Run all error tests.
 local [recmolset, recok, recchgok, ligok, ligchgok, ckmsg]
     = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
-        coreopts.ligchg, 1, 1, 1, 1];
+        coreopts.ligchg, 1, 1, coreopts.testH, coreopts.testMM];
 
 if not alltrue [recok, recchgok, ligok, ligchgok] then
     if not alltrue [recok, ligok] then
         if tok_length ckmsg > 0 then
-            errmess = cat [errmess, swrite ['Skipping!\n{}Skipping!', ckmsg]];
+            errmess = cat [errmess, swrite ['Skipping!\n{}', ckmsg]];
+            errmess = droplast errmess;  //drop the extra newline
         else
             errmess = cat [errmess, 
                 swrite ['Problematic molecule in {}, skipping!\n',
@@ -93,7 +94,7 @@ else
     subdirname = twrite ['{}/qb_out{n:}', coreopts.workdir, coreopts.task];
     local okay = _fmkdir subdirname;
     if okay === -1 then
-        errmess = cat [swrite ['Unable to create subdirectory:  {}',
+        errmess = cat [swrite ['Unable to create subdirectory:  {}\n',
             subdirname], errmess];
         return [[], errmess];
     endif
@@ -242,7 +243,7 @@ if success === 1 then
     local delerr = app _fdelete templist;
     if anytrue delerr then
         local errfiles = templist | neE [delerr, 0];
-        errmess = cat [swrite ['Unable to delete files: {v}',
+        errmess = cat [swrite ['Unable to delete files: {v}\n',
             errfiles], errmess];
     endif
 endif
@@ -252,7 +253,7 @@ if success === 1 then
 else
     if isnull divconerrmess then divconerrmess = "Unknown error!"; endif
     if isnull errmess then
-        errmess = cat [divconerrmess, swrite ['\nLog file:  {}:{}/divcon.log',
+        errmess = cat [divconerrmess, swrite ['\nLog file:  {}:{}/divcon.log\n',
             getenv 'HOSTNAME', coreopts.workdir]];
     else
         errmess = cat [divconerrmess, swrite ['\nLog file:  {}:{}/divcon.log\n',

@@ -63,7 +63,7 @@ const STATUS_DEFAULTS =
     [
     ['prevwd',       ''            ],
     ['calcchg',      0             ],
-    ['verifychg',    0             ],
+    ['verified',     0             ],
     ['recchg',       1             ],
     ['ligchg',       1             ],
     ['moerecchg',    0             ],
@@ -1687,6 +1687,7 @@ endfunction
 global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         dbtype]
 
+    local stsmess = "", recstsmess = "", recok, ligok, testmess;
     local dbkey = db_Open [coreopts.scoredb, 'create'];
     SetScoreFields [dbkey, coreopts.mode === 'Many-to-Many', fields, dbtype];
 
@@ -1699,17 +1700,32 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
 
         SaveEnv [dbkey, receptor, ligand, status, coreopts, appopts, complex, 
             dbtype];
+
+        recstsmess = GetStatusMessage ['Receptor', neL [status.recchg, 3]];
+        [recok, testmess] = qb_TestDivcon ['receptor', receptor, 
+            coreopts.testLP, coreopts.testOverlap, coreopts.testH,
+            coreopts.testMM];
+        if not recok and tok_length testmess > 0 then
+            recstsmess = cat [recstsmess, string testmess];
+
+        if coreopts.mode === 'One-to-One' then
+            stsmess = cat [stsmess, GetStatusMessage ['Ligand', 
+                neL [status.ligchg, 3]]];
+            [ligok, ligmess] = TestDivcon [coreopts.testLP,
+                coreopts.testOverlap, coreopts.testH, coreopts.testMM];
+            if not alltrue [recok, ligok] and tok_length testmess > 0 then
+                stsmess = cat [stsmess, string testmess];
+            endif
+        endif
+
     else
         SaveEnv [dbkey, [], [], status, coreopts, appopts, complex, dbtype];
     endif
 
     if coreopts.mode === 'One-to-One' then
         local posedata = tag [qb_GetPoseFields [], [ligand, coreopts.ligchg]];
-        local stsmess = GetStatusMessage ['Receptor', 
-            neL [status.recchg, 3]];
-        stsmess = cat [stsmess, GetStatusMessage ['Ligand', 
-            neL [status.ligchg, 3]]];
         local rowkey = db_Write [dbkey, 0, posedata];
+
         if not isnull stsmess then
             qb_SaveDivconStatus [dbkey, rowkey, stsmess];
         endif
@@ -1970,37 +1986,56 @@ global function qb_UpdateCorePanel [wkey, status, coreopts]
 endfunction
 
 /****************************************************************************
- *                          qb_VerifyCharges
+ *                          qb_VerifyDivcon
  *
- *  Verify with the user that the current charges should be used even if
- *  they are problematic for Divcon.
+ *  Verify with the user that the current charges and/or molecules should
+ *  be used even if they are problematic for Divcon.
  *
  *  Assumption:  called from MOE gui, not moebatch.
  *
  *
  ****************************************************************************/
-global function qb_VerifyCharges [wkey, status, vals]
+global function qb_VerifyDivcon [wkey, status, vals]
 
     if vals.mode === 'Many-to-Many' then
-        status.verifychg = 1;
+        status.verified = 1;
         return status;
     endif
 
+    local msgkey = Message [0, 'Testing ...'];
+
+    local ynmess = '';
     status = CheckCharge [wkey, status, vals.recchg, vals.ligchg];
-    if status.ligchg === 3 or status.recchg === 3 then
-        local which = qb_GetWhich [status.recchg === 3, status.ligchg === 3];
-        local ynmess = twrite [
-            'Divcon is going to have problems\n'
-            'with the {}.  Continue anyway?', which];
-        if YesNo ynmess then
-            status.verifychg = 1;
-            return status;
-        else
-            status.verifychg = 0;
-            return status;
+    local recchgok = neL [status.recchg, 3];
+    local ligchgok = neL [status.ligchg, 3];
+    local [recok, ligok, m] = TestComplex [1, 1, 0, 0];
+
+    if not alltrue [recok, recchgok, ligok, ligchgok] then
+        if not alltrue [recok, ligok] then
+            ynmess = tok_cat [ynmess,
+                twrite ['Problematic molecule in {}!\n',
+                qb_GetWhich [not recok, not ligok]]];
         endif
+
+        if not alltrue [recchgok, ligchgok] then
+            ynmess =  tok_cat [ynmess, 
+                twrite ['Problematic charge for {}!\n', 
+                qb_GetWhich [not recchgok, not ligchgok]]];
+        endif
+
+        ynmess = tok_cat [ynmess, 'Continue anyway?'];
+        if YesNo ynmess then
+            status.verified = 1;
+        else
+            status.verified = 0;
+        endif
+
     else
-        status.verifychg = 1;
-        return status;
+        status.verified = 1;
+
     endif
+
+    Message [msgkey, 'Testing ... done.'];
+    return status;
+
 endfunction
