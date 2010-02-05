@@ -341,12 +341,18 @@ the QMScore database in <w>One-to-Many</w> or <w>Many-to-Many</w> mode.  The
 results of the tests are stored in the <w>Status</w> field of the QMScore
 database allowing you to verify them.
 <p>
-The tests are always performed by MOEDivcon before passing the receptor and
-ligand to Divcon for calculation.  If any of the "Error" tests fail, the
-calculation will be skipped.  The "Error" and "Warning" test results are stored
-in the <w>Status</w> field of the QMScore database.
-
-<todo>Explain format of error/warning messages.</todo>
+The "Error" tests are always performed by MOEDivcon before passing the
+receptor and ligand to Divcon for calculation.  If any of the "Error" tests
+fail, the calculation will be skipped.  The "Error" and selected "Warning"
+test results are stored in the <w>Status</w> field of the QMScore database.
+<p>
+For each atom that is detected to be problematic, MOEDivcon prints information
+that makes it easy to locate the atom using MOE's Atom Manager.  The 
+statement has the following format:
+<pre>
+AtomIndex : AtomName in ResidueName ResidueIndex
+</pre>
+where the atom index is for the molecule, not the residue.
 
 <h3><a name="test-lp"></a>Lone Pairs</h3>
 <p>
@@ -372,8 +378,7 @@ This is a "Warning" test.
 The most common reasons for a missing H is a truncated residue in a protein
 and a misinterpreted bond order in ligands.  The most common reason for an
 extra protein is a carbonyl (C=O) misinterpreted as an alcohol (COH).   Other
-problems are caused by incorrect charges, covalent bonds generated in metal
-coordinations, etc.
+problems are caused by incorrect charges, metal coordinations, etc.
 <p>
 This test can also generate false positives.  MOEDivcon already filters out
 the most common source of false positives:  terminal amines in proteins
@@ -384,8 +389,14 @@ if you receive this warning.
 
 <h3><a name="test-mm"></a>Undefined MM Atom Type</h3>
 <p>
-This is a "Warning" test.
-
+This is a "Warning" test.  If MOE was unable to determine the molecular
+mechanics atom type, it's very likely that there is a serious problem with
+the structure.  If an atom has a problem detected by the other tests, it 
+is often listed under this test as well.  It also detects problems not
+caught by the other tests.
+<p>
+It is recommended that you verify the correctness of the molecular structure
+if you receive this warning.
 
 <h2><a name="charge"></a>Charges</h2>
 <p>
@@ -874,28 +885,37 @@ Ligand has to be a single molecule.
   <li><p><prob>
     I get the MOE message:
     <pre>
-Divcon is going to have problems with the receptor and/or ligand.  Continue anyway?
+Problematic molecule in receptor and/or ligand.  Continue anyway?
     </pre>
     </prob><p><sol>
-    MOEDivcon has detected that there is a problem with the structure or charge
+    MOEDivcon has detected that there is a problem with the structure
+    of either the receptor or ligand.  You should try to address the problem
+    before running or saving the QMScore database.  MOEDivcon will skip the
+    calculation of molecules with problematic structures.  You can learn
+    what the problem is by clicking the <w>Perform</w> button in the
+    <w>Molecule Tests</w> section with the "Error" tests selected.
+  </sol>
+  <li><p><prob>
+    I get the MOE message:
+    <pre>
+Problematic charge for receptor and/or ligand.  Continue anyway?
+    </pre>
+    </prob><p><sol>
+    MOEDivcon has detected that there is a problem with the charge
     of either the receptor or ligand.  The problematic molecule should be marked
-    red.  You should try to address the problem before
-    running or saving the QMScore database.  MOEDivcon will skip the calculation
-    of molecules with problematic structures or charges.
+    red in the <w>Charge</w> section.  You should try to address the problem
+    before running or saving the QMScore database.  MOEDivcon will skip the
+    calculation of molecules with problematic charges.
   </sol>
   <li><p><prob>
     In the <w>Status</w> field of the QMScore database, I get the message:
     <pre>
-Warning:  Problematic molecule in receptor and/or ligand.
-    </pre>
-or
-    <pre>
 Error:  Problematic molecule in receptor and/or ligand.
     </pre>
     </prob><p><sol>
-You should get a warning about a problematic molecule when creating or saving
-a QMScore
-database.  An error message is stored when MOE/moebatch attempts to run a
+    You should get a warning about a problematic molecule when creating or
+    saving a QMScore database.  An error message is stored when MOE/moebatch
+ attempts to run a
 job and detects there are still problems with the molecules.  You should also
 get another message clarifying the problem detected, such as:
     <pre>

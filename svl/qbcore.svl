@@ -235,9 +235,9 @@ const CORE_PANEL =
                     [
                     font: 'mediumBold', text: 'Warning:',
                     bubbleHelp:
-                        'These are tests for problems with the receptor(s) and\n'
-                        'ligand(s) that may or may not cause Divcon to fail,\n'
-                        'but the results will probably be questionable.'
+                        'These are tests for problems with the receptor(s)\n'
+                        'and ligand(s) that may or may not cause Divcon to\n'
+                        ' fail, but the results will probably be questionable.'
                     ],
                 Checkbox :
                     [
@@ -623,7 +623,8 @@ function SingleMol;
  *  Copy the Poses database into the QMScore output database.
  *
  ****************************************************************************/
-local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM]
+local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM,
+        recmess]
 
     local mess = '';
     local [fields, ftypes] = db_Fields poseskey;
@@ -638,57 +639,55 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM]
     local status = qb_GetEnvTag [resultskey, STATUS];
     local coreopts = qb_GetEnvTag [resultskey, COREOPTS];
 
-    //  Check receptor charge
-    local recmess = GetStatusMessage ['Receptor', neL [status.recchg, 3]];
-
     //  HACK alert:  temporarily renames mol field to make copying easier
     db_RenameField [resultskey, POSE_FIELD, molfield];
     apt db_EnsureField [resultskey,  fields, ftypes];
 
     if not MOE_BATCH then
+        msgkey = Message [0, 'Saving database ...'];
         local [osys, nsys] = SystemPush [];
     endif
 
     local rowkey = 0, stsmess = "";
     while rowkey = db_NextEntry [poseskey, rowkey] loop
         local rowdata = db_Read [poseskey, rowkey];
-        local chgdata;
-        if coreopts.poseschg then
-            stsmess = cat [recmess, GetStatusMessage ['Ligand',
-                neL [status.ligchg, 3]]];
-            chgdata = tag [[LIGCHG_FIELD], [coreopts.ligchg]];
-        else
-            local ligmol = tagpeek [rowdata, molfield];
-            local ligch = mol_Create ligmol;
-            local ligatms = cat cAtoms ligch;
-            local charge = 0;
 
-            stsmess = recmess;
-            if not SingleMol [ligatms] then
-                stsmess = cat [stsmess,
-                    "Error!  Ligand must to be a single molecule.\n"];
-            endif
+        local ligmol = tagpeek [rowdata, molfield];
+        local ligch = mol_Create ligmol;
+        local ligatms = cat cAtoms ligch;
 
-            charge = CalcCharge [ligatms];
-            local chgok = ChargeOK [ligatms, charge];
-            local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms, 
-                lp, overlap, missH, MM];
-            stsmess = cat [stsmess, GetStatusMessage ['Ligand', chgok],
-                string ligmess];
-
-            chgdata = tag [[LIGCHG_FIELD], [charge]];
-            oDestroy ligch;
+        stsmess = recmess;
+        if not SingleMol [ligatms] then
+            stsmess = cat [stsmess,
+                "Error!  Ligand must to be a single molecule.\n"];
         endif
 
+        local charge = 0, chgok = 0;
+        if coreopts.poseschg then
+            charge = coreopts.ligchg;
+            chgok = neL [status.ligchg, 3];
+        else
+            charge = CalcCharge [ligatms];
+            chgok = ChargeOK [ligatms, charge];
+        endif
+
+        local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms, 
+            lp, overlap, missH, MM];
+        stsmess = cat [stsmess, GetStatusMessage ['Ligand', chgok],
+            string ligmess];
+        local chgdata = tag [[LIGCHG_FIELD], [charge]];
         rowdata = cat [chgdata, rowdata];
         local resultrowkey = db_Write [resultskey, 0, rowdata];
-        if not isnull stsmess then
+        if  length stsmess > 0 then
             qb_SaveDivconStatus [resultskey, resultrowkey, stsmess];
         endif
+
+        oDestroy ligch;
     endloop
 
     if not MOE_BATCH then
         SystemPop [osys, nsys];
+        Message [msgkey, 'Saving database ... done.'];
     endif
 
     db_RenameField [resultskey, molfield, POSE_FIELD];
@@ -792,13 +791,12 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         ith = ith + 1;
     endloop
 
-    db_RenameField [resultskey, posemolfield, POSE_FIELD];
-
     if not MOE_BATCH then
         SystemPop [osys, nsys];
         Message [msgkey, 'Saving database ... done.'];
-        sleep 5;
     endif
+
+    db_RenameField [resultskey, posemolfield, POSE_FIELD];
 
     return mess;
 endfunction
@@ -1004,7 +1002,7 @@ local function TestComplex [lonepairs, overlap, missextraH, MMtype]
     local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatoms,
         lonepairs, overlap, missextraH, MMtype];
 
-    return [recok, ligok, tok_cat [recmess, ligmess]];
+    return [recok, recmess, ligok, ligmess];
 
 endfunction
 
@@ -1264,16 +1262,17 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
 
             if neL [vals.mode, 'Many-to-Many'] then
                 msgkey = Message [0, 'Running tests ...'];
-                local [recok, ligok, cmess] = TestComplex [vals.testLP,
-                    vals.testOverlap, vals.testH, vals.testMM];
+                local [recok, recmess, ligok, ligmess] = TestComplex [
+                    vals.testLP, vals.testOverlap, vals.testH, vals.testMM];
                 Message [msgkey, 'Running tests ... done.'];
 
-                if [recok and ligok and cmess === ''] then
+                if [recok and ligok and recmess === '' and ligmess === ''] then
                     Warning 'No problems detected.';
                     exit [];
                 else
                     local messwin = WindowCreate MESS_WINDOW;
-                    WindowSetData [messwin, [mess: string cmess]];
+                    WindowSetData [messwin, [mess: string tok_cat [recmess,
+                        ligmess]]];
                     WindowShow [messwin, 1];
                     loop
                         local [v, t] = WindowWait messwin;
@@ -1665,7 +1664,7 @@ endfunction
  ****************************************************************************/
 global function qb_SaveDivconStatus [dbkey, rowkey, message]
 
-    local sep = "------------------------------------------------------------\n";
+    local sep = "-----------------------------------------------------------\n";
     local [status] = db_ReadFields [dbkey, rowkey, [STATUS_FIELD]];
     message = cat [message, asctime [], "\n", sep, status];
     local fielddata = tag [STATUS_FIELD, [message]];
@@ -1687,7 +1686,7 @@ endfunction
 global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         dbtype]
 
-    local stsmess = "", recstsmess = "", recok, ligok, testmess;
+    local stsmess = "", recstsmess = "", recok, recmess, ligok, ligmess;
     local dbkey = db_Open [coreopts.scoredb, 'create'];
     SetScoreFields [dbkey, coreopts.mode === 'Many-to-Many', fields, dbtype];
 
@@ -1702,19 +1701,25 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
             dbtype];
 
         recstsmess = GetStatusMessage ['Receptor', neL [status.recchg, 3]];
-        [recok, testmess] = qb_TestDivcon ['receptor', receptor, 
+        local [recok, recmess, ligok, ligmess] = TestComplex [
             coreopts.testLP, coreopts.testOverlap, coreopts.testH,
             coreopts.testMM];
-        if not recok and tok_length testmess > 0 then
-            recstsmess = cat [recstsmess, string testmess];
+
+        if not recok and tok_length recmess > 0 then
+            recstsmess = cat [recstsmess, string recmess];
 
         if coreopts.mode === 'One-to-One' then
-            stsmess = cat [stsmess, GetStatusMessage ['Ligand', 
+            stsmess = cat [stsmess, recstsmess, GetStatusMessage ['Ligand', 
                 neL [status.ligchg, 3]]];
-            [ligok, ligmess] = TestDivcon [coreopts.testLP,
-                coreopts.testOverlap, coreopts.testH, coreopts.testMM];
-            if not alltrue [recok, ligok] and tok_length testmess > 0 then
-                stsmess = cat [stsmess, string testmess];
+            if not ligok and tok_length ligmess > 0 then
+                stsmess = cat [stsmess, string ligmess];
+
+            local posedata = tag [qb_GetPoseFields [], 
+                [ligand, coreopts.ligchg]];
+            local rowkey = db_Write [dbkey, 0, posedata];
+
+            if not isnull stsmess then
+                qb_SaveDivconStatus [dbkey, rowkey, stsmess];
             endif
         endif
 
@@ -1722,15 +1727,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         SaveEnv [dbkey, [], [], status, coreopts, appopts, complex, dbtype];
     endif
 
-    if coreopts.mode === 'One-to-One' then
-        local posedata = tag [qb_GetPoseFields [], [ligand, coreopts.ligchg]];
-        local rowkey = db_Write [dbkey, 0, posedata];
-
-        if not isnull stsmess then
-            qb_SaveDivconStatus [dbkey, rowkey, stsmess];
-        endif
-
-    else
+    if neL [coreopts.mode, 'One-to-One'] then
         local posekey = db_Open [coreopts.posedb, 'read'];
         if dbkey === posekey then
             Warning twrite ['{} and {}\n are the same database.', 
@@ -1740,7 +1737,8 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
 
         if coreopts.mode === 'One-to-Many' then
             local pmess = CopyPoseDB [dbkey, posekey, coreopts.testLP,
-                coreopts.testOverlap, coreopts.testH, coreopts.testMM];
+                coreopts.testOverlap, coreopts.testH, coreopts.testMM,
+                recstsmess];
             if neL [pmess, ''] then
                 db_Close posekey;
                 db_Close dbkey;
@@ -1907,7 +1905,8 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap,
             rnums = rNumber residues;
             anames = aName atoms [indices];
             ith = 0; 
-            mess = tok_cat [mess, '    Warning!  Unknown MM types for atoms:\n'];
+            mess = tok_cat [mess, 
+                '    Warning!  Unknown MM types for atoms:\n'];
             for length indices loop
                 ith = ith + 1;
                 mess = tok_cat [mess, twrite ['        {}:  {} in {} {}\n', 
@@ -2008,7 +2007,7 @@ global function qb_VerifyDivcon [wkey, status, vals]
     status = CheckCharge [wkey, status, vals.recchg, vals.ligchg];
     local recchgok = neL [status.recchg, 3];
     local ligchgok = neL [status.ligchg, 3];
-    local [recok, ligok, m] = TestComplex [1, 1, 0, 0];
+    local [recok, rm, ligok, lm] = TestComplex [1, 1, 0, 0];
 
     if not alltrue [recok, recchgok, ligok, ligchgok] then
         if not alltrue [recok, ligok] then
