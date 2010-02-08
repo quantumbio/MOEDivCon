@@ -112,9 +112,11 @@ global function qb_QMScoreBatch [dbpath]
                 write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
             else
                 qb_SaveQMScore [dbkey, indkey(1), results];
-                local sucmess = cat [ "Success\n", errmess];
+                local sucmess = "Success";
                 if not isnull errmess then
-                    sucmess = cat [sucmess, errmess, "\n"];
+                    sucmess = cat [sucmess, "-warnings!\n", errmess];
+                else
+                    sucmess = cat [sucmess, "\n"];
                 endif
                 qb_SaveDivconStatus [dbkey, indkey(1), sucmess];
             endif
