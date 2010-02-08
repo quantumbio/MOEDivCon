@@ -626,7 +626,7 @@ function SingleMol;
 local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM,
         recmess]
 
-    local mess = '';
+    local mess = '', msgkey;
     local [fields, ftypes] = db_Fields poseskey;
     local molfield = fields | (ftypes == 'molecule');
 
@@ -994,7 +994,7 @@ local function TestComplex [lonepairs, overlap, missextraH, MMtype]
 
     local [recatoms, ligatoms, errmess] = SplitComplex [];
     if recatoms === [] or ligatoms === [] then
-        return  [[], [], errmess];
+        return  [[], '', [], errmess];
     endif
 
     local [recok, recmess] = qb_TestDivcon ['receptor', recatoms, 
@@ -1684,9 +1684,10 @@ endfunction
  *
  ****************************************************************************/
 global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
-        dbtype]
+        dbtype, dotests]
 
-    local stsmess = "", recstsmess = "", recok, recmess, ligok, ligmess;
+    local stsmess = "", recstsmess = "";
+    local recok = 1, recmess = '', ligok = 1, ligmess = '';
     local dbkey = db_Open [coreopts.scoredb, 'create'];
     SetScoreFields [dbkey, coreopts.mode === 'Many-to-Many', fields, dbtype];
 
@@ -1700,19 +1701,26 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         SaveEnv [dbkey, receptor, ligand, status, coreopts, appopts, complex, 
             dbtype];
 
-        recstsmess = GetStatusMessage ['Receptor', neL [status.recchg, 3]];
-        local [recok, recmess, ligok, ligmess] = TestComplex [
-            coreopts.testLP, coreopts.testOverlap, coreopts.testH,
-            coreopts.testMM];
+        if dotests then
+            recstsmess = GetStatusMessage ['Receptor', neL [status.recchg, 3]];
+            [recok, recmess, ligok, ligmess] = TestComplex [
+                coreopts.testLP, coreopts.testOverlap, coreopts.testH,
+                coreopts.testMM];
+        endif
 
-        if not recok and tok_length recmess > 0 then
+        if tok_length recmess > 0 then
             recstsmess = cat [recstsmess, string recmess];
+        endif
 
         if coreopts.mode === 'One-to-One' then
-            stsmess = cat [stsmess, recstsmess, GetStatusMessage ['Ligand', 
-                neL [status.ligchg, 3]]];
-            if not ligok and tok_length ligmess > 0 then
+            if dotests then
+                stsmess = cat [stsmess, recstsmess, GetStatusMessage ['Ligand', 
+                    neL [status.ligchg, 3]]];
+            endif
+
+            if tok_length ligmess > 0 then
                 stsmess = cat [stsmess, string ligmess];
+            endif
 
             local posedata = tag [qb_GetPoseFields [], 
                 [ligand, coreopts.ligchg]];
