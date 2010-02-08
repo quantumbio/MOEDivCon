@@ -382,18 +382,17 @@ global function qb_QMScoreSetupPanel []
 
             elseif vals.panel === 'Run' then
 
-                status = qb_VerifyDivcon [wkey, status, vals];
-                if not status.verified then exit []; endif
+                if second task_fork [statics:'share'] === 'child' then
 
-                if second task_fork [statics:'share',
-                        prio:3, idle:0] === 'child' then
+                    status = qb_VerifyDivcon [wkey, status, vals];
+                    if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.ham, vals.scaling, vals.freq, vals.opt,
                         vals.shift]];
                     qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
-                        [], QMS_NUM_FIELDS, 'qmscore'];
+                        [], QMS_NUM_FIELDS, 'qmscore', 0];
                     RunCalc [qmskey];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
@@ -404,17 +403,17 @@ global function qb_QMScoreSetupPanel []
 
             elseif vals.panel === 'Save' then
 
-                status = qb_VerifyDivcon [wkey, status, vals];
-                if not status.verified then exit []; endif
-
                 if second task_fork [statics:'share'] === 'child' then
+
+                    status = qb_VerifyDivcon [wkey, status, vals];
+                    if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.ham, vals.scaling, vals.freq, vals.opt,
                         vals.shift]];
                     qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts,
-                        [], QMS_NUM_FIELDS, 'qmscore'];
+                        [], QMS_NUM_FIELDS, 'qmscore', 1];
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
                     exit [];
