@@ -271,6 +271,10 @@ is located (assuming you have 4 processors on your workstation):
 <pre>
 &gt; moebatch -mpu 4 -exec "run ['qmsbatch.svl', ['qmscore.mdb']]" -exit
 </pre>
+Or alternatively, close the MOE Database Viewer and click the <w>Run</w> button
+and the jobs will be executed sequentially in the current MOE session (not
+recommended for large proteins).
+<p>
 MOEDivcon will print out progress messages for one of the jobs.  When all
 four jobs are completed, open <inline>qmscore.mdb</inline> in the MOE
 Database Viewer.  You should see results similar to these:
@@ -332,14 +336,14 @@ you are able to select which tests are performed during setup.
 You should turn off the tests only if you are sure the receptor(s) and ligand(s)
 have been cleaned up and are correctly parsed by MOE.
 <p>
-The selected tests are performed on the receptor and ligand in the MOE Window
-when you click <w>Run</w> or <w>Save</w> in <w>One-to-One</w> or
+The "Error" tests are always performed on the receptor and ligand in the MOE
+Window when you click <w>Run</w> or <w>Save</w> in <w>One-to-One</w> or
 <w>One-to-Many</w> mode.  If any problems  that will cause Divcon to fail are
 detected, you are asked whether you wish to continue.  The selected tests are
 also performed on any receptors and/or ligands/poses as they are copied into
 the QMScore database in <w>One-to-Many</w> or <w>Many-to-Many</w> mode.  The
 results of the tests are stored in the <w>Status</w> field of the QMScore
-database allowing you to verify them.
+database so that you to verify the test results.
 <p>
 The "Error" tests are always performed by MOEDivcon before passing the
 receptor and ligand to Divcon for calculation.  If any of the "Error" tests
@@ -352,15 +356,22 @@ statement has the following format:
 <pre>
 AtomIndex : AtomName in ResidueName ResidueIndex
 </pre>
-where the atom index is for the molecule, not the residue.
+where the atom index is for the molecule, not the residue.  Below is an
+example error and warning tests report.
+<p>
+<object id="QMScoreErrorReport" title="QMScore Error and Warning Tests Report"
+data="images/qmscoreerrorreport.png" type=image/png>
+QMScore Error and Warning Tests Report
+</object>
+<p>
 
 <h3><a name="test-lp"></a>Lone Pairs</h3>
 <p>
 This is an "Error" test.
-Divcon doesn't recognize MOE's <inline>LP</inline> (lone pair) atom element and
+Divcon doesn't recognize MOE's <inline>LP</inline> (lone pair) element name and
 will immediately abort the calculation of a molecule that contains one.  The
 most likely reason for a lone pair appearing in a molecule is that MOE had
-problems parsing a PDB file, in particular the <w>Atom Name</w> field.
+problems parsing a PDB file, in particular the Atom Name field.
 
 <h3><a name="test-overlap"></a>Atom Overlap</h3>
 <p>
@@ -371,13 +382,15 @@ atom overlap; that is, whether any two atoms in the ligand are too close to
 each other, or any two atoms in the receptor collection, which may include 
 solvents, cofactors, etc.  This test detects structural problems that may be
 difficult to see with a 3D molecular viewer.
+<p>
+Note:  for large proteins, this can be a time consuming test.
 
 <h3><a name="test-h"></a>Missing/Extra H</h3>
 <p>
 This is a "Warning" test.
-The most common reasons for a missing H is a truncated residue in a protein
-and a misinterpreted bond order in ligands.  The most common reason for an
-extra protein is a carbonyl (C=O) misinterpreted as an alcohol (COH).   Other
+The most common reasons for a missing H are truncated residues in proteins
+and misinterpreted bond orders in ligands.  The most common reason for an
+extra H in proteins are protonated carbonyl oxygens (C=O&rarr;C=OH).   Other
 problems are caused by incorrect charges, metal coordinations, etc.
 <p>
 This test can also generate false positives.  MOEDivcon already filters out
@@ -393,7 +406,9 @@ This is a "Warning" test.  If MOE was unable to determine the molecular
 mechanics atom type, it's very likely that there is a serious problem with
 the structure.  If an atom has a problem detected by the other tests, it 
 is often listed under this test as well.  It also detects problems not
-caught by the other tests.
+caught by the other tests such as truncated residues, incorrect charges on
+metals, incorrect bond orders on sulphates, sulfoxides, sulfonyls, 
+phosphates, and orthovanadate ions, metal coordinations problems, etc.
 <p>
 It is recommended that you verify the correctness of the molecular structure
 if you receive this warning.
@@ -910,39 +925,49 @@ Problematic charge for receptor and/or ligand.  Continue anyway?
   <li><p><prob>
     In the <w>Status</w> field of the QMScore database, I get the message:
     <pre>
-Error:  Problematic molecule in receptor and/or ligand.
+Error:  Problematic receptor and/or ligand.
+    </pre>
+or
+    <pre>
+Warning:  Problematic receptor and/or ligand.
     </pre>
     </prob><p><sol>
-    You should get a warning about a problematic molecule when creating or
-    saving a QMScore database.  An error message is stored when MOE/moebatch
- attempts to run a
-job and detects there are still problems with the molecules.  You should also
-get another message clarifying the problem detected, such as:
-    <pre>
-Ligand must to be a single molecule.
-    </pre>
-You can use your favorite molecule editor to fix the problem using the original
-molecule file, then rebuild the QMScore database using the modified molecule
-file.
+    You should get error or warning messages about a problematic molecules when 
+    creating or saving a QMScore database (see the 
+    <a href="#test">Molecule Tests</a> section for more information).
+    You can right-click on the problematic molecule in the MOE Database Viewer,
+    select <w>Send to MOE</w> from the popup menu, cleanup the molecule with
+    MOE's suite of tools, then save it back in the database by right-clicking
+    on the same molecule in the MOE  Database Viewer and
+    selecting <w>Get from MOE</w> from the popup menu.  You may also wish to
+    save the cleaned up molecule in it's original format.
+    <p>
+    You can also use your favorite molecule editor to fix the problems using
+    the original molecule files, then rebuild the QMScore database using the
+    modified molecule files.
   </sol>
   <li><p><prob>
     In the <w>Status</w> field of the QMScore database, I get the message:
     <pre>
-Warning:  Problematic charge for receptor and/or ligand.
-    </pre>
-or
-    <pre>
 Error:  Problematic charge for receptor and/or ligand.
     </pre>
     </prob><p><sol>
-You should get a warning about a problematic charge when creating or saving a
-QMScore
-database.  An error message is stored when MOE/moebatch attempts to run a
-job and detects there are still problems with the charges.  You can address the
-charge problem by correcting the molecule using your favorite molecule editor
-and rebuilding the QMScore database using the modified molecule file.  Or you
-can simply edit the charge in the MOE database (see the
-<a href="#charge-editing">charge</a> section).
+    You should get a error messages about problematic charges when creating 
+    or saving a QMScore database.  The preferred solution is to cleanup the
+    molecule:  Right-click on the problematic molecule in the MOE Database
+    Viewer,
+    select <w>Send to MOE</w> from the popup menu, cleanup the molecule with
+    MOE's suite of tools, then save it back in the database by right-clicking
+    on the same molecule in the MOE  Database Viewer and
+    selecting <w>Get from MOE</w> from the popup menu.  You may also wish to
+    save the cleaned up molecule in it's original format.
+    <p>
+    You can also use your favorite molecule editor to fix the problems using
+    the original molecule files, then rebuild the QMScore database using the
+    modified molecule files.
+    <p>
+    Or you can simply edit the charge in the MOE database (see the
+    <a href="#charge-editing">charge</a> section).
   </sol>
   <li><p><prob>
     I get the MOE message:
