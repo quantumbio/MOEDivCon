@@ -32,8 +32,6 @@
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetQMSEnv;
-function qb_GetStatusFlags;
-function qb_GetWhich;
 function qb_SaveDivconStatus;
 function qb_SaveQMScore;
 function qb_QMScore;

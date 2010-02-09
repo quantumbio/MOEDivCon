@@ -994,7 +994,7 @@ local function TestComplex [lonepairs, overlap, missextraH, MMtype]
 
     local [recatoms, ligatoms, errmess] = SplitComplex [];
     if recatoms === [] or ligatoms === [] then
-        return  [[], '', [], errmess];
+        return  [0, '', 0, errmess];
     endif
 
     local [recok, recmess] = qb_TestDivcon ['receptor', recatoms, 
@@ -1139,7 +1139,7 @@ local function UpdateMode [wkey, mode, status]
         WindowSetAttr [wkey, [
             recbox: [sensitive: 0], recdb: [allowBlank: 1],
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
-            panel:[sensitive: [0,1,1,1]], calcchg: [sensitive: 1],
+            panel:[sensitive: [1,1,1,1]], calcchg: [sensitive: 1],
             chgbox: [sensitive: 1], recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0],
             poseschg: [sensitive: 1]]];
