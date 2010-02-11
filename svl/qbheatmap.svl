@@ -1,0 +1,114 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+	
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif      
+
+//    qbheatmap.svl    Interactive Heap Map
+
+#set title   'QuantumBio Heat Map'
+#set class   'QuantumBio'
+#set version '2010.01'
+
+const HEADER = 
+    [
+    name: 'panel', 
+    title: 'QB Heat Map',
+    windowName: 'QB Heat Map',
+    text: ['Close'],
+    onTrigger: ['return']
+    ];
+
+const PANEL =
+    [
+    Hbox :
+        [
+        extendH: 1,
+        Vbox :
+            [
+            Button :
+                [
+                name: 'lig1', text: 'lig1'
+                ]
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+        Label :
+            [
+            minWidth: 10, background: 'red', centerV: 1
+            ]
+        ]
+    ];
+
+
+/****************************************************************************
+ *
+ *                          GetColors
+ *
+ ****************************************************************************/
+local function GetColors [min, max, scale]
+
+    local colors = [];
+
+    if min === 0 and max > 0 and scale > 0 then
+        print 'positive';
+    elseif max === 0 and min < 0 and scale > 0 then
+        print 'negative';
+    elseif min < 0 and max > 0 and max === abs min and scale > 0 then
+        print 'both';
+    else
+        return [[], 
+            twrite ['Cannot generate heat map with min {}, max {}, scale {}\n',
+            min, max, scale]];
+    endif
+
+    return [colors, ''];
+
+endfunction
+
+
+/****************************************************************************
+ *
+ *                          qb_HeatMapSetupPanel
+ *
+ ****************************************************************************/
+global function qb_HeatMapSetupPanel []
+
+    if MOE_BATCH then return; endif
+    if WindowShow ['QB Heat Map', 1] then return; endif
+
+    local wkey = WindowCreate cat [HEADER, PANEL];
+    WindowShow [wkey, 1];
+
+    loop
+        local [vals, trig] = WindowWait wkey;
+        if trig === 'panel' then
+            if vals.panel === 'Close' then 
+                break;
+            endif
+        endif
+    endloop
+
+    WindowDestroy wkey;
+
+endfunction
