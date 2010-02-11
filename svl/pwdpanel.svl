@@ -1,0 +1,251 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif      
+
+//    pwdpanel.svl    User-interface entrypoint to QB-PWD calculations
+
+#set title   'QuantumBio PWD'
+#set class   'QuantumBio'
+#set version '2010.02'
+#set main    'qb_QBPWDSetupPanel'
+
+function qb_CoreHandler;
+function qb_GetCoreEnv;
+function qb_GetCorePanel;
+function qb_GetDefaultsCore;
+function qb_GetDefaultsStatus;
+function qb_GetEnvApp;
+function qb_GetEnvTag;
+function qb_GetWhich;
+function qb_InitCorePanel;
+function qb_LoadCoreScoreDB;
+function qb_SaveDivconStatus;
+function qb_SetUpScoreDB;
+function qb_TagCoreVals;
+function qb_UpdateCorePanel;
+function qb_VerifyDivcon;
+
+function qb_HeatMapSetupPanel;
+
+const QBPWD_OPT_DEFAULTS =
+    [
+    ['map-min',      -1.0           ],
+    ['map-max',       1.0           ],
+    ['map-ncolors',  16             ]
+    ];
+
+
+const HEADER = 
+    [
+    name: 'panel', 
+    title: 'QB-PWD',
+    windowName: 'QB-PWDPanel',
+    text: ['Run', 'Save', 'Load', 'Close'],
+    onTrigger: ['validate', 'validate', 'return', 'return'],
+    bubbleHelp: ['Execute QB-PWD from MOE Window.',
+        'Save run parameters in database\n'
+        'for later execution on cluster.', 
+        'Load run parameters from a QB-PWD database.', 
+        '']
+    ];
+
+const PANEL =
+    [
+    Vbox :
+        [
+        Hbox :
+            [
+            extendH: 1,
+            Button :
+                [
+                name: 'heatmap', text: 'Heat Map',
+                bubbleHelp:
+                    ''
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Vbox :
+                [
+                Text :
+                    [
+                    name: 'map-min', len: 7, extendH: 1, title: 'Min:',
+                    type: 'real', allowBlank: 0,
+                    shortcut: ['0.0', '-0.5', '-1.0', '-5.0'],
+                    bubbleHelp: 'Minimum cut off value.'
+                    ],
+                Text :
+                    [
+                    name: 'map-max', len: 7, extendH: 1, title: 'Max:',
+                    type: 'real', allowBlank: 0,
+                    shortcut: ['0.0', '0.5', '1.0', '5.0'],
+                    bubbleHelp: 'Maximum cut off value.'
+                    ]
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Text :
+                [
+                name: 'map-ncolors', len: 7, extendH: 1, 
+                title: 'Number of Colors:',
+                type: 'int', allowBlank: 0,
+                shortcut: ['4', '8', '16', '32'],
+                bubbleHelp: 'Number of distinct colors.'
+                ]
+            ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1]
+    ];
+
+//  Local Functions
+
+//  Global Functions
+
+/****************************************************************************
+ *
+ *                          qb_QBPWDSetupPanel
+ *
+ ****************************************************************************/
+global function qb_QBPWDSetupPanel []
+
+    static status;                     //  Shared with child tasks.
+    static pwdkey;
+
+    if MOE_BATCH then return; endif
+    if WindowShow ['QB-PWDPanel', 1] then return; endif
+
+    local coreopts = [], pwdopts = [], browsetasks = [];
+    status = qb_GetDefaultsStatus [];
+    local coredflts = qb_GetDefaultsCore [];
+    local appdflts = tag tr QBPWD_OPT_DEFAULTS;
+    coredflts = tagpoke [coredflts, 'scoredb', 'qb_pwd.mdb'];
+
+    local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
+    status = qb_InitCorePanel [wkey, status, coredflts];
+    pwdkey = 0;
+    WindowSetData [wkey, appdflts];
+    WindowShow [wkey, 1];
+
+    loop
+        local [vals, trig] = WindowWait wkey;
+
+       if trig === 'panel' then
+            if vals.panel === 'Close' then 
+                break;
+
+            elseif vals.panel === 'Load' then 
+                if second task_fork [master: 'parent',
+                        statics:'share'] === 'child' then
+                    task_prio 0;
+/*
+                    local dbpath = FilePrompt [title: 'Load Database', 
+                        filter: '*.mdb', allowEmptyList: 0];
+                    if not isnull dbpath then
+                        local [ldkey, ldrec, ldlig, ldsts, ldcoreopts,
+                            ldqmropts] = LoadDB [dbpath];
+
+    	                Close [force:1];
+                        if neL [ldrec, []] and neL [ldlig, []] then
+                            local ldligmol = mol_Create ldlig;
+                            local ldligatoms = cat oAtoms ldligmol;
+                            oSetCollection ['QB_LIGAND', ldligatoms];
+                            aSetNucleusLook [ldligatoms, 'small-sphere'];
+                            aSetBondLook [ldligatoms, 'cylinder'];
+                            mol_Create ldrec;
+        	                View [];
+                        endif
+
+                        status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
+                        pwdkey = ldkey;
+                        dbv_Open db_Filename pwdkey;
+                        db_Close ldkey;
+                        WindowSetData [wkey, ldqmropts];
+                    endif
+*/
+                    exit [];
+                endif
+
+            elseif vals.panel === 'Run' then
+
+                if second task_fork [statics:'share'] === 'child' then
+/*
+                    status = qb_VerifyDivcon [wkey, status, vals];
+                    if not status.verified then exit []; endif
+
+                    coreopts = qb_TagCoreVals [vals];
+                    pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
+                        vals.ham, vals.scaling, vals.freq, vals.opt,
+                        vals.shift]];
+                    pwdkey = qb_SetUpScoreDB [status, coreopts, pwdopts, 
+                        [], QMS_NUM_FIELDS, 'QBPWD', 0];
+                    if vals.mode === 'One-to-One' then
+                        RunCalc [pwdkey];
+                    else
+                        RunOneToManyCalc [pwdkey];
+                    endif
+
+                    dbv_Open db_Filename pwdkey;
+                    db_Close pwdkey;
+*/
+                    exit [];
+                else
+                    break;
+                endif
+
+            elseif vals.panel === 'Save' then
+
+                if second task_fork [statics:'share'] === 'child' then
+/*
+                    status = qb_VerifyDivcon [wkey, status, vals];
+                    if not status.verified then exit []; endif
+
+                    coreopts = qb_TagCoreVals [vals];
+                    pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
+                        vals.ham, vals.scaling, vals.freq, vals.opt,
+                        vals.shift]];
+                    pwdkey = qb_SetUpScoreDB [status, coreopts, pwdopts,
+                        [], QMS_NUM_FIELDS, 'QBPWD', 1];
+                    dbv_Open db_Filename pwdkey;
+                    db_Close pwdkey;
+*/
+                    exit [];
+                endif
+            endif
+		elseif trig === 'heatmap' then
+
+            qb_HeatMapSetupPanel [vals.min, vals.max, vals.ncolors];
+
+        else
+           [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
+               browsetasks, pwdkey];
+        endif
+    endloop
+
+    task_kill browsetasks;
+    WindowDestroy wkey;
+
+endfunction
