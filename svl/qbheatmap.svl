@@ -28,6 +28,11 @@
 #set class   'QuantumBio'
 #set version '2010.01'
 
+const NEG_RANGE_MAX = 896;
+const POS_RANGE_MAX = 704;
+const G_FACTOR = 256;
+const R_FACTOR = 256 * 256;
+
 const HEADER = 
     [
     name: 'panel', 
@@ -65,27 +70,139 @@ const PANEL =
  *
  *                          GetColors
  *
+ *  Returns a scale of num + 1 colors starting with the color that
+ *  represent min (blue or white) and ending with the color that
+ *  represents max (white or red).
+ *
+ *  Note:  num has to be a multiple of 5 for half scales (0 - min, max) and
+ *  a multiple of 10 for full scales (min - max).
+ *
  ****************************************************************************/
-local function GetColors [min, max, scale]
+local function GetColors [min, max, num]
 
     local colors = [];
 
-    if min === 0 and max > 0 and scale > 0 then
-        print 'positive';
-    elseif max === 0 and min < 0 and scale > 0 then
-        print 'negative';
-    elseif min < 0 and max > 0 and max === abs min and scale > 0 then
-        print 'both';
+    if min === 0 and max > 0 and num > 0 and mod [num, 5] === 0 then
+        colors = GetPosColors [max, num];
+    elseif max === 0 and min < 0 and num > 0 and mod [num, 5] === 0 then
+        colors = GetNegColors [min, num];
+    elseif min < 0 and max > 0 and max === abs min and num > 0
+            and mod [num, 10] === 0 then
+        local half = max [1, floor (num / 2)];
+        colors = GetNegColors [min, half];
+        colors = cat [colors, dropfirst  GetPosColors [max, half]];
     else
-        return [[], 
-            twrite ['Cannot generate heat map with min {}, max {}, scale {}\n',
-            min, max, scale]];
+        return [[], twrite ['Cannot generate colors with minimum {},\n'
+            maximum {}, and number {}\n', min, max, num]];
     endif
 
     return [colors, ''];
 
 endfunction
 
+/****************************************************************************
+ *
+ *                          GetNegColors
+ *
+ *  For each five colors, one blue, one turquoise, one aquamarine and
+ *  two greens (blues below 127 are too dark).
+ *
+ ****************************************************************************/
+local function GetNegColors [min, num]
+
+    local colors = [], newcolor;
+    local r, g, b;
+    local bigdelta = floor ((255 * 5) / num);
+    local delta = floor ((255 * 5) / (num * 2));
+
+    //  Blue
+    r = 0; g = 0; b = 127;
+    while b < 255 loop
+        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+        colors = append [colors, newcolor];
+        b = r + delta;
+    endloop
+
+    //  Turquoise
+    r = 0; g = 0; b = 255;
+    while g < 255 loop
+        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+        colors = append [colors, newcolor];
+        g = g + bigdelta;
+    endloop
+
+    //  Aquamarine
+    r = 0; g = 255; b = 255;
+    while g > 0 loop
+        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+        colors = append [colors, newcolor];
+        g = g - bigdelta;
+    endloop
+
+    //  Green
+    r = 0; g = 255; b = 0;
+    while r < 255 loop
+        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+        colors = append [colors, newcolor];
+        r = r + delta;
+    endloop
+
+    //  White
+    r = 255; g = 255; b = 255;
+    newcolor = b * B_FACTOR + g * G_FACTOR + r;
+    colors = append [colors, newcolor];
+
+    return [colors, ''];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          GetPosColors
+ *
+ *  For each five colors, one red, two oranges and two yellows (reds below
+ *  127 are too dark).
+ *
+ ****************************************************************************/
+local function GetPosColors [max, num]
+
+    local colors = [], newcolor;
+    local r, g, b;
+    local delta = floor ((255 * 5) / (num * 2));
+
+    //  Since we prefer darker colors, build red to white and then reverse.
+    //  Red
+    r = 127; g = 0; b = 0;
+    while r < 255 loop
+        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+        colors = append [colors, newcolor];
+        r = r + delta;
+    endloop
+    
+    //  Orange
+    r = 255; g = 0; b = 0;
+    while g < 255 loop
+        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+        colors = append [colors, newcolor];
+        g = g + delta;
+    endloop
+
+    //  Yellow
+    r = 255; g = 255; b = 0;
+    while b < 255 loop
+        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+        colors = append [colors, newcolor];
+        b = b + delta;
+    endloop
+
+    //  White
+    r = 255; g = 255; b = 255;
+    newcolor = b * B_FACTOR + g * G_FACTOR + r;
+    colors = append [colors, newcolor];
+
+    return [reverse colors, ''];
+
+endfunction
 
 /****************************************************************************
  *
