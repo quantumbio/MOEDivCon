@@ -49,9 +49,10 @@ function qb_HeatMapSetupPanel;
 
 const QBPWD_OPT_DEFAULTS =
     [
-    ['map-min',      -1.0           ],
-    ['map-max',       1.0           ],
-    ['map-ncolors',  16             ]
+    ['mapmin',      -1.0           ],
+    ['mapmax',       1.0           ],
+    ['mapncolors',  15             ],
+    ['mapnticks',    5             ]
     ];
 
 
@@ -78,7 +79,7 @@ const PANEL =
             extendH: 1,
             Button :
                 [
-                name: 'heatmap', text: 'Heat Map',
+                name: 'heatmap', text: 'Heat Map', onTrigger: 'validate',
                 bubbleHelp:
                     ''
                 ],
@@ -90,14 +91,14 @@ const PANEL =
                 [
                 Text :
                     [
-                    name: 'map-min', len: 7, extendH: 1, title: 'Min:',
+                    name: 'mapmin', len: 7, extendH: 1, title: 'Min:',
                     type: 'real', allowBlank: 0,
                     shortcut: ['0.0', '-0.5', '-1.0', '-5.0'],
                     bubbleHelp: 'Minimum cut off value.'
                     ],
                 Text :
                     [
-                    name: 'map-max', len: 7, extendH: 1, title: 'Max:',
+                    name: 'mapmax', len: 7, extendH: 1, title: 'Max:',
                     type: 'real', allowBlank: 0,
                     shortcut: ['0.0', '0.5', '1.0', '5.0'],
                     bubbleHelp: 'Maximum cut off value.'
@@ -107,13 +108,24 @@ const PANEL =
                 [
                 vertical:0, shadow:'noline', extendH: 0, margin:1
                 ],
-            Text :
+            Vbox :
                 [
-                name: 'map-ncolors', len: 7, extendH: 1, 
-                title: 'Number of Colors:',
-                type: 'int', allowBlank: 0,
-                shortcut: ['4', '8', '16', '32'],
-                bubbleHelp: 'Number of distinct colors.'
+                Text :
+                    [
+                    name: 'mapncolors', len: 7, extendH: 1, 
+                    title: 'Number of Colors:',
+                    type: 'int', allowBlank: 0,
+                    shortcut: ['3', '7', '15', '31'],
+                    bubbleHelp: 'Number of distinct colors.'
+                    ],
+                Text :
+                    [
+                    name: 'mapnticks', len: 7, extendH: 1, 
+                    title: 'Number of Ticks:',
+                    type: 'int', allowBlank: 0,
+                    shortcut: ['3', '5', '7', '9'],
+                    bubbleHelp: 'Number of labeled ticks on color scale.'
+                    ]
                 ]
             ]
         ],
@@ -237,7 +249,8 @@ global function qb_QBPWDSetupPanel []
             endif
 		elseif trig === 'heatmap' then
 
-            qb_HeatMapSetupPanel [vals.min, vals.max, vals.ncolors];
+            qb_HeatMapSetupPanel [vals.mapmin, vals.mapmax, vals.mapncolors,
+                vals.mapnticks];
 
         else
            [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
