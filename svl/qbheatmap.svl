@@ -33,6 +33,11 @@ const POS_RANGE_MAX = 704;
 const G_FACTOR = 256;
 const R_FACTOR = 256 * 256;
 
+const PAGE_HT = 750;
+const SCALE_PAD = 10;
+const SCALE_WD = 10;
+const TICK_LEN = 5;
+
 const HEADER = 
     [
     name: 'panel', 
@@ -51,7 +56,9 @@ const PANEL =
             [
             Button :
                 [
-                name: 'lig1', text: 'lig1'
+                name: 'mapbuttom', shadow: 'none',
+                type: 'int', grPosition: 'right',
+                uniformRows: 1, margin: 0 //uniformCols: 1
                 ]
             ],
         Separator : 
@@ -60,7 +67,7 @@ const PANEL =
             ],
         Label :
             [
-            minWidth: 10, background: 'red', centerV: 1
+            name: 'colorscale', centerV: 1
             ]
         ]
     ];
@@ -68,32 +75,98 @@ const PANEL =
 
 /****************************************************************************
  *
- *                          GetColors
+ *                          DrawCell
  *
- *  Returns a scale of num + 1 colors starting with the color that
- *  represent min (blue or white) and ending with the color that
- *  represents max (white or red).
+ *  Returns a graphics object with the appropriate background color
+ *  representing its value.
  *
- *  Note:  num has to be a multiple of 5 for half scales (0 - min, max) and
- *  a multiple of 10 for full scales (min - max).
+ *  NOTE:  calling function should call gr_destroy on key after using it.
  *
  ****************************************************************************/
-local function GetColors [min, max, num]
+local function DrawCell [colors, width, height, minval, maxval, value]
+
+    local cidx;
+    if value <= minval then
+        cidx = 1;
+    elseif value >= maxval then
+        cidx = length colors;
+    else
+        local step = (maxval - minval) / (length colors);
+        cidx = ceil ((value - minval) / step);
+    endif
+
+    local key = gr_create [size: [width, height], units: 'pt'];
+    gr_box [key, [0, [0, 0], [width , height],
+        colors (cidx), 1, colors (cidx)]];
+
+    return key;
+endfunction
+
+/****************************************************************************
+ *
+ *                          DrawColorScale
+ *
+ *  Returns a scale of num colors starting with the color that
+ *  represent minval (blue or white) and ending with the color that
+ *  represents maxval (white or red).
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawColorScale [colors, cell_w, cell_h, minval, maxval, ticks]
+
+    local width = cell_w + 40;  // cell + ticks
+    local height = cell_h * length colors;
+    local key = gr_create [title: 'colorscale',
+        size: [width, height  + 2 * SCALE_PAD], units: 'pt'];
+    local ith;
+    for ith = 1, length colors, 1 loop
+        gr_box [key, [0, [0, (ith - 1) * cell_h + SCALE_PAD],
+            [cell_w , ith * cell_h  + SCALE_PAD],
+            colors (ith), 1, colors (ith)]];
+    endloop
+    local step = height / (ticks - 1);
+    local delta = (maxval - minval) / (ticks - 1);
+    for ith = 0, ticks, 1 loop
+        gr_line [key, [0, [cell_w, ith * step  + SCALE_PAD],
+            [cell_w + TICK_LEN, ith * step + SCALE_PAD],
+            icolor'black', 1]];
+        gr_text [key, [0, [cell_w + TICK_LEN * 1.5, ith * step + SCALE_PAD],
+            twrite ['{n:.2f}', minval + (ith * delta)], 'sys', icolor'black',
+            10, [position: 'middleleft']]];
+    endloop
+
+    return [key, width, height];
+
+endfunction
+
+function GetNegColors;
+function GetPosColors;
+
+/****************************************************************************
+ *
+ *                          GetColors
+ *
+ *  Returns a scale of num colors starting with the color that
+ *  represent minval (blue or white) and ending with the color that
+ *  represents maxval (white or red).
+ *
+ ****************************************************************************/
+local function GetColors [minval, maxval, num]
 
     local colors = [];
 
-    if min === 0 and max > 0 and num > 0 and mod [num, 5] === 0 then
-        colors = GetPosColors [max, num];
-    elseif max === 0 and min < 0 and num > 0 and mod [num, 5] === 0 then
-        colors = GetNegColors [min, num];
-    elseif min < 0 and max > 0 and max === abs min and num > 0
-            and mod [num, 10] === 0 then
-        local half = max [1, floor (num / 2)];
-        colors = GetNegColors [min, half];
-        colors = cat [colors, dropfirst  GetPosColors [max, half]];
+    if minval === 0 and maxval > 0 and num > 0 then
+        colors = GetPosColors [maxval, num - 1];
+    elseif maxval === 0 and minval < 0 and num > 0 then
+        colors = GetNegColors [minval, num - 1];
+    elseif minval < 0 and maxval > 0 and num > 0 then
+        local mid = max [1, floor ((num - 1) * (minval / (minval - maxval)))];
+        colors = GetNegColors [minval, mid];
+        colors = cat [colors, dropfirst  GetPosColors [maxval, num - mid - 1]];
     else
         return [[], twrite ['Cannot generate colors with minimum {},\n'
-            maximum {}, and number {}\n', min, max, num]];
+            'maximum {}, and number {}\n', minval, maxval, num]];
     endif
 
     return [colors, ''];
@@ -104,55 +177,64 @@ endfunction
  *
  *                          GetNegColors
  *
- *  For each five colors, one blue, one turquoise, one aquamarine and
- *  two greens (blues below 127 are too dark).
+ *  Return num number of scaled colors, plus white, ordered from blue to white.
  *
  ****************************************************************************/
-local function GetNegColors [min, num]
+local function GetNegColors [minval, num]
 
     local colors = [], newcolor;
     local r, g, b;
-    local bigdelta = floor ((255 * 5) / num);
-    local delta = floor ((255 * 5) / (num * 2));
-
+//    local bigdelta = floor ((255 * 5) / num);
+//    local delta = floor ((255 * 5) / (num * 2));
+    local delta = floor (NEG_RANGE_MAX / num);
+write ['Min {}  Num {}  Delta {}\n', minval, num, delta];//DEBUG
     //  Blue
     r = 0; g = 0; b = 127;
-    while b < 255 loop
-        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+    while b < 256 loop
+write ['B: {}\n', b];//DEBUG
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
-        b = r + delta;
+        b = b + delta;
     endloop
 
     //  Turquoise
-    r = 0; g = 0; b = 255;
-    while g < 255 loop
-        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+    g = b - 256; r = 0; b = 255;
+    while g < 256 loop
+write ['G: {}\n', g];//DEBUG
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
-        g = g + bigdelta;
+        g = g + delta;
     endloop
 
     //  Aquamarine
-    r = 0; g = 255; b = 255;
-    while g > 0 loop
-        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+    b = 256 - (g - 256); r = 0; g = 255;
+    while b >= 0 loop
+write ['B: {}\n', b];//DEBUG
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
-        g = g - bigdelta;
+        b = b - delta;
     endloop
 
     //  Green
-    r = 0; g = 255; b = 0;
-    while r < 255 loop
-        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+    r = -b; g = 255; b = 0;
+    while r < 256 loop
+write ['R: {}\n', r];//DEBUG
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         r = r + delta;
     endloop
 
+write ['Neg: {}\n', length colors];//DEBUG
+    if length colors > num then
+        colors = drop [colors, num - length colors];
+    endif
+
     //  White
     r = 255; g = 255; b = 255;
-    newcolor = b * B_FACTOR + g * G_FACTOR + r;
+    newcolor = r * R_FACTOR + g * G_FACTOR + b;
     colors = append [colors, newcolor];
 
-    return [colors, ''];
+    return colors;
 
 endfunction
 
@@ -160,47 +242,66 @@ endfunction
  *
  *                          GetPosColors
  *
- *  For each five colors, one red, two oranges and two yellows (reds below
- *  127 are too dark).
+ *  Return num number of scaled colors, plus white, ordered from white to red.
  *
  ****************************************************************************/
-local function GetPosColors [max, num]
+local function GetPosColors [maxval, num]
 
     local colors = [], newcolor;
     local r, g, b;
-    local delta = floor ((255 * 5) / (num * 2));
+//    local delta = floor ((255 * 5) / (num * 2));
+    local delta = floor (POS_RANGE_MAX / num);
+write ['Max {}  Num {}  Delta {}\n', maxval, num, delta];//DEBUG
 
     //  Since we prefer darker colors, build red to white and then reverse.
+    //  Maroon
+    r = 95; g = 0; b = 95;
+    while r < 128 loop
+write ['RB: {}\n', r];//DEBUG
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        r = r + delta;
+        b = b + delta;
+    endloop
+
     //  Red
-    r = 127; g = 0; b = 0;
-    while r < 255 loop
-        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+     r = 127 + r - 128; g = 0; b = 0;
+    while r < 256 loop
+write ['R: {}\n', r];//DEBUG
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         r = r + delta;
     endloop
     
     //  Orange
-    r = 255; g = 0; b = 0;
-    while g < 255 loop
-        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+    g = r - 256; r = 255; b = 0;
+    while g < 256 loop
+write ['G: {}\n', g];//DEBUG
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         g = g + delta;
     endloop
 
     //  Yellow
-    r = 255; g = 255; b = 0;
-    while b < 255 loop
-        newcolor = b * B_FACTOR + g * G_FACTOR + r;
+     b = g - 256; r = 255; g = 255;
+    while b < 256 loop
+write ['B: {}\n', b];//DEBUG
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         b = b + delta;
     endloop
 
+write ['Pos: {}\n', length colors];//DEBUG
+    if length colors > num then
+        colors = drop [colors, num - length colors];
+    endif
+
     //  White
     r = 255; g = 255; b = 255;
-    newcolor = b * B_FACTOR + g * G_FACTOR + r;
+    newcolor = r * R_FACTOR + g * G_FACTOR + b;
     colors = append [colors, newcolor];
 
-    return [reverse colors, ''];
+    return reverse colors;
 
 endfunction
 
@@ -209,13 +310,50 @@ endfunction
  *                          qb_HeatMapSetupPanel
  *
  ****************************************************************************/
-global function qb_HeatMapSetupPanel []
-
+global function qb_HeatMapSetupPanel [minval, maxval, num, ticks]
+write ['Min: {}  Max: {}  Num: {}  Ticks: {}\n', minval, maxval, num, ticks];//DEBUG
     if MOE_BATCH then return; endif
     if WindowShow ['QB Heat Map', 1] then return; endif
 
-    local wkey = WindowCreate cat [HEADER, PANEL];
+    local [colors, errmess] = GetColors [minval, maxval, num];
+    if colors === [] then
+        Warning errmess;
+        return;
+    endif
+
+write ['Colors: {v}\n', colors];//DEBUG
+
+    local cell_h = floor (PAGE_HT / num);
+    local cell_w = SCALE_WD;
+
+write ['W: {}  H: {}\n', cell_w, cell_h];//DEBUG
+
+    local [scalekey, s_w, s_h] = DrawColorScale [colors, cell_w, cell_h, 
+        minval, maxval, ticks];
+
+    local ith, bnames = [], bcolors = [];
+    randseed 101;
+    for ith = 1, 1240, 1 loop
+        if mod [ith, 31] === 1 then
+            bnames = append [bnames, twrite ['lig{}', ith]];
+            bcolors = append [bcolors, 0];
+        else
+            bnames = append [bnames, ''];
+            bcolors = append [bcolors, DrawCell [colors, 20, 10, 
+                minval, maxval, randN 1]];
+
+        endif
+    endloop
+
+    local panel = tagpoke [PANEL, ['Hbox', 'Vbox', 'Button', 'graphics'],
+        bcolors];
+    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Button', 'text'], bnames];
+    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Button', 'columns'], 31];
+    local wkey = WindowCreate cat [HEADER, panel];
+    WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
     WindowShow [wkey, 1];
+
+    gr_destroy scalekey;
 
     loop
         local [vals, trig] = WindowWait wkey;
