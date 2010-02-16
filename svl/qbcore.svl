@@ -1783,6 +1783,26 @@ endfunction
 
 /****************************************************************************
  *
+ *                          qb_StandardDeviation
+ *
+ *  Return the average and standard deviation of the flat vector of numbers.
+ *
+ ****************************************************************************/
+global function qb_StandardDeviation [nums]
+
+    local n = length nums;
+    if n === 0 then
+        return 0;
+    endif
+
+    local avg = (add nums) / n;
+
+    return [avg, sqrt ((add (sqr (nums - avg))) / n)];
+
+endfunction
+
+/****************************************************************************
+ *
  *                          qb_TagCoreVals
  *
  *  Tag the values from the core panel window.

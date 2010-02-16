@@ -28,16 +28,27 @@
 #set class   'QuantumBio'
 #set version '2010.01'
 
+//  Colors
 const NEG_RANGE_MAX = 896;
 const POS_RANGE_MAX = 704;
 const G_FACTOR = 256;
 const R_FACTOR = 256 * 256;
 
-const PAGE_HT = 750;
+//  Page
+const PAGE_HT_MAX = 750;
+const PAGE_WD_MAX = 900;
+
+//  Scale
 const SCALE_PAD = 10;
-const SCALE_WD = 10;
+const SCALE_CELL_WD = 10;
+const SCALE_CELL_HT_MAX = 40;
 const TICK_LEN = 5;
 
+//  Cells
+const CELL_WD_MIN = 20;
+const CELL_HT_MIN = 10;
+
+//  Window GUI
 const HEADER = 
     [
     name: 'panel', 
@@ -56,9 +67,9 @@ const PANEL =
             [
             Button :
                 [
-                name: 'mapbuttom', shadow: 'none',
+                name: 'mapbutton', shadow: 'none',
                 type: 'int', grPosition: 'right',
-                uniformRows: 1, margin: 0 //uniformCols: 1
+                margin: 0, font: 'mediumBold'
                 ]
             ],
         Separator : 
@@ -67,11 +78,12 @@ const PANEL =
             ],
         Label :
             [
-            name: 'colorscale', centerV: 1
+            name: 'colorscale', centerV: 1, extendV: 1
             ]
         ]
     ];
 
+//  Local Functions
 
 /****************************************************************************
  *
@@ -106,9 +118,9 @@ endfunction
  *
  *                          DrawColorScale
  *
- *  Returns a scale of num colors starting with the color that
- *  represent minval (blue or white) and ending with the color that
- *  represents maxval (white or red).
+ *  Draws a scale of colors starting with color that represents minval (blue
+ *  or white) at the bottom and ending with the color that represents maxval
+ *  (white or red) at the top.
  *
  *  NOTE:  calling function should call gr_destroy on key after using it.
  *
@@ -184,14 +196,11 @@ local function GetNegColors [minval, num]
 
     local colors = [], newcolor;
     local r, g, b;
-//    local bigdelta = floor ((255 * 5) / num);
-//    local delta = floor ((255 * 5) / (num * 2));
     local delta = floor (NEG_RANGE_MAX / num);
-write ['Min {}  Num {}  Delta {}\n', minval, num, delta];//DEBUG
+
     //  Blue
     r = 0; g = 0; b = 127;
     while b < 256 loop
-write ['B: {}\n', b];//DEBUG
         newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         b = b + delta;
@@ -200,7 +209,6 @@ write ['B: {}\n', b];//DEBUG
     //  Turquoise
     g = b - 256; r = 0; b = 255;
     while g < 256 loop
-write ['G: {}\n', g];//DEBUG
         newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         g = g + delta;
@@ -209,7 +217,6 @@ write ['G: {}\n', g];//DEBUG
     //  Aquamarine
     b = 256 - (g - 256); r = 0; g = 255;
     while b >= 0 loop
-write ['B: {}\n', b];//DEBUG
         newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         b = b - delta;
@@ -218,13 +225,11 @@ write ['B: {}\n', b];//DEBUG
     //  Green
     r = -b; g = 255; b = 0;
     while r < 256 loop
-write ['R: {}\n', r];//DEBUG
         newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         r = r + delta;
     endloop
 
-write ['Neg: {}\n', length colors];//DEBUG
     if length colors > num then
         colors = drop [colors, num - length colors];
     endif
@@ -249,15 +254,12 @@ local function GetPosColors [maxval, num]
 
     local colors = [], newcolor;
     local r, g, b;
-//    local delta = floor ((255 * 5) / (num * 2));
     local delta = floor (POS_RANGE_MAX / num);
-write ['Max {}  Num {}  Delta {}\n', maxval, num, delta];//DEBUG
 
     //  Since we prefer darker colors, build red to white and then reverse.
     //  Maroon
     r = 95; g = 0; b = 95;
     while r < 128 loop
-write ['RB: {}\n', r];//DEBUG
         newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         r = r + delta;
@@ -267,7 +269,6 @@ write ['RB: {}\n', r];//DEBUG
     //  Red
      r = 127 + r - 128; g = 0; b = 0;
     while r < 256 loop
-write ['R: {}\n', r];//DEBUG
         newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         r = r + delta;
@@ -276,7 +277,6 @@ write ['R: {}\n', r];//DEBUG
     //  Orange
     g = r - 256; r = 255; b = 0;
     while g < 256 loop
-write ['G: {}\n', g];//DEBUG
         newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         g = g + delta;
@@ -285,13 +285,11 @@ write ['G: {}\n', g];//DEBUG
     //  Yellow
      b = g - 256; r = 255; g = 255;
     while b < 256 loop
-write ['B: {}\n', b];//DEBUG
         newcolor = r * R_FACTOR + g * G_FACTOR + b;
         colors = append [colors, newcolor];
         b = b + delta;
     endloop
 
-write ['Pos: {}\n', length colors];//DEBUG
     if length colors > num then
         colors = drop [colors, num - length colors];
     endif
@@ -302,58 +300,80 @@ write ['Pos: {}\n', length colors];//DEBUG
     colors = append [colors, newcolor];
 
     return reverse colors;
-
 endfunction
+
+//  Global Functions
 
 /****************************************************************************
  *
  *                          qb_HeatMapSetupPanel
  *
+ *  Note, data has the format:
+ *
+ *  [[colNames], [[rowName1, [values1]], [rowName2, [values2]], ...
+ *      ... , [rowNameN, [valuesN]]]
+ *  where length colNames === length values1 === ... === length valuesN,
+ *  and the names are tokens and the values are numbers.
+ *
  ****************************************************************************/
-global function qb_HeatMapSetupPanel [minval, maxval, num, ticks]
-write ['Min: {}  Max: {}  Num: {}  Ticks: {}\n', minval, maxval, num, ticks];//DEBUG
+global function qb_HeatMapSetupPanel [data, minval, maxval, numcolors, ticks,
+        selfun]
+
     if MOE_BATCH then return; endif
     if WindowShow ['QB Heat Map', 1] then return; endif
 
-    local [colors, errmess] = GetColors [minval, maxval, num];
+    local [colors, errmess] = GetColors [minval, maxval, numcolors];
     if colors === [] then
         Warning errmess;
         return;
     endif
 
-write ['Colors: {v}\n', colors];//DEBUG
+    local [colnames, rowdata] = data;
+    local numcols = length colnames;
+    local numrows = length rowdata;
+    local page_w = (numcols + 1) * CELL_WD_MIN;
+    local page_h = (numrows + 1) * CELL_HT_MIN;
 
-    local cell_h = floor (PAGE_HT / num);
-    local cell_w = SCALE_WD;
-
-write ['W: {}  H: {}\n', cell_w, cell_h];//DEBUG
-
+    local scalecell_h = floor (page_h / numcolors);
+    local scalecell_w =  SCALE_CELL_WD;
     local [scalekey, s_w, s_h] = DrawColorScale [colors, cell_w, cell_h, 
         minval, maxval, ticks];
 
-    local ith, bnames = [], bcolors = [];
-    randseed 101;
-    for ith = 1, 1240, 1 loop
-        if mod [ith, 31] === 1 then
-            bnames = append [bnames, twrite ['lig{}', ith]];
-            bcolors = append [bcolors, 0];
-        else
+    //  Color map cells and store row labels
+    local row_i, col_i, bnames = [], bcolors = [];
+    for row_i = 1, numrows, 1 loop
+        local [rowlabel, rowvals] = rowdata (row_i);
+        bnames = append [bnames, rowlabel];
+        bcolors = append [bcolors, 0];
+        for col_i = 1, numcols, 1 loop
             bnames = append [bnames, ''];
-            bcolors = append [bcolors, DrawCell [colors, 20, 10, 
-                minval, maxval, randN 1]];
+            bcolors = append [bcolors, DrawCell [colors, 
+                CELL_WD_MIN, CELL_HT_MIN, minval, maxval, rowvals (col_i)]];
+        endloop
+    endloop
 
-        endif
+    //  Empty corner label
+    bnames = append [bnames, ''];
+    bcolors = append [bcolors, 0];
+
+    //  Column labels
+    for col_i = 1, numcols, 1 loop
+        bnames = append [bnames, colnames (col_i)];
+        bcolors = append [bcolors, 0];
     endloop
 
     local panel = tagpoke [PANEL, ['Hbox', 'Vbox', 'Button', 'graphics'],
         bcolors];
-    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Button', 'text'], bnames];
-    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Button', 'columns'], 31];
+    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Button', 'text'],
+        bnames];
+    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Button', 'columns'],
+        numcols + 1];
     local wkey = WindowCreate cat [HEADER, panel];
     WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
     WindowShow [wkey, 1];
 
     gr_destroy scalekey;
+    app gr_destroy bcolors;
 
     loop
         local [vals, trig] = WindowWait wkey;
@@ -361,9 +381,23 @@ write ['W: {}  H: {}\n', cell_w, cell_h];//DEBUG
             if vals.panel === 'Close' then 
                 break;
             endif
+        else if trig === 'mapbutton' then
+            //  Selected cells have row numbers from 1 to numrows
+            //  and col numbers from 1 to numcols
+            //  Selected rows have col number 0
+            //  and selected cols have row number 0
+            local selrow = ceil (vals.mapbutton / (numcols + 1));
+            if selrow === numrows + 1 then
+                selrow = 0;
+            endif
+
+            local selcol = mod [vals.mapbutton, numcols + 1] - 1;
+write ['R: {}, C: {}\n', selrow, selcol];//DEBUG
+            // local errmess = call [selfun, [data, selrow, selcol]];
         endif
     endloop
 
     WindowDestroy wkey;
 
 endfunction
+
