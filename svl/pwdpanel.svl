@@ -135,7 +135,54 @@ const PANEL =
 
 //  Local Functions
 
+/****************************************************************************
+ *
+ *                          GenerateData
+ *
+ *  Return data formatted for the heat map.
+ *
+ ****************************************************************************/
+local function GenerateData [minval, maxval, numres, numlig]
+
+    local resnames = [], ligdata = [];
+    local range = max [maxval, abs minval];
+    randseed 101;
+
+    //  Residue labels
+    const RESLIST = ['ARG', 'MET', 'THR', 'GLY', 'PHE', 'GLU', 'ALA', 'LEU',
+        'LYS', 'PRO', 'VAL', 'SER', 'GLN', 'ASN', 'ASP'];
+
+    for res_i = numres, 1 loop
+        resnames = append [resnames, twrite ['{}\n{}',
+            RESLIST (rand (length resnames - 1) + 1), rand 999]];
+    endloop
+
+    //  ligand labels and values
+    local res_i, lig_i;
+    for lig_i = 1, numlig, 1 loop
+        local ligname, ligvals = [];
+        ligname = twrite ['lig{}', lig_i];
+        for res_i = 1, numres, 1 loop
+            ligvals = append [ligvals, randN range];
+        endloop
+
+        ligdata = append [ligdata, [ligname, ligvals]];
+    endloop
+
+    return [resnames, ligdata];
+
 //  Global Functions
+
+/****************************************************************************
+ *
+ *                          qb_QBPWDSelectHandler
+ *
+ ****************************************************************************/
+global function qb_QBPWDSelectHandler [data, row, col]
+
+write ['R: {}, C: {}\n', row, col];//DEBUG
+
+endfunction
 
 /****************************************************************************
  *
@@ -249,8 +296,9 @@ global function qb_QBPWDSetupPanel []
             endif
 		elseif trig === 'heatmap' then
 
-            qb_HeatMapSetupPanel [vals.mapmin, vals.mapmax, vals.mapncolors,
-                vals.mapnticks];
+            local data = GenerateData [vals.mapmin, vals.mapmax, 30, 40];
+            qb_HeatMapSetupPanel [data, vals.mapmin, vals.mapmax, 
+            vals.mapncolors, vals.mapnticks, 'qb_QBPWDSelectHandler'];
 
         else
            [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
