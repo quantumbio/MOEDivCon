@@ -41,7 +41,6 @@ const PAGE_WD_MAX = 900;
 //  Scale
 const SCALE_PAD = 10;
 const SCALE_CELL_WD = 10;
-const SCALE_CELL_HT_MAX = 40;
 const TICK_LEN = 5;
 
 //  Cells
@@ -69,7 +68,8 @@ const PANEL =
                 [
                 name: 'mapbutton', shadow: 'none',
                 type: 'int', grPosition: 'right',
-                margin: 0, font: 'mediumBold'
+                margin: 0, font: 'smallBold',
+                uniformCols: 0, uniformRows: 0
                 ]
             ],
         Separator : 
@@ -78,12 +78,38 @@ const PANEL =
             ],
         Label :
             [
-            name: 'colorscale', centerV: 1, extendV: 1
+            name: 'colorscale', extendV: 0, centerV: 1, resizeV: 0,
+            grScale: 'none'
             ]
         ]
     ];
 
 //  Local Functions
+
+function StandardDeviation;
+
+/****************************************************************************
+ *
+ *                          CalculateCuts
+ *
+ *  Return the average and standard deviation of the flat vector of numbers.
+ *
+ ****************************************************************************/
+local function CalculateCuts [data, cutoff, cols]
+
+    local rowdata = second data;
+    local row, numbers = [];
+    for row in rowdata loop
+        numbers = cat [numbers, keep [second row, cols]];
+    endloop
+
+    local [avg, sigma] = StandardDeviation [numbers];
+
+write ['A: {}, S: {}\n', avg, sigma];//DEBUG
+
+    return [avg - (cutoff * sigma), avg + (cutoff * sigma)];
+
+endfunction
 
 /****************************************************************************
  *
@@ -95,16 +121,16 @@ const PANEL =
  *  NOTE:  calling function should call gr_destroy on key after using it.
  *
  ****************************************************************************/
-local function DrawCell [colors, width, height, minval, maxval, value]
+local function DrawCell [colors, width, height, mincut, maxcut, value]
 
     local cidx;
-    if value <= minval then
+    if value <= mincut then
         cidx = 1;
-    elseif value >= maxval then
+    elseif value >= maxcut then
         cidx = length colors;
     else
-        local step = (maxval - minval) / (length colors);
-        cidx = ceil ((value - minval) / step);
+        local step = (maxcut - mincut) / (length colors);
+        cidx = ceil ((value - mincut) / step);
     endif
 
     local key = gr_create [size: [width, height], units: 'pt'];
@@ -118,14 +144,14 @@ endfunction
  *
  *                          DrawColorScale
  *
- *  Draws a scale of colors starting with color that represents minval (blue
- *  or white) at the bottom and ending with the color that represents maxval
+ *  Draws a scale of colors starting with color that represents mincut (blue
+ *  or white) at the bottom and ending with the color that represents maxcut
  *  (white or red) at the top.
  *
  *  NOTE:  calling function should call gr_destroy on key after using it.
  *
  ****************************************************************************/
-local function DrawColorScale [colors, cell_w, cell_h, minval, maxval, ticks]
+local function DrawColorScale [colors, cell_w, cell_h, mincut, maxcut, ticks]
 
     local width = cell_w + 40;  // cell + ticks
     local height = cell_h * length colors;
@@ -138,13 +164,13 @@ local function DrawColorScale [colors, cell_w, cell_h, minval, maxval, ticks]
             colors (ith), 1, colors (ith)]];
     endloop
     local step = height / (ticks - 1);
-    local delta = (maxval - minval) / (ticks - 1);
+    local delta = (maxcut - mincut) / (ticks - 1);
     for ith = 0, ticks, 1 loop
         gr_line [key, [0, [cell_w, ith * step  + SCALE_PAD],
             [cell_w + TICK_LEN, ith * step + SCALE_PAD],
             icolor'black', 1]];
         gr_text [key, [0, [cell_w + TICK_LEN * 1.5, ith * step + SCALE_PAD],
-            twrite ['{n:.2f}', minval + (ith * delta)], 'sys', icolor'black',
+            twrite ['{n:.2f}', mincut + (ith * delta)], 'sys', icolor'black',
             10, [position: 'middleleft']]];
     endloop
 
@@ -160,25 +186,25 @@ function GetPosColors;
  *                          GetColors
  *
  *  Returns a scale of num colors starting with the color that
- *  represent minval (blue or white) and ending with the color that
- *  represents maxval (white or red).
+ *  represent mincut (blue or white) and ending with the color that
+ *  represents maxcut (white or red).
  *
  ****************************************************************************/
-local function GetColors [minval, maxval, num]
+local function GetColors [mincut, maxcut, num]
 
     local colors = [];
 
-    if minval === 0 and maxval > 0 and num > 0 then
-        colors = GetPosColors [maxval, num - 1];
-    elseif maxval === 0 and minval < 0 and num > 0 then
-        colors = GetNegColors [minval, num - 1];
-    elseif minval < 0 and maxval > 0 and num > 0 then
-        local mid = max [1, floor ((num - 1) * (minval / (minval - maxval)))];
-        colors = GetNegColors [minval, mid];
-        colors = cat [colors, dropfirst  GetPosColors [maxval, num - mid - 1]];
+    if mincut === 0 and maxcut > 0 and num > 0 then
+        colors = GetPosColors [maxcut, num - 1];
+    elseif maxcut === 0 and mincut < 0 and num > 0 then
+        colors = GetNegColors [mincut, num - 1];
+    elseif mincut < 0 and maxcut > 0 and num > 0 then
+        local mid = max [1, floor ((num - 1) * (mincut / (mincut - maxcut)))];
+        colors = GetNegColors [mincut, mid];
+        colors = cat [colors, dropfirst  GetPosColors [maxcut, num - mid - 1]];
     else
         return [[], twrite ['Cannot generate colors with minimum {},\n'
-            'maximum {}, and number {}\n', minval, maxval, num]];
+            'maximum {}, and number {}\n', mincut, maxcut, num]];
     endif
 
     return [colors, ''];
@@ -192,7 +218,7 @@ endfunction
  *  Return num number of scaled colors, plus white, ordered from blue to white.
  *
  ****************************************************************************/
-local function GetNegColors [minval, num]
+local function GetNegColors [mincut, num]
 
     local colors = [], newcolor;
     local r, g, b;
@@ -250,7 +276,7 @@ endfunction
  *  Return num number of scaled colors, plus white, ordered from white to red.
  *
  ****************************************************************************/
-local function GetPosColors [maxval, num]
+local function GetPosColors [maxcut, num]
 
     local colors = [], newcolor;
     local r, g, b;
@@ -302,6 +328,26 @@ local function GetPosColors [maxval, num]
     return reverse colors;
 endfunction
 
+/****************************************************************************
+ *
+ *                          StandardDeviation
+ *
+ *  Return the average and standard deviation of the flat vector of numbers.
+ *
+ ****************************************************************************/
+local function StandardDeviation [nums]
+
+    local n = length nums;
+    if n === 0 then
+        return 0;
+    endif
+    local avg = (add nums) / n;
+    local sigma = sqrt ((add (sqr (nums - avg))) / n);
+
+    return [avg, sigma];
+endfunction
+
+
 //  Global Functions
 
 /****************************************************************************
@@ -316,13 +362,21 @@ endfunction
  *  and the names are tokens and the values are numbers.
  *
  ****************************************************************************/
-global function qb_HeatMapSetupPanel [data, minval, maxval, numcolors, ticks,
-        selfun]
+global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
+        numcolors, ticks,selfun]
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB Heat Map', 1] then return; endif
 
-    local [colors, errmess] = GetColors [minval, maxval, numcolors];
+    local MOE_PAD;
+    if MOE_VERSION === 2009.1 then
+        MOE_PAD = 9;
+    else
+        MOE_PAD = 11;
+    endif
+
+    local [mincut, maxcut] = CalculateCuts [data, cutoff, numsignifcols];
+    local [colors, errmess] = GetColors [mincut, maxcut, numcolors];
     if colors === [] then
         Warning errmess;
         return;
@@ -331,13 +385,13 @@ global function qb_HeatMapSetupPanel [data, minval, maxval, numcolors, ticks,
     local [colnames, rowdata] = data;
     local numcols = length colnames;
     local numrows = length rowdata;
-    local page_w = (numcols + 1) * CELL_WD_MIN;
-    local page_h = (numrows + 1) * CELL_HT_MIN;
+    local page_w = (numcols + 1) * (CELL_WD_MIN + MOE_PAD);
+    local page_h = (numrows + 1) * (CELL_HT_MIN + MOE_PAD);
 
     local scalecell_h = floor (page_h / numcolors);
     local scalecell_w =  SCALE_CELL_WD;
-    local [scalekey, s_w, s_h] = DrawColorScale [colors, cell_w, cell_h, 
-        minval, maxval, ticks];
+    local [scalekey, s_w, s_h] = DrawColorScale [colors, scalecell_w,
+        scalecell_h, mincut, maxcut, ticks];
 
     //  Color map cells and store row labels
     local row_i, col_i, bnames = [], bcolors = [];
@@ -348,7 +402,7 @@ global function qb_HeatMapSetupPanel [data, minval, maxval, numcolors, ticks,
         for col_i = 1, numcols, 1 loop
             bnames = append [bnames, ''];
             bcolors = append [bcolors, DrawCell [colors, 
-                CELL_WD_MIN, CELL_HT_MIN, minval, maxval, rowvals (col_i)]];
+                CELL_WD_MIN, CELL_HT_MIN, mincut, maxcut, rowvals (col_i)]];
         endloop
     endloop
 
@@ -381,7 +435,7 @@ global function qb_HeatMapSetupPanel [data, minval, maxval, numcolors, ticks,
             if vals.panel === 'Close' then 
                 break;
             endif
-        else if trig === 'mapbutton' then
+        elseif trig === 'mapbutton' then
             //  Selected cells have row numbers from 1 to numrows
             //  and col numbers from 1 to numcols
             //  Selected rows have col number 0
@@ -392,8 +446,8 @@ global function qb_HeatMapSetupPanel [data, minval, maxval, numcolors, ticks,
             endif
 
             local selcol = mod [vals.mapbutton, numcols + 1] - 1;
-write ['R: {}, C: {}\n', selrow, selcol];//DEBUG
-            // local errmess = call [selfun, [data, selrow, selcol]];
+            selcol = select [numcols, selcol, selcol === -1];
+            local selerrmess = call [selfun, [data, selrow, selcol]];
         endif
     endloop
 
