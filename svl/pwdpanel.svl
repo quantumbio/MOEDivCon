@@ -49,12 +49,10 @@ function qb_HeatMapSetupPanel;
 
 const QBPWD_OPT_DEFAULTS =
     [
-    ['mapmin',      -1.0           ],
-    ['mapmax',       1.0           ],
+    ['cutoff',       2.0           ],
     ['mapncolors',  15             ],
     ['mapnticks',    5             ]
     ];
-
 
 const HEADER = 
     [
@@ -91,17 +89,11 @@ const PANEL =
                 [
                 Text :
                     [
-                    name: 'mapmin', len: 7, extendH: 1, title: 'Min:',
+                    name: 'cutoff', len: 7, extendH: 1, title: 'Cutoff:',
                     type: 'real', allowBlank: 0,
-                    shortcut: ['0.0', '-0.5', '-1.0', '-5.0'],
-                    bubbleHelp: 'Minimum cut off value.'
-                    ],
-                Text :
-                    [
-                    name: 'mapmax', len: 7, extendH: 1, title: 'Max:',
-                    type: 'real', allowBlank: 0,
-                    shortcut: ['0.0', '0.5', '1.0', '5.0'],
-                    bubbleHelp: 'Maximum cut off value.'
+                    shortcut: ['0.5', '1.0', '1.5', '2.0', '2.5', '3.0'],
+                    bubbleHelp: 'Number of standard deviations used to\n'
+                        'calculate the minimum and maximum cutoffs.'
                     ]
                 ],
             Separator : 
@@ -137,39 +129,89 @@ const PANEL =
 
 /****************************************************************************
  *
+ *                          BreakResidueNames
+ *
+ *  Insert a line break between the residue name and number for better
+ *  formatting of heat map.
+ *
+ ****************************************************************************/
+local function BreakResidueNames [names]
+    local n, broken = [];
+    for n in names loop
+        broken = append [broken, cat [keep [n,3], "\n", drop [n,3]]];
+    endloop
+    return broken;
+endfunction
+
+/****************************************************************************
+ *
  *                          GenerateData
  *
  *  Return data formatted for the heat map.
  *
  ****************************************************************************/
-local function GenerateData [minval, maxval, numres, numlig]
+local function GenerateData [pivot, numres, numlig]
 
     local resnames = [], ligdata = [];
-    local range = max [maxval, abs minval];
     randseed 101;
 
     //  Residue labels
     const RESLIST = ['ARG', 'MET', 'THR', 'GLY', 'PHE', 'GLU', 'ALA', 'LEU',
         'LYS', 'PRO', 'VAL', 'SER', 'GLN', 'ASN', 'ASP'];
 
-    for res_i = numres, 1 loop
+    local res_i, lig_i;
+    for res_i = 1, numres, 1 loop
         resnames = append [resnames, twrite ['{}\n{}',
-            RESLIST (rand (length resnames - 1) + 1), rand 999]];
+            RESLIST (mod [res_i, length resnames - 1] + 1), rand 999]];
     endloop
 
     //  ligand labels and values
-    local res_i, lig_i;
     for lig_i = 1, numlig, 1 loop
         local ligname, ligvals = [];
         ligname = twrite ['lig{}', lig_i];
         for res_i = 1, numres, 1 loop
-            ligvals = append [ligvals, randN range];
+            ligvals = append [ligvals, randN pivot];
         endloop
 
         ligdata = append [ligdata, [ligname, ligvals]];
     endloop
 
     return [resnames, ligdata];
+endfunction
+
+/****************************************************************************
+ *
+ *                          ReadData
+ *
+ *  Return data formatted for the heat map.
+ *
+ ****************************************************************************/
+local function ReadData [filename]
+
+    local f = fopenr filename;
+    local lines = freadb [f, 'line', INT_MAX];
+    local line = first lines;
+    local m = line == ",";
+    local strings = split [line | not m, dec mtoc prepend [m, 1]];
+    strings = BreakResidueNames [strings];
+    local resnames = app token strings;
+    lines = dropfirst lines;
+
+    //  ligand labels and values
+    local ligdata = [];
+    for line in lines loop
+        m = line == ",";
+        strings = split [line | not m, dec mtoc prepend [m, 1]];
+        local ligname = token first strings;
+        strings = dropfirst strings;
+        local ligvals = atof app token strings;
+        ligdata = append [ligdata, [ligname, ligvals]];
+    endloop
+
+    fclose f;
+
+    return [resnames, ligdata];
+endfunction
 
 //  Global Functions
 
@@ -178,10 +220,23 @@ local function GenerateData [minval, maxval, numres, numlig]
  *                          qb_QBPWDSelectHandler
  *
  ****************************************************************************/
-global function qb_QBPWDSelectHandler [data, row, col]
+global function qb_QBPWDSelectHandler [data, selrow, selcol]
 
-write ['R: {}, C: {}\n', row, col];//DEBUG
-
+    if selrow === 0 and selcol === 0 then
+write ['Selected empty cell!\n'];//DEBUG
+    elseif selrow === 0 then
+    local resnames = first data;
+    local str = string resnames (selcol);
+    str = str | str <> "\n";
+write ['Selected residue: {}\n', str];//DEBUG
+    elseif selcol === 0 then
+        local row = second data;
+write ['Selected ligand: {}\n', first row (selrow)];//DEBUG
+    else
+        local rowdata = second data;
+        local rowvals = second rowdata (selrow);
+write ['Selected R: {}, C: {}, V: {}\n', selrow, selcol, rowvals (selcol)];//DEBUG
+    endif
 endfunction
 
 /****************************************************************************
@@ -196,6 +251,9 @@ global function qb_QBPWDSetupPanel []
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB-PWDPanel', 1] then return; endif
+
+//    local data = GenerateData [2.5, 30, 40];
+    local data = ReadData ['~daren/dev/MOEDivcon/heatmapdata2.csv'];
 
     local coreopts = [], pwdopts = [], browsetasks = [];
     status = qb_GetDefaultsStatus [];
@@ -296,9 +354,8 @@ global function qb_QBPWDSetupPanel []
             endif
 		elseif trig === 'heatmap' then
 
-            local data = GenerateData [vals.mapmin, vals.mapmax, 30, 40];
-            qb_HeatMapSetupPanel [data, vals.mapmin, vals.mapmax, 
-            vals.mapncolors, vals.mapnticks, 'qb_QBPWDSelectHandler'];
+            qb_HeatMapSetupPanel [data, vals.cutoff, 5, vals.mapncolors, 
+                vals.mapnticks, 'qb_QBPWDSelectHandler'];
 
         else
            [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
