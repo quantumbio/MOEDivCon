@@ -356,7 +356,7 @@ const MESS_WINDOW =
 
 //***********************  Local Functions  *********************************
 
-function SplitComplex;
+function qb_SplitComplex;
 
 /****************************************************************************
  *                          AtomsToMols
@@ -367,7 +367,7 @@ function SplitComplex;
  ****************************************************************************/
 local function AtomsToMols []
 
-    local [recatoms, ligatoms, errmess] = SplitComplex [];
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
 
     if recatoms === [] or ligatoms === [] then
         return [[], [], errmess];
@@ -404,7 +404,7 @@ function ChargeOK;
  ****************************************************************************/
 local function CalcComplexCharge []
 
-    local [recatoms, ligatoms, errmess] = SplitComplex [];
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
     if recatoms === [] or ligatoms === [] then
         return  [[], [], [], [], errmess];
     endif
@@ -489,7 +489,7 @@ endfunction
  ****************************************************************************/
 local function CheckComplexCharge [recchg, ligchg]
 
-    local [recatoms, ligatoms, errmess] = SplitComplex [];
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
     if recatoms === [] or ligatoms === [] then
         return  [[], [], errmess];
     endif
@@ -911,55 +911,6 @@ local function SingleMol [atoms]
 endfunction
 
 /****************************************************************************
- *                          SplitComplex
- *
- *  Split the set of atoms in the MOE Window into ligand and receptor atoms.
- *
- ****************************************************************************/
-local function SplitComplex []
-
-    local complexatoms = Atoms [];
-    if length complexatoms === 0 then
-        return [[], [], 'No molecular complex loaded in MOE Window.'];
-    endif
-
-    const COLLECTNAMES = ['QB_LIGAND', 'LIGX_LIGAND'];
-    local recatoms, ligatoms;
-    local cname, makecoll = 0;
-
-    local colnames = oCollections [];
-    for cname in COLLECTNAMES loop
-        if anytrue eqE [cname, colnames] then
-            ligatoms  = cat oAtoms oGetCollection cname;
-            ligatoms = join [ligatoms, complexatoms];
-            break;
-        endif
-    endloop
-
-    if length ligatoms === 0 then
-        ligatoms  = _Atoms '$$ligand';
-        makecoll = 1;
-    endif
-
-    if length ligatoms === 0 or length ligatoms >= length complexatoms then
-        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
-    endif
-
-    if not SingleMol [ligatoms] then
-        return [[], [], 'Ligand must to be a single molecule.'];
-    endif
-
-    if makecoll then
-        oSetCollection ['QB_LIGAND', ligatoms];
-     endif
-
-    recatoms = diff [complexatoms, ligatoms];
-
-    return [recatoms, ligatoms, ''];
-
-endfunction
-
-/****************************************************************************
  *                          SplitReceptor
  *
  *  Given a set of receptor atoms, returns subsets which represent
@@ -992,7 +943,7 @@ endfunction
  ****************************************************************************/
 local function TestComplex [lonepairs, overlap, missextraH, MMtype]
 
-    local [recatoms, ligatoms, errmess] = SplitComplex [];
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
     if recatoms === [] or ligatoms === [] then
         return  [0, '', 0, errmess];
     endif
@@ -1367,7 +1318,7 @@ global function qb_CutReceptor [posedbkey, radius]
         return [[], [], 'Radius must be greater than zero.'];
     endif
 
-    local [recatoms, ligatoms, errmess] = SplitComplex [];
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
 
     if recatoms === [] or ligatoms === [] then
         return [[], [], errmess];
@@ -1507,7 +1458,7 @@ endfunction
  *
  ****************************************************************************/
 global function qb_GetLigandAtoms []
-    local [r, ligatms, errmess] = SplitComplex [];
+    local [r, ligatms, errmess] = qb_SplitComplex [];
 
     return [ligatms, errmess];
 endfunction
@@ -1779,6 +1730,55 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
     endif
 
     return dbkey;
+endfunction
+
+/****************************************************************************
+ *                          qb_SplitComplex
+ *
+ *  Split the set of atoms in the MOE Window into ligand and receptor atoms.
+ *
+ ****************************************************************************/
+global function qb_SplitComplex []
+
+    local complexatoms = Atoms [];
+    if length complexatoms === 0 then
+        return [[], [], 'No molecular complex loaded in MOE Window.'];
+    endif
+
+    const COLLECTNAMES = ['QB_LIGAND', 'LIGX_LIGAND'];
+    local recatoms, ligatoms;
+    local cname, makecoll = 0;
+
+    local colnames = oCollections [];
+    for cname in COLLECTNAMES loop
+        if anytrue eqE [cname, colnames] then
+            ligatoms  = cat oAtoms oGetCollection cname;
+            ligatoms = join [ligatoms, complexatoms];
+            break;
+        endif
+    endloop
+
+    if length ligatoms === 0 then
+        ligatoms  = _Atoms '$$ligand';
+        makecoll = 1;
+    endif
+
+    if length ligatoms === 0 or length ligatoms >= length complexatoms then
+        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
+    endif
+
+    if not SingleMol [ligatoms] then
+        return [[], [], 'Ligand must to be a single molecule.'];
+    endif
+
+    if makecoll then
+        oSetCollection ['QB_LIGAND', ligatoms];
+     endif
+
+    recatoms = diff [complexatoms, ligatoms];
+
+    return [recatoms, ligatoms, ''];
+
 endfunction
 
 /****************************************************************************

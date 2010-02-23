@@ -29,6 +29,10 @@
 #set version '2010.02'
 #set main    'qb_QBPWDSetupPanel'
 
+function grid_isoidx_emit;
+function msurf_MolecularSurface;
+function pboltz_AtomParameters;
+
 function qb_CoreHandler;
 function qb_GetCoreEnv;
 function qb_GetCorePanel;
@@ -41,6 +45,7 @@ function qb_InitCorePanel;
 function qb_LoadCoreScoreDB;
 function qb_SaveDivconStatus;
 function qb_SetUpScoreDB;
+function qb_SplitComplex;
 function qb_TagCoreVals;
 function qb_UpdateCorePanel;
 function qb_VerifyDivcon;
@@ -91,7 +96,7 @@ const PANEL =
                     [
                     name: 'cutoff', len: 7, extendH: 1, title: 'Cutoff:',
                     type: 'real', allowBlank: 0,
-                    shortcut: ['0.5', '1.0', '1.5', '2.0', '2.5', '3.0'],
+                    shortcut: ['1.0', '2.0', '3.0', '4.0', '5.0', '6.0'],
                     bubbleHelp: 'Number of standard deviations used to\n'
                         'calculate the minimum and maximum cutoffs.'
                     ]
@@ -121,9 +126,13 @@ const PANEL =
                 ]
             ]
         ],
-
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
+
+//  Static Variables
+
+    static surface;                     // Callback function needs access
+    static residuemap;                  // to this data.
 
 //  Local Functions
 
@@ -141,6 +150,134 @@ local function BreakResidueNames [names]
         broken = append [broken, cat [keep [n,3], "\n", drop [n,3]]];
     endloop
     return broken;
+endfunction
+
+/****************************************************************************
+ *
+ *                          ClearSurfaceMap
+ *
+ *  Clear the surface map of the pocket.
+ *
+ *  Acknowledgement:  borrowed heavily from surfmap.svl.
+ *
+ ****************************************************************************/
+local function ClearSurfaceMap [surface]
+    local gobjs = GKeyList [];
+    GDestroy (gobjs | m_findmatch [tok_cat [surface.title,'*'], GTitle gobjs]);
+    surface = [];
+endfunction
+
+/****************************************************************************
+ *
+ *                          ColorAtoms
+ *
+ *  Determine the color of the residue atoms based on its interaction with
+ *  the ligand.
+ *
+ ****************************************************************************/
+local function ColorAtoms [data, resatoms]
+
+    local atom, atmcolors = [];
+    for atom in resatoms loop
+        local residue = aResidue atom;
+        local restok = twrite ['{}\n{}', rName residue, rNumber residue];
+    endloop
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          CreateSurfaceMap
+ *
+ *  Create a surface map of the pocket.
+ *
+ *  Acknowledgement:  borrowed heavily from surfmap.svl.
+ *
+ ****************************************************************************/
+local function CreateSurfaceMap [restokens]
+
+    const MAT_TRANS_MIN = 0x80;
+    const CLASS = 1;  // Connolly
+    const RDIST = 10;
+
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
+    if recatoms === [] or ligatoms === [] then
+        Warning errmess;
+        return [];
+    endif
+
+    local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
+
+    // Determine a distance that include all residues in heat map
+    // TODO:  report error if can't find residues
+    local res, resnames = [], resnums = [];
+    for res in restokens loop
+        resnames =  append [resnames, tok_keep [res, 3]];
+        resnums = append [resnums, atoi tok_drop [res, 4]];
+    endloop
+
+    local atom, rdist = 0.0;
+    for atom in recatoms loop
+        res = aResidue atom;
+        local idx = indexof [rName res, resnames];
+        if idx then
+            if rNumber res === resnums (idx) then
+                rdist = max append [aDist [atom, ligatoms], rdist];
+            endif
+        endif
+    endloop
+
+    rdist = select [rdist, 10.0, rdist];
+
+write ['Dist:  {}\n', rdist];//DEBUG
+
+    local opt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
+        clipmode: 0];
+
+    local surface =
+        [
+        title   : 'QB Heat Map',
+        class   : CLASS,
+        colorby : 'Constant',
+        colconst: 0xFFFFFF,
+        surfdim : 3,
+        trans_f : 96,
+        trans_b : 96,
+        rec     : recatoms,
+        site    : ligatoms,
+        pos     : aPos recatoms,
+        rpos    : aPos ligatoms,
+        rdist   : rdist,
+        rad     : vdwR,
+        eps     : vdwE,
+        opt     : opt
+        ];
+
+    surface.gvtx = msurf_MolecularSurface [surface.pos, 
+        surface.rad, surface.eps, surface.rpos, surface.rdist, surface.opt];
+
+    local [s_idx, s_color, s_vpt, s_vnorm] = surface.gvtx;
+    s_idx = grid_isoidx_emit [s_idx, surface.surfdim, -1];
+
+    if add GKey surface.gobj then
+        GSetTitle [surface.gobj, surface.title];
+        surface.gobj = GCreateUnique surface.gobj;
+    else
+        surface.gobj = GCreateUnique surface.title;
+    endif
+
+    local trans = [surface.trans_f, surface.trans_b];
+    GSetTransparency [surface.gobj, trans];
+    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
+    GSetMaterial [surface.gobj, mat];
+    GVertex [surface.gobj, surface.surfdim, s_idx, surface.colconst,
+      s_vpt, s_vnorm];
+
+    aSetNucleusLook [ligatoms, 'sphere'];
+    View ligatoms;
+
+    return surface;
+
 endfunction
 
 /****************************************************************************
@@ -177,6 +314,72 @@ local function GenerateData [pivot, numres, numlig]
     endloop
 
     return [resnames, ligdata];
+endfunction
+
+/****************************************************************************
+ *
+ *                          NearestAtomColor
+ *
+ *  Computes the surface colors as the closest atom colors to the
+ *  surface points (weighted by distance).
+ *
+ *  Local function copied from surfmap.svl (ask CCG to change it to global?).
+ *  Note:  the atom colors are based on the interaction between its residue
+ *  and the ligand.
+ *
+ ****************************************************************************/
+local function NearestAtomColor [pos, rad, acolor, spos]
+    const NAC_BUCKET_SIZE = 4.0;
+    const NAC_MAX_POINTS  = 100000;
+
+    const ALPHA = 2.5;
+    local maxrad = max [1, max rad];
+    local argb = bitand [0xFF, bitshr [[acolor],[16,8,0]]];
+    local r = rep [0, l_length spos], g = r, b = r;
+    local vsum = rep [0, l_length spos];
+
+    // Do a proximity check to determine the minimum distance
+    // that will associate a point with an atom.  NAC_BUCKET_SIZE
+    // is the bin size for the search, and so the maximum distance
+    // allowed.  We'll use at most NAC_MAX_POINT gridpoints for
+    // the check.
+
+    local pprox = prox_open [NAC_BUCKET_SIZE, pos, NAC_BUCKET_SIZE];
+    local Upts;
+
+    if length first spos > NAC_MAX_POINTS then
+    Upts = apt keep [spos, NAC_MAX_POINTS];
+    else
+    Upts = spos;
+    endif
+
+    local [seg, idx, r2] = prox_find [pprox, Upts, 0];
+    local d_ndx          = split [idx, seg];
+    local min_dist       = max app min apt get [[r2], d_ndx];
+
+    prox_close pprox;
+
+    // Use the larger of the caller's and 'found' distances
+
+    maxrad      = max [maxrad, sqrt min_dist - 1];
+    local sprox = prox_open [1 + maxrad, spos, 1 + maxrad];
+
+    local i;
+    for i = 1, l_length pos loop
+    [seg, idx, r2] = prox_find [sprox, apt peek [pos, i], 0];
+    if not length idx then continue; endif
+    local w = exp (-ALPHA * maxE [0, sqrt r2 - 0.95 * rad(i)] );
+    vsum[idx] = vsum[idx] + w;
+    r[idx] = r[idx] + w * argb(1)(i);
+    g[idx] = g[idx] + w * argb(2)(i);
+    b[idx] = b[idx] + w * argb(3)(i);
+    endloop
+
+    prox_close sprox;
+
+    local vrgb = [r,g,b] * [invz vsum];
+    vrgb = maxE [0, minE [0xFF, vrgb]];
+    return bitor bitshl [vrgb,[16,8,0]];
 endfunction
 
 /****************************************************************************
@@ -223,19 +426,24 @@ endfunction
 global function qb_QBPWDSelectHandler [data, selrow, selcol]
 
     if selrow === 0 and selcol === 0 then
-write ['Selected empty cell!\n'];//DEBUG
+        write ['Selected empty cell!\n'];//DEBUG
     elseif selrow === 0 then
-    local resnames = first data;
-    local str = string resnames (selcol);
-    str = str | str <> "\n";
-write ['Selected residue: {}\n', str];//DEBUG
+        local resnames = first data;
+        local str = string resnames (selcol);
+        str = str | str <> "\n";
+        write ['Selected residue: {}\n', str];//DEBUG
     elseif selcol === 0 then
         local row = second data;
-write ['Selected ligand: {}\n', first row (selrow)];//DEBUG
+        write ['Selected ligand: {}\n', first row (selrow)];//DEBUG
     else
-        local rowdata = second data;
-        local rowvals = second rowdata (selrow);
-write ['Selected R: {}, C: {}, V: {}\n', selrow, selcol, rowvals (selcol)];//DEBUG
+        resnames = first data;
+        str = string resnames (selcol);
+        str = str | str <> "\n";
+
+        row = second data;
+        local rowvals = second row (selrow);
+        write ['Selected ligand: {}, residue: {}, interaction: {}\n', 
+            first row (selrow), str, rowvals (selcol)];//DEBUG
     endif
 endfunction
 
@@ -253,7 +461,7 @@ global function qb_QBPWDSetupPanel []
     if WindowShow ['QB-PWDPanel', 1] then return; endif
 
 //    local data = GenerateData [2.5, 30, 40];
-    local data = ReadData ['~daren/dev/MOEDivcon/heatmapdata2.csv'];
+    local data = ReadData ['~daren/dev/MOEDivcon/heatmapdata3.csv'];
 
     local coreopts = [], pwdopts = [], browsetasks = [];
     status = qb_GetDefaultsStatus [];
@@ -264,6 +472,7 @@ global function qb_QBPWDSetupPanel []
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
     pwdkey = 0;
+    surface = [];
     WindowSetData [wkey, appdflts];
     WindowShow [wkey, 1];
 
@@ -285,7 +494,7 @@ global function qb_QBPWDSetupPanel []
                         local [ldkey, ldrec, ldlig, ldsts, ldcoreopts,
                             ldqmropts] = LoadDB [dbpath];
 
-    	                Close [force:1];
+                        Close [force:1];
                         if neL [ldrec, []] and neL [ldlig, []] then
                             local ldligmol = mol_Create ldlig;
                             local ldligatoms = cat oAtoms ldligmol;
@@ -293,7 +502,7 @@ global function qb_QBPWDSetupPanel []
                             aSetNucleusLook [ldligatoms, 'small-sphere'];
                             aSetBondLook [ldligatoms, 'cylinder'];
                             mol_Create ldrec;
-        	                View [];
+                            View [];
                         endif
 
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
@@ -352,10 +561,23 @@ global function qb_QBPWDSetupPanel []
                     exit [];
                 endif
             endif
-		elseif trig === 'heatmap' then
 
-            qb_HeatMapSetupPanel [data, vals.cutoff, 5, vals.mapncolors, 
-                vals.mapnticks, 'qb_QBPWDSelectHandler'];
+        elseif trig === 'heatmap' then
+
+            if second task_fork [statics:'share', 
+                    master:'parent'] === 'child' then
+
+                if isnull surface then
+                    local msgkey = Message [0, 'Calculating surface ...'];
+                    surface = CreateSurfaceMap [first data];
+                    msgkey = Message [msgkey, ''];
+                endif
+
+                qb_HeatMapSetupPanel [data, vals.cutoff, 5, vals.mapncolors, 
+                    vals.mapnticks, 'qb_QBPWDSelectHandler'];
+
+                exit [];
+            endif
 
         else
            [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
@@ -363,6 +585,7 @@ global function qb_QBPWDSetupPanel []
         endif
     endloop
 
+    ClearSurfaceMap [surface];
     task_kill browsetasks;
     WindowDestroy wkey;
 
