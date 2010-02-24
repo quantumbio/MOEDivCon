@@ -64,9 +64,9 @@ const PANEL =
         extendH: 1,
         Vbox :
             [
-            Button :
+            Radio :
                 [
-                name: 'mapbutton', shadow: 'none',
+                name: 'mapradio', shadow: 'none',
                 type: 'int', grPosition: 'right',
                 margin: 0, font: 'smallBold',
                 uniformCols: 0, uniformRows: 0
@@ -347,7 +347,6 @@ local function StandardDeviation [nums]
     return [avg, sigma];
 endfunction
 
-
 //  Global Functions
 
 /****************************************************************************
@@ -363,7 +362,7 @@ endfunction
  *
  ****************************************************************************/
 global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
-        numcolors, ticks,selfun]
+        numcolors, ticks, selfun, initsel]
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB Heat Map', 1] then return; endif
@@ -416,18 +415,33 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
         bcolors = append [bcolors, 0];
     endloop
 
-    local panel = tagpoke [PANEL, ['Hbox', 'Vbox', 'Button', 'graphics'],
+    local panel = tagpoke [PANEL, ['Hbox', 'Vbox', 'Radio', 'graphics'],
         bcolors];
-    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Button', 'text'],
+    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Radio', 'text'],
         bnames];
-    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Button', 'columns'],
+    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Radio', 'columns'],
         numcols + 1];
     local wkey = WindowCreate cat [HEADER, panel];
+    WindowSetData [wkey, [mapradio: initsel]];
     WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
     WindowShow [wkey, 1];
 
     gr_destroy scalekey;
     app gr_destroy bcolors;
+
+    //  Selected cells have row numbers from 1 to numrows
+    //      and col numbers from 1 to numcols
+    //  Selected rows have col number 0
+    //  Selected cols have row number 0
+    local selrow = ceil (initsel / (numcols + 1));
+    if selrow === numrows + 1 then
+        selrow = 0;
+    endif
+
+    local selcol = mod [initsel, numcols + 1] - 1;
+    selcol = select [numcols, selcol, selcol === -1];
+    local selerrmess = call [selfun, [data, selrow, selcol, mincut,
+        maxcut, colors]];
 
     loop
         local [vals, trig] = WindowWait wkey;
@@ -435,19 +449,16 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
             if vals.panel === 'Close' then 
                 break;
             endif
-        elseif trig === 'mapbutton' then
-            //  Selected cells have row numbers from 1 to numrows
-            //  and col numbers from 1 to numcols
-            //  Selected rows have col number 0
-            //  and selected cols have row number 0
-            local selrow = ceil (vals.mapbutton / (numcols + 1));
+        elseif trig === 'mapradio' then
+            selrow = ceil (vals.mapradio / (numcols + 1));
             if selrow === numrows + 1 then
                 selrow = 0;
             endif
 
-            local selcol = mod [vals.mapbutton, numcols + 1] - 1;
+            selcol = mod [vals.mapradio, numcols + 1] - 1;
             selcol = select [numcols, selcol, selcol === -1];
-            local selerrmess = call [selfun, [data, selrow, selcol]];
+            selerrmess = call [selfun, [data, selrow, selcol, mincut,
+                maxcut, colors]];
         endif
     endloop
 

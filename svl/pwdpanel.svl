@@ -131,8 +131,10 @@ const PANEL =
 
 //  Static Variables
 
-    static surface;                     // Callback function needs access
-    static residuemap;                  // to this data.
+    static G_surface;                     // Callback function needs access
+    static G_prevligidx;                  // to this data.
+    static G_prevligset;
+    static G_ligmols;
 
 //  Local Functions
 
@@ -161,10 +163,33 @@ endfunction
  *  Acknowledgement:  borrowed heavily from surfmap.svl.
  *
  ****************************************************************************/
-local function ClearSurfaceMap [surface]
+local function ClearSurfaceMap [G_surface]
     local gobjs = GKeyList [];
-    GDestroy (gobjs | m_findmatch [tok_cat [surface.title,'*'], GTitle gobjs]);
-    surface = [];
+    GDestroy (gobjs | m_findmatch [tok_cat [G_surface.title,'*'], GTitle gobjs]);
+    G_surface = [];
+endfunction
+
+/****************************************************************************
+ *
+ *                          CalcDist
+ *
+ *  Determine a distance that include all residues in heat map.
+ *
+ ****************************************************************************/
+local function CalcDist [restokens, recatoms, ligatoms]
+
+    local atom, dist = 10.0;
+    for atom in recatoms loop
+        local residue = aResidue atom;
+        local restok = twrite ['{}\n{}', rName residue, rNumber residue];
+        local idx = indexof [restok, restokens];
+        if idx > 0 then
+            dist = max append [aDist [atom, ligatoms], dist];
+        endif
+    endloop
+
+    return dist;
+
 endfunction
 
 /****************************************************************************
@@ -172,16 +197,33 @@ endfunction
  *                          ColorAtoms
  *
  *  Determine the color of the residue atoms based on its interaction with
- *  the ligand.
+ *  the ligand.  If ligidx is zero, return all white.
  *
  ****************************************************************************/
-local function ColorAtoms [data, resatoms]
+local function ColorAtoms [data, ligidx, residx, recatoms, 
+        mincut, maxcut, colors]
 
+    if ligidx === 0 then
+        return rep [0xFFFFFF, length recatoms];
+    endif
+
+    local step = (maxcut - mincut) / (length colors);
+    local [restokens, rowdata] = data;
+    local rowvals = second rowdata (ligidx);
     local atom, atmcolors = [];
-    for atom in resatoms loop
+    for atom in recatoms loop
         local residue = aResidue atom;
         local restok = twrite ['{}\n{}', rName residue, rNumber residue];
+        local idx = indexof [restok, restokens];
+        if idx > 0 and (residx === 0 or residx === idx) then
+            local cidx = ceil ((rowvals (idx) - mincut) / step);
+            atomcolors = append [atomcolors, colors (cidx)];
+        else
+            atomcolors = append [atomcolors, 0xFFFFFF];  // White
+        endif
     endloop
+
+    return atmcolors;
 
 endfunction
 
@@ -206,31 +248,11 @@ local function CreateSurfaceMap [restokens]
         return [];
     endif
 
-    local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
-
-    // Determine a distance that include all residues in heat map
-    // TODO:  report error if can't find residues
-    local res, resnames = [], resnums = [];
-    for res in restokens loop
-        resnames =  append [resnames, tok_keep [res, 3]];
-        resnums = append [resnums, atoi tok_drop [res, 4]];
-    endloop
-
-    local atom, rdist = 0.0;
-    for atom in recatoms loop
-        res = aResidue atom;
-        local idx = indexof [rName res, resnames];
-        if idx then
-            if rNumber res === resnums (idx) then
-                rdist = max append [aDist [atom, ligatoms], rdist];
-            endif
-        endif
-    endloop
-
-    rdist = select [rdist, 10.0, rdist];
+    local rdist = CalcDist [restokens, recatoms, ligatoms];
 
 write ['Dist:  {}\n', rdist];//DEBUG
 
+    local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
     local opt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
         clipmode: 0];
 
@@ -239,7 +261,7 @@ write ['Dist:  {}\n', rdist];//DEBUG
         title   : 'QB Heat Map',
         class   : CLASS,
         colorby : 'Constant',
-        colconst: 0xFFFFFF,
+        colconst: 0xFFFFFF,            // White
         surfdim : 3,
         trans_f : 96,
         trans_b : 96,
@@ -314,6 +336,68 @@ local function GenerateData [pivot, numres, numlig]
     endloop
 
     return [resnames, ligdata];
+endfunction
+
+/****************************************************************************
+ *                          LoadDB
+ *
+ *  Get the core enviroment and application environment.
+ *
+ ****************************************************************************/
+local function LoadDB [dbpath]
+
+    local [dbkey, recset, ligand, status, coreopts, c, mess] = 
+        qb_LoadCoreScoreDB [dbpath, 'qb-pwd'];
+    if dbkey === 0 and status === [] and coreopts === [] then
+        Warning mess;
+        exit [];
+    endif
+
+    local pwdopts = qb_GetEnvApp [dbkey];
+    pwdopts = tagcat [pwdopts, tag tr QBPWD_OPT_DEFAULTS];
+
+    return [dbkey, recset, ligand, status, coreopts, pwdopts];
+endfunction
+
+/****************************************************************************
+ *                          LoadLigs
+ *
+ *  Load the ligands from the PWD database.
+ *
+ *
+ ****************************************************************************/
+local function LoadLigs [oldkey]
+
+    if MOE_BATCH then return []; endif
+
+    if oldkey === 0 then
+        Warning 'The PWD database hasn\'t been created.';
+        return;
+    endif
+
+    local dblist = dbv_KeyList [];
+    if isnull dblist or isnull indexof [oldkey, dblist] then
+        Warning 'The PWD database isn\'t open.';
+        return;
+    endif
+
+    local dbkey = db_Open [oldkey, 'read'];
+    local ligmols = [], rowkey = 0;
+    local ligflds = qb_GetPoseFields [dbkey];
+
+    local [osys, nsys] = SystemPush [];
+
+    while rowkey = db_NextEntry [dbkey, rowkey] loop
+        local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
+        ligmols = append [ligmols, ligatoms];
+    endloop
+
+    SystemPop [osys, nsys];
+
+    db_Close dbkey;
+
+    return ligmols;
+
 endfunction
 
 /****************************************************************************
@@ -416,6 +500,38 @@ local function ReadData [filename]
     return [resnames, ligdata];
 endfunction
 
+/****************************************************************************
+ *
+ *                          UpdateComplex
+ *
+ *  Replace the ligand in the MOE window with the given ligand.
+ *
+ ****************************************************************************/
+local function UpdateComplex [lignum]
+
+    if G_prevligidx === lignum then return; endif
+
+    if G_prevligidx === 0 then
+        local [r, ligatoms, errmess] = qb_SplitComplex [];
+
+        if prevligatoms === [] then
+            Warning errmess;
+            return;
+        endif
+    else
+        ligatoms = G_prevligset;
+    endif
+
+    oDestroy ligatoms;
+
+    local ligchn = mol_Create G_ligmols (G_prevligidx);
+    ligatoms = cat cAtoms ligchn;
+
+    G_prevligidx = lignum;
+    G_prevligset = ligatoms;
+
+endfunction
+
 //  Global Functions
 
 /****************************************************************************
@@ -423,8 +539,9 @@ endfunction
  *                          qb_QBPWDSelectHandler
  *
  ****************************************************************************/
-global function qb_QBPWDSelectHandler [data, selrow, selcol]
-
+global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
+        colors]
+    
     if selrow === 0 and selcol === 0 then
         write ['Selected empty cell!\n'];//DEBUG
     elseif selrow === 0 then
@@ -454,6 +571,9 @@ endfunction
  ****************************************************************************/
 global function qb_QBPWDSetupPanel []
 
+    const INITLIG = 1;
+    const SIGNIFRES = 5;
+
     static status;                     //  Shared with child tasks.
     static pwdkey;
 
@@ -472,7 +592,10 @@ global function qb_QBPWDSetupPanel []
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
     pwdkey = 0;
-    surface = [];
+    G_surface = [];
+    G_prevlig = 0;
+    G_ligmols = [];
+
     WindowSetData [wkey, appdflts];
     WindowShow [wkey, 1];
 
@@ -487,12 +610,12 @@ global function qb_QBPWDSetupPanel []
                 if second task_fork [master: 'parent',
                         statics:'share'] === 'child' then
                     task_prio 0;
-/*
+
                     local dbpath = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
                         local [ldkey, ldrec, ldlig, ldsts, ldcoreopts,
-                            ldqmropts] = LoadDB [dbpath];
+                            ldpwdopts] = LoadDB [dbpath];
 
                         Close [force:1];
                         if neL [ldrec, []] and neL [ldlig, []] then
@@ -509,9 +632,9 @@ global function qb_QBPWDSetupPanel []
                         pwdkey = ldkey;
                         dbv_Open db_Filename pwdkey;
                         db_Close ldkey;
-                        WindowSetData [wkey, ldqmropts];
+                        WindowSetData [wkey, ldpwdopts];
                     endif
-*/
+
                     exit [];
                 endif
 
@@ -524,10 +647,9 @@ global function qb_QBPWDSetupPanel []
 
                     coreopts = qb_TagCoreVals [vals];
                     pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
-                        vals.ham, vals.scaling, vals.freq, vals.opt,
-                        vals.shift]];
+                        vals.cutoff, vals.mapncolors, vals.mapnticks]];
                     pwdkey = qb_SetUpScoreDB [status, coreopts, pwdopts, 
-                        [], QMS_NUM_FIELDS, 'QBPWD', 0];
+                        [], [/*fields*/], 'qb-pwd', 0];
                     if vals.mode === 'One-to-One' then
                         RunCalc [pwdkey];
                     else
@@ -545,19 +667,17 @@ global function qb_QBPWDSetupPanel []
             elseif vals.panel === 'Save' then
 
                 if second task_fork [statics:'share'] === 'child' then
-/*
+
                     status = qb_VerifyDivcon [wkey, status, vals];
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
                     pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
-                        vals.ham, vals.scaling, vals.freq, vals.opt,
-                        vals.shift]];
+                        vals.cutoff, vals.mapncolors, vals.mapnticks]];
                     pwdkey = qb_SetUpScoreDB [status, coreopts, pwdopts,
-                        [], QMS_NUM_FIELDS, 'QBPWD', 1];
+                        [], [/*fields*/], 'qb-pwd', 1];
                     dbv_Open db_Filename pwdkey;
                     db_Close pwdkey;
-*/
                     exit [];
                 endif
             endif
@@ -567,14 +687,23 @@ global function qb_QBPWDSetupPanel []
             if second task_fork [statics:'share', 
                     master:'parent'] === 'child' then
 
-                if isnull surface then
+                if isnull G_surface then
                     local msgkey = Message [0, 'Calculating surface ...'];
-                    surface = CreateSurfaceMap [first data];
+                    G_surface = CreateSurfaceMap [first data];
                     msgkey = Message [msgkey, ''];
                 endif
 
-                qb_HeatMapSetupPanel [data, vals.cutoff, 5, vals.mapncolors, 
-                    vals.mapnticks, 'qb_QBPWDSelectHandler'];
+                //  Make sure ligand atoms sets are loaded.
+                if isnull G_ligmols then
+                    G_ligmols = LoadLigs [pwdkey];
+                endif
+
+                //  Make sure first ligand is in MOE Window
+                UpdateComplex INITLIG;
+
+                qb_HeatMapSetupPanel [data, vals.cutoff, SIGNIFRES, 
+                    vals.mapncolors, vals.mapnticks, 
+                    'qb_QBPWDSelectHandler', INITLIG];
 
                 exit [];
             endif
@@ -585,7 +714,7 @@ global function qb_QBPWDSetupPanel []
         endif
     endloop
 
-    ClearSurfaceMap [surface];
+    ClearSurfaceMap [G_surface];
     task_kill browsetasks;
     WindowDestroy wkey;
 
