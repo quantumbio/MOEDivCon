@@ -50,6 +50,7 @@ const APPOPTS = 'applicationoptions';
 const DBTYPE = 'qb_dbtype';
 const QMSCORE = 'qb_qmscoredb';
 const NMRSCORE = 'qb_nmrscoredb';
+const QBPWD = 'qb_pwddb'
 
 //  Charge status
 const CHG_COLOR = 
@@ -854,6 +855,8 @@ local function SaveEnv [dbkey, tgtmols, ligmol, status, coreopts, appopts,
         db_SetEnv [dbkey, DBTYPE, NMRSCORE];
     elseif type === 'qmscore' then
         db_SetEnv [dbkey, DBTYPE, QMSCORE];
+    elseif type === 'qb-pwd' then
+        db_SetEnv [dbkey, DBTYPE, QBPWD];
     endif
 
 endfunction
@@ -883,7 +886,7 @@ endfunction
  *  Ensure that the required fields are present.
  *
  ****************************************************************************/
-local function SetScoreFields [dbkey, addreceptor, fields, dbtype]
+local function SetScoreFields [dbkey, addreceptor, fields]
 
     if addreceptor then
         db_EnsureField [dbkey, REC_FIELD, 'molecule'];
@@ -970,6 +973,8 @@ function qb_TestDivconMol;
  ****************************************************************************/
 local function TestDBMols [oldkey, testLP, testOverlap, testH, testMM]
 
+    if MOE_BATCH then return; endif
+
     if oldkey === 0 then
         Warning 'The MOEDivcon database hasn\'t been created.';
         return;
@@ -987,9 +992,7 @@ local function TestDBMols [oldkey, testLP, testOverlap, testH, testMM]
     local recflds = qb_GetRecFields [dbkey];
     local ligflds = qb_GetPoseFields [dbkey];
 
-    if not MOE_BATCH then
-        local [osys, nsys] = SystemPush [];
-    endif
+    local [osys, nsys] = SystemPush [];
 
     while rowkey = db_NextEntry [dbkey, rowkey] loop
         local recok = 1, recchgok = 1, recmess = '';
@@ -1014,12 +1017,11 @@ local function TestDBMols [oldkey, testLP, testOverlap, testH, testMM]
         endif
     endloop
 
-    if not MOE_BATCH then
-        SystemPop [osys, nsys];
-    endif
+    SystemPop [osys, nsys];
 
     db_Close dbkey;
     return;
+
 endfunction
 
 /****************************************************************************
@@ -1568,6 +1570,12 @@ global function qb_LoadCoreScoreDB [dbpath, type]
             twrite ['{}\nis not a QMScore Database.', dbpath]];
     endif
 
+    if type === 'qb-pwd' and neL [dbtype, QBPWD] then
+        db_Close dbkey;
+        return [0, [], [], [], [], [],
+            twrite ['{}\nis not a QB-PWD Database.', dbpath]];
+    endif
+
     local [rec, lig, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
 
     return [dbkey, rec, lig, status, coreopts, complex, ''];
@@ -1606,7 +1614,6 @@ global function qb_MergeDB [srcname1, srcname2, dstname]
     db_Close srckey2;
 endfunction
 
-
 /****************************************************************************
  *                          qb_SaveDivconStatus
  *
@@ -1640,7 +1647,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
     local stsmess = "", recstsmess = "";
     local recok = 1, recmess = '', ligok = 1, ligmess = '';
     local dbkey = db_Open [coreopts.scoredb, 'create'];
-    SetScoreFields [dbkey, coreopts.mode === 'Many-to-Many', fields, dbtype];
+    SetScoreFields [dbkey, coreopts.mode === 'Many-to-Many', fields];
 
     if coreopts.mode === 'One-to-One' or coreopts.mode === 'One-to-Many' then
         local [receptor, ligand, errmess] = AtomsToMols [];
