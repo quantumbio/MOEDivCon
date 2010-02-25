@@ -68,8 +68,7 @@ const PANEL =
                 [
                 name: 'mapradio', shadow: 'none',
                 type: 'int', grPosition: 'right',
-                margin: 0, font: 'smallBold',
-                uniformCols: 0, uniformRows: 0
+                margin: 0, font: 'smallBold'
                 ]
             ],
         Separator : 

@@ -40,6 +40,7 @@ function qb_GetDefaultsCore;
 function qb_GetDefaultsStatus;
 function qb_GetEnvApp;
 function qb_GetEnvTag;
+function qb_GetPoseFields;
 function qb_GetWhich;
 function qb_InitCorePanel;
 function qb_LoadCoreScoreDB;
@@ -51,6 +52,8 @@ function qb_UpdateCorePanel;
 function qb_VerifyDivcon;
 
 function qb_HeatMapSetupPanel;
+
+const MAT_TRANS_MIN = 0x80;
 
 const QBPWD_OPT_DEFAULTS =
     [
@@ -82,7 +85,7 @@ const PANEL =
             extendH: 1,
             Button :
                 [
-                name: 'heatmap', text: 'Heat Map', onTrigger: 'validate',
+                name: 'heatmap', text: 'Heat Map', // onTrigger: 'validate',
                 bubbleHelp:
                     ''
                 ],
@@ -129,12 +132,9 @@ const PANEL =
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
-//  Static Variables
+//  Global Variables
 
-    static G_surface;                     // Callback function needs access
-    static G_prevligidx;                  // to this data.
-    static G_prevligset;
-    static G_ligmols;
+    global G_surface;                     // Callback function needs access
 
 //  Local Functions
 
@@ -152,21 +152,6 @@ local function BreakResidueNames [names]
         broken = append [broken, cat [keep [n,3], "\n", drop [n,3]]];
     endloop
     return broken;
-endfunction
-
-/****************************************************************************
- *
- *                          ClearSurfaceMap
- *
- *  Clear the surface map of the pocket.
- *
- *  Acknowledgement:  borrowed heavily from surfmap.svl.
- *
- ****************************************************************************/
-local function ClearSurfaceMap [G_surface]
-    local gobjs = GKeyList [];
-    GDestroy (gobjs | m_findmatch [tok_cat [G_surface.title,'*'], GTitle gobjs]);
-    G_surface = [];
 endfunction
 
 /****************************************************************************
@@ -194,6 +179,21 @@ endfunction
 
 /****************************************************************************
  *
+ *                          ClearSurfaceMap
+ *
+ *  Clear the surface map of the pocket.
+ *
+ *  Acknowledgement:  borrowed heavily from surfmap.svl.
+ *
+ ****************************************************************************/
+local function ClearSurfaceMap [title]
+    local gobjs = GKeyList [];
+    GDestroy (gobjs | m_findmatch [tok_cat [title,'*'], GTitle gobjs]);
+
+endfunction
+
+/****************************************************************************
+ *
  *                          ColorAtoms
  *
  *  Determine the color of the residue atoms based on its interaction with
@@ -203,18 +203,22 @@ endfunction
 local function ColorAtoms [data, ligidx, residx, recatoms, 
         mincut, maxcut, colors]
 
+write ['Rec len:  {}\n', length recatoms];//DEBUG
+
     if ligidx === 0 then
         return rep [0xFFFFFF, length recatoms];
     endif
 
     local step = (maxcut - mincut) / (length colors);
     local [restokens, rowdata] = data;
+write ['ResTokens:  {}\n', restokens];//DEBUG
     local rowvals = second rowdata (ligidx);
-    local atom, atmcolors = [];
+    local atom, atomcolors = [];
     for atom in recatoms loop
         local residue = aResidue atom;
         local restok = twrite ['{}\n{}', rName residue, rNumber residue];
         local idx = indexof [restok, restokens];
+//write ['Token:  {}, Idx: {}\n', restok, idx];//DEBUG
         if idx > 0 and (residx === 0 or residx === idx) then
             local cidx = ceil ((rowvals (idx) - mincut) / step);
             atomcolors = append [atomcolors, colors (cidx)];
@@ -223,7 +227,7 @@ local function ColorAtoms [data, ligidx, residx, recatoms,
         endif
     endloop
 
-    return atmcolors;
+    return atomcolors;
 
 endfunction
 
@@ -238,7 +242,6 @@ endfunction
  ****************************************************************************/
 local function CreateSurfaceMap [restokens]
 
-    const MAT_TRANS_MIN = 0x80;
     const CLASS = 1;  // Connolly
     const RDIST = 10;
 
@@ -248,15 +251,17 @@ local function CreateSurfaceMap [restokens]
         return [];
     endif
 
-    local rdist = CalcDist [restokens, recatoms, ligatoms];
+print 'G_rectatoms set.';//DEBUG
 
-write ['Dist:  {}\n', rdist];//DEBUG
+    local dist = CalcDist [restokens, recatoms, ligatoms];
+
+write ['Dist:  {}\n', dist];//DEBUG
 
     local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
     local opt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
         clipmode: 0];
 
-    local surface =
+    G_surface =
         [
         title   : 'QB Heat Map',
         class   : CLASS,
@@ -266,39 +271,45 @@ write ['Dist:  {}\n', rdist];//DEBUG
         trans_f : 96,
         trans_b : 96,
         rec     : recatoms,
-        site    : ligatoms,
-        pos     : aPos recatoms,
-        rpos    : aPos ligatoms,
-        rdist   : rdist,
+        lig     : ligatoms,
+        ligidx  : 0,
+        ligmols : [],
+        recpos  : aPos recatoms,
+        ligpos  : aPos ligatoms,
+        dist    : dist,
         rad     : vdwR,
         eps     : vdwE,
-        opt     : opt
+        opt     : opt,
+        gvtx    : [],
+        origidx : [],  
+        gobj    : []
         ];
 
-    surface.gvtx = msurf_MolecularSurface [surface.pos, 
-        surface.rad, surface.eps, surface.rpos, surface.rdist, surface.opt];
+    G_surface.gvtx = msurf_MolecularSurface [G_surface.recpos, 
+        G_surface.rad, G_surface.eps, G_surface.ligpos, G_surface.dist, 
+        G_surface.opt];
 
-    local [s_idx, s_color, s_vpt, s_vnorm] = surface.gvtx;
-    s_idx = grid_isoidx_emit [s_idx, surface.surfdim, -1];
+    local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
+    G_surface.origidx = s_idx;
+    s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
+    G_surface.gvtx = poke [G_surface.gvtx, 1, s_idx];
 
-    if add GKey surface.gobj then
-        GSetTitle [surface.gobj, surface.title];
-        surface.gobj = GCreateUnique surface.gobj;
+    if add GKey G_surface.gobj then
+        GSetTitle [G_surface.gobj, G_surface.title];
+        G_surface.gobj = GCreateUnique G_surface.gobj;
     else
-        surface.gobj = GCreateUnique surface.title;
+        G_surface.gobj = GCreateUnique G_surface.title;
     endif
 
-    local trans = [surface.trans_f, surface.trans_b];
-    GSetTransparency [surface.gobj, trans];
+    local trans = [G_surface.trans_f, G_surface.trans_b];
+    GSetTransparency [G_surface.gobj, trans];
     local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
-    GSetMaterial [surface.gobj, mat];
-    GVertex [surface.gobj, surface.surfdim, s_idx, surface.colconst,
+    GSetMaterial [G_surface.gobj, mat];
+    GVertex [G_surface.gobj, G_surface.surfdim, s_idx, G_surface.colconst,
       s_vpt, s_vnorm];
 
-    aSetNucleusLook [ligatoms, 'sphere'];
-    View ligatoms;
-
-    return surface;
+    aSetNucleusLook [G_surface.lig, 'sphere'];
+    View G_surface.lig;
 
 endfunction
 
@@ -357,6 +368,7 @@ local function LoadDB [dbpath]
     pwdopts = tagcat [pwdopts, tag tr QBPWD_OPT_DEFAULTS];
 
     return [dbkey, recset, ligand, status, coreopts, pwdopts];
+
 endfunction
 
 /****************************************************************************
@@ -366,37 +378,30 @@ endfunction
  *
  *
  ****************************************************************************/
-local function LoadLigs [oldkey]
+local function LoadLigs [pwdfilename]
 
     if MOE_BATCH then return []; endif
 
-    if oldkey === 0 then
-        Warning 'The PWD database hasn\'t been created.';
-        return;
+    if neL [ftype pwdfilename, 'file'] or neL [fext pwdfilename, 'mdb'] then
+        Warning 'The PWD database doesn\'t exist.';
+        exit [];
     endif
 
-    local dblist = dbv_KeyList [];
-    if isnull dblist or isnull indexof [oldkey, dblist] then
-        Warning 'The PWD database isn\'t open.';
-        return;
-    endif
 
-    local dbkey = db_Open [oldkey, 'read'];
-    local ligmols = [], rowkey = 0;
+
+    local dbkey = db_Open [pwdfilename, 'read'];
+    local ligmols = [];
+    local rowkey = 0;
     local ligflds = qb_GetPoseFields [dbkey];
-
-    local [osys, nsys] = SystemPush [];
 
     while rowkey = db_NextEntry [dbkey, rowkey] loop
         local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
-        ligmols = append [ligmols, ligatoms];
+        ligmols = append [ligmols, ligmol];
     endloop
 
-    SystemPop [osys, nsys];
-
+    G_surface.ligmols = ligmols;
     db_Close dbkey;
 
-    return ligmols;
 
 endfunction
 
@@ -448,22 +453,31 @@ local function NearestAtomColor [pos, rad, acolor, spos]
     maxrad      = max [maxrad, sqrt min_dist - 1];
     local sprox = prox_open [1 + maxrad, spos, 1 + maxrad];
 
+local f = fopenw '/tmp/pwddebug.txt';//DEBUG
+
     local i;
     for i = 1, l_length pos loop
     [seg, idx, r2] = prox_find [sprox, apt peek [pos, i], 0];
     if not length idx then continue; endif
     local w = exp (-ALPHA * maxE [0, sqrt r2 - 0.95 * rad(i)] );
     vsum[idx] = vsum[idx] + w;
+
+fwrite [f, 'I {}, Idx {}, Len A {}, lLen A {}, Len R {}\n',i, last idx,
+length argb, l_length argb, length r];//DEBUG
+
     r[idx] = r[idx] + w * argb(1)(i);
     g[idx] = g[idx] + w * argb(2)(i);
     b[idx] = b[idx] + w * argb(3)(i);
     endloop
+
+fclose f;//DEBUG
 
     prox_close sprox;
 
     local vrgb = [r,g,b] * [invz vsum];
     vrgb = maxE [0, minE [0xFF, vrgb]];
     return bitor bitshl [vrgb,[16,8,0]];
+
 endfunction
 
 /****************************************************************************
@@ -509,26 +523,14 @@ endfunction
  ****************************************************************************/
 local function UpdateComplex [lignum]
 
-    if G_prevligidx === lignum then return; endif
+    if G_surface.ligidx === lignum then return; endif
 
-    if G_prevligidx === 0 then
-        local [r, ligatoms, errmess] = qb_SplitComplex [];
+    oDestroy G_surface.lig;
+    local ligchn = mol_Create G_surface.ligmols (lignum);
+    G_surface.lig = cat cAtoms ligchn;
 
-        if prevligatoms === [] then
-            Warning errmess;
-            return;
-        endif
-    else
-        ligatoms = G_prevligset;
-    endif
-
-    oDestroy ligatoms;
-
-    local ligchn = mol_Create G_ligmols (G_prevligidx);
-    ligatoms = cat cAtoms ligchn;
-
-    G_prevligidx = lignum;
-    G_prevligset = ligatoms;
+    oSetCollection ['QB_LIGAND', G_surface.lig];
+    G_surface.ligidx = lignum;
 
 endfunction
 
@@ -542,6 +544,37 @@ endfunction
 global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
         colors]
     
+    ClearSurfaceMap G_surface.title;
+    UpdateComplex selrow;
+    local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
+        mincut, maxcut, colors];
+
+write ['recl: {}, posl: {}, rad: {}, acl: {}, gvtxl: {}, l_gvtx {}\n', 
+length G_surface.rec, length G_surface.recpos,
+length G_surface.rad, length atomcolors, length G_surface.gvtx(3),
+l_length G_surface.gvtx(3)];//DEBUG
+
+	local vcolor = NearestAtomColor [G_surface.recpos, G_surface.rad, atomcolors,
+        G_surface.gvtx(3)];
+
+    local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
+    if add GKey G_surface.gobj then
+        GSetTitle [G_surface.gobj, G_surface.title];
+        G_surface.gobj = GCreateUnique G_surface.gobj;
+    else
+        G_surface.gobj = GCreateUnique G_surface.title;
+    endif
+
+    local trans = [G_surface.trans_f, G_surface.trans_b];
+    GSetTransparency [G_surface.gobj, trans];
+    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
+    GSetMaterial [G_surface.gobj, mat];
+    GVertex [G_surface.gobj, G_surface.surfdim, s_idx, vcolor,
+      s_vpt, s_vnorm];
+
+    aSetNucleusLook [G_surface.lig, 'sphere'];
+    View G_surface.lig;
+
     if selrow === 0 and selcol === 0 then
         write ['Selected empty cell!\n'];//DEBUG
     elseif selrow === 0 then
@@ -576,6 +609,7 @@ global function qb_QBPWDSetupPanel []
 
     static status;                     //  Shared with child tasks.
     static pwdkey;
+    static pwdfilename;
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB-PWDPanel', 1] then return; endif
@@ -592,9 +626,8 @@ global function qb_QBPWDSetupPanel []
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
     pwdkey = 0;
+    pwdfilename = '';
     G_surface = [];
-    G_prevlig = 0;
-    G_ligmols = [];
 
     WindowSetData [wkey, appdflts];
     WindowShow [wkey, 1];
@@ -617,20 +650,23 @@ global function qb_QBPWDSetupPanel []
                         local [ldkey, ldrec, ldlig, ldsts, ldcoreopts,
                             ldpwdopts] = LoadDB [dbpath];
 
-                        Close [force:1];
-                        if neL [ldrec, []] and neL [ldlig, []] then
-                            local ldligmol = mol_Create ldlig;
-                            local ldligatoms = cat oAtoms ldligmol;
-                            oSetCollection ['QB_LIGAND', ldligatoms];
-                            aSetNucleusLook [ldligatoms, 'small-sphere'];
-                            aSetBondLook [ldligatoms, 'cylinder'];
-                            mol_Create ldrec;
-                            View [];
+                        if neL [ldcoreopts.mode, 'Many-to-Many'] then
+                            Close [force:1];
+                            if neL [ldrec, []] and neL [ldlig, []] then
+                                local ldligmol = mol_Create ldlig;
+                                local ldligatoms = cat oAtoms ldligmol;
+                                oSetCollection ['QB_LIGAND', ldligatoms];
+                                aSetNucleusLook [ldligatoms, 'small-sphere'];
+                                aSetBondLook [ldligatoms, 'cylinder'];
+                                mol_Create ldrec;
+                                View [];
+                            endif
                         endif
 
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
                         pwdkey = ldkey;
-                        dbv_Open db_Filename pwdkey;
+                        pwdfilename = db_Filename pwdkey;
+                        dbv_Open pwdfilename;
                         db_Close ldkey;
                         WindowSetData [wkey, ldpwdopts];
                     endif
@@ -650,6 +686,8 @@ global function qb_QBPWDSetupPanel []
                         vals.cutoff, vals.mapncolors, vals.mapnticks]];
                     pwdkey = qb_SetUpScoreDB [status, coreopts, pwdopts, 
                         [], [/*fields*/], 'qb-pwd', 0];
+                    pwdfilename = db_Filename pwdkey;
+
                     if vals.mode === 'One-to-One' then
                         RunCalc [pwdkey];
                     else
@@ -676,7 +714,8 @@ global function qb_QBPWDSetupPanel []
                         vals.cutoff, vals.mapncolors, vals.mapnticks]];
                     pwdkey = qb_SetUpScoreDB [status, coreopts, pwdopts,
                         [], [/*fields*/], 'qb-pwd', 1];
-                    dbv_Open db_Filename pwdkey;
+                    pwdfilename = db_Filename pwdkey;
+                    dbv_Open pwdfilename;
                     db_Close pwdkey;
                     exit [];
                 endif
@@ -689,13 +728,13 @@ global function qb_QBPWDSetupPanel []
 
                 if isnull G_surface then
                     local msgkey = Message [0, 'Calculating surface ...'];
-                    G_surface = CreateSurfaceMap [first data];
+                    CreateSurfaceMap [first data];
                     msgkey = Message [msgkey, ''];
                 endif
 
                 //  Make sure ligand atoms sets are loaded.
-                if isnull G_ligmols then
-                    G_ligmols = LoadLigs [pwdkey];
+                if isnull G_surface.ligmols then
+                    LoadLigs [pwdfilename];
                 endif
 
                 //  Make sure first ligand is in MOE Window
@@ -714,7 +753,8 @@ global function qb_QBPWDSetupPanel []
         endif
     endloop
 
-    ClearSurfaceMap [G_surface];
+    ClearSurfaceMap G_surface.title;
+    G_surface = [];
     task_kill browsetasks;
     WindowDestroy wkey;
 

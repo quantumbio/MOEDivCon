@@ -50,7 +50,7 @@ const APPOPTS = 'applicationoptions';
 const DBTYPE = 'qb_dbtype';
 const QMSCORE = 'qb_qmscoredb';
 const NMRSCORE = 'qb_nmrscoredb';
-const QBPWD = 'qb_pwddb'
+const QBPWD = 'qb_pwddb';
 
 //  Charge status
 const CHG_COLOR = 
