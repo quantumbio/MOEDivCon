@@ -147,11 +147,14 @@ const PANEL =
  *
  ****************************************************************************/
 local function BreakResidueNames [names]
+
     local n, broken = [];
     for n in names loop
         broken = append [broken, cat [keep [n,3], "\n", drop [n,3]]];
     endloop
+
     return broken;
+
 endfunction
 
 /****************************************************************************
@@ -179,6 +182,40 @@ endfunction
 
 /****************************************************************************
  *
+ *                          CheckResidues
+ *
+ *  Check whether the residue names and numbers match those present
+ *  in the receptor in the MOE Window.
+ *
+ *  Returns the list of residues tokens not found in the receptor.
+ *
+ ****************************************************************************/
+local function CheckResidues [restoks]
+
+    if MOE_BATCH then return restoks; endif
+
+    local res, residues = Residues [], missing = [];
+    local resnames = rName residues;
+    local resnums = rNumber residues;
+    for res in restoks loop
+        local rname = tok_keep [res, 3];
+        local indices = indicesof [rname, resnames];
+        if length indices > 0 and then
+            local rnum = atoi tok_drop [res, 4];
+            if not anytrue eqE [rnum, rNumber peek [residues, indices]] then
+                missing = append [missing, res];
+            endif
+        else
+            missing = append [missing, res];
+        endif
+    endloop
+
+    return missing;
+
+endfunction
+
+/****************************************************************************
+ *
  *                          ClearSurfaceMap
  *
  *  Clear the surface map of the pocket.
@@ -187,6 +224,7 @@ endfunction
  *
  ****************************************************************************/
 local function ClearSurfaceMap [title]
+
     local gobjs = GKeyList [];
     GDestroy (gobjs | m_findmatch [tok_cat [title,'*'], GTitle gobjs]);
 
@@ -211,14 +249,18 @@ write ['Rec len:  {}\n', length recatoms];//DEBUG
 
     local step = (maxcut - mincut) / (length colors);
     local [restokens, rowdata] = data;
+
 write ['ResTokens:  {}\n', restokens];//DEBUG
+
     local rowvals = second rowdata (ligidx);
     local atom, atomcolors = [];
     for atom in recatoms loop
         local residue = aResidue atom;
         local restok = twrite ['{}\n{}', rName residue, rNumber residue];
         local idx = indexof [restok, restokens];
+
 //write ['Token:  {}, Idx: {}\n', restok, idx];//DEBUG
+
         if idx > 0 and (residx === 0 or residx === idx) then
             local cidx = ceil ((rowvals (idx) - mincut) / step);
             atomcolors = append [atomcolors, colors (cidx)];
@@ -251,8 +293,6 @@ local function CreateSurfaceMap [restokens]
         return [];
     endif
 
-print 'G_rectatoms set.';//DEBUG
-
     local dist = CalcDist [restokens, recatoms, ligatoms];
 
 write ['Dist:  {}\n', dist];//DEBUG
@@ -281,7 +321,6 @@ write ['Dist:  {}\n', dist];//DEBUG
         eps     : vdwE,
         opt     : opt,
         gvtx    : [],
-        origidx : [],  
         gobj    : []
         ];
 
@@ -290,7 +329,6 @@ write ['Dist:  {}\n', dist];//DEBUG
         G_surface.opt];
 
     local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
-    G_surface.origidx = s_idx;
     s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
     G_surface.gvtx = poke [G_surface.gvtx, 1, s_idx];
 
@@ -337,8 +375,8 @@ local function GenerateData [pivot, numres, numlig]
 
     //  ligand labels and values
     for lig_i = 1, numlig, 1 loop
-        local ligname, ligvals = [];
-        ligname = twrite ['lig{}', lig_i];
+        local ligvals = [];
+        local ligname = twrite ['lig{}', lig_i];
         for res_i = 1, numres, 1 loop
             ligvals = append [ligvals, randN pivot];
         endloop
@@ -347,6 +385,7 @@ local function GenerateData [pivot, numres, numlig]
     endloop
 
     return [resnames, ligdata];
+
 endfunction
 
 /****************************************************************************
@@ -387,8 +426,6 @@ local function LoadLigs [pwdfilename]
         exit [];
     endif
 
-
-
     local dbkey = db_Open [pwdfilename, 'read'];
     local ligmols = [];
     local rowkey = 0;
@@ -401,7 +438,6 @@ local function LoadLigs [pwdfilename]
 
     G_surface.ligmols = ligmols;
     db_Close dbkey;
-
 
 endfunction
 
@@ -454,17 +490,18 @@ local function NearestAtomColor [pos, rad, acolor, spos]
     local sprox = prox_open [1 + maxrad, spos, 1 + maxrad];
 
 local f = fopenw '/tmp/pwddebug.txt';//DEBUG
+fwrite [f, 'Len A {}, lLen A {}, Len R {}\n',
+length argb, l_length argb, length r];//DEBUG
 
     local i;
     for i = 1, l_length pos loop
     [seg, idx, r2] = prox_find [sprox, apt peek [pos, i], 0];
     if not length idx then continue; endif
+
+fwrite [f, 'I {}, minIdx {}, maxIdx {}\n', i, min idx, max idx];//DEBUG
+
     local w = exp (-ALPHA * maxE [0, sqrt r2 - 0.95 * rad(i)] );
     vsum[idx] = vsum[idx] + w;
-
-fwrite [f, 'I {}, Idx {}, Len A {}, lLen A {}, Len R {}\n',i, last idx,
-length argb, l_length argb, length r];//DEBUG
-
     r[idx] = r[idx] + w * argb(1)(i);
     g[idx] = g[idx] + w * argb(2)(i);
     b[idx] = b[idx] + w * argb(3)(i);
@@ -544,18 +581,39 @@ endfunction
 global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
         colors]
     
+    local resnames, str, row;
+    if selrow === 0 and selcol === 0 then
+        write ['Selected empty cell.\n'];//DEBUG
+    elseif selrow === 0 then
+        resnames = first data;
+        str = string resnames (selcol);
+        str = str | str <> "\n";
+        write ['Selected residue: {}\n', str];//DEBUG
+    elseif selcol === 0 then
+        row = second data;
+        write ['Selected ligand: {}\n', first row (selrow)];//DEBUG
+    else
+        resnames = first data;
+        str = string resnames (selcol);
+        str = str | str <> "\n";
+        row = second data;
+        local rowvals = second row (selrow);
+        write ['Selected ligand: {}, residue: {}, interaction: {}\n', 
+            first row (selrow), str, rowvals (selcol)];//DEBUG
+    endif
+
     ClearSurfaceMap G_surface.title;
     UpdateComplex selrow;
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
         mincut, maxcut, colors];
 
-write ['recl: {}, posl: {}, rad: {}, acl: {}, gvtxl: {}, l_gvtx {}\n', 
+write ['recl: {}, posl: {}, rad: {}, acl: {}, spos: {}, l_spos {}\n', 
 length G_surface.rec, length G_surface.recpos,
 length G_surface.rad, length atomcolors, length G_surface.gvtx(3),
 l_length G_surface.gvtx(3)];//DEBUG
 
-	local vcolor = NearestAtomColor [G_surface.recpos, G_surface.rad, atomcolors,
-        G_surface.gvtx(3)];
+	local vcolor = NearestAtomColor [G_surface.recpos, G_surface.rad,
+        atomcolors, G_surface.gvtx(3)];
 
     local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
     if add GKey G_surface.gobj then
@@ -575,26 +633,6 @@ l_length G_surface.gvtx(3)];//DEBUG
     aSetNucleusLook [G_surface.lig, 'sphere'];
     View G_surface.lig;
 
-    if selrow === 0 and selcol === 0 then
-        write ['Selected empty cell!\n'];//DEBUG
-    elseif selrow === 0 then
-        local resnames = first data;
-        local str = string resnames (selcol);
-        str = str | str <> "\n";
-        write ['Selected residue: {}\n', str];//DEBUG
-    elseif selcol === 0 then
-        local row = second data;
-        write ['Selected ligand: {}\n', first row (selrow)];//DEBUG
-    else
-        resnames = first data;
-        str = string resnames (selcol);
-        str = str | str <> "\n";
-
-        row = second data;
-        local rowvals = second row (selrow);
-        write ['Selected ligand: {}, residue: {}, interaction: {}\n', 
-            first row (selrow), str, rowvals (selcol)];//DEBUG
-    endif
 endfunction
 
 /****************************************************************************
