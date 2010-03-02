@@ -132,7 +132,7 @@ const PANEL =
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
-//  Global Variables
+//  Static Variables
 
     global G_surface;                     // Callback function needs access
 
@@ -150,7 +150,8 @@ local function BreakResidueNames [names]
 
     local n, broken = [];
     for n in names loop
-        broken = append [broken, cat [keep [n,3], "\n", drop [n,3]]];
+//        broken = append [broken, cat [keep [n,3], "\n", drop [n,3]]];
+        broken = append [broken, tok_cat [token keep [n,3], '\n', token drop [n,3]]];
     endloop
 
     return broken;
@@ -169,7 +170,7 @@ local function CalcDist [restokens, recatoms, ligatoms]
     local atom, dist = 10.0;
     for atom in recatoms loop
         local residue = aResidue atom;
-        local restok = twrite ['{}\n{}', rName residue, rNumber residue];
+        local restok = twrite ['{}{}', rName residue, rUID residue];
         local idx = indexof [restok, restokens];
         if idx > 0 then
             dist = max append [aDist [atom, ligatoms], dist];
@@ -179,6 +180,8 @@ local function CalcDist [restokens, recatoms, ligatoms]
     return dist;
 
 endfunction
+
+function FindResidue;
 
 /****************************************************************************
  *
@@ -194,18 +197,10 @@ local function CheckResidues [restoks]
 
     if MOE_BATCH then return restoks; endif
 
-    local res, residues = Residues [], missing = [];
-    local resnames = rName residues;
-    local resnums = rNumber residues;
+    local res, missing = [];
     for res in restoks loop
-        local rname = tok_keep [res, 3];
-        local indices = indicesof [rname, resnames];
-        if length indices > 0 and then
-            local rnum = atoi tok_drop [res, 4];
-            if not anytrue eqE [rnum, rNumber peek [residues, indices]] then
-                missing = append [missing, res];
-            endif
-        else
+        local [residx, ra] = FindResidue res;
+        if residx === 0 then
             missing = append [missing, res];
         endif
     endloop
@@ -241,28 +236,28 @@ endfunction
 local function ColorAtoms [data, ligidx, residx, recatoms, 
         mincut, maxcut, colors]
 
-write ['Rec len:  {}\n', length recatoms];//DEBUG
-
     if ligidx === 0 then
         return rep [0xFFFFFF, length recatoms];
     endif
 
     local step = (maxcut - mincut) / (length colors);
     local [restokens, rowdata] = data;
-
-write ['ResTokens:  {}\n', restokens];//DEBUG
-
     local rowvals = second rowdata (ligidx);
     local atom, atomcolors = [];
     for atom in recatoms loop
         local residue = aResidue atom;
-        local restok = twrite ['{}\n{}', rName residue, rNumber residue];
+        local restok = twrite ['{}{}', rName residue, rUID residue];
         local idx = indexof [restok, restokens];
-
-//write ['Token:  {}, Idx: {}\n', restok, idx];//DEBUG
-
         if idx > 0 and (residx === 0 or residx === idx) then
-            local cidx = ceil ((rowvals (idx) - mincut) / step);
+            local cidx, value = rowvals (idx);
+            if value <= mincut then
+                cidx = 1;
+            elseif value >= maxcut then
+                cidx = length colors;
+            else
+                cidx = ceil ((value - mincut) / step);
+            endif
+
             atomcolors = append [atomcolors, colors (cidx)];
         else
             atomcolors = append [atomcolors, 0xFFFFFF];  // White
@@ -294,11 +289,11 @@ local function CreateSurfaceMap [restokens]
     endif
 
     local dist = CalcDist [restokens, recatoms, ligatoms];
-
+    dist = dist / 2;
 write ['Dist:  {}\n', dist];//DEBUG
 
     local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
-    local opt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
+    local gridopt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
         clipmode: 0];
 
     G_surface =
@@ -314,19 +309,22 @@ write ['Dist:  {}\n', dist];//DEBUG
         lig     : ligatoms,
         ligidx  : 0,
         ligmols : [],
+        restok  : 0,
+        resatms : [],
         recpos  : aPos recatoms,
         ligpos  : aPos ligatoms,
         dist    : dist,
         rad     : vdwR,
         eps     : vdwE,
-        opt     : opt,
+        gridopt : gridopt,
+		fix     : 0,
         gvtx    : [],
         gobj    : []
         ];
 
     G_surface.gvtx = msurf_MolecularSurface [G_surface.recpos, 
         G_surface.rad, G_surface.eps, G_surface.ligpos, G_surface.dist, 
-        G_surface.opt];
+        G_surface.gridopt];
 
     local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
     s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
@@ -353,6 +351,38 @@ endfunction
 
 /****************************************************************************
  *
+ *                          FindResidue
+ *
+ *  Find the residue with the given name and number in the receptor 
+ *  in the MOE Window.
+ *
+ *  Returns the index of the residue and its atom set.
+ *
+ ****************************************************************************/
+local function FindResidue [restok]
+
+    if MOE_BATCH then return [0, []]; endif
+
+    local residx = 0, resatms = []; 
+    local residues = Residues [];
+    local resnames = rName residues;
+    local rname = tok_keep [restok, 3];
+    local [indices] = indicesof [rname, resnames];
+    if length indices > 0 then
+        local rnum = atoi tok_drop [restok, 3];
+        local idx_i = indexof [rnum, rUID residues [indices]];
+        if idx_i > 0 then
+            residx = indices (idx_i);
+            resatms = cat oChildren residues (residx);
+        endif
+    endif
+
+    return [residx, resatms];
+
+endfunction
+
+/****************************************************************************
+ *
  *                          GenerateData
  *
  *  Return data formatted for the heat map.
@@ -369,7 +399,7 @@ local function GenerateData [pivot, numres, numlig]
 
     local res_i, lig_i;
     for res_i = 1, numres, 1 loop
-        resnames = append [resnames, twrite ['{}\n{}',
+        resnames = append [resnames, twrite ['{}{}',
             RESLIST (mod [res_i, length resnames - 1] + 1), rand 999]];
     endloop
 
@@ -488,26 +518,16 @@ local function NearestAtomColor [pos, rad, acolor, spos]
 
     maxrad      = max [maxrad, sqrt min_dist - 1];
     local sprox = prox_open [1 + maxrad, spos, 1 + maxrad];
-
-local f = fopenw '/tmp/pwddebug.txt';//DEBUG
-fwrite [f, 'Len A {}, lLen A {}, Len R {}\n',
-length argb, l_length argb, length r];//DEBUG
-
     local i;
     for i = 1, l_length pos loop
     [seg, idx, r2] = prox_find [sprox, apt peek [pos, i], 0];
     if not length idx then continue; endif
-
-fwrite [f, 'I {}, minIdx {}, maxIdx {}\n', i, min idx, max idx];//DEBUG
-
     local w = exp (-ALPHA * maxE [0, sqrt r2 - 0.95 * rad(i)] );
     vsum[idx] = vsum[idx] + w;
     r[idx] = r[idx] + w * argb(1)(i);
     g[idx] = g[idx] + w * argb(2)(i);
     b[idx] = b[idx] + w * argb(3)(i);
     endloop
-
-fclose f;//DEBUG
 
     prox_close sprox;
 
@@ -526,13 +546,16 @@ endfunction
  ****************************************************************************/
 local function ReadData [filename]
 
+    //TODO:  change to use fieldsplit
     local f = fopenr filename;
     local lines = freadb [f, 'line', INT_MAX];
     local line = first lines;
     local m = line == ",";
     local strings = split [line | not m, dec mtoc prepend [m, 1]];
-    strings = BreakResidueNames [strings];
+//    strings = BreakResidueNames [strings];
     local resnames = app token strings;
+//    local resnames = BreakResidueNames [strings];
+//    local resnames = rep ['ABC', length strings];
     lines = dropfirst lines;
 
     //  ligand labels and values
@@ -571,6 +594,38 @@ local function UpdateComplex [lignum]
 
 endfunction
 
+/****************************************************************************
+ *
+ *                          UpdateResidue
+ *
+ *  Name highlight, and shift the view towards the selected residue.
+ *
+ *  Acknowledgement:  labeling the residue was borrowed from LabelResidue
+ *                    in menu.svl.
+ *
+ ****************************************************************************/
+local function UpdateResidue [restok]
+
+    if G_surface.restok === restok then return; endif
+
+    aSetLabelRes [G_surface.resatms, 0];
+
+    local [residx, resatms] = FindResidue restok;
+    if residx === 0 then return; endif
+
+    G_surface.restok = restok;
+    G_surface.resatms = resatms;
+
+	local [idx, m] = sam graph_ccomponent BondGraph resatms;
+    local aa;
+	for aa in split [resatms [idx], mtoc m] loop
+	    aSetLabelRes [sample [aa | graph_center BondGraph aa, 1], 1];
+	endloop
+
+    View resatms;
+
+endfunction
+
 //  Global Functions
 
 /****************************************************************************
@@ -581,36 +636,32 @@ endfunction
 global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
         colors]
     
-    local resnames, str, row;
+    local [resnames, rowdata] = data;
+    local restok = '', ligtok = '', ligdata = [];
     if selrow === 0 and selcol === 0 then
         write ['Selected empty cell.\n'];//DEBUG
     elseif selrow === 0 then
-        resnames = first data;
-        str = string resnames (selcol);
-        str = str | str <> "\n";
-        write ['Selected residue: {}\n', str];//DEBUG
+        restok = resnames (selcol);
+        write ['Selected residue: {}\n', restok];//DEBUG
     elseif selcol === 0 then
-        row = second data;
-        write ['Selected ligand: {}\n', first row (selrow)];//DEBUG
+        [ligtok, ligdata] = rowdata (selrow);
+        write ['Selected ligand: {}\n', ligtok];//DEBUG
     else
-        resnames = first data;
-        str = string resnames (selcol);
-        str = str | str <> "\n";
-        row = second data;
-        local rowvals = second row (selrow);
+        restok = resnames (selcol);
+        [ligtok, ligdata] = rowdata (selrow);
         write ['Selected ligand: {}, residue: {}, interaction: {}\n', 
-            first row (selrow), str, rowvals (selcol)];//DEBUG
+            ligtok, restok, ligdata (selcol)];//DEBUG
+    endif
+
+    if selrow === 0 and selcol > 0 then
+        UpdateResidue restok;
+    return;
     endif
 
     ClearSurfaceMap G_surface.title;
     UpdateComplex selrow;
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
         mincut, maxcut, colors];
-
-write ['recl: {}, posl: {}, rad: {}, acl: {}, spos: {}, l_spos {}\n', 
-length G_surface.rec, length G_surface.recpos,
-length G_surface.rad, length atomcolors, length G_surface.gvtx(3),
-l_length G_surface.gvtx(3)];//DEBUG
 
 	local vcolor = NearestAtomColor [G_surface.recpos, G_surface.rad,
         atomcolors, G_surface.gvtx(3)];
@@ -631,7 +682,11 @@ l_length G_surface.gvtx(3)];//DEBUG
       s_vpt, s_vnorm];
 
     aSetNucleusLook [G_surface.lig, 'sphere'];
-    View G_surface.lig;
+
+    if not G_surface.fix then
+        View G_surface.lig;
+        G_surface.fix = 1;
+    endif
 
 endfunction
 
@@ -648,12 +703,20 @@ global function qb_QBPWDSetupPanel []
     static status;                     //  Shared with child tasks.
     static pwdkey;
     static pwdfilename;
+    static data;
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB-PWDPanel', 1] then return; endif
 
-//    local data = GenerateData [2.5, 30, 40];
-    local data = ReadData ['~daren/dev/MOEDivcon/heatmapdata3.csv'];
+//    local data = GenerateData [2.5, 30, 40];//DEBUG
+    data = ReadData ['~daren/dev/MOEDivcon/heatmapdata3.csv'];
+
+    local missing = CheckResidues first data;
+    if length missing > 0 then
+        Warning twrite ['The following residues are not present\n'
+            'in receptor in MOE Window:\n{v}\n', missing];
+        return;
+    endif
 
     local coreopts = [], pwdopts = [], browsetasks = [];
     status = qb_GetDefaultsStatus [];
@@ -777,10 +840,9 @@ global function qb_QBPWDSetupPanel []
 
                 //  Make sure first ligand is in MOE Window
                 UpdateComplex INITLIG;
-
                 qb_HeatMapSetupPanel [data, vals.cutoff, SIGNIFRES, 
                     vals.mapncolors, vals.mapnticks, 
-                    'qb_QBPWDSelectHandler', INITLIG];
+                    'qb_QBPWDSelectHandler', INITLIG, 1];
 
                 exit [];
             endif

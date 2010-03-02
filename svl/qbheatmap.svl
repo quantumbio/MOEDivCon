@@ -44,8 +44,11 @@ const SCALE_CELL_WD = 10;
 const TICK_LEN = 5;
 
 //  Cells
-const CELL_WD_MIN = 20;
-const CELL_HT_MIN = 10;
+const CELL_WD = 21;
+const CELL_HT = 11;
+
+const MOE_PAD_W = 3.7;
+const MOE_PAD_H = 3.0;
 
 //  Window GUI
 const HEADER = 
@@ -66,9 +69,8 @@ const PANEL =
             [
             Radio :
                 [
-                name: 'mapradio', shadow: 'none',
-                type: 'int', grPosition: 'right',
-                margin: 0, font: 'smallBold'
+                name: 'mapradio', shadow: 'none', type: 'int',
+                margin: 0, font: 'smallBold', onTrigger: 'return'
                 ]
             ],
         Separator : 
@@ -137,6 +139,7 @@ local function DrawCell [colors, width, height, mincut, maxcut, value]
         colors (cidx), 1, colors (cidx)]];
 
     return key;
+
 endfunction
 
 /****************************************************************************
@@ -174,6 +177,74 @@ local function DrawColorScale [colors, cell_w, cell_h, mincut, maxcut, ticks]
     endloop
 
     return [key, width, height];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          DrawCellLabel
+ *
+ *  Returns a graphics object with the formated text drawn.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawCellLabel [ftext, width, height]
+
+    local key = gr_create [size: [width, height], units: 'pt'];
+    gr_text [key, [0, [width/2 , height/2], ftext, 'sys-b', 
+        icolor'black', 8, [position: 'middlecenter']]];
+
+    return key;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          DrawColLabels
+ *
+ *  Returns a graphics object with the column labels using formated texts.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawColLabels [ftexts, width, height]
+
+
+    local key = gr_create [size: [length ftexts * (width + MOE_PAD_W) + 1,
+        height], units: 'pt'];
+    local x = 1, ft;
+    for ft in ftexts loop
+        gr_text [key, [0, [x + width/2 , height/2], ft, 'sys-b', 
+            icolor'black', 8, [position: 'middlecenter']]];
+        x = x + width + MOE_PAD_W;
+    endloop
+
+    return key;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          DrawRowLabels
+ *
+ *  Returns a graphics object with the row labels using formated texts.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawRowLabels [ftexts, width, height]
+
+    local key = gr_create [size: [width,
+        length ftexts * (height + MOE_PAD_H) + 1], units: 'pt'];
+    local y = 1, ft;
+    for ft in ftexts loop
+        gr_text [key, [0, [width/2 , y + height/2], ft, 'sys-b', 
+            icolor'black', 8, [position: 'middlecenter']]];
+        y = y + height + MOE_PAD_H;
+    endloop
+
+    return key;
 
 endfunction
 
@@ -359,19 +430,15 @@ endfunction
  *  where length colNames === length values1 === ... === length valuesN,
  *  and the names are tokens and the values are numbers.
  *
+ *  Note:  uses only the last three characters of ColNames and RowNames for
+ *  labels.
+ *
  ****************************************************************************/
-global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
-        numcolors, ticks, selfun, initsel]
+global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols, 
+        numcolors, ticks, selfun, initsel, help]
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB Heat Map', 1] then return; endif
-
-    local MOE_PAD;
-    if MOE_VERSION === 2009.1 then
-        MOE_PAD = 9;
-    else
-        MOE_PAD = 11;
-    endif
 
     local [mincut, maxcut] = CalculateCuts [data, cutoff, numsignifcols];
     local [colors, errmess] = GetColors [mincut, maxcut, numcolors];
@@ -383,8 +450,8 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
     local [colnames, rowdata] = data;
     local numcols = length colnames;
     local numrows = length rowdata;
-    local page_w = (numcols + 1) * (CELL_WD_MIN + MOE_PAD);
-    local page_h = (numrows + 1) * (CELL_HT_MIN + MOE_PAD);
+    local page_w = (numcols + 1) * (CELL_WD + MOE_PAD_W) + MOE_PAD_W;
+    local page_h = (numrows + 1) * (CELL_HT + MOE_PAD_H) + MOE_PAD_H;
 
     local scalecell_h = floor (page_h / numcolors);
     local scalecell_w =  SCALE_CELL_WD;
@@ -392,41 +459,54 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
         scalecell_h, mincut, maxcut, ticks];
 
     //  Color map cells and store row labels
-    local row_i, col_i, bnames = [], bcolors = [];
+    local row_i, col_i, bgraphics = [], bhelp = [];
     for row_i = 1, numrows, 1 loop
         local [rowlabel, rowvals] = rowdata (row_i);
-        bnames = append [bnames, rowlabel];
-        bcolors = append [bcolors, 0];
+        bgraphics = append [bgraphics, DrawCellLabel [tok_keep [rowlabel, -3],
+            CELL_WD, CELL_HT]];
+        if help then
+            bhelp = append [bhelp, twrite ['row:  {}', rowlabel]];
+        endif
+
         for col_i = 1, numcols, 1 loop
-            bnames = append [bnames, ''];
-            bcolors = append [bcolors, DrawCell [colors, 
-                CELL_WD_MIN, CELL_HT_MIN, mincut, maxcut, rowvals (col_i)]];
+            bgraphics = append [bgraphics, DrawCell [colors, 
+                CELL_WD, CELL_HT, mincut, maxcut, rowvals (col_i)]];
+                if help then
+                    bhelp = append [bhelp, twrite ['cell:  [{}, {}]', rowlabel,
+                        colnames (col_i)]];
+                endif
         endloop
     endloop
 
     //  Empty corner label
-    bnames = append [bnames, ''];
-    bcolors = append [bcolors, 0];
+    bgraphics = append [bgraphics, 0];
+    bhelp = append [bhelp, 'empty cell'];
 
     //  Column labels
     for col_i = 1, numcols, 1 loop
-        bnames = append [bnames, colnames (col_i)];
-        bcolors = append [bcolors, 0];
+        bgraphics = append [bgraphics, 
+            DrawCellLabel [tok_keep [colnames (col_i), -3], CELL_WD, CELL_HT]];
+        if help then
+            bhelp = append [bhelp, twrite ['col:  {}', colnames (col_i)]];
+        endif
     endloop
 
     local panel = tagpoke [PANEL, ['Hbox', 'Vbox', 'Radio', 'graphics'],
-        bcolors];
-    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Radio', 'text'],
-        bnames];
+        bgraphics];
     panel = tagpoke [panel, ['Hbox', 'Vbox', 'Radio', 'columns'],
         numcols + 1];
+    if (help) then
+            panel = tagpoke [panel, ['Hbox', 'Vbox', 'Radio', 'bubbleHelp'],
+                bhelp];
+    endif
+
     local wkey = WindowCreate cat [HEADER, panel];
     WindowSetData [wkey, [mapradio: initsel]];
     WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
     WindowShow [wkey, 1];
 
     gr_destroy scalekey;
-    app gr_destroy bcolors;
+    app gr_destroy bgraphics;
 
     //  Selected cells have row numbers from 1 to numrows
     //      and col numbers from 1 to numcols
