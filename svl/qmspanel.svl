@@ -90,7 +90,8 @@ const QMSCORE_OPT_DEFAULTS =
     ['scaling',      1             ],
     ['freq',         0             ],
     ['opt',          1             ],
-    ['shift',        0.0           ]
+    ['shift',        0.0           ],
+    ['pwd',          0             ]       //  Analysis
     ];
 
 const HAMILTONIANS =
@@ -203,6 +204,20 @@ const PANEL =
                 ]
             ]
         ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
+    Hbox :
+        [
+        extendH: 1,
+        Checkbox :
+            [
+            name: 'pwd', text: 'PWD', title: 'Analysis',
+            bubbleHelp:
+                'Perform pair-wise decomposition analysis\n'
+                'after the QMScore calculations.'
+            ]
+        ]
 
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
@@ -471,7 +486,7 @@ global function qb_QMScoreSetupPanel []
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.ham, vals.scaling, vals.freq, vals.opt,
-                        vals.shift]];
+                        vals.shift, vals.pwd]];
                     qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
                         [], QMS_NUM_FIELDS, 'qmscore', 0];
                     if vals.mode === 'One-to-One' then
@@ -497,7 +512,7 @@ global function qb_QMScoreSetupPanel []
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.ham, vals.scaling, vals.freq, vals.opt,
-                        vals.shift]];
+                        vals.shift, vals.pwd]];
                     qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', 1];
                     dbv_Open db_Filename qmskey;
