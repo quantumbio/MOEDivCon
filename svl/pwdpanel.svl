@@ -67,13 +67,10 @@ const HEADER =
     name: 'panel', 
     title: 'QB-PWD',
     windowName: 'QB-PWDPanel',
-    text: ['Run', 'Save', 'Load', 'Close'],
-    onTrigger: ['validate', 'validate', 'return', 'return'],
-    bubbleHelp: ['Execute QB-PWD from MOE Window.',
-        'Save run parameters in database\n'
-        'for later execution on cluster.', 
-        'Load run parameters from a QB-PWD database.', 
-        '']
+    text: ['Load', 'Close'],
+    onTrigger: ['return', 'return'],
+    bubbleHelp: ['Load QB-PWD analysis results from a QMScore database.', 
+            '']
     ];
 
 const PANEL =
@@ -85,7 +82,7 @@ const PANEL =
             extendH: 1,
             Button :
                 [
-                name: 'heatmap', text: 'Heat Map', // onTrigger: 'validate',
+                name: 'heatmap', text: 'Heat Map',
                 bubbleHelp:
                     ''
                 ],
@@ -718,14 +715,10 @@ global function qb_QBPWDSetupPanel []
         return;
     endif
 
-    local coreopts = [], pwdopts = [], browsetasks = [];
-    status = qb_GetDefaultsStatus [];
-    local coredflts = qb_GetDefaultsCore [];
+    local pwdopts = [], browsetasks = [];
     local appdflts = tag tr QBPWD_OPT_DEFAULTS;
-    coredflts = tagpoke [coredflts, 'scoredb', 'qb_pwd.mdb'];
 
-    local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
-    status = qb_InitCorePanel [wkey, status, coredflts];
+    local wkey = WindowCreate cat [HEADER, PANEL];
     pwdkey = 0;
     pwdfilename = '';
     G_surface = [];
@@ -744,6 +737,8 @@ global function qb_QBPWDSetupPanel []
                 if second task_fork [master: 'parent',
                         statics:'share'] === 'child' then
                     task_prio 0;
+
+//TODO:  message and disable window while loading
 
                     local dbpath = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
@@ -764,10 +759,8 @@ global function qb_QBPWDSetupPanel []
                             endif
                         endif
 
-                        status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
                         pwdkey = ldkey;
                         pwdfilename = db_Filename pwdkey;
-                        dbv_Open pwdfilename;
                         db_Close ldkey;
                         WindowSetData [wkey, ldpwdopts];
                     endif
