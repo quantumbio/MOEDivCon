@@ -91,7 +91,8 @@ const QMSCORE_OPT_DEFAULTS =
     ['freq',         0             ],
     ['opt',          1             ],
     ['shift',        0.0           ],
-    ['pwd',          0             ]       //  Analysis
+    ['analpwd',      0             ],      //  Analysis
+    ['trainingset',  0             ]
     ];
 
 const HAMILTONIANS =
@@ -212,12 +213,27 @@ const PANEL =
         extendH: 1,
         Checkbox :
             [
-            name: 'pwd', text: 'PWD', title: 'Analysis',
+            name: 'analpwd', text: 'PWD', title: 'Analysis:',
+            onTrigger: 'return',
             bubbleHelp:
                 'Perform pair-wise decomposition analysis\n'
                 'after the QMScore calculations.'
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 1, margin:1
+            ],
+        Text :
+            [
+            name: 'trainingset', title: 'Training set size:',
+            len: 20, extendH: 0, 
+            type: 'int', allowBlank: 0,
+            bubbleHelp:
+                'Size of the training set (the first N\n'
+                'receptors and/or ligands are treated\n'
+                'as the training set during analysis.'
             ]
-        ]
+        ],
 
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
@@ -380,6 +396,22 @@ global function RunOneToManyCalc [oldkey]
 
 endfunction
 
+/****************************************************************************
+ *                          UpdatePWD
+ *
+ *  Update the window based on new PWD value.
+ *
+ ****************************************************************************/
+local function UpdatePWD [wkey, pwd]
+
+    if pwd === 0 then
+        WindowSetAttr [wkey, [trainingset: [sensitive: 0, allowBlank: 1]]];
+    else
+        WindowSetAttr [wkey, [trainingset: [sensitive: 1, allowBlank: 0]]];
+    endif
+endfunction
+
+
 //  Global Functions
 
 /****************************************************************************
@@ -434,13 +466,16 @@ global function qb_QMScoreSetupPanel []
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
     qmskey = 0;
+    UpdatePWD [wkey, appdflts.analpwd];
     WindowSetData [wkey, appdflts];
     WindowShow [wkey, 1];
 
     loop
         local [vals, trig] = WindowWait wkey;
+        if trig === 'analpwd' then
+            UpdatePWD [wkey, vals.analpwd];
 
-       if trig === 'panel' then
+       elseif trig === 'panel' then
             if vals.panel === 'Close' then 
                 break;
 

@@ -46,11 +46,17 @@ const LIGAND = 'ligand';
 const STATUS = 'status';
 const COREOPTS = 'coreoptions';
 const APPOPTS = 'applicationoptions';
+const ANALOPTS = 'analysisoptions';
+const ANALDATA = 'analysisdata';
 
 const DBTYPE = 'qb_dbtype';
 const QMSCORE = 'qb_qmscoredb';
 const NMRSCORE = 'qb_nmrscoredb';
-const QBPWD = 'qb_pwddb';
+const QBPWD = 'qb_pwddb';//DEBUG - remove
+
+const ANALYSIS = 'qb_analysistype';
+const ANALPWDSAR = 'qb_pwdSAR';
+const ANALPWDINTER = 'qb_pwdinteraction';
 
 //  Charge status
 const CHG_COLOR = 
