@@ -59,6 +59,7 @@ const QBPWD_OPT_DEFAULTS =
     [
     ['cutoff',       2.0           ],
     ['mapncolors',  15             ],
+    ['mapmono',      1             ],
     ['mapnticks',    5             ]
     ];
 
@@ -107,13 +108,26 @@ const PANEL =
                 ],
             Vbox :
                 [
-                Text :
+                Hbox :
                     [
-                    name: 'mapncolors', len: 7, extendH: 1, 
-                    title: 'Number of Colors:',
-                    type: 'int', allowBlank: 0,
-                    shortcut: ['3', '7', '15', '31'],
-                    bubbleHelp: 'Number of distinct colors.'
+                    Text :
+                        [
+                        name: 'mapncolors', len: 7, extendH: 1, 
+                        title: 'Number of Colors:',
+                        type: 'int', allowBlank: 0,
+                        shortcut: ['3', '7', '15', '31'],
+                        bubbleHelp: 'Number of distinct colors.'
+                        ],
+                    Separator : 
+                        [
+                        vertical:0, shadow:'noline', extendH: 0, margin:1
+                        ],
+                    Checkbox :
+                        [
+                        name: 'mapmono', text: 'Monochrome',
+                        bubbleHelp:
+                            'Use a monochrome color scheme.'
+                        ]
                     ],
                 Text :
                     [
@@ -129,31 +143,11 @@ const PANEL =
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
-//  Static Variables
+//  Global Variables
 
     global G_surface;                     // Callback function needs access
 
 //  Local Functions
-
-/****************************************************************************
- *
- *                          BreakResidueNames
- *
- *  Insert a line break between the residue name and number for better
- *  formatting of heat map.
- *
- ****************************************************************************/
-local function BreakResidueNames [names]
-
-    local n, broken = [];
-    for n in names loop
-//        broken = append [broken, cat [keep [n,3], "\n", drop [n,3]]];
-        broken = append [broken, tok_cat [token keep [n,3], '\n', token drop [n,3]]];
-    endloop
-
-    return broken;
-
-endfunction
 
 /****************************************************************************
  *
@@ -170,7 +164,7 @@ local function CalcDist [restokens, recatoms, ligatoms]
         local restok = twrite ['{}{}', rName residue, rUID residue];
         local idx = indexof [restok, restokens];
         if idx > 0 then
-            dist = max append [aDist [atom, ligatoms], dist];
+            dist = max [max aDist [atom, ligatoms], dist];
         endif
     endloop
 
@@ -210,7 +204,7 @@ endfunction
  *
  *                          ClearSurfaceMap
  *
- *  Clear the surface map of the pocket.
+ *  Clear the surface map of the pocket and the residue label.
  *
  *  Acknowledgement:  borrowed heavily from surfmap.svl.
  *
@@ -238,8 +232,8 @@ local function ColorAtoms [data, ligidx, residx, recatoms,
     endif
 
     local step = (maxcut - mincut) / (length colors);
-    local [restokens, rowdata] = data;
-    local rowvals = second rowdata (ligidx);
+    local [restokens, resabbrevs, rowdata] = data;
+    local rowvals = third rowdata (ligidx);
     local atom, atomcolors = [];
     for atom in recatoms loop
         local residue = aResidue atom;
@@ -303,13 +297,13 @@ write ['Dist:  {}\n', dist];//DEBUG
         trans_f : 96,
         trans_b : 96,
         rec     : recatoms,
+        recpos  : aPos recatoms,
         lig     : ligatoms,
+        ligpos  : aPos ligatoms,
         ligidx  : 0,
         ligmols : [],
-        restok  : 0,
+        restok  : '',
         resatms : [],
-        recpos  : aPos recatoms,
-        ligpos  : aPos ligatoms,
         dist    : dist,
         rad     : vdwR,
         eps     : vdwE,
@@ -375,43 +369,6 @@ local function FindResidue [restok]
     endif
 
     return [residx, resatms];
-
-endfunction
-
-/****************************************************************************
- *
- *                          GenerateData
- *
- *  Return data formatted for the heat map.
- *
- ****************************************************************************/
-local function GenerateData [pivot, numres, numlig]
-
-    local resnames = [], ligdata = [];
-    randseed 101;
-
-    //  Residue labels
-    const RESLIST = ['ARG', 'MET', 'THR', 'GLY', 'PHE', 'GLU', 'ALA', 'LEU',
-        'LYS', 'PRO', 'VAL', 'SER', 'GLN', 'ASN', 'ASP'];
-
-    local res_i, lig_i;
-    for res_i = 1, numres, 1 loop
-        resnames = append [resnames, twrite ['{}{}',
-            RESLIST (mod [res_i, length resnames - 1] + 1), rand 999]];
-    endloop
-
-    //  ligand labels and values
-    for lig_i = 1, numlig, 1 loop
-        local ligvals = [];
-        local ligname = twrite ['lig{}', lig_i];
-        for res_i = 1, numres, 1 loop
-            ligvals = append [ligvals, randN pivot];
-        endloop
-
-        ligdata = append [ligdata, [ligname, ligvals]];
-    endloop
-
-    return [resnames, ligdata];
 
 endfunction
 
@@ -506,14 +463,14 @@ local function NearestAtomColor [pos, rad, acolor, spos]
     endif
 
     local [seg, idx, r2] = prox_find [pprox, Upts, 0];
-    local d_ndx          = split [idx, seg];
-    local min_dist       = max app min apt get [[r2], d_ndx];
+    local d_ndx = split [idx, seg];
+    local min_dist = max app min apt get [[r2], d_ndx];
 
     prox_close pprox;
 
     // Use the larger of the caller's and 'found' distances
 
-    maxrad      = max [maxrad, sqrt min_dist - 1];
+    maxrad = max [maxrad, sqrt min_dist - 1];
     local sprox = prox_open [1 + maxrad, spos, 1 + maxrad];
     local i;
     for i = 1, l_length pos loop
@@ -549,10 +506,7 @@ local function ReadData [filename]
     local line = first lines;
     local m = line == ",";
     local strings = split [line | not m, dec mtoc prepend [m, 1]];
-//    strings = BreakResidueNames [strings];
     local resnames = app token strings;
-//    local resnames = BreakResidueNames [strings];
-//    local resnames = rep ['ABC', length strings];
     lines = dropfirst lines;
 
     //  ligand labels and values
@@ -581,13 +535,17 @@ endfunction
 local function UpdateComplex [lignum]
 
     if G_surface.ligidx === lignum then return; endif
+    if length G_surface.lig === 0 then return; endif
 
-    oDestroy G_surface.lig;
+    local lignuc = aNucleusLook G_surface.lig (1);
+    oDestroy uniq oChains G_surface.lig;
     local ligchn = mol_Create G_surface.ligmols (lignum);
+
     G_surface.lig = cat cAtoms ligchn;
+    G_surface.ligidx = lignum;
 
     oSetCollection ['QB_LIGAND', G_surface.lig];
-    G_surface.ligidx = lignum;
+    aSetNucleusLook [G_surface.lig, lignuc];
 
 endfunction
 
@@ -601,9 +559,16 @@ endfunction
  *                    in menu.svl.
  *
  ****************************************************************************/
-local function UpdateResidue [restok]
+local function UpdateResidue [restok, row, col, zoom]
 
-    if G_surface.restok === restok then return; endif
+    if col === 0 then
+        aSetLabelRes [G_surface.resatms, 0];
+        G_surface.resatms = [];
+        G_surface.restok = '';
+        return;
+    endif
+
+    if G_surface.restok === restok and row > 0 then return; endif
 
     aSetLabelRes [G_surface.resatms, 0];
 
@@ -619,7 +584,9 @@ local function UpdateResidue [restok]
 	    aSetLabelRes [sample [aa | graph_center BondGraph aa, 1], 1];
 	endloop
 
-    View resatms;
+    if zoom then
+        View resatms;
+    endif
 
 endfunction
 
@@ -633,26 +600,21 @@ endfunction
 global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
         colors]
     
-    local [resnames, rowdata] = data;
-    local restok = '', ligtok = '', ligdata = [];
+    local [resnames, resabbrevs, rowdata] = data;
+    local restok = '', ligtok = '', ligabbrev = '', ligdata = [];
     if selrow === 0 and selcol === 0 then
-        write ['Selected empty cell.\n'];//DEBUG
+        return;
     elseif selrow === 0 then
         restok = resnames (selcol);
-        write ['Selected residue: {}\n', restok];//DEBUG
+        if selcol > 0 then
+            UpdateResidue [restok, selrow, selcol, 1];
+            return;
+        endif
     elseif selcol === 0 then
-        [ligtok, ligdata] = rowdata (selrow);
-        write ['Selected ligand: {}\n', ligtok];//DEBUG
+        [ligtok, ligabbrev, ligdata] = rowdata (selrow);
     else
         restok = resnames (selcol);
-        [ligtok, ligdata] = rowdata (selrow);
-        write ['Selected ligand: {}, residue: {}, interaction: {}\n', 
-            ligtok, restok, ligdata (selcol)];//DEBUG
-    endif
-
-    if selrow === 0 and selcol > 0 then
-        UpdateResidue restok;
-    return;
+        [ligtok, ligabbrev, ligdata] = rowdata (selrow);
     endif
 
     ClearSurfaceMap G_surface.title;
@@ -678,7 +640,7 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
     GVertex [G_surface.gobj, G_surface.surfdim, s_idx, vcolor,
       s_vpt, s_vnorm];
 
-    aSetNucleusLook [G_surface.lig, 'sphere'];
+    UpdateResidue [restok, selrow, selcol, 0];
 
     if not G_surface.fix then
         View G_surface.lig;
@@ -697,16 +659,19 @@ global function qb_QBPWDSetupPanel []
     const INITLIG = 1;
     const SIGNIFRES = 5;
 
-    static status;                     //  Shared with child tasks.
-    static pwdkey;
+    static pwdkey;                     //  Shared with child tasks.
     static pwdfilename;
     static data;
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB-PWDPanel', 1] then return; endif
 
-//    local data = GenerateData [2.5, 30, 40];//DEBUG
-    data = ReadData ['~daren/dev/MOEDivcon/heatmapdata3.csv'];
+    local [resnames, ligdata] = ReadData ['~daren/dev/MOEDivcon/heatmapdata3.csv'];
+    local resabbrevs = apt tok_drop [resnames, 3];
+    local lignames = app first ligdata;
+    local ligabbrevs = apt tok_keep [lignames, -3];
+    local ligvals = app second ligdata;
+    data = [resnames, resabbrevs, tr [lignames, ligabbrevs, ligvals]];
 
     local missing = CheckResidues first data;
     if length missing > 0 then
@@ -715,7 +680,6 @@ global function qb_QBPWDSetupPanel []
         return;
     endif
 
-    local pwdopts = [], browsetasks = [];
     local appdflts = tag tr QBPWD_OPT_DEFAULTS;
 
     local wkey = WindowCreate cat [HEADER, PANEL];
@@ -767,52 +731,6 @@ global function qb_QBPWDSetupPanel []
 
                     exit [];
                 endif
-
-            elseif vals.panel === 'Run' then
-
-                if second task_fork [statics:'share'] === 'child' then
-/*
-                    status = qb_VerifyDivcon [wkey, status, vals];
-                    if not status.verified then exit []; endif
-
-                    coreopts = qb_TagCoreVals [vals];
-                    pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
-                        vals.cutoff, vals.mapncolors, vals.mapnticks]];
-                    pwdkey = qb_SetUpScoreDB [status, coreopts, pwdopts, 
-                        [], [/*fields*/], 'qb-pwd', 0];
-                    pwdfilename = db_Filename pwdkey;
-
-                    if vals.mode === 'One-to-One' then
-                        RunCalc [pwdkey];
-                    else
-                        RunOneToManyCalc [pwdkey];
-                    endif
-
-                    dbv_Open db_Filename pwdkey;
-                    db_Close pwdkey;
-*/
-                    exit [];
-                else
-                    break;
-                endif
-
-            elseif vals.panel === 'Save' then
-
-                if second task_fork [statics:'share'] === 'child' then
-
-                    status = qb_VerifyDivcon [wkey, status, vals];
-                    if not status.verified then exit []; endif
-
-                    coreopts = qb_TagCoreVals [vals];
-                    pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
-                        vals.cutoff, vals.mapncolors, vals.mapnticks]];
-                    pwdkey = qb_SetUpScoreDB [status, coreopts, pwdopts,
-                        [], [/*fields*/], 'qb-pwd', 1];
-                    pwdfilename = db_Filename pwdkey;
-                    dbv_Open pwdfilename;
-                    db_Close pwdkey;
-                    exit [];
-                endif
             endif
 
         elseif trig === 'heatmap' then
@@ -834,21 +752,17 @@ global function qb_QBPWDSetupPanel []
                 //  Make sure first ligand is in MOE Window
                 UpdateComplex INITLIG;
                 qb_HeatMapSetupPanel [data, vals.cutoff, SIGNIFRES, 
-                    vals.mapncolors, vals.mapnticks, 
+                    vals.mapncolors, vals.mapmono, vals.mapnticks, 
                     'qb_QBPWDSelectHandler', INITLIG, 1];
 
                 exit [];
             endif
-
-        else
-           [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
-               browsetasks, pwdkey];
         endif
     endloop
 
     ClearSurfaceMap G_surface.title;
+    aSetLabelRes [G_surface.resatms, 0];
     G_surface = [];
-    task_kill browsetasks;
     WindowDestroy wkey;
 
 endfunction

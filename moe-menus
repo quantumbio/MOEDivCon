@@ -17,9 +17,10 @@
 MENU APPEND "Main:Compute:Simulations"
     "QuantumBio"
         MENU  "QuantumBio"
-            "QB-PWD..."           exec "run'pwdpanel.svl'"
             "QMScore..."          exec "run'qmspanel.svl'"
             "NMRScore..."         exec "run'nmrpanel.svl'"
+	    SEPARATOR
+            "QB-PWD..."           exec "run'pwdpanel.svl'"
         ENDMENU
 ENDMENU
 

@@ -31,6 +31,7 @@
 //  Colors
 const NEG_RANGE_MAX = 896;
 const POS_RANGE_MAX = 704;
+const MONO_RANGE_MAX = 384;
 const G_FACTOR = 256;
 const R_FACTOR = 256 * 256;
 
@@ -93,22 +94,47 @@ function StandardDeviation;
  *
  *                          CalculateCuts
  *
- *  Return the average and standard deviation of the flat vector of numbers.
+ *  Determine the minimum and maximum cuts.
  *
  ****************************************************************************/
-local function CalculateCuts [data, cutoff, cols]
+local function CalculateCuts [data, cutoff, cols, num]
 
-    local rowdata = second data;
+    local rowdata = third data;
     local row, numbers = [];
     for row in rowdata loop
-        numbers = cat [numbers, keep [second row, cols]];
+        numbers = cat [numbers, keep [third row, cols]];
     endloop
 
+    local minnum = min numbers;
+    local maxnum = max numbers;
     local [avg, sigma] = StandardDeviation [numbers];
 
 write ['A: {}, S: {}\n', avg, sigma];//DEBUG
 
-    return [avg - (cutoff * sigma), avg + (cutoff * sigma)];
+    local mincut, maxcut;
+    if minnum === 0 and maxnum > 0 and num > 0 then
+        mincut = 0;
+        maxcut = 2 * (avg + (cutoff * sigma));
+    elseif maxnum === 0 and minnum < 0 and num > 0 then
+        mincut  = 2 * (avg - (cutoff * sigma));
+        maxcut = 0;
+    elseif minnum < 0 and maxnum > 0 and num > 0 then
+        mincut = avg - (cutoff * sigma);
+        maxcut = avg + (cutoff * sigma);
+
+        //  Adjust so that 0 is in the middle of white
+        local length = maxcut - mincut;
+        local step = (length) / num;
+        mincut = (ceil (mincut / step) - 0.5) * step;
+        maxcut = mincut + length;
+
+    else
+        return [[], [], twrite ['Cannot generate minimum and maximum cuts\n'
+            'with cutoff {}, signifcant columns {}, and number {}\n',
+            cutoff, cols, num]];
+    endif
+
+    return [mincut, maxcut, ''];
 
 endfunction
 
@@ -398,6 +424,129 @@ local function GetPosColors [maxcut, num]
     return reverse colors;
 endfunction
 
+function GetMonoNegColors;
+function GetMonoPosColors;
+
+/****************************************************************************
+ *
+ *                          GetMonoColors
+ *
+ *  Returns a scale of num colors starting with the color that
+ *  represent mincut (blue or white) and ending with the color that
+ *  represents maxcut (white or red).
+ *
+ ****************************************************************************/
+local function GetMonoColors [mincut, maxcut, num]
+
+    local colors = [];
+
+    if mincut === 0 and maxcut > 0 and num > 0 then
+        colors = GetMonoPosColors [maxcut, num - 1];
+    elseif maxcut === 0 and mincut < 0 and num > 0 then
+        colors = GetMonoNegColors [mincut, num - 1];
+    elseif mincut < 0 and maxcut > 0 and num > 0 then
+        local mid = max [1, floor ((num - 1) * (mincut / (mincut - maxcut)))];
+        colors = GetMonoNegColors [mincut, mid];
+        colors = cat [colors, dropfirst  GetMonoPosColors [maxcut,
+            num - mid - 1]];
+    else
+        return [[], twrite ['Cannot generate colors with minimum {},\n'
+            'maximum {}, and number {}\n', mincut, maxcut, num]];
+    endif
+
+    return [colors, ''];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          GetMonoNegColors
+ *
+ *  Return num number of scaled colors, plus white, ordered from blue to white.
+ *
+ ****************************************************************************/
+local function GetMonoNegColors [mincut, num]
+
+    local colors = [], newcolor;
+    local r, g, b;
+    local delta = floor (MONO_RANGE_MAX / num);
+
+    //  Dark Blue
+    r = 0; g = 0; b = 127;
+    while b < 256 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        b = b + delta;
+    endloop
+
+
+    //  Light Blue
+    g = b - 256; r = b - 256; b = 255;
+    while g < 256 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        g = g + delta;
+        r = r + delta;
+    endloop
+
+
+    if length colors > num then
+        colors = drop [colors, num - length colors];
+    endif
+
+    //  White
+    r = 255; g = 255; b = 255;
+    newcolor = r * R_FACTOR + g * G_FACTOR + b;
+    colors = append [colors, newcolor];
+
+    return colors;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          GetMonoPosColors
+ *
+ *  Return num number of scaled colors, plus white, ordered from white to red.
+ *
+ ****************************************************************************/
+local function GetMonoPosColors [maxcut, num]
+
+    local colors = [], newcolor;
+    local r, g, b;
+    local delta = floor (MONO_RANGE_MAX / num);
+
+    //  Since we prefer darker colors, build red to white and then reverse.
+
+    //  Dark Red
+     r = 127; g = 0; b = 0;
+    while r < 256 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        r = r + delta;
+    endloop
+    
+    //  Light Red
+     g = r - 255; b = r - 255; r = 255; 
+    while g < 256 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        g = g + delta;
+        b = b + delta;
+    endloop
+    
+    if length colors > num then
+        colors = drop [colors, num - length colors];
+    endif
+
+    //  White
+    r = 255; g = 255; b = 255;
+    newcolor = r * R_FACTOR + g * G_FACTOR + b;
+    colors = append [colors, newcolor];
+
+    return reverse colors;
+endfunction
+
 /****************************************************************************
  *
  *                          StandardDeviation
@@ -425,29 +574,44 @@ endfunction
  *
  *  Note, data has the format:
  *
- *  [[colNames], [[rowName1, [values1]], [rowName2, [values2]], ...
- *      ... , [rowNameN, [valuesN]]]
- *  where length colNames === length values1 === ... === length valuesN,
- *  and the names are tokens and the values are numbers.
+ *  [[colNames], [colAbbrevs], [[rowName1, rowAbbrev1, [values1]],
+ *  [rowName2, rowAbbrev2, [values2]], ... , [rowNameN, rowAbbrevN, [valuesN]]]
+ *  where length colNames === length colAbbrevs === length values1 ===
+ *   ... === length valuesN,
+ *  and the names and abbreviations are tokens and the values are numbers.
  *
- *  Note:  uses only the last three characters of ColNames and RowNames for
- *  labels.
+ *  Note:  only the first three characters of the abbreviations are used 
+ *  for the labels.
  *
  ****************************************************************************/
 global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols, 
-        numcolors, ticks, selfun, initsel, help]
+        numcolors, monochrome, ticks, selfun, initsel, help]
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB Heat Map', 1] then return; endif
 
-    local [mincut, maxcut] = CalculateCuts [data, cutoff, numsignifcols];
-    local [colors, errmess] = GetColors [mincut, maxcut, numcolors];
+    local mincut, maxcut, errmess;
+    [mincut, maxcut, errmess] = CalculateCuts [data, cutoff, 
+        numsignifcols, numcolors];
+
+    if mincut === [] or maxcut === [] then
+        Warning errmess;
+        return;
+    endif
+
+    local colors;
+    if monochrome then
+        [colors, errmess] = GetMonoColors [mincut, maxcut, numcolors];
+    else
+        [colors, errmess] = GetColors [mincut, maxcut, numcolors];
+    endif
+
     if colors === [] then
         Warning errmess;
         return;
     endif
 
-    local [colnames, rowdata] = data;
+    local [colnames, colabbrevs, rowdata] = data;
     local numcols = length colnames;
     local numrows = length rowdata;
     local page_w = (numcols + 1) * (CELL_WD + MOE_PAD_W) + MOE_PAD_W;
@@ -461,31 +625,33 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
     //  Color map cells and store row labels
     local row_i, col_i, bgraphics = [], bhelp = [];
     for row_i = 1, numrows, 1 loop
-        local [rowlabel, rowvals] = rowdata (row_i);
-        bgraphics = append [bgraphics, DrawCellLabel [tok_keep [rowlabel, -3],
+        local [rowname, rowabbrev, rowvals] = rowdata (row_i);
+        bgraphics = append [bgraphics, DrawCellLabel [tok_keep [rowabbrev, 3],
             CELL_WD, CELL_HT]];
         if help then
-            bhelp = append [bhelp, twrite ['row:  {}', rowlabel]];
+            bhelp = append [bhelp, twrite ['row:  {}', rowname]];
         endif
 
         for col_i = 1, numcols, 1 loop
             bgraphics = append [bgraphics, DrawCell [colors, 
                 CELL_WD, CELL_HT, mincut, maxcut, rowvals (col_i)]];
                 if help then
-                    bhelp = append [bhelp, twrite ['cell:  [{}, {}]', rowlabel,
-                        colnames (col_i)]];
+                    bhelp = append [bhelp, twrite ['cell [{}, {}] = {}',
+                        rowname, colnames (col_i), rowvals (col_i)]];
                 endif
         endloop
     endloop
 
     //  Empty corner label
     bgraphics = append [bgraphics, 0];
-    bhelp = append [bhelp, 'empty cell'];
+    if help then
+        bhelp = append [bhelp, 'empty cell'];
+    endif
 
     //  Column labels
     for col_i = 1, numcols, 1 loop
         bgraphics = append [bgraphics, 
-            DrawCellLabel [tok_keep [colnames (col_i), -3], CELL_WD, CELL_HT]];
+            DrawCellLabel [tok_keep [colabbrevs (col_i), 3], CELL_WD, CELL_HT]];
         if help then
             bhelp = append [bhelp, twrite ['col:  {}', colnames (col_i)]];
         endif
