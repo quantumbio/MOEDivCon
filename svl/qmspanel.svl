@@ -278,7 +278,7 @@ local function RunCalc [dbkey]
     local [recset, ligand, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
 
     local workdir;
-    if coreopts.pwd === 1 then
+    if coreopts.cwd === 1 then
         workdir = getenv 'PWD';
     else
         workdir = fabsname coreopts.workdir;
@@ -344,7 +344,7 @@ global function RunOneToManyCalc [oldkey]
 
     local msgkey = 0;
     local workdir;
-    if coreopts.pwd === 1 then
+    if coreopts.cwd === 1 then
         workdir = getenv 'PWD';
     else
         workdir = fabsname coreopts.workdir;
@@ -521,7 +521,7 @@ global function qb_QMScoreSetupPanel []
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.ham, vals.scaling, vals.freq, vals.opt,
-                        vals.shift, vals.pwd]];
+                        vals.shift, vals.analpwd, vals.trainingset]];
                     qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
                         [], QMS_NUM_FIELDS, 'qmscore', 0];
                     if vals.mode === 'One-to-One' then
@@ -547,7 +547,7 @@ global function qb_QMScoreSetupPanel []
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.ham, vals.scaling, vals.freq, vals.opt,
-                        vals.shift, vals.pwd]];
+                        vals.shift, vals.analpwd, vals.trainingset]];
                     qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', 1];
                     dbv_Open db_Filename qmskey;

@@ -52,7 +52,7 @@ global function qb_QMScoreBatch [dbpath]
     local [recmols, ligmol, s, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
 
     local workdir;
-    if coreopts.pwd === 1 then
+    if coreopts.cwd === 1 then
         workdir = getenv 'PWD';
     else
         workdir = fabsname coreopts.workdir;

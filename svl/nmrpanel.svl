@@ -278,7 +278,7 @@ function RunCalc [dbkey, moeindices, moeatomnames]
         = qb_GetNMRSEnv [dbkey];
 
     local workdir;
-    if coreopts.pwd === 1 then
+    if coreopts.cwd === 1 then
         workdir = getenv 'PWD';
     else
         workdir = fabsname coreopts.workdir;
