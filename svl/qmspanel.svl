@@ -40,6 +40,7 @@ function qb_GetEnvTag;
 function qb_GetWhich;
 function qb_InitCorePanel;
 function qb_LoadCoreScoreDB;
+function qb_SaveAnalysisData;//temp
 function qb_SaveDivconStatus;
 function qb_SetUpScoreDB;
 function qb_TagCoreVals;
@@ -150,7 +151,7 @@ const PANEL =
                 ]
             ],
         Hbox :
-                [
+            [
             Option :
                 [
                 name: 'scaling', title: 'Calculation:', text: ALG_OPTS,
@@ -211,6 +212,7 @@ const PANEL =
     Hbox :
         [
         extendH: 1,
+        name: 'analbox',
         Checkbox :
             [
             name: 'analpwd', text: 'PWD', title: 'Analysis:',
@@ -263,6 +265,40 @@ endfunction
 
 function qb_GetQMSEnv;
 function qb_SaveQMScore;
+
+/****************************************************************************
+ *
+ *                          ReadData
+ *
+ *  Return data formatted for the heat map.
+ *
+ ****************************************************************************/
+local function ReadData [filename]
+
+    //TODO:  change to use fieldsplit
+    local f = fopenr filename;
+    local lines = freadb [f, 'line', INT_MAX];
+    local line = first lines;
+    local m = line == ",";
+    local strings = split [line | not m, dec mtoc prepend [m, 1]];
+    local resnames = app token strings;
+    lines = dropfirst lines;
+
+    //  ligand labels and values
+    local ligdata = [];
+    for line in lines loop
+        m = line == ",";
+        strings = split [line | not m, dec mtoc prepend [m, 1]];
+        local ligname = token first strings;
+        strings = dropfirst strings;
+        local ligvals = atof app token strings;
+        ligdata = append [ligdata, [ligname, ligvals]];
+    endloop
+
+    fclose f;
+
+    return [resnames, ligdata];
+endfunction
 
 /****************************************************************************
  *                          RunCalc
@@ -548,8 +584,16 @@ global function qb_QMScoreSetupPanel []
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.ham, vals.scaling, vals.freq, vals.opt,
                         vals.shift, vals.analpwd, vals.trainingset]];
+
                     qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', 1];
+//DEBUG
+                    if qmsopts.analpwd then
+                        local sardata = ReadData [
+                            '~daren/dev/MOEDivcon/heatmapdata3-88.csv'];
+                        qb_SaveAnalysisData [qmskey, 'pwd', 'sar', sardata];
+                    endif
+//DEBUG
                     dbv_Open db_Filename qmskey;
                     db_Close qmskey;
                     exit [];

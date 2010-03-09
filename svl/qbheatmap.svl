@@ -28,6 +28,9 @@
 #set class   'QuantumBio'
 #set version '2010.01'
 
+function gr_export;
+function gr_print;
+
 //  Colors
 const NEG_RANGE_MAX = 896;
 const POS_RANGE_MAX = 704;
@@ -35,21 +38,22 @@ const MONO_RANGE_MAX = 384;
 const G_FACTOR = 256;
 const R_FACTOR = 256 * 256;
 
-//  Page
-const PAGE_HT_MAX = 750;
-const PAGE_WD_MAX = 900;
-
 //  Scale
+const SCALE_BOX = 2;
 const SCALE_PAD = 10;
 const SCALE_CELL_WD = 10;
-const TICK_LEN = 5;
+const SCALE_TICK_LEN = 5;
+const SCALE_VAL_LEN = 40;
 
 //  Cells
-const CELL_WD = 21;
-const CELL_HT = 11;
+const CELL_WD = 20;
+const CELL_HT = 10;
 
 const MOE_PAD_W = 3.7;
 const MOE_PAD_H = 3.0;
+
+const MAX_ROWS = 40;
+const MAX_COLS = 30;
 
 //  Window GUI
 const HEADER = 
@@ -57,8 +61,8 @@ const HEADER =
     name: 'panel', 
     title: 'QB Heat Map',
     windowName: 'QB Heat Map',
-    text: ['Close'],
-    onTrigger: ['return']
+    text: ['Animate', 'Print', 'Save', 'Close'],
+    onTrigger: ['return', 'return', 'return', 'return']
     ];
 
 const PANEL =
@@ -87,6 +91,27 @@ const PANEL =
     ];
 
 //  Local Functions
+
+/****************************************************************************
+ *
+ *                          Animate
+ *
+ *  Automatically selects rows, columns or cells.
+ *
+ ****************************************************************************/
+local function Animate [dir, data, numrows, numcols, selfun, mincut, 
+        maxcut, colors];
+
+    local sel_i, errmess;
+    if dir === 'row' then
+        for sel_i = 1, numrows, 1 loop
+            errmess = call [selfun, [data, sel_i, 0, mincut,
+                maxcut, colors]];
+            sleep 0.5;
+        endloop
+    endif
+
+endfunction
 
 function StandardDeviation;
 
@@ -123,10 +148,10 @@ write ['A: {}, S: {}\n', avg, sigma];//DEBUG
         maxcut = avg + (cutoff * sigma);
 
         //  Adjust so that 0 is in the middle of white
-        local length = maxcut - mincut;
-        local step = (length) / num;
+        local dist = maxcut - mincut;
+        local step = dist / num;
         mincut = (ceil (mincut / step) - 0.5) * step;
-        maxcut = mincut + length;
+        maxcut = mincut + dist;
 
     else
         return [[], [], twrite ['Cannot generate minimum and maximum cuts\n'
@@ -170,44 +195,6 @@ endfunction
 
 /****************************************************************************
  *
- *                          DrawColorScale
- *
- *  Draws a scale of colors starting with color that represents mincut (blue
- *  or white) at the bottom and ending with the color that represents maxcut
- *  (white or red) at the top.
- *
- *  NOTE:  calling function should call gr_destroy on key after using it.
- *
- ****************************************************************************/
-local function DrawColorScale [colors, cell_w, cell_h, mincut, maxcut, ticks]
-
-    local width = cell_w + 40;  // cell + ticks
-    local height = cell_h * length colors;
-    local key = gr_create [title: 'colorscale',
-        size: [width, height  + 2 * SCALE_PAD], units: 'pt'];
-    local ith;
-    for ith = 1, length colors, 1 loop
-        gr_box [key, [0, [0, (ith - 1) * cell_h + SCALE_PAD],
-            [cell_w , ith * cell_h  + SCALE_PAD],
-            colors (ith), 1, colors (ith)]];
-    endloop
-    local step = height / (ticks - 1);
-    local delta = (maxcut - mincut) / (ticks - 1);
-    for ith = 0, ticks, 1 loop
-        gr_line [key, [0, [cell_w, ith * step  + SCALE_PAD],
-            [cell_w + TICK_LEN, ith * step + SCALE_PAD],
-            icolor'black', 1]];
-        gr_text [key, [0, [cell_w + TICK_LEN * 1.5, ith * step + SCALE_PAD],
-            twrite ['{n:.2f}', mincut + (ith * delta)], 'sys', icolor'black',
-            10, [position: 'middleleft']]];
-    endloop
-
-    return [key, width, height];
-
-endfunction
-
-/****************************************************************************
- *
  *                          DrawCellLabel
  *
  *  Returns a graphics object with the formated text drawn.
@@ -245,6 +232,166 @@ local function DrawColLabels [ftexts, width, height]
             icolor'black', 8, [position: 'middlecenter']]];
         x = x + width + MOE_PAD_W;
     endloop
+
+    return key;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          DrawColorScale
+ *
+ *  Draws a scale of colors starting with color that represents mincut (blue
+ *  or white) at the bottom and ending with the color that represents maxcut
+ *  (white or red) at the top.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawColorScale [colors, cell_w, cell_h, mincut, maxcut, ticks]
+
+    local width = cell_w + 40;  // cell + ticks
+    local height = cell_h * length colors;
+    local key = gr_create [title: 'colorscale',
+        size: [width, height  + 2 * SCALE_PAD], units: 'pt'];
+    local ith;
+    for ith = 1, length colors, 1 loop
+        gr_box [key, [0, [0, (ith - 1) * cell_h + SCALE_PAD],
+            [cell_w , ith * cell_h  + SCALE_PAD],
+            colors (ith), 1, colors (ith)]];
+    endloop
+
+    local step = height / (ticks - 1);
+    local delta = (maxcut - mincut) / (ticks - 1);
+    for ith = 0, ticks - 1, 1 loop
+        gr_line [key, [0, [cell_w, ith * step  + SCALE_PAD],
+            [cell_w + SCALE_TICK_LEN, ith * step + SCALE_PAD],
+            icolor'black', 1]];
+        gr_text [key, [0, [cell_w + SCALE_TICK_LEN * 1.5, ith * step + SCALE_PAD],
+            twrite ['{n:.2f}', mincut + (ith * delta)], 'sys', icolor'black',
+            10, [position: 'middleleft']]];
+    endloop
+
+    return [key, width, height];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          DrawMap
+ *
+ *  Returns a graphics object containing the Heat Map for printing or
+ *  saving to a file in one of the standard formats.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawMap [data, numrows, numcols, mincut, maxcut, colors, ticks]
+
+    local [colnames, colabbrevs, rowdata] = data;
+
+    local colnmlen = (max app tok_length colnames) * 8 + 4;
+    local rownmlen = (max app tok_length app first rowdata) * 8 + 4;
+
+    local box_w = numcols * CELL_WD;
+    local box_h = numrows * CELL_HT;
+
+    local cs_h = floor ((box_h - 2 * SCALE_PAD) / length colors);
+    local tcs_h = cs_h * length colors;
+    local cs_w =  SCALE_CELL_WD;
+    local tcs_w = SCALE_PAD + cs_w + SCALE_VAL_LEN;
+
+    local page_w = rownmlen + box_w + tcs_w;
+    local page_h = box_h + colnmlen;
+
+write ['min {} max {} cnl {}, rnl {}, nr {}, nc {}, bw {}, bh {}, pw {}, ph {}\n', 
+mincut, maxcut, colnmlen, rownmlen, numrows, numcols, box_w, box_h, page_w, page_h];//DEBUG
+
+    local key = gr_create [size: [page_w, page_h], units: 'pt'];
+
+    //  Color map cells
+    local row_i, col_i;
+    for row_i = 1, numrows, 1 loop
+        local [rowname, rowabbrev, rowvals] = rowdata (row_i);
+        local c_y = colnmlen + (numrows - row_i) * CELL_HT;
+
+        gr_text [key, [0, [CELL_WD/2 , c_y + CELL_HT/2], rowname, 'sys', 
+            icolor'black', 8, [position: 'middlecenter']]];
+
+        for col_i = 1, numcols, 1 loop
+            local cidx, value = rowvals (col_i);
+            if value <= mincut then
+                cidx = 1;
+            elseif value >= maxcut then
+                cidx = length colors;
+            else
+                local step = (maxcut - mincut) / (length colors);
+                cidx = ceil ((value - mincut) / step);
+            endif
+
+            local c_x = rownmlen + (col_i - 1) * CELL_WD;
+            gr_box [key, [0, [c_x, c_y], [c_x + CELL_WD , c_y + CELL_HT],
+                colors (cidx), 1, colors (cidx)]];
+        endloop
+    endloop
+
+    //  Column labels
+    local bg = rep [rep [0x00FFFFFF, colnmlen], CELL_WD];
+    for col_i = 1, numcols, 1 loop
+
+        local colkey = gr_create [size: [colnmlen, CELL_WD], units: 'pt'];
+        gr_text [colkey, [0, [2, CELL_WD/2], colnames (col_i), 'sys', 
+            icolor'black', 8, [position: 'middleleft']]];
+        local img = gr_render_pixmap [bg, colkey];
+        gr_destroy colkey;
+        gr_pixmap [key, [0, [rownmlen + (col_i - 1) * CELL_WD, colnmlen],
+            [CELL_WD, colnmlen], app reverse tr img]];
+    endloop
+
+
+    //  Draw box
+   gr_line [key, [0,
+        [[rownmlen, rownmlen, rownmlen + box_w, rownmlen + box_w],
+         [colnmlen, colnmlen + box_h, colnmlen + box_h, colnmlen]],
+        [[rownmlen, rownmlen + box_w, rownmlen + box_w, rownmlen],
+         [colnmlen + box_h, colnmlen + box_h, colnmlen, colnmlen]],
+        icolor'black', 1]];
+
+    //  Center the scale in its alloted space.
+    local cs_x = rownmlen + box_w + SCALE_PAD;
+    local cs_y = (box_h - 2 * SCALE_PAD - tcs_h) / 2 + colnmlen + SCALE_PAD;
+
+    local ith;
+    for ith = 1, length colors, 1 loop
+        gr_box [key, [0, [cs_x, cs_y + (ith - 1) * cs_h],
+            [cs_x + cs_w, ith * cs_h + cs_y],
+            colors (ith), 1, colors (ith)]];
+    endloop
+
+    //  Draw box around scale
+   gr_line [key, [0,
+        [[cs_x, cs_x, cs_x + cs_w, cs_x + cs_w],
+         [cs_y, cs_y + tcs_h, cs_y + tcs_h, cs_y]],
+        [[cs_x, cs_x + cs_w, cs_x + cs_w, cs_x],
+         [cs_y + tcs_h, cs_y + tcs_h, cs_y, cs_y]],
+        icolor'black', 1]];
+
+    local csstep = tcs_h / (ticks - 1);
+    local delta = (maxcut - mincut) / (ticks - 1);
+
+write ['csw {}, csh {}, tcsw {}, tcsh {}, csx {}, cxy {}\nstep {}, delta {}\n', 
+cs_w, cs_h, tcs_w, tcs_h, cs_x, cs_y, csstep, delta];//DEBUG
+
+
+    for ith = 0, ticks - 1, 1 loop
+        gr_line [key, [0, [cs_x + cs_w, cs_y + ith * csstep],
+            [cs_x + cs_w + SCALE_TICK_LEN, cs_y + ith * csstep],
+            icolor'black', 1]];
+        gr_text [key, [0, [cs_x + cs_w + SCALE_TICK_LEN * 1.5,
+            cs_y + ith * csstep], twrite ['{n:.2f}', mincut + (ith * delta)],
+            'sys', icolor'black', 8, [position: 'middleleft']]];
+    endloop
+
 
     return key;
 
@@ -570,6 +717,53 @@ endfunction
 
 /****************************************************************************
  *
+ *                          TruncateCols
+ *
+ *  Return the data with only the first MAX_COLS columns of data.
+ *
+ ****************************************************************************/
+local function TruncateCols [data]
+
+    local [resnames, resabbrevs, rowdata] = data;
+    if length resnames <= MAX_COLS then
+        return data;
+    endif
+
+    local truncresnames = keep [resnames, MAX_COLS];
+    local truncresabbrevs = keep [resabbrevs, MAX_COLS];
+    local row, trunclignames = [], truncligabbrevs = [], truncrowvals = [];
+    for row in rowdata loop
+        local [ligname, ligabbrev, rowvals] = row;
+        trunclignames = append [trunclignames, ligname];
+        truncligabbrevs = append [truncligabbrevs, ligabbrev];
+        truncrowvals = append [truncrowvals, keep [rowvals, MAX_COLS]];
+    endloop
+
+    local truncdata = [truncresnames, truncresabbrevs,
+        tr [trunclignames, truncligabbrevs, truncrowvals]];
+
+    return truncdata;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          TruncateRows
+ *
+ *  Return the data with only the first MAX_ROWS rows of data.
+ *
+ ****************************************************************************/
+local function TruncateRows [data]
+
+    local [resnames, resabbrevs, rowdata] = data;
+    return [resnames, resabbrevs, keep [rowdata, MAX_ROWS]];
+
+endfunction
+
+//  Global Functions
+
+/****************************************************************************
+ *
  *                          qb_HeatMapSetupPanel
  *
  *  Note, data has the format:
@@ -589,6 +783,9 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB Heat Map', 1] then return; endif
+
+    data = TruncateCols [data];
+    data = TruncateRows [data];
 
     local mincut, maxcut, errmess;
     [mincut, maxcut, errmess] = CalculateCuts [data, cutoff, 
@@ -693,7 +890,26 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
         if trig === 'panel' then
             if vals.panel === 'Close' then 
                 break;
+
+            elseif vals.panel === 'Save' then
+                local simgkey = DrawMap [data, numrows, numcols, mincut, 
+                    maxcut, colors, ticks];
+                gr_export simgkey;
+                gr_destroy simgkey;
+
+            elseif vals.panel === 'Print' then
+                local pimgkey = DrawMap [data, numrows, numcols, mincut, 
+                    maxcut, colors, ticks];
+                gr_print pimgkey;
+                gr_destroy pimgkey;
+
+            elseif vals.panel === 'Animate' then
+                WindowShow [wkey, 0];
+                Animate ['row', data, numrows, numcols, selfun, mincut, 
+                    maxcut, colors];
+                WindowShow [wkey, 1];
             endif
+
         elseif trig === 'mapradio' then
             selrow = ceil (vals.mapradio / (numcols + 1));
             if selrow === numrows + 1 then

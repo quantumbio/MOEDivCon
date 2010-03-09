@@ -132,6 +132,14 @@ global function qb_QMScoreBatch [dbpath]
     until code === 'eof'
     endloop
 
+
+    if qmsopts.analpwd then
+    //TODO:  perform analysis
+write ['Training set:  {}\n', qmsopts.trainingset];//DEBUG
+
+    //TODO:  save analysis results
+    endif
+
     db_Close dbkey;
 
 endfunction
