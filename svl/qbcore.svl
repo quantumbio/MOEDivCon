@@ -47,14 +47,13 @@ const STATUS = 'status';
 const COREOPTS = 'coreoptions';
 const APPOPTS = 'applicationoptions';
 const ANALOPTS = 'analysisoptions';
-const ANALDATA = 'analysisdata';
 
 const DBTYPE = 'qb_dbtype';
 const QMSCORE = 'qb_qmscoredb';
 const NMRSCORE = 'qb_nmrscoredb';
-const QBPWD = 'qb_pwddb';//DEBUG - remove
 
 const ANALYSIS = 'qb_analysistype';
+const ANALPWD = 'qb_pwd';
 const ANALPWDSAR = 'qb_pwdSAR';
 const ANALPWDINTER = 'qb_pwdinteraction';
 
@@ -861,8 +860,6 @@ local function SaveEnv [dbkey, tgtmols, ligmol, status, coreopts, appopts,
         db_SetEnv [dbkey, DBTYPE, NMRSCORE];
     elseif type === 'qmscore' then
         db_SetEnv [dbkey, DBTYPE, QMSCORE];
-    elseif type === 'qb-pwd' then
-        db_SetEnv [dbkey, DBTYPE, QBPWD];
     endif
 
 endfunction
@@ -1378,6 +1375,29 @@ global function qb_CutReceptor [posedbkey, radius]
 endfunction
 
 /****************************************************************************
+ *                          qb_GetAnalysisData
+ *
+ *  Return the analysis results in the database.
+ *
+ ****************************************************************************/
+global function qb_GetAnalysisData [dbkey, analysis, type]
+
+    local datatok, data = [];
+    if analysis === 'pwd' then
+        if type === 'sar' then
+            datatok = db_GetEnv [dbkey, ANALPWDSAR];
+            [[data]] = sread [string datatok, '{v}'];
+        elseif type === 'inter' then
+            datatok = db_GetEnv [dbkey, ANALPWDINTER];
+            [[data]] = sread [string datatok, '{v}'];
+        endif
+    endif
+
+    return data;
+
+endfunction
+
+/****************************************************************************
  *
  *                          qb_GetCorePanel
  *
@@ -1406,6 +1426,20 @@ endfunction
  ****************************************************************************/
 global function qb_GetDefaultsStatus []
     return tag tr STATUS_DEFAULTS;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetEnvAnal
+ *
+ *  Get the environment value for the analysis options.
+ *
+ ****************************************************************************/
+global function qb_GetEnvAnal [dbkey]
+
+    local tagtok = db_GetEnv [dbkey, ANALOPTS];
+    local [[tagval]] = sread [string tagtok, '{v}'];
+
+    return tagval;
 endfunction
 
 /****************************************************************************
@@ -1576,12 +1610,6 @@ global function qb_LoadCoreScoreDB [dbpath, type]
             twrite ['{}\nis not a QMScore Database.', dbpath]];
     endif
 
-    if type === 'qb-pwd' and neL [dbtype, QBPWD] then
-        db_Close dbkey;
-        return [0, [], [], [], [], [],
-            twrite ['{}\nis not a QB-PWD Database.', dbpath]];
-    endif
-
     local [rec, lig, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
 
     return [dbkey, rec, lig, status, coreopts, complex, ''];
@@ -1618,6 +1646,36 @@ global function qb_MergeDB [srcname1, srcname2, dstname]
     db_Close dstkey;
     db_Close srckey1;
     db_Close srckey2;
+endfunction
+
+/****************************************************************************
+ *                          qb_SaveEnvAnal
+ *
+ *  Save the analysis options in the database.
+ *
+ ****************************************************************************/
+global function qb_SaveEnvAnal [dbkey, analopts]
+
+    db_SetEnv [dbkey, ANALOPTS, twrite ['{v}', analopts]];
+endfunction
+
+/****************************************************************************
+ *                          qb_SaveAnalysisData
+ *
+ *  Save the analysis results in the database.
+ *
+ ****************************************************************************/
+global function qb_SaveAnalysisData [dbkey, analysis, type, data]
+
+    if analysis === 'pwd' then
+        db_SetEnv [dbkey, ANALYSIS, ANALPWD];
+        if type === 'sar' then
+            db_SetEnv [dbkey, ANALPWDSAR, twrite ['{v}', data]];
+        elseif type === 'inter' then
+            db_SetEnv [dbkey, ANALPWDINTER, twrite ['{v}', data]];
+        endif
+    endif
+
 endfunction
 
 /****************************************************************************

@@ -33,23 +33,12 @@ function grid_isoidx_emit;
 function msurf_MolecularSurface;
 function pboltz_AtomParameters;
 
-function qb_CoreHandler;
-function qb_GetCoreEnv;
-function qb_GetCorePanel;
-function qb_GetDefaultsCore;
-function qb_GetDefaultsStatus;
-function qb_GetEnvApp;
-function qb_GetEnvTag;
+function qb_GetAnalysisData;
+function qb_GetEnvAnal;
 function qb_GetPoseFields;
-function qb_GetWhich;
-function qb_InitCorePanel;
 function qb_LoadCoreScoreDB;
-function qb_SaveDivconStatus;
-function qb_SetUpScoreDB;
+function qb_SaveEnvAnal;
 function qb_SplitComplex;
-function qb_TagCoreVals;
-function qb_UpdateCorePanel;
-function qb_VerifyDivcon;
 
 function qb_HeatMapSetupPanel;
 
@@ -57,10 +46,23 @@ const MAT_TRANS_MIN = 0x80;
 
 const QBPWD_OPT_DEFAULTS =
     [
+    ['analysis',     1             ],
     ['cutoff',       2.0           ],
     ['mapncolors',  15             ],
     ['mapmono',      1             ],
     ['mapnticks',    5             ]
+    ];
+
+const ANALYSIS =
+    [
+    'SAR',
+    'Interaction'
+    ];
+
+const ANALKEYS =
+    [
+    'sar',
+    'inter'
     ];
 
 const HEADER = 
@@ -68,9 +70,10 @@ const HEADER =
     name: 'panel', 
     title: 'QB-PWD',
     windowName: 'QB-PWDPanel',
-    text: ['Load', 'Close'],
-    onTrigger: ['return', 'return'],
-    bubbleHelp: ['Load QB-PWD analysis results from a QMScore database.', 
+    text: ['Apply', 'Load', 'Close'],
+    onTrigger: ['validate', 'return', 'return'],
+    bubbleHelp: ['Generate surface and heat map.',
+            'Load QB-PWD analysis results from a QMScore database.', 
             '']
     ];
 
@@ -81,16 +84,24 @@ const PANEL =
         Hbox :
             [
             extendH: 1,
-            Button :
+            Option :
                 [
-                name: 'heatmap', text: 'Heat Map',
+                name: 'analysis', title: 'Analysis:', text: ANALYSIS,
+                type: 'int', minWidth: 8,
                 bubbleHelp:
                     ''
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
+                ]
+            ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
+    Vbox :
+        [
+        title: 'Heat Map:     ',
+        Hbox :
+            [
+            extendH: 1,
             Vbox :
                 [
                 Text :
@@ -124,7 +135,7 @@ const PANEL =
                         ],
                     Checkbox :
                         [
-                        name: 'mapmono', text: 'Monochrome',
+                        name: 'mapmono', text: 'Monochromatic',
                         bubbleHelp:
                             'Use a monochrome color scheme.'
                         ]
@@ -140,6 +151,7 @@ const PANEL =
                 ]
             ]
         ],
+
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
@@ -373,24 +385,69 @@ local function FindResidue [restok]
 endfunction
 
 /****************************************************************************
+ *                          GetAnalData
+ *
+ *  Get the analysis and repackage for heat map.
+ *
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
+ *
+ ****************************************************************************/
+local function GetAnalData [dbpath, type]
+
+    if MOE_BATCH then return []; endif
+
+    if neL [ftype dbpath, 'file'] or neL [fext dbpath, 'mdb'] then
+        Warning 'The PWD database doesn\'t exist.';
+        exit [];
+    endif
+
+    local dbkey = db_Open [dbpath, 'read'];
+    local data = qb_GetAnalysisData [dbkey, 'pwd', type];
+    db_Close dbkey;
+
+    local [resnames, ligdata] = data;
+    local resabbrevs = apt tok_drop [resnames, 3];
+    local lignames = app first ligdata;
+    local ligabbrevs = apt tok_keep [lignames, -3];
+    local ligvals = app second ligdata;
+    data = [resnames, resabbrevs,
+        tr [lignames, ligabbrevs, ligvals]];
+
+    local missing = CheckResidues [first data];
+    if length missing > 0 then
+        Warning twrite ['The following residues are not \n'
+            'present in receptor in MOE Window:\n{v}\n',
+            missing];
+        exit [];
+    endif
+
+    return data;
+
+endfunction
+
+/****************************************************************************
  *                          LoadDB
  *
  *  Get the core enviroment and application environment.
  *
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
+ *
  ****************************************************************************/
 local function LoadDB [dbpath]
 
-    local [dbkey, recset, ligand, status, coreopts, c, mess] = 
-        qb_LoadCoreScoreDB [dbpath, 'qb-pwd'];
-    if dbkey === 0 and status === [] and coreopts === [] then
+    local [dbkey, recset, ligand, s, coreopts, c, mess] = 
+        qb_LoadCoreScoreDB [dbpath, 'qmscore'];
+    if dbkey === 0 then
         Warning mess;
         exit [];
     endif
 
-    local pwdopts = qb_GetEnvApp [dbkey];
+    local pwdopts = qb_GetEnvAnal [dbkey];
     pwdopts = tagcat [pwdopts, tag tr QBPWD_OPT_DEFAULTS];
 
-    return [dbkey, recset, ligand, status, coreopts, pwdopts];
+    return [dbkey, recset, ligand, coreopts, pwdopts];
 
 endfunction
 
@@ -400,7 +457,10 @@ endfunction
  *  Load the ligands from the PWD database.
  *
  *
- ****************************************************************************/
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
+ *
+****************************************************************************/
 local function LoadLigs [pwdfilename]
 
     if MOE_BATCH then return []; endif
@@ -411,6 +471,7 @@ local function LoadLigs [pwdfilename]
     endif
 
     local dbkey = db_Open [pwdfilename, 'read'];
+
     local ligmols = [];
     local rowkey = 0;
     local ligflds = qb_GetPoseFields [dbkey];
@@ -492,37 +553,27 @@ local function NearestAtomColor [pos, rad, acolor, spos]
 endfunction
 
 /****************************************************************************
+ *                          SaveOptions
  *
- *                          ReadData
+ *  Get the analysis and repackage for heat map.
  *
- *  Return data formatted for the heat map.
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
  *
  ****************************************************************************/
-local function ReadData [filename]
+local function SaveOptions [dbpath, options]
 
-    //TODO:  change to use fieldsplit
-    local f = fopenr filename;
-    local lines = freadb [f, 'line', INT_MAX];
-    local line = first lines;
-    local m = line == ",";
-    local strings = split [line | not m, dec mtoc prepend [m, 1]];
-    local resnames = app token strings;
-    lines = dropfirst lines;
+    if MOE_BATCH then return []; endif
 
-    //  ligand labels and values
-    local ligdata = [];
-    for line in lines loop
-        m = line == ",";
-        strings = split [line | not m, dec mtoc prepend [m, 1]];
-        local ligname = token first strings;
-        strings = dropfirst strings;
-        local ligvals = atof app token strings;
-        ligdata = append [ligdata, [ligname, ligvals]];
-    endloop
+    if neL [ftype dbpath, 'file'] or neL [fext dbpath, 'mdb'] then
+        Warning 'The PWD database doesn\'t exist.';
+        exit [];
+    endif
 
-    fclose f;
+    local dbkey = db_Open [dbpath, 'read-write'];
+    local data = qb_SaveEnvAnal [dbkey, options];
+    db_Close dbkey;
 
-    return [resnames, ligdata];
 endfunction
 
 /****************************************************************************
@@ -666,27 +717,12 @@ global function qb_QBPWDSetupPanel []
     if MOE_BATCH then return; endif
     if WindowShow ['QB-PWDPanel', 1] then return; endif
 
-    local [resnames, ligdata] = ReadData ['~daren/dev/MOEDivcon/heatmapdata3.csv'];
-    local resabbrevs = apt tok_drop [resnames, 3];
-    local lignames = app first ligdata;
-    local ligabbrevs = apt tok_keep [lignames, -3];
-    local ligvals = app second ligdata;
-    data = [resnames, resabbrevs, tr [lignames, ligabbrevs, ligvals]];
-
-    local missing = CheckResidues first data;
-    if length missing > 0 then
-        Warning twrite ['The following residues are not present\n'
-            'in receptor in MOE Window:\n{v}\n', missing];
-        return;
-    endif
-
     local appdflts = tag tr QBPWD_OPT_DEFAULTS;
-
     local wkey = WindowCreate cat [HEADER, PANEL];
     pwdkey = 0;
     pwdfilename = '';
+    data = [[], []];
     G_surface = [];
-
     WindowSetData [wkey, appdflts];
     WindowShow [wkey, 1];
 
@@ -694,8 +730,48 @@ global function qb_QBPWDSetupPanel []
         local [vals, trig] = WindowWait wkey;
 
        if trig === 'panel' then
-            if vals.panel === 'Close' then 
+            if vals.panel === 'Close' then
+	            if tok_length pwdfilename > 0 then
+                    local pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
+                            vals.analysis, vals.cutoff, vals.mapncolors, 
+                            vals.mapmono, vals.mapnticks]];
+                    SaveOptions [pwdfilename, pwdopts];
+                endif
                 break;
+
+            elseif vals.panel === 'Apply' then
+
+                if second task_fork [statics:'share', 
+                        master:'parent'] === 'child' then
+
+                    // Load and setup data
+                    if isnull peek [data, vals.analysis] then
+                        data = poke [data, vals.analysis, 
+                            GetAnalData [pwdfilename, 
+                            ANALKEYS (vals.analysis)]];
+                    endif
+
+                    //  Create surface if necessary
+                    if isnull G_surface then
+                        local msgkey = Message [0, 'Calculating surface ...'];
+                        CreateSurfaceMap [first data (vals.analysis)];
+                        msgkey = Message [msgkey, ''];
+                    endif
+
+                    //  Make sure ligand atoms sets are loaded.
+                    if isnull G_surface.ligmols then
+                        LoadLigs [pwdfilename];
+                    endif
+
+                    //  Make sure first ligand is in MOE Window
+                    UpdateComplex INITLIG;
+                    qb_HeatMapSetupPanel [data (vals.analysis), vals.cutoff,
+                        SIGNIFRES, 
+                        vals.mapncolors, vals.mapmono, vals.mapnticks, 
+                        'qb_QBPWDSelectHandler', INITLIG, 1];
+
+                    exit [];
+                endif
 
             elseif vals.panel === 'Load' then 
                 if second task_fork [master: 'parent',
@@ -704,11 +780,11 @@ global function qb_QBPWDSetupPanel []
 
 //TODO:  message and disable window while loading
 
-                    local dbpath = FilePrompt [title: 'Load Database', 
+                    pwdfilename = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
-                    if not isnull dbpath then
-                        local [ldkey, ldrec, ldlig, ldsts, ldcoreopts,
-                            ldpwdopts] = LoadDB [dbpath];
+                    if not isnull pwdfilename then
+                        local [ldkey, ldrec, ldlig, ldcoreopts, ldpwdopts]
+                            = LoadDB [pwdfilename];
 
                         if neL [ldcoreopts.mode, 'Many-to-Many'] then
                             Close [force:1];
@@ -724,38 +800,12 @@ global function qb_QBPWDSetupPanel []
                         endif
 
                         pwdkey = ldkey;
-                        pwdfilename = db_Filename pwdkey;
                         db_Close ldkey;
                         WindowSetData [wkey, ldpwdopts];
                     endif
 
                     exit [];
                 endif
-            endif
-
-        elseif trig === 'heatmap' then
-
-            if second task_fork [statics:'share', 
-                    master:'parent'] === 'child' then
-
-                if isnull G_surface then
-                    local msgkey = Message [0, 'Calculating surface ...'];
-                    CreateSurfaceMap [first data];
-                    msgkey = Message [msgkey, ''];
-                endif
-
-                //  Make sure ligand atoms sets are loaded.
-                if isnull G_surface.ligmols then
-                    LoadLigs [pwdfilename];
-                endif
-
-                //  Make sure first ligand is in MOE Window
-                UpdateComplex INITLIG;
-                qb_HeatMapSetupPanel [data, vals.cutoff, SIGNIFRES, 
-                    vals.mapncolors, vals.mapmono, vals.mapnticks, 
-                    'qb_QBPWDSelectHandler', INITLIG, 1];
-
-                exit [];
             endif
         endif
     endloop
