@@ -55,6 +55,12 @@ const MOE_PAD_H = 3.0;
 const MAX_ROWS = 40;
 const MAX_COLS = 30;
 
+//  Data
+const DATA_TITLES 1;
+const DATA_COLNAMES 2;
+const DATA_COLABBR 3;
+const DATA_ROWDATA 4;
+
 //  Window GUI
 const HEADER = 
     [
@@ -67,25 +73,72 @@ const HEADER =
 
 const PANEL =
     [
-    Hbox :
+    Vbox :
         [
-        extendH: 1,
-        Vbox :
+        Hbox :
             [
+            extendH: 1,
+            Label :
+                [
+                extendV: 1, centerV: 1, resizeV: 0
+                ]
+            Label :
+                [
+                name: 'maptitle', shadow: 'none', 
+                margin: 0, font: 'smallBold'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Label :
+                [
+                extendV: 1, centerV: 1, resizeV: 0
+                ]
+            ],
+        Hbox :
+            [
+            extendH: 1,
+            Label :
+                [
+                name: 'rowlbl', extendV: 1, centerV: 1, resizeV: 0,
+                grScale: 'none'
+                ]
             Radio :
                 [
                 name: 'mapradio', shadow: 'none', type: 'int',
                 margin: 0, font: 'smallBold', onTrigger: 'return'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Label :
+                [
+                name: 'colorscale', extendV: 0, centerV: 1, resizeV: 0,
+                grScale: 'none'
                 ]
             ],
-        Separator : 
+        Hbox :
             [
-            vertical:0, shadow:'noline', extendH: 0, margin:1
-            ],
-        Label :
-            [
-            name: 'colorscale', extendV: 0, centerV: 1, resizeV: 0,
-            grScale: 'none'
+            extendH: 1,
+            Label :
+                [
+                extendV: 1, centerV: 1, resizeV: 0
+                ]
+            Label :
+                [
+                name: 'collbl', shadow: 'none', 
+                margin: 0, font: 'smallBold'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Label :
+                [
+                extendV: 1, centerV: 1, resizeV: 0
+                ]
             ]
         ]
     ];
@@ -102,12 +155,43 @@ const PANEL =
 local function Animate [dir, data, numrows, numcols, selfun, mincut, 
         maxcut, colors];
 
-    local sel_i, errmess;
+    local selrow, selcol, errmess;
     if dir === 'row' then
-        for sel_i = 1, numrows, 1 loop
-            errmess = call [selfun, [data, sel_i, 0, mincut,
+        for selrow = 1, numrows, 1 loop
+            errmess = call [selfun, [data, selrow, 0, mincut,
                 maxcut, colors]];
+            if tok_length errmess > 0 then //TEST
+                Warning errmess;
+                return;
+            endif
+
             sleep 0.5;
+        endloop
+
+    elseif dir === 'col' then
+        for selcol = 1, numcols, 1 loop
+            errmess = call [selfun, [data, 0, selcol, mincut,
+                maxcut, colors]];
+            if tok_length errmess > 0 then //TEST
+                Warning errmess;
+                return;
+            endif
+
+            sleep 0.5;
+        endloop
+
+    elseif dir === 'cell' then
+        for selrow = 1, numrows, 1 loop
+            for selcol = 1, numcols, 1 loop
+                errmess = call [selfun, [data, selrow, selcol, mincut,
+                    maxcut, colors]];
+                if tok_length errmess > 0 then //TEST
+                    Warning errmess;
+                    return;
+                endif
+
+                sleep 0.5;
+            endloop
         endloop
     endif
 
@@ -124,7 +208,7 @@ function StandardDeviation;
  ****************************************************************************/
 local function CalculateCuts [data, cutoff, cols, num]
 
-    local rowdata = third data;
+    local rowdata = data (DATA_ROWDATA);
     local row, numbers = [];
     for row in rowdata loop
         numbers = cat [numbers, keep [third row, cols]];
@@ -223,7 +307,6 @@ endfunction
  ****************************************************************************/
 local function DrawColLabels [ftexts, width, height]
 
-
     local key = gr_create [size: [length ftexts * (width + MOE_PAD_W) + 1,
         height], units: 'pt'];
     local x = 1, ft;
@@ -288,7 +371,7 @@ endfunction
  ****************************************************************************/
 local function DrawMap [data, numrows, numcols, mincut, maxcut, colors, ticks]
 
-    local [colnames, colabbrevs, rowdata] = data;
+    local [titles, colnames, colabbrevs, rowdata] = data;
 
     local colnmlen = (max app tok_length colnames) * 8 + 4;
     local rownmlen = (max app tok_length app first rowdata) * 8 + 4;
@@ -338,7 +421,6 @@ mincut, maxcut, colnmlen, rownmlen, numrows, numcols, box_w, box_h, page_w, page
     //  Column labels
     local bg = rep [rep [0x00FFFFFF, colnmlen], CELL_WD];
     for col_i = 1, numcols, 1 loop
-
         local colkey = gr_create [size: [colnmlen, CELL_WD], units: 'pt'];
         gr_text [colkey, [0, [2, CELL_WD/2], colnames (col_i), 'sys', 
             icolor'black', 8, [position: 'middleleft']]];
@@ -392,6 +474,7 @@ cs_w, cs_h, tcs_w, tcs_h, cs_x, cs_y, csstep, delta];//DEBUG
             'sys', icolor'black', 8, [position: 'middleleft']]];
     endloop
 
+    //TODO:  Draw titles
 
     return key;
 
@@ -696,6 +779,28 @@ endfunction
 
 /****************************************************************************
  *
+ *                          IndexToRowCol
+ *
+ *  Return the selected row and column numbers.  Selected rows have selcol = 0
+ *  and selected columns have selrow = 0.  
+ *
+ ****************************************************************************/
+local function IndexToRowCol [index, numrows, numcols]
+
+    local selrow = ceil (index / (numcols + 1));
+    if selrow === numrows + 1 then
+        selrow = 0;
+    endif
+
+    local selcol = mod [index, numcols + 1] - 1;
+    selcol = select [numcols, selcol, selcol === -1];
+
+    return [selrow, selcol];
+
+endfunction
+
+/****************************************************************************
+ *
  *                          StandardDeviation
  *
  *  Return the average and standard deviation of the flat vector of numbers.
@@ -711,9 +816,8 @@ local function StandardDeviation [nums]
     local sigma = sqrt ((add (sqr (nums - avg))) / n);
 
     return [avg, sigma];
-endfunction
 
-//  Global Functions
+endfunction
 
 /****************************************************************************
  *
@@ -724,7 +828,7 @@ endfunction
  ****************************************************************************/
 local function TruncateCols [data]
 
-    local [resnames, resabbrevs, rowdata] = data;
+    local [titles, resnames, resabbrevs, rowdata] = data;
     if length resnames <= MAX_COLS then
         return data;
     endif
@@ -739,7 +843,7 @@ local function TruncateCols [data]
         truncrowvals = append [truncrowvals, keep [rowvals, MAX_COLS]];
     endloop
 
-    local truncdata = [truncresnames, truncresabbrevs,
+    local truncdata = [titles, truncresnames, truncresabbrevs,
         tr [trunclignames, truncligabbrevs, truncrowvals]];
 
     return truncdata;
@@ -755,8 +859,8 @@ endfunction
  ****************************************************************************/
 local function TruncateRows [data]
 
-    local [resnames, resabbrevs, rowdata] = data;
-    return [resnames, resabbrevs, keep [rowdata, MAX_ROWS]];
+    local [titles, resnames, resabbrevs, rowdata] = data;
+    return [titles, resnames, resabbrevs, keep [rowdata, MAX_ROWS]];
 
 endfunction
 
@@ -766,31 +870,70 @@ endfunction
  *
  *                          qb_HeatMapSetupPanel
  *
- *  Note, data has the format:
+ *  Parameters:
  *
- *  [[colNames], [colAbbrevs], [[rowName1, rowAbbrev1, [values1]],
- *  [rowName2, rowAbbrev2, [values2]], ... , [rowNameN, rowAbbrevN, [valuesN]]]
- *  where length colNames === length colAbbrevs === length values1 ===
- *   ... === length valuesN,
- *  and the names and abbreviations are tokens and the values are numbers.
+ *    data : vector : the data to display in heat map.  It has the format:
+ *          [ 
+ *            [mapTitle, rowTitle, colTitle], [colNames], [colAbbrevs], 
+ *            [
+ *              [rowName1, rowAbbrev1, [values1]],
+ *              [rowName2, rowAbbrev2, [values2]],
+ *              ... , 
+ *              [rowNameN, rowAbbrevN, [valuesN]]
+ *            ]
+ *          ]
+ *          where length colNames === length colAbbrevs === length values1
+ *          ===  ... === length valuesN; the titles, names and abbreviations
+ *          are tokens; and the values are numbers. Only the first three
+ *          characters of the abbreviations are used for the labels.
  *
- *  Note:  only the first three characters of the abbreviations are used 
- *  for the labels.
+ *    cutoff : real : the number of standard deviations used to determine the
+ *          minimum and maximum values of the color scale.  Values smaller
+ *          than the minimum are assigned the same color as the minimum and
+ *          values greater than the maximum are assigned the same color as
+ *          the maximum.
+ *
+ *    numsignifcols : int : the number of significant columns used to
+ *          calculate the standard deviation.
+ *
+ *    numcolors : int : the number of different colors used to generate the
+ *          color scale for the heat map.
+ *
+ *    monochrome : boolean : if true, use a single color (red for positive,
+ *          blue for negative) to generate the color scale.  Otherwise,
+ *          use a rainbow spectrum of colors.
+ *
+ *    ticks : int : the number of ticks to display on the color scale showing
+ *          the values represented by the colors.
+ *
+ *    selfun : token : the name of the global function to call when the user
+ *          selects a row, column or cell of the heat map.  The function is
+ *          passed the following parameters: data, selrow, selcol, mincut,
+ *          maxcut and colors.  Selected cells have selrow from 1 to numrows
+ *          selcol from 1 to numcols.  Selected rows have selcol = 0 and
+ *          selected columns have selrow = 0.  If the function returns an
+ *          error message (token), it is displayed using Warning [].
+ *
+ *    initsel : int : the initial selection.  It is the index into the
+ *          radio buttons generated using the above data.
+ *
+ *    help : boolean : if true, show in the bubble help for each button
+ *          the full row label, full column label and cell value.
  *
  ****************************************************************************/
-global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols, 
+global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
         numcolors, monochrome, ticks, selfun, initsel, help]
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB Heat Map', 1] then return; endif
 
+    //  Currently, only 30 columns and 40 rows are allowed.
     data = TruncateCols [data];
     data = TruncateRows [data];
 
     local mincut, maxcut, errmess;
     [mincut, maxcut, errmess] = CalculateCuts [data, cutoff, 
         numsignifcols, numcolors];
-
     if mincut === [] or maxcut === [] then
         Warning errmess;
         return;
@@ -808,7 +951,7 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
         return;
     endif
 
-    local [colnames, colabbrevs, rowdata] = data;
+    local [titles, colnames, colabbrevs, rowdata] = data;
     local numcols = length colnames;
     local numrows = length rowdata;
     local page_w = (numcols + 1) * (CELL_WD + MOE_PAD_W) + MOE_PAD_W;
@@ -854,6 +997,22 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
         endif
     endloop
 
+    //  Create title labels
+    local rowkey = gr_create [size: [page_h, CELL_HT], units: 'pt'];
+    gr_text [rowkey, [0, [page_h/2, CELL_HT/2], titles (2), 'sys-b', 
+        icolor'black', 8, [position: 'middlecenter']]];
+    local bg = rep [rep [0x00FFFFFF, page_h], CELL_HT];
+    local img = gr_render_pixmap [bg, rowkey];
+    gr_destroy rowkey;
+    local rowkey = gr_create [size: [CELL_HT, page_h], units: 'pt'];
+    gr_pixmap [rowkey, [0, [0, page_h],
+        [CELL_HT, page_h], app reverse tr img]];
+
+    local colkey = gr_create [size: [page_w, CELL_HT], units: 'pt'];
+    gr_text [colkey, [0, [page_w/2, CELL_HT], titles (3), 'sys-b', 
+        icolor'black', 8, [position: 'middlecenter']]];
+
+/*
     local panel = tagpoke [PANEL, ['Hbox', 'Vbox', 'Radio', 'graphics'],
         bgraphics];
     panel = tagpoke [panel, ['Hbox', 'Vbox', 'Radio', 'columns'],
@@ -862,28 +1021,28 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
             panel = tagpoke [panel, ['Hbox', 'Vbox', 'Radio', 'bubbleHelp'],
                 bhelp];
     endif
-
-    local wkey = WindowCreate cat [HEADER, panel];
+*/
+    local wkey = WindowCreate cat [HEADER, PANEL];
     WindowSetData [wkey, [mapradio: initsel]];
-    WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
+    WindowSetAttr [wkey, [colorscale: [graphics: scalekey], 
+        mapradio: [graphics: bgraphics, columns: numcols + 1,
+        bubbleHelp: bhelp], maptitle: [text: titles (1)],
+        rowlbl: [graphics: rowkey], collbl: [graphics: colkey]]];
     WindowShow [wkey, 1];
 
+    gr_destroy rowkey;
+    gr_destroy colkey;
     gr_destroy scalekey;
     app gr_destroy bgraphics;
 
-    //  Selected cells have row numbers from 1 to numrows
-    //      and col numbers from 1 to numcols
-    //  Selected rows have col number 0
-    //  Selected cols have row number 0
-    local selrow = ceil (initsel / (numcols + 1));
-    if selrow === numrows + 1 then
-        selrow = 0;
-    endif
-
-    local selcol = mod [initsel, numcols + 1] - 1;
-    selcol = select [numcols, selcol, selcol === -1];
+    local [selrow, selcol] = IndexToRowCol [initsel, numrows, numcols];
     local selerrmess = call [selfun, [data, selrow, selcol, mincut,
         maxcut, colors]];
+    if tok_length selerrmess > 0 then //TEST
+        WindowDestroy wkey;
+        Warning selerrmess;
+        return;
+    endif
 
     loop
         local [vals, trig] = WindowWait wkey;
@@ -911,15 +1070,14 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
             endif
 
         elseif trig === 'mapradio' then
-            selrow = ceil (vals.mapradio / (numcols + 1));
-            if selrow === numrows + 1 then
-                selrow = 0;
-            endif
-
-            selcol = mod [vals.mapradio, numcols + 1] - 1;
-            selcol = select [numcols, selcol, selcol === -1];
+            [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows, numcols];
             selerrmess = call [selfun, [data, selrow, selcol, mincut,
                 maxcut, colors]];
+            if tok_length selerrmess > 0 then //TEST
+                Warning selerrmess;
+                break;
+            endif
+
         endif
     endloop
 

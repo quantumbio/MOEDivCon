@@ -244,7 +244,7 @@ local function ColorAtoms [data, ligidx, residx, recatoms,
     endif
 
     local step = (maxcut - mincut) / (length colors);
-    local [restokens, resabbrevs, rowdata] = data;
+    local [titles, restokens, resabbrevs, rowdata] = data;
     local rowvals = third rowdata (ligidx);
     local atom, atomcolors = [];
     for atom in recatoms loop
@@ -411,10 +411,10 @@ local function GetAnalData [dbpath, type]
     local lignames = app first ligdata;
     local ligabbrevs = apt tok_keep [lignames, -3];
     local ligvals = app second ligdata;
-    data = [resnames, resabbrevs,
+    data = [['SAR Map', 'Ligands', 'Residues'], resnames, resabbrevs,
         tr [lignames, ligabbrevs, ligvals]];
 
-    local missing = CheckResidues [first data];
+    local missing = CheckResidues [second data];
     if length missing > 0 then
         Warning twrite ['The following residues are not \n'
             'present in receptor in MOE Window:\n{v}\n',
@@ -555,7 +555,7 @@ endfunction
 /****************************************************************************
  *                          SaveOptions
  *
- *  Get the analysis and repackage for heat map.
+ *  Save the analysis data.
  *
  *  Note:  it is assumed that this function is called from a child process
  *  and will exit on an error.
@@ -651,7 +651,7 @@ endfunction
 global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
         colors]
     
-    local [resnames, resabbrevs, rowdata] = data;
+    local [titles, resnames, resabbrevs, rowdata] = data;
     local restok = '', ligtok = '', ligabbrev = '', ligdata = [];
     if selrow === 0 and selcol === 0 then
         return;
@@ -712,7 +712,7 @@ global function qb_QBPWDSetupPanel []
 
     static pwdkey;                     //  Shared with child tasks.
     static pwdfilename;
-    static data;
+    static pwddata;
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB-PWDPanel', 1] then return; endif
@@ -721,7 +721,7 @@ global function qb_QBPWDSetupPanel []
     local wkey = WindowCreate cat [HEADER, PANEL];
     pwdkey = 0;
     pwdfilename = '';
-    data = [[], []];
+    pwddata = [[], []];
     G_surface = [];
     WindowSetData [wkey, appdflts];
     WindowShow [wkey, 1];
@@ -745,8 +745,8 @@ global function qb_QBPWDSetupPanel []
                         master:'parent'] === 'child' then
 
                     // Load and setup data
-                    if isnull peek [data, vals.analysis] then
-                        data = poke [data, vals.analysis, 
+                    if isnull peek [pwddata, vals.analysis] then
+                        pwddata = poke [pwddata, vals.analysis, 
                             GetAnalData [pwdfilename, 
                             ANALKEYS (vals.analysis)]];
                     endif
@@ -754,7 +754,7 @@ global function qb_QBPWDSetupPanel []
                     //  Create surface if necessary
                     if isnull G_surface then
                         local msgkey = Message [0, 'Calculating surface ...'];
-                        CreateSurfaceMap [first data (vals.analysis)];
+                        CreateSurfaceMap [second pwddata (vals.analysis)];
                         msgkey = Message [msgkey, ''];
                     endif
 
@@ -765,7 +765,7 @@ global function qb_QBPWDSetupPanel []
 
                     //  Make sure first ligand is in MOE Window
                     UpdateComplex INITLIG;
-                    qb_HeatMapSetupPanel [data (vals.analysis), vals.cutoff,
+                    qb_HeatMapSetupPanel [pwddata (vals.analysis), vals.cutoff,
                         SIGNIFRES, 
                         vals.mapncolors, vals.mapmono, vals.mapnticks, 
                         'qb_QBPWDSelectHandler', INITLIG, 1];

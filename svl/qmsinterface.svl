@@ -125,7 +125,7 @@ local mol, molIndex, residueIndex, residueCount, atomIndex, atomCount;
 local molCount = length recmolset;
 //fwrite [stdin, '{c:}\n', scorepath];
 fwrite [stdin, '{c:}\n', HAM_KEYS(appopts.ham)];
-fwrite [stdin, '{c:}\n', select ['STANDARD', 'NOSTANDARD',
+fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
     appopts.scaling === 1]];
 fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', appopts.freq]];
 fwrite [stdin, '{c:}\n', LIG_KEYS(appopts.opt)];
