@@ -56,10 +56,16 @@ const MAX_ROWS = 40;
 const MAX_COLS = 30;
 
 //  Data
-const DATA_TITLES 1;
-const DATA_COLNAMES 2;
-const DATA_COLABBR 3;
-const DATA_ROWDATA 4;
+const DATA_TITLES = 1;
+const DATA_COLNAMES = 2;
+const DATA_COLABBR = 3;
+const DATA_ROWDATA = 4;
+
+//  Titles
+const PAGETITLE_H = 16;
+const PAGEFONT_H = 12;
+const ROWCOLTITLE_H = 14;
+const ROWCOLFONT_H = 10;
 
 //  Window GUI
 const HEADER = 
@@ -80,12 +86,11 @@ const PANEL =
             extendH: 1,
             Label :
                 [
-                extendV: 1, centerV: 1, resizeV: 0
-                ]
+                extendV: 1, centerV: 1, resizeV: 0, extendH: 0
+                ],
             Label :
                 [
-                name: 'maptitle', shadow: 'none', 
-                margin: 0, font: 'smallBold'
+                name: 'maptitle', shadow: 'none', centerH: 1, margin: 0
                 ],
             Separator : 
                 [
@@ -93,7 +98,7 @@ const PANEL =
                 ],
             Label :
                 [
-                extendV: 1, centerV: 1, resizeV: 0
+                extendV: 1, centerV: 1, resizeV: 0, extendH: 0
                 ]
             ],
         Hbox :
@@ -103,7 +108,7 @@ const PANEL =
                 [
                 name: 'rowlbl', extendV: 1, centerV: 1, resizeV: 0,
                 grScale: 'none'
-                ]
+                ],
             Radio :
                 [
                 name: 'mapradio', shadow: 'none', type: 'int',
@@ -124,12 +129,11 @@ const PANEL =
             extendH: 1,
             Label :
                 [
-                extendV: 1, centerV: 1, resizeV: 0
-                ]
+                extendV: 1, centerV: 1, resizeV: 0, extendH: 0
+                ],
             Label :
                 [
-                name: 'collbl', shadow: 'none', 
-                margin: 0, font: 'smallBold'
+                name: 'collbl', shadow: 'none', centerH: 1, margin: 0
                 ],
             Separator : 
                 [
@@ -137,7 +141,7 @@ const PANEL =
                 ],
             Label :
                 [
-                extendV: 1, centerV: 1, resizeV: 0
+                extendV: 1, centerV: 1, resizeV: 0, extendH: 0
                 ]
             ]
         ]
@@ -160,7 +164,7 @@ local function Animate [dir, data, numrows, numcols, selfun, mincut,
         for selrow = 1, numrows, 1 loop
             errmess = call [selfun, [data, selrow, 0, mincut,
                 maxcut, colors]];
-            if tok_length errmess > 0 then //TEST
+            if not isnull errmess and neL [errmess, ''] then
                 Warning errmess;
                 return;
             endif
@@ -172,7 +176,7 @@ local function Animate [dir, data, numrows, numcols, selfun, mincut,
         for selcol = 1, numcols, 1 loop
             errmess = call [selfun, [data, 0, selcol, mincut,
                 maxcut, colors]];
-            if tok_length errmess > 0 then //TEST
+            if not isnull errmess and neL [errmess, ''] then
                 Warning errmess;
                 return;
             endif
@@ -185,7 +189,7 @@ local function Animate [dir, data, numrows, numcols, selfun, mincut,
             for selcol = 1, numcols, 1 loop
                 errmess = call [selfun, [data, selrow, selcol, mincut,
                     maxcut, colors]];
-                if tok_length errmess > 0 then //TEST
+                if not isnull errmess and neL [errmess, ''] then
                     Warning errmess;
                     return;
                 endif
@@ -298,30 +302,6 @@ endfunction
 
 /****************************************************************************
  *
- *                          DrawColLabels
- *
- *  Returns a graphics object with the column labels using formated texts.
- *
- *  NOTE:  calling function should call gr_destroy on key after using it.
- *
- ****************************************************************************/
-local function DrawColLabels [ftexts, width, height]
-
-    local key = gr_create [size: [length ftexts * (width + MOE_PAD_W) + 1,
-        height], units: 'pt'];
-    local x = 1, ft;
-    for ft in ftexts loop
-        gr_text [key, [0, [x + width/2 , height/2], ft, 'sys-b', 
-            icolor'black', 8, [position: 'middlecenter']]];
-        x = x + width + MOE_PAD_W;
-    endloop
-
-    return key;
-
-endfunction
-
-/****************************************************************************
- *
  *                          DrawColorScale
  *
  *  Draws a scale of colors starting with color that represents mincut (blue
@@ -350,7 +330,8 @@ local function DrawColorScale [colors, cell_w, cell_h, mincut, maxcut, ticks]
         gr_line [key, [0, [cell_w, ith * step  + SCALE_PAD],
             [cell_w + SCALE_TICK_LEN, ith * step + SCALE_PAD],
             icolor'black', 1]];
-        gr_text [key, [0, [cell_w + SCALE_TICK_LEN * 1.5, ith * step + SCALE_PAD],
+        gr_text [key, [0, [cell_w + SCALE_TICK_LEN * 1.5,
+            ith * step + SCALE_PAD],
             twrite ['{n:.2f}', mincut + (ith * delta)], 'sys', icolor'black',
             10, [position: 'middleleft']]];
     endloop
@@ -378,17 +359,16 @@ local function DrawMap [data, numrows, numcols, mincut, maxcut, colors, ticks]
 
     local box_w = numcols * CELL_WD;
     local box_h = numrows * CELL_HT;
+    local box_x = ROWCOLTITLE_H + rownmlen;
+    local box_y = ROWCOLTITLE_H + colnmlen;
 
     local cs_h = floor ((box_h - 2 * SCALE_PAD) / length colors);
     local tcs_h = cs_h * length colors;
     local cs_w =  SCALE_CELL_WD;
     local tcs_w = SCALE_PAD + cs_w + SCALE_VAL_LEN;
 
-    local page_w = rownmlen + box_w + tcs_w;
-    local page_h = box_h + colnmlen;
-
-write ['min {} max {} cnl {}, rnl {}, nr {}, nc {}, bw {}, bh {}, pw {}, ph {}\n', 
-mincut, maxcut, colnmlen, rownmlen, numrows, numcols, box_w, box_h, page_w, page_h];//DEBUG
+    local page_w = ROWCOLTITLE_H + rownmlen + box_w + tcs_w;
+    local page_h = PAGETITLE_H + box_h + colnmlen + ROWCOLTITLE_H;
 
     local key = gr_create [size: [page_w, page_h], units: 'pt'];
 
@@ -396,10 +376,10 @@ mincut, maxcut, colnmlen, rownmlen, numrows, numcols, box_w, box_h, page_w, page
     local row_i, col_i;
     for row_i = 1, numrows, 1 loop
         local [rowname, rowabbrev, rowvals] = rowdata (row_i);
-        local c_y = colnmlen + (numrows - row_i) * CELL_HT;
+        local c_y = box_y + (numrows - row_i) * CELL_HT;
 
-        gr_text [key, [0, [CELL_WD/2 , c_y + CELL_HT/2], rowname, 'sys', 
-            icolor'black', 8, [position: 'middlecenter']]];
+        gr_text [key, [0, [ROWCOLTITLE_H + CELL_WD/2 , c_y + CELL_HT/2],
+            rowname, 'sys', icolor'black', 8, [position: 'middlecenter']]];
 
         for col_i = 1, numcols, 1 loop
             local cidx, value = rowvals (col_i);
@@ -412,36 +392,39 @@ mincut, maxcut, colnmlen, rownmlen, numrows, numcols, box_w, box_h, page_w, page
                 cidx = ceil ((value - mincut) / step);
             endif
 
-            local c_x = rownmlen + (col_i - 1) * CELL_WD;
+            local c_x = box_x + (col_i - 1) * CELL_WD;
             gr_box [key, [0, [c_x, c_y], [c_x + CELL_WD , c_y + CELL_HT],
                 colors (cidx), 1, colors (cidx)]];
         endloop
     endloop
 
     //  Column labels
-    local bg = rep [rep [0x00FFFFFF, colnmlen], CELL_WD];
+    //  HACK ALERT:  make pixmap images 4 times normal size to deal with
+    //               anti-aliasing problems.
+    local img, bg = rep [rep [0xFFFFFFFF, 4 * colnmlen], 4 * CELL_WD];
     for col_i = 1, numcols, 1 loop
-        local colkey = gr_create [size: [colnmlen, CELL_WD], units: 'pt'];
-        gr_text [colkey, [0, [2, CELL_WD/2], colnames (col_i), 'sys', 
-            icolor'black', 8, [position: 'middleleft']]];
-        local img = gr_render_pixmap [bg, colkey];
+        local colkey = gr_create [size: [4 * colnmlen, 4 * CELL_WD],
+            units: 'pt'];
+        gr_text [colkey, [0, [4 * 2, 2 * CELL_WD], colnames (col_i), 'sys', 
+            icolor'black', 4 * 8, [position: 'middleleft']]];
+        img = gr_render_pixmap [bg, colkey];
         gr_destroy colkey;
-        gr_pixmap [key, [0, [rownmlen + (col_i - 1) * CELL_WD, colnmlen],
+        gr_pixmap [key, [0, [box_x + (col_i - 1) * CELL_WD, box_y],
             [CELL_WD, colnmlen], app reverse tr img]];
     endloop
 
 
     //  Draw box
    gr_line [key, [0,
-        [[rownmlen, rownmlen, rownmlen + box_w, rownmlen + box_w],
-         [colnmlen, colnmlen + box_h, colnmlen + box_h, colnmlen]],
-        [[rownmlen, rownmlen + box_w, rownmlen + box_w, rownmlen],
-         [colnmlen + box_h, colnmlen + box_h, colnmlen, colnmlen]],
+        [[box_x, box_x, box_x + box_w, box_x + box_w],
+         [box_y, box_y + box_h, box_y + box_h, box_y]],
+        [[box_x, box_x + box_w, box_x + box_w, box_x],
+         [box_y + box_h, box_y + box_h, box_y, box_y]],
         icolor'black', 1]];
 
     //  Center the scale in its alloted space.
-    local cs_x = rownmlen + box_w + SCALE_PAD;
-    local cs_y = (box_h - 2 * SCALE_PAD - tcs_h) / 2 + colnmlen + SCALE_PAD;
+    local cs_x = box_x + box_w + SCALE_PAD;
+    local cs_y = (box_h - 2 * SCALE_PAD - tcs_h) / 2 + box_y + SCALE_PAD;
 
     local ith;
     for ith = 1, length colors, 1 loop
@@ -474,31 +457,34 @@ cs_w, cs_h, tcs_w, tcs_h, cs_x, cs_y, csstep, delta];//DEBUG
             'sys', icolor'black', 8, [position: 'middleleft']]];
     endloop
 
-    //TODO:  Draw titles
+    //  Draw titles
 
-    return key;
+    gr_text [key, [0, [box_x + box_w/2, box_y + box_h + PAGETITLE_H/2],
+        titles (1), 'sys-b', icolor'black', PAGEFONT_H,
+        [position: 'middlecenter']]];
+/*
+    local rowkey = gr_create [size: [box_h, ROWCOLTITLE_H], units: 'pt'];
+    gr_text [rowkey, [0, [box_h/2, ROWCOLTITLE_H/2], titles (2), 'sys-b', 
+        icolor'black', ROWCOLFONT_H, [position: 'middlecenter']]];
+    bg = rep [rep [0xFFFFFFFF, box_h], ROWCOLTITLE_H];
+    img = gr_render_pixmap [bg, rowkey];
+    gr_destroy rowkey;
+    gr_pixmap [key, [0, [0, box_y + box_h],
+        [ROWCOLTITLE_H, box_h], app reverse tr img]];
+*/
+    //  HACK ALERT:  make pixmap images 4 times normal size to deal with
+    //               anti-aliasing problems.
+    local rowkey = gr_create [size: [4 * box_h, 4 * ROWCOLTITLE_H], units: 'pt'];
+    gr_text [rowkey, [0, [2 * box_h, 2 * ROWCOLTITLE_H], titles (2), 'sys-b', 
+        icolor'black', 4 * ROWCOLFONT_H, [position: 'middlecenter']]];
+    bg = rep [rep [0xFFFFFFFF, 4 * box_h], 4 * ROWCOLTITLE_H];
+    img = gr_render_pixmap [bg, rowkey];
+    gr_destroy rowkey;
+    gr_pixmap [key, [0, [0, box_y + box_h],
+        [ROWCOLTITLE_H, box_h], app reverse tr img]];
 
-endfunction
-
-/****************************************************************************
- *
- *                          DrawRowLabels
- *
- *  Returns a graphics object with the row labels using formated texts.
- *
- *  NOTE:  calling function should call gr_destroy on key after using it.
- *
- ****************************************************************************/
-local function DrawRowLabels [ftexts, width, height]
-
-    local key = gr_create [size: [width,
-        length ftexts * (height + MOE_PAD_H) + 1], units: 'pt'];
-    local y = 1, ft;
-    for ft in ftexts loop
-        gr_text [key, [0, [width/2 , y + height/2], ft, 'sys-b', 
-            icolor'black', 8, [position: 'middlecenter']]];
-        y = y + height + MOE_PAD_H;
-    endloop
+    gr_text [key, [0, [box_x + box_w/2, ROWCOLTITLE_H/2], titles (3), 'sys-b', 
+        icolor'black', ROWCOLFONT_H, [position: 'middlecenter']]];
 
     return key;
 
@@ -998,38 +984,36 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
     endloop
 
     //  Create title labels
-    local rowkey = gr_create [size: [page_h, CELL_HT], units: 'pt'];
-    gr_text [rowkey, [0, [page_h/2, CELL_HT/2], titles (2), 'sys-b', 
-        icolor'black', 8, [position: 'middlecenter']]];
-    local bg = rep [rep [0x00FFFFFF, page_h], CELL_HT];
+    local mapkey = gr_create [size: [page_w, PAGETITLE_H], units: 'pt'];
+    gr_text [mapkey, [0, [page_w/2, PAGETITLE_H/2], titles (1), 'sys-b', 
+        icolor'black', PAGEFONT_H, [position: 'middlecenter']]];
+
+    //  HACK ALERT:  make pixmap images 4 times normal size to deal with
+    //               anti-aliasing problems.
+    local rowkey = gr_create [size: [4 * page_h, 4 * ROWCOLTITLE_H],
+        units: 'pt'];
+    gr_text [rowkey, [0, [2 * page_h, 2 * ROWCOLTITLE_H], titles (2), 'sys-b', 
+        icolor'black', 4 * ROWCOLFONT_H, [position: 'middlecenter']]];
+    local bg = rep [rep [0xFFFFFFFF, 4 * page_h], 4 * ROWCOLTITLE_H];
     local img = gr_render_pixmap [bg, rowkey];
     gr_destroy rowkey;
-    local rowkey = gr_create [size: [CELL_HT, page_h], units: 'pt'];
+    rowkey = gr_create [size: [ROWCOLTITLE_H, page_h], units: 'pt'];
     gr_pixmap [rowkey, [0, [0, page_h],
-        [CELL_HT, page_h], app reverse tr img]];
+        [ROWCOLTITLE_H, page_h], app reverse tr img]];
 
-    local colkey = gr_create [size: [page_w, CELL_HT], units: 'pt'];
-    gr_text [colkey, [0, [page_w/2, CELL_HT], titles (3), 'sys-b', 
-        icolor'black', 8, [position: 'middlecenter']]];
+    local colkey = gr_create [size: [page_w, ROWCOLTITLE_H], units: 'pt'];
+    gr_text [colkey, [0, [page_w/2, ROWCOLTITLE_H/2], titles (3), 'sys-b', 
+        icolor'black', ROWCOLFONT_H, [position: 'middlecenter']]];
 
-/*
-    local panel = tagpoke [PANEL, ['Hbox', 'Vbox', 'Radio', 'graphics'],
-        bgraphics];
-    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Radio', 'columns'],
-        numcols + 1];
-    if (help) then
-            panel = tagpoke [panel, ['Hbox', 'Vbox', 'Radio', 'bubbleHelp'],
-                bhelp];
-    endif
-*/
     local wkey = WindowCreate cat [HEADER, PANEL];
     WindowSetData [wkey, [mapradio: initsel]];
     WindowSetAttr [wkey, [colorscale: [graphics: scalekey], 
         mapradio: [graphics: bgraphics, columns: numcols + 1,
-        bubbleHelp: bhelp], maptitle: [text: titles (1)],
+        bubbleHelp: bhelp], maptitle: [graphics: mapkey],
         rowlbl: [graphics: rowkey], collbl: [graphics: colkey]]];
     WindowShow [wkey, 1];
 
+    gr_destroy mapkey;
     gr_destroy rowkey;
     gr_destroy colkey;
     gr_destroy scalekey;
@@ -1038,7 +1022,7 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
     local [selrow, selcol] = IndexToRowCol [initsel, numrows, numcols];
     local selerrmess = call [selfun, [data, selrow, selcol, mincut,
         maxcut, colors]];
-    if tok_length selerrmess > 0 then //TEST
+    if not isnull errmess and neL [errmess, ''] then
         WindowDestroy wkey;
         Warning selerrmess;
         return;
@@ -1073,7 +1057,7 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
             [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows, numcols];
             selerrmess = call [selfun, [data, selrow, selcol, mincut,
                 maxcut, colors]];
-            if tok_length selerrmess > 0 then //TEST
+            if not isnull errmess and neL [errmess, ''] then
                 Warning selerrmess;
                 break;
             endif
