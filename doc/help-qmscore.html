@@ -100,6 +100,13 @@ QuantumBio Homepage
     <li><a href="#options-opt">Ligand Optimization</a>
     <li><a href="#options-freq">Frequency</a>
   </ol>
+  <li><a href="#heatmap">Heat Map</a>
+  <ol id=tocl>
+    <li><a href="#heatmap-selection">Selection</a>
+    <li><a href="#heatmap-saveprint">Save and Print</a>
+    <li><a href="#heatmap-animation">Animation</a>
+    <li><a href="#heatmap-setup">Setup</a>
+  </ol>
   <li><a href="#trouble">Troubleshooting</a>
   <li><a href="#contact">Support Contact Information</a></ol>
 
@@ -770,6 +777,116 @@ of the calculation.
 <p>
 Perform frequency calculation to determine ligand entropy in score
 function.  Warning: may increase CPU cost of the calculation.
+
+<h2><a name="heatmap"></a>Heat Map</h2>
+<p>
+The <w>QB Heat Map</w> is used to implement the interaction energy map and the
+structure-activity relationship (SAR) map.  The interaction energy map is based
+on the absolute <em>E</em><sub>AB</sub> terms from PWD, which  makes it
+easy to identify the residues that have the largest absolute effect on ligand
+binding.  The SAR map consists of the most important residue-ligand interaction
+terms derived from the PLS analysis of all the interaction terms (attractive
+and repulsive), which highlights residues that are most critical to discriminating
+between more and less potent ligands (see the PWD section for more details).
+Below is an example SAR map.
+<p>
+<object id="QBPWDHeatMapPoly" title="QBPWD Heat Map Poly"
+data="images/qbheatmappoly.png" type=image/png>
+QBPWD Heat Map Poly
+</object>
+<p>
+Note that ligand and residue names are abbreviated so that they fit into the
+heat map.  If you hover the mouse over the abreviated names, a bubble appears
+with the full name.  If you hover over a color-coded cell, the full corresponding 
+ligand and residue names as well as the interaction value appears in the bubble.
+<p>
+The <w>QB Heat Map</w> is interactive.  When first invoked, a Connolly molecular
+surface of the pocket is generated.  Then, depending on the user selection, the
+corresponding residues along the molecular surface are colored 
+according to their interaction values in the heap map.  An example of such a
+surface (ligand 6 of the heat map is selected) is shown below.
+<p>
+<object id="QBPWDSurfacePoly" title="QBPWD Surface Poly" width=1000
+data="images/surfacepoly.png" type=image/png>
+QBPWD Surface Poly
+</object>
+<p>
+
+<h3><a name="heatmap-selection"></a>Selection</h3>
+<p>
+There are three types of interactive selections you can make.  If you select a
+ligand, the chosen ligand  is loaded into the MOE Window and the molecular
+surface is recolored to show the values for all residues in the heat map for
+that ligand.  If you select a residue, the ligand and surface do not
+change, but the chosen residue is labeled and the view zooms in on it.  If
+you select a color-coded cell, the corresponding ligand is loaded into the MOE 
+Window and the molecular surface is recolored to show only the value for the
+corresponding residue, which is also labeled.
+
+<h3><a name="heatmap-saveprint"></a>Save and Print</h3>
+<p>
+You can save a publication quality image of the <w>QB Heat Map</w> by
+clicking the <w>Save</w>  button.  MOE's <w>Graphic Export Panel</w> is used
+to save the image.  An example is shown below.
+<p>
+<object id="QMPWDHeatMapSave" title="QBPWD Heat Map Save"
+data="images/qbheatmapoutputpoly.png" type=image/png>
+QBPWD Heat Map Save
+</object>
+<p>
+Likewise, MOE's <w>Print Preview Panel</w> is used to print
+the <w>QB Heat Map</w> when you click the <w>Print</w> button.
+
+<h3><a name="heatmap-animation"></a>Animation</h3>
+<p>
+When you click on the <w>Animate</w> button, the <w>QB Heat Map</w> is
+temporarily hidden, and each ligand is sequentially selected beginning with
+the topmost one.  That is, each ligand is loaded into the MOE Window and
+the molecular surface is recolored.  When all ligands have been shown, the
+<w>QB Heat Map</w> reappears.
+
+<h3><a name="heatmap-setup"></a>Setup</h3>
+<p>
+The <w>QB-PWD</w> dialog contains several options you can use to
+set up the <w>QB Heat Map</w> as shown below.
+<p>
+<object id="QBPWDAnalysis" title="QBPWD Anaysis"
+data="images/qbpwdanalysis.png" type=image/png>
+QBPWD Anaysis
+</object>
+<p>
+
+<h4><a name="heatmap-setup-cutoff"></a>Cutoff</h4>
+<p>
+If <w>Cutoff</w> is selected, the standard deviation of a subset of the heat
+map values is used to determine minimum and maximum cutoffs; otherwise, the
+absolute minimum and maximum values are used.  In addition, you can specify
+in the <w>Number of sima</w> field, how standard deviations are used to
+determine the minimum and maximum values of the color scale.  Values smaller
+than the minimum are assigned the same color as the minimum and
+values greater than the maximum are assigned the same color as the maximum.
+
+<h4><a name="heatmap-setup-numcolors"></a>Number of Colors</h4>
+<p>
+The number of different colors used to generate the color scale for the heat map.
+
+<h4><a name="heatmap-setup-mono"></a>Monochromatic</h4>
+<p>
+If <w>Monochromatic</w> is selected, a single color (red for positive,
+blue for negative) is used to generate the color scale.  Otherwise,
+a rainbow spectrum of colors is used (as was seen above).  The same heat map
+with the monochromatic option is shown below.
+<p>
+<object id="QMPWDHeatMapMono" title="QBPWD Heat Map Mono"
+data="images/qbheatmapmono.png" type=image/png>
+QBPWD Heat Map Poly
+</object>
+<p>
+
+<h4><a name="heatmap-setup-numticks"></a>Number of Ticks</h4>
+<p>
+The number of ticks to display on the color scale showing the values
+represented by the colors.
 
 <h2><a name="trouble"></a>Troubleshooting</h2>
 We list here potential problems using the MOEDivcon integration and possible
