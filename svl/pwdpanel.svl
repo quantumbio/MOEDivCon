@@ -47,7 +47,8 @@ const MAT_TRANS_MIN = 0x80;
 const QBPWD_OPT_DEFAULTS =
     [
     ['analysis',     1             ],
-    ['cutoff',       2.0           ],
+    ['cutoff',       1             ],
+    ['sigma',        2.0           ],
     ['mapncolors',  15             ],
     ['mapmono',      1             ],
     ['mapnticks',    5             ]
@@ -104,9 +105,18 @@ const PANEL =
             extendH: 1,
             Vbox :
                 [
+                Checkbox :
+                    [
+                    name: 'cutoff', text: 'Cutoff', onTrigger: 'return',
+                    bubbleHelp:
+                        'Determine minimum and maximum cuts using the\n'
+                        'standard deviation of a subset of the map data.\n'
+                        'Otherwise, use absolute minimum and maximum.'
+                    ],
                 Text :
                     [
-                    name: 'cutoff', len: 7, extendH: 1, title: 'Cutoff:',
+                    name: 'sigma', len: 7, extendH: 1,
+                    title: 'Number of sigmas:',
                     type: 'real', allowBlank: 0,
                     shortcut: ['1.0', '2.0', '3.0', '4.0', '5.0', '6.0'],
                     bubbleHelp: 'Number of standard deviations used to\n'
@@ -124,7 +134,7 @@ const PANEL =
                     Text :
                         [
                         name: 'mapncolors', len: 7, extendH: 1, 
-                        title: 'Number of Colors:',
+                        title: 'Number of colors:',
                         type: 'int', allowBlank: 0,
                         shortcut: ['3', '7', '15', '31'],
                         bubbleHelp: 'Number of distinct colors.'
@@ -143,7 +153,7 @@ const PANEL =
                 Text :
                     [
                     name: 'mapnticks', len: 7, extendH: 1, 
-                    title: 'Number of Ticks:',
+                    title: 'Number of ticks:',
                     type: 'int', allowBlank: 0,
                     shortcut: ['3', '5', '7', '9'],
                     bubbleHelp: 'Number of labeled ticks on color scale.'
@@ -601,6 +611,21 @@ local function UpdateComplex [lignum]
 endfunction
 
 /****************************************************************************
+ *                          UpdateCutoff
+ *
+ *  Update the window based on new cutoff value.
+ *
+ ****************************************************************************/
+local function UpdateCutoff [wkey, cutoff]
+
+    if cutoff === 0 then
+        WindowSetAttr [wkey, [sigma: [sensitive: 0, allowBlank: 1]]];
+    else
+        WindowSetAttr [wkey, [sigma: [sensitive: 1, allowBlank: 0]]];
+    endif
+endfunction
+
+/****************************************************************************
  *
  *                          UpdateResidue
  *
@@ -688,6 +713,7 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
     GSetTransparency [G_surface.gobj, trans];
     local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
     GSetMaterial [G_surface.gobj, mat];
+
     GVertex [G_surface.gobj, G_surface.surfdim, s_idx, vcolor,
       s_vpt, s_vnorm];
 
@@ -729,12 +755,15 @@ global function qb_QBPWDSetupPanel []
     loop
         local [vals, trig] = WindowWait wkey;
 
-       if trig === 'panel' then
+        if trig === 'cutoff' then
+            UpdateCutoff [wkey, vals.cutoff];
+
+        elseif trig === 'panel' then
             if vals.panel === 'Close' then
 	            if tok_length pwdfilename > 0 then
                     local pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
-                            vals.analysis, vals.cutoff, vals.mapncolors, 
-                            vals.mapmono, vals.mapnticks]];
+                            vals.analysis, vals.cutoff, vals.sigma,
+                            vals.mapncolors, vals.mapmono, vals.mapnticks]];
                     SaveOptions [pwdfilename, pwdopts];
                 endif
                 break;
@@ -765,8 +794,8 @@ global function qb_QBPWDSetupPanel []
 
                     //  Make sure first ligand is in MOE Window
                     UpdateComplex INITLIG;
-                    qb_HeatMapSetupPanel [pwddata (vals.analysis), vals.cutoff,
-                        SIGNIFRES, 
+                    qb_HeatMapSetupPanel [pwddata (vals.analysis),
+                        vals.cutoff, vals.sigma, SIGNIFRES, 
                         vals.mapncolors, vals.mapmono, vals.mapnticks, 
                         'qb_QBPWDSelectHandler', INITLIG, 1];
 

@@ -210,7 +210,7 @@ function StandardDeviation;
  *  Determine the minimum and maximum cuts.
  *
  ****************************************************************************/
-local function CalculateCuts [data, cutoff, cols, num]
+local function CalculateCuts [data, numsigma, cols, num]
 
     local rowdata = data (DATA_ROWDATA);
     local row, numbers = [];
@@ -227,13 +227,13 @@ write ['A: {}, S: {}\n', avg, sigma];//DEBUG
     local mincut, maxcut;
     if minnum === 0 and maxnum > 0 and num > 0 then
         mincut = 0;
-        maxcut = 2 * (avg + (cutoff * sigma));
+        maxcut = 2 * (avg + (numsigma * sigma));
     elseif maxnum === 0 and minnum < 0 and num > 0 then
-        mincut  = 2 * (avg - (cutoff * sigma));
+        mincut  = 2 * (avg - (numsigma * sigma));
         maxcut = 0;
     elseif minnum < 0 and maxnum > 0 and num > 0 then
-        mincut = avg - (cutoff * sigma);
-        maxcut = avg + (cutoff * sigma);
+        mincut = avg - (numsigma * sigma);
+        maxcut = avg + (numsigma * sigma);
 
         //  Adjust so that 0 is in the middle of white
         local dist = maxcut - mincut;
@@ -243,8 +243,56 @@ write ['A: {}, S: {}\n', avg, sigma];//DEBUG
 
     else
         return [[], [], twrite ['Cannot generate minimum and maximum cuts\n'
-            'with cutoff {}, signifcant columns {}, and number {}\n',
-            cutoff, cols, num]];
+            'with number of sigmas {}, signifcant columns {}, and number {}\n',
+            numsigma, cols, num]];
+    endif
+
+    return [mincut, maxcut, ''];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          CalculateMinMax
+ *
+ *  Determine the minimum and maximum cut without standard deviation.
+ *
+ ****************************************************************************/
+local function CalculateMinMax [data, num]
+
+    local rowdata = data (DATA_ROWDATA);
+    local numbers = cat app third rowdata;
+/*
+    for row in rowdata loop
+        numbers = cat [numbers, keep [third row, cols]];
+    endloop
+*/
+
+    local minnum = min numbers;
+    local maxnum = max numbers;
+
+write ['min: {}, max: {}\n', minnum, maxnum];//DEBUG
+
+    local mincut, maxcut;
+    if minnum === 0 and maxnum > 0 and num > 0 then
+        mincut = 0;
+        maxcut = maxnum;
+    elseif maxnum === 0 and minnum < 0 and num > 0 then
+        mincut  = minnum;
+        maxcut = 0;
+    elseif minnum < 0 and maxnum > 0 and num > 0 then
+        mincut = minnum;
+        maxcut = maxnum;
+
+        //  Adjust so that 0 is in the middle of white
+        local dist = maxcut - mincut;
+        local step = dist / num;
+        mincut = (ceil (mincut / step) - 0.5) * step;
+        maxcut = mincut + dist;
+
+    else
+        return [[], [], twrite ['Cannot generate minimum and maximum cuts\n'
+            'with number {}\n', num]];
     endif
 
     return [mincut, maxcut, ''];
@@ -379,7 +427,7 @@ local function DrawMap [data, numrows, numcols, mincut, maxcut, colors, ticks]
         local c_y = box_y + (numrows - row_i) * CELL_HT;
 
         gr_text [key, [0, [ROWCOLTITLE_H + CELL_WD/2 , c_y + CELL_HT/2],
-            rowname, 'sys', icolor'black', 8, [position: 'middlecenter']]];
+            rowname, 'sys-b', icolor'black', 8, [position: 'middlecenter']]];
 
         for col_i = 1, numcols, 1 loop
             local cidx, value = rowvals (col_i);
@@ -405,7 +453,7 @@ local function DrawMap [data, numrows, numcols, mincut, maxcut, colors, ticks]
     for col_i = 1, numcols, 1 loop
         local colkey = gr_create [size: [4 * colnmlen, 4 * CELL_WD],
             units: 'pt'];
-        gr_text [colkey, [0, [4 * 2, 2 * CELL_WD], colnames (col_i), 'sys', 
+        gr_text [colkey, [0, [4 * 2, 2 * CELL_WD], colnames (col_i), 'sys-b', 
             icolor'black', 4 * 8, [position: 'middleleft']]];
         img = gr_render_pixmap [bg, colkey];
         gr_destroy colkey;
@@ -873,7 +921,10 @@ endfunction
  *          are tokens; and the values are numbers. Only the first three
  *          characters of the abbreviations are used for the labels.
  *
- *    cutoff : real : the number of standard deviations used to determine the
+ *    cutoff : boolean : if true, use the standard deviation to determine
+ *          cutoffs; otherwise, use absolute min and max.
+ *
+ *    sigma : real : the number of standard deviations used to determine the
  *          minimum and maximum values of the color scale.  Values smaller
  *          than the minimum are assigned the same color as the minimum and
  *          values greater than the maximum are assigned the same color as
@@ -907,7 +958,7 @@ endfunction
  *          the full row label, full column label and cell value.
  *
  ****************************************************************************/
-global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
+global function qb_HeatMapSetupPanel [data, cutoff, sigma, numsignifcols,
         numcolors, monochrome, ticks, selfun, initsel, help]
 
     if MOE_BATCH then return; endif
@@ -918,11 +969,19 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
     data = TruncateRows [data];
 
     local mincut, maxcut, errmess;
-    [mincut, maxcut, errmess] = CalculateCuts [data, cutoff, 
-        numsignifcols, numcolors];
-    if mincut === [] or maxcut === [] then
-        Warning errmess;
-        return;
+    if cutoff then
+        [mincut, maxcut, errmess] = CalculateCuts [data, sigma, 
+            numsignifcols, numcolors];
+        if mincut === [] or maxcut === [] then
+            Warning errmess;
+            return;
+        endif
+    else
+        [mincut, maxcut, errmess] = CalculateMinMax [data, numcolors];
+        if mincut === [] or maxcut === [] then
+            Warning errmess;
+            return;
+        endif
     endif
 
     local colors;
@@ -1061,7 +1120,6 @@ global function qb_HeatMapSetupPanel [data, cutoff, numsignifcols,
                 Warning selerrmess;
                 break;
             endif
-
         endif
     endloop
 
