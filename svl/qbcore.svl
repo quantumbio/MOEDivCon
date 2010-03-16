@@ -56,6 +56,8 @@ const ANALYSIS = 'qb_analysistype';
 const ANALPWD = 'qb_pwd';
 const ANALPWDSAR = 'qb_pwdSAR';
 const ANALPWDINTER = 'qb_pwdinteraction';
+const ANALNMR = 'qb_nmr';
+const ANALNMREXP = 'qb_nmrexperimental';
 
 //  Charge status
 const CHG_COLOR = 
@@ -1391,6 +1393,11 @@ global function qb_GetAnalysisData [dbkey, analysis, type]
             datatok = db_GetEnv [dbkey, ANALPWDINTER];
             [[data]] = sread [string datatok, '{v}'];
         endif
+    elseif analysis === 'nmr' then
+        if type === 'exp' then
+            datatok = db_GetEnv [dbkey, ANALNMREXP];
+            [[data]] = sread [string datatok, '{v}'];
+        endif
     endif
 
     return data;
@@ -1516,19 +1523,21 @@ endfunction
  *
  ****************************************************************************/
 global function qb_GetLigandAtomsIndices [elem]
+
+    if MOE_BATCH then return [[], [], 'No MOE Window!']; endif
+
     local [atoms, errmess] = qb_GetLigandAtoms [];
     if atoms === [] then
-        if MOE_BATCH then
-            write ['Error!  {}\n', errmess];
-        else
-            Warning errmess;
-        endif
-        exit [];
+        return [[], [], errmess];
     endif
 
     local [atomindices] = indicesof [elem, aElement atoms];
+    if atomindices === [] then
+        return [[], [],  
+            fwrite ['There are no {} present in the ligand', elem]];
+    endif
 
-    return [atoms, atomindices];
+    return [atoms, atomindices, ''];
 endfunction
 
 /****************************************************************************
@@ -1674,6 +1683,10 @@ global function qb_SaveAnalysisData [dbkey, analysis, type, data]
         elseif type === 'inter' then
             db_SetEnv [dbkey, ANALPWDINTER, twrite ['{v}', data]];
         endif
+    elseif analysis === 'nmr' then
+        if type === 'exp' then
+            db_SetEnv [dbkey, ANALNMREXP, twrite ['{v}', data]];
+        endif
     endif
 
 endfunction
@@ -1818,13 +1831,16 @@ global function qb_SplitComplex []
 
     const COLLECTNAMES = ['QB_LIGAND', 'LIGX_LIGAND'];
     local recatoms, ligatoms;
-    local cname, makecoll = 0;
+    local cname, col, x, makecoll = 0;
 
     local colnames = oCollections [];
     for cname in COLLECTNAMES loop
         if anytrue eqE [cname, colnames] then
-            ligatoms  = cat oAtoms oGetCollection cname;
-            ligatoms = join [ligatoms, complexatoms];
+            //  Make sure the ligand atoms maintain their order in complex.
+            col = cat oAtoms oGetCollection cname;
+            col = join [col, complexatoms];
+            x = x_sort aNumber col;
+            ligatoms  = col [x];
             break;
         endif
     endloop
@@ -1846,7 +1862,10 @@ global function qb_SplitComplex []
         oSetCollection ['QB_LIGAND', ligatoms];
      endif
 
-    recatoms = diff [complexatoms, ligatoms];
+    //  Make sure the receptor atoms maintain their order in complex.
+    col = diff [complexatoms, ligatoms];
+    x = x_sort aNumber col;
+    recatoms  = col [x];
 
     return [recatoms, ligatoms, ''];
 
