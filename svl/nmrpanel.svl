@@ -31,6 +31,7 @@
 
 function qb_CoreHandler;
 function qb_CutReceptor;
+function qb_GetAnalysisData;
 function qb_GetCoreEnv;
 function qb_GetCorePanel;
 function qb_GetDefaultsCore;
@@ -41,11 +42,12 @@ function qb_GetLigandAtomsIndices;
 function qb_GetWhich;
 function qb_InitCorePanel;
 function qb_LoadCoreScoreDB;
+function qb_SaveAnalysisData;
 function qb_SaveDivconStatus;
 function qb_SetUpScoreDB;
 function qb_TagCoreVals;
 function qb_UpdateCorePanel;
-function qb_VerifyCharges;
+function qb_VerifyDivcon;
 
 function qb_NMRScore;
 function qb_NMRScoreBatch;
@@ -256,8 +258,10 @@ local function LoadDB [dbpath]
 
     local nrmsopts = qb_GetEnvApp [dbkey];
     nrmsopts = tagcat [nrmsopts, tag tr NMRSCORE_OPT_DEFAULTS];
+    local [free, bound] = qb_GetAnalysisData [dbkey, 'nmr', 'exp'];
+    return [dbkey, recset, ligand, status, coreopts, nrmsopts, complex,
+        free, bound];
 
-    return [dbkey, recset, ligand, status, coreopts, nrmsopts, complex];
 endfunction
 
 function qb_GetNMRSEnv;
@@ -331,22 +335,23 @@ endfunction
  *                          SetupExpDataPanel
  *
  ****************************************************************************/
-global function SetupExpDataPanel [ligatoms, indices]
+global function SetupExpDataPanel [ligatoms, indices, atomfree, atombound]
 
     if MOE_BATCH then return; endif
     if WindowShow ['NMRExperimentalData', 1] then return; endif
 
     local atomnames = get [aName ligatoms, indices];
 
-write['{v}\n{v}\n{v}\n', ligatoms, indices, atomnames];//DEBUG
+write['Lig: {v}\nIdx: {v}\nAN: {v}\nAF: {v}\nAB: {v}\n',
+aName ligatoms, indices, atomnames, atomfree, atombound];//DEBUG
 
     local curratom = 0;
     local buttons = EXP_NAMELBL;
     local freetexts = EXP_FREELBL;
     local boundtexts = EXP_BNDLBL;
-    local ith = 0;
-    for length indices loop
-        ith = ith + 1;
+    local fnames = [], bnames = [];
+    local ith;
+    for ith = 1, length indices, 1 loop
         local butname = twrite ['name{}', ith];
         local freename = twrite ['free{}', ith];
         local bndname = twrite ['bound{}', ith];
@@ -360,10 +365,20 @@ write['{v}\n{v}\n{v}\n', ligatoms, indices, atomnames];//DEBUG
 
         local newbndtext = tagpoke [EXP_TEXTCELL, ['Text', 'name'], bndname];
         boundtexts = cat [boundtexts, newbndtext];
+
+        fnames = append [fnames, freename];
+        bnames = append [bnames, bndname];
     endloop
 
     local box = [Mbox: cat [EXP_BOXHDR, cat [buttons, freetexts, boundtexts]]];
     local expwkey = WindowCreate cat [EXP_HEADER, box];
+
+    if length indices === length atomfree
+            and length indices === length atombound then
+        local prevvals = cat [tag [fnames, atomfree], tag [bnames, atombound]];
+        WindowSetData [expwkey, prevvals];
+    endif
+
     WindowShow [expwkey, 1];
 
     local free = [], bound = [];
@@ -371,14 +386,12 @@ write['{v}\n{v}\n{v}\n', ligatoms, indices, atomnames];//DEBUG
         local [vals, trig] = WindowWait expwkey;
         if trig === 'exppanel' then
             if vals.exppanel === 'Cancel' then
+                free = atomfree;
+                bound = atombound;
                 break;
 
             elseif vals.exppanel === 'Okay' then
-write['{v}\n', vals];//DEBUG
-
-                ith = 0;
-                for length indices loop
-                    ith = ith + 1;
+                for ith = 1, length indices, 1 loop
                     freename = twrite ['free{}', ith];
                     free = append [free, tagpeek [vals, freename]];
                     bndname = twrite ['bound{}', ith];
@@ -390,8 +403,6 @@ write['{v}\n', vals];//DEBUG
         elseif 'name' === tok_keep [trig, 4] then
             local numtok = tok_drop [trig, 4];
             local atmidx = atoi numtok;
-write['{}th:  {}\n', atmidx, atomnames(atmidx)];//DEBUG
-
             if curratom > 0 then
                 aSetLabelName [curratom, 0];
             endif
@@ -472,7 +483,11 @@ global function qb_NMRScoreSetupPanel []
     indices = [];
     atomfree = [];
     atombound = [];
-
+//DEBUG
+local num = length second qb_GetLigandAtomsIndices [elem];
+atomfree = rep [1.025, num];
+atombound = rep [1.050, num];
+//DEBUG
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
     WindowSetData [wkey, appdflts];
@@ -538,10 +553,18 @@ global function qb_NMRScoreSetupPanel []
             if second task_fork [statics:'share',
                     master: 'parent'] === 'child' then
 
+                local xerrmess;
                 ViewSave 1;
-                [ligatoms, indices] = qb_GetLigandAtomsIndices [elem];
+                [ligatoms, indices, xerrmess] = qb_GetLigandAtomsIndices [elem];
+                if ligatoms === [] or indices === [] then
+                    ViewLoad 1;
+                    Warning xerrmess;
+                    exit [];
+                endif
+
                 View ligatoms;
-                [atomfree, atombound] = SetupExpDataPanel [ligatoms, indices];
+                [atomfree, atombound] = SetupExpDataPanel [ligatoms, indices,
+                    atomfree, atombound];
                 ViewLoad 1;
                 exit [];
             endif
@@ -559,7 +582,8 @@ global function qb_NMRScoreSetupPanel []
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
                         local [ldkey, ldcutrec, ldlig, ldsts, ldcoreopts,
-                            ldnmrsopts, ldcomplex, ldmess] = LoadDB [dbpath];
+                            ldnmrsopts, ldcomplex, ldfree, ldbound]
+                            = LoadDB [dbpath];
 
     	                Close [force:1];
                         if neL [ldcutrec, []] and neL [ldlig, []] then
@@ -574,6 +598,8 @@ global function qb_NMRScoreSetupPanel []
 
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
                         complexmol = ldcomplex;
+                        atomfree = ldfree;
+                        atombound = ldbound;
                         nmrskey = ldkey;
                         dbv_Open db_Filename nmrskey;
                         db_Close ldkey;
@@ -597,8 +623,8 @@ global function qb_NMRScoreSetupPanel []
                     continue;
                 endif
 
-                status = qb_VerifyCharges [wkey, status, vals];
-                if not status.verifychg then continue; endif
+                status = qb_VerifyDivcon [wkey, status, vals];
+                if not status.verified then continue; endif
 
                 if second task_fork [statics:'share',
                         prio:3, idle:0] === 'child' then
@@ -613,7 +639,9 @@ global function qb_NMRScoreSetupPanel []
                     atomnames = tok_cat [indextoks, '-', atomnames];
                     nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         complexmol, cat [NMR_NUM_FIELDS, atomnames],
-                        'nmrscore'];
+                        'nmrscore', 0];
+                    qb_SaveAnalysisData [nmrskey, 'nmr', 'exp',
+                        [atomfree, atombound]];
                     RunCalc [nmrskey, indices, atomnames];
                     dbv_Open db_Filename nmrskey;
                     db_Close nmrskey;
@@ -636,8 +664,8 @@ global function qb_NMRScoreSetupPanel []
                     continue;
                 endif
 
-                status = qb_VerifyCharges [wkey, status, vals];
-                if not status.verifychg then continue; endif
+                status = qb_VerifyDivcon [wkey, status, vals];
+                if not status.verified then continue; endif
 
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
@@ -652,7 +680,9 @@ global function qb_NMRScoreSetupPanel []
                     atomnames = tok_cat [indextoks, '-', atomnames];
                     nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         complexmol, cat [NMR_NUM_FIELDS, atomnames],
-                        'nmrscore'];
+                        'nmrscore', 1];
+                    qb_SaveAnalysisData [nmrskey, 'nmr', 'exp',
+                        [atomfree, atombound]];
                     dbv_Open db_Filename nmrskey;
                     db_Close nmrskey;
                     exit [];
