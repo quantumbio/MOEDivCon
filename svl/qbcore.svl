@@ -1319,7 +1319,7 @@ endfunction
  *  the "molecules" formed by those atoms.
  *
  ****************************************************************************/
-global function qb_CutReceptor [posedbkey, radius]
+global function qb_CutReceptor [posekey, radius]
 
     if radius <= 0.0 then
         return [[], [], 'Radius must be greater than zero.'];
@@ -1331,22 +1331,38 @@ global function qb_CutReceptor [posedbkey, radius]
         return [[], [], errmess];
     endif
 
-    //  Find neighboring atoms within radius
-    local cutset = [];
-    local subset;
+    if not MOE_BATCH then
+        local [osys, nsys] = SystemPush [];
+    endif
+
+    //  Find neighboring atoms within radius of each pose
+    local poseflds = qb_GetPoseFields [posekey];
+    local subset, cutset = [];
     for subset in split [x_id recatoms, 50] loop
-        local key = prox_open [radius, aPos recatoms[subset], radius/2];
-        local cutidx = uniq second prox_find [key, aPos ligatoms, radius/2];
+        local key = prox_open [radius, aPos recatoms [subset], radius/2];
+        local rowkey = 0;
+        while rowkey = db_NextEntry [poseskey, rowkey] loop
+            local [posemol, c] = db_ReadFields [posekey, rowkey, poseflds];
+            local posech = mol_Create posemol;
+            local poseatms = cat cAtoms posech;
+            local cutidx = uniq second prox_find [key, aPos poseatms, radius/2];
+            cutset = cat [cutset, subset [cutidx]];
+            oDestroy posech;
+        endloop
+
         prox_close key;
-        cutset = cat [cutset, subset[cutidx]];
     endloop
+
+    if not MOE_BATCH then
+        SystemPop [osys, nsys];
+    endif
 
     if length cutset === 0 then
         return [[], [], twrite ['No receptor atoms within radius {n:.1f}\n'
             'of the ligand pose atoms.', radius]];
     endif
 
-    local cutatoms = recatoms [cutset];
+    local cutatoms = uniq recatoms [cutset];
 
     print aMoleculeNumber cutatoms;  //DEBUG
 
