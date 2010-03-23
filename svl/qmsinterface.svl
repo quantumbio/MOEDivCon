@@ -114,6 +114,7 @@ exe_setpriority [process_keys, prios];
 
 local stdin = exe_stdin process_keys;
 local stdout = exe_stdout process_keys;
+local stderr = exe_stderr process_keys;
 
 //  Pass the two backbones to QuantumBio's Divcon QMScore
 //
@@ -222,9 +223,18 @@ while exe_status process_key loop
     endif
 endloop
 
+//  Look for error messages from stderr.
+local [[newerror]] = fread [stderr, '{c:*}'];
+while length newerror > 0 loop
+    write ['MOEDivcon: {}\n', newerror];//DEBUG
+    errmess = cat [newerror, errmess];
+    [[newerror]] = fread [stderr, '{c:*}'];
+endloop
+
 exe_kill  [process_key, 0];
 exe_kill  process_key;
 exe_close process_keys;
+
 
 //  Clean up working directory.
 if success === 1 then
