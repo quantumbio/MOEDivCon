@@ -69,6 +69,7 @@ const CHG_COLOR =
 
 const STATUS_DEFAULTS =
     [
+    ['allowmode',    [1,1,1]       ],
     ['prevwd',       ''            ],
     ['calcchg',      0             ],
     ['verified',     0             ],
@@ -82,7 +83,7 @@ const STATUS_DEFAULTS =
 const CORE_OPT_DEFAULTS =
     [
     ['task',         0             ],
-    ['mode',         'One-to-One'  ],  // Shared dialog defaults options
+    ['mode',         'One-to-One'  ],
     ['cwd',          0             ],
     ['workdir',      '/tmp'        ],
     ['scoredb',      'qbscore.mdb' ],
@@ -364,30 +365,6 @@ const MESS_WINDOW =
 
 //***********************  Local Functions  *********************************
 
-function qb_SplitComplex;
-
-/****************************************************************************
- *                          AtomsToMols
- *
- *  Given the set of atoms in the MOE Window, identify and separate the
- *  ligand and the receptor atoms.  Returns the extracted molecules.
- *
- ****************************************************************************/
-local function AtomsToMols []
-
-    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
-
-    if recatoms === [] or ligatoms === [] then
-        return [[], [], errmess];
-    endif
-
-    local ligmol = mol_Extract ligatoms;
-    local recmol = mol_Extract recatoms;
-
-    return [recmol, ligmol, ''];
-
-endfunction
-
 /****************************************************************************
  *                          CalcCharge
  *
@@ -403,6 +380,7 @@ local function CalcCharge [atoms]
 endfunction
 
 function ChargeOK;
+function qb_SplitComplex;
 
 /****************************************************************************
  *                          CalcComplexCharge
@@ -412,7 +390,7 @@ function ChargeOK;
  ****************************************************************************/
 local function CalcComplexCharge []
 
-    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
     if recatoms === [] or ligatoms === [] then
         return  [[], [], [], [], errmess];
     endif
@@ -497,7 +475,7 @@ endfunction
  ****************************************************************************/
 local function CheckComplexCharge [recchg, ligchg]
 
-    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
     if recatoms === [] or ligatoms === [] then
         return  [[], [], errmess];
     endif
@@ -951,7 +929,7 @@ endfunction
  ****************************************************************************/
 local function TestComplex [lonepairs, overlap, missextraH, MMtype]
 
-    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
     if recatoms === [] or ligatoms === [] then
         return  [0, '', 0, errmess];
     endif
@@ -1030,37 +1008,6 @@ local function TestDBMols [oldkey, testLP, testOverlap, testH, testMM]
 endfunction
 
 /****************************************************************************
- *                          UpdateCharge
- *
- *  Update the window based on new charge.
- *
- ****************************************************************************/
-local function UpdateCharge [wkey, status, warn]
-
-    local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
-    if (recchg === [] or recok === [] or ligchg === [] or ligok === []) then
-        if warn then
-            Warning  errmess;
-        endif
-
-        SetChargeStatus [wkey, status];
-        return status;
-    endif
-
-    status.calcchg = 1;
-    status.moerecchg = recchg;
-    status.moeligchg = ligchg;
-
-    status.recchg = select [2, 3, recok];
-    status.ligchg = select [2, 3, ligok];
-
-    WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
-    SetChargeStatus [wkey, status];
-
-    return status;
-endfunction
-
-/****************************************************************************
  *                          UpdateCWD
  *
  *  Update the window based on new CWD value.
@@ -1115,6 +1062,28 @@ local function UpdateMode [wkey, mode, status]
 endfunction
 
 //************************  Global Functions  *******************************
+
+/****************************************************************************
+ *                          qb_AtomsToMols
+ *
+ *  Given the set of atoms in the MOE Window, identify and separate the
+ *  ligand and the receptor atoms.  Returns the extracted molecules.
+ *
+ ****************************************************************************/
+global function qb_AtomsToMols []
+
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
+
+    if recatoms === [] or ligatoms === [] then
+        return [[], [], errmess];
+    endif
+
+    local ligmol = mol_Extract ligatoms;
+    local recmol = mol_Extract recatoms;
+
+    return [recmol, ligmol, ''];
+
+endfunction
 
 /****************************************************************************
  *                          qb_CheckChgDivconMol
@@ -1191,6 +1160,8 @@ global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
 
 endfunction
 
+function qb_UpdateCharge;
+
 /****************************************************************************
  *
  *                          qb_CoreHandler
@@ -1258,7 +1229,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
                 statics:'share'] === 'child' then
             task_prio 0;
 
-            status = UpdateCharge [wkey, status, 1];
+            status = qb_UpdateCharge [wkey, status, 1];
             exit [];
         endif
 
@@ -1313,49 +1284,45 @@ endfunction
 /****************************************************************************
  *                          qb_CutReceptor
  *
- *  Given a pose database and radius, find all receptor atoms of the current
- *  complex in the MOE window that are within the radius distance from each
+ *  Given a vector of poses and radius, find all receptor atoms of the current
+ *  complex in the MOE Window that are within the radius distance from each
  *  pose, expand those atoms out to their respective residues, and return
- *  the "molecules" formed by those atoms.
+ *  the "molecules" formed by those atoms.  If poses is empty, cut around
+ *  the ligand in the MOE Window.
  *
  ****************************************************************************/
-global function qb_CutReceptor [posekey, radius]
+global function qb_CutReceptor [poses, radius]
+
+    if MOE_BATCH then return [[], [], 'No MOE Window!']; endif
 
     if radius <= 0.0 then
         return [[], [], 'Radius must be greater than zero.'];
     endif
 
-    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
 
     if recatoms === [] or ligatoms === [] then
-        return [[], [], errmess];
-    endif
-
-    if not MOE_BATCH then
-        local [osys, nsys] = SystemPush [];
+        return [[], errmess];
     endif
 
     //  Find neighboring atoms within radius of each pose
-    local poseflds = qb_GetPoseFields [posekey];
-    local subset, cutset = [];
+    local subset, cutidx, cutset = [];
     for subset in split [x_id recatoms, 50] loop
         local key = prox_open [radius, aPos recatoms [subset], radius/2];
-        local rowkey = 0;
-        while rowkey = db_NextEntry [poseskey, rowkey] loop
-            local [posemol, c] = db_ReadFields [posekey, rowkey, poseflds];
-            local posech = mol_Create posemol;
-            local poseatms = cat cAtoms posech;
-            local cutidx = uniq second prox_find [key, aPos poseatms, radius/2];
+        if poses  === [] then
+            cutidx = uniq second prox_find [key, aPos ligatoms, radius/2];
             cutset = cat [cutset, subset [cutidx]];
-            oDestroy posech;
-        endloop
+        else
+            local posemol;
+            for posemol in poses loop
+                cutidx = uniq second prox_find [key, [posemol(4)(MOL_ATOM_X), 
+                posemol(4)(MOL_ATOM_Y), posemol(4)(MOL_ATOM_Z)], radius/2];
+                cutset = cat [cutset, subset [cutidx]];
+            endloop
+        endif
 
         prox_close key;
     endloop
-
-    if not MOE_BATCH then
-        SystemPop [osys, nsys];
-    endif
 
     if length cutset === 0 then
         return [[], [], twrite ['No receptor atoms within radius {n:.1f}\n'
@@ -1363,32 +1330,25 @@ global function qb_CutReceptor [posekey, radius]
     endif
 
     local cutatoms = uniq recatoms [cutset];
-
-    print aMoleculeNumber cutatoms;  //DEBUG
-
-    local residues = uniq oParent (cutatoms);
-    local resatoms = cat oChildren residues;
-
-    print aMoleculeNumber resatoms;  //DEBUG
+    local residues = uniq oResidues (cutatoms);
+    local resatoms = cat oAtoms residues;
 
     local delatoms = diff [recatoms, resatoms];
-    local delresidues = uniq oParent delatoms;
+    local delresidues = uniq oResidues delatoms;
     oDestroy delatoms;
     delresidues = delresidues | rAtomCount delresidues == 0;
-    local delchains = uniq oParent delresidues;
+    local delchains = uniq oChains delresidues;
     oDestroy delresidues;
     delchains = delchains | cResidueCount delchains == 0;
     oDestroy delchains;
 
-    Add_H (resatoms | aLonePairs resatoms <= 0);
-    Add_HLP (resatoms | aLonePairs resatoms > 0);
+    Add_H resatoms;
 
-    print aMoleculeNumber resatoms;  //DEBUG
+    [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
 
-    local ligmol = mol_Extract ligatoms;
-    local recmol = mol_Extract resatoms;
+    local recmol = mol_Extract recatoms;
 
-    return [recmol, ligmol, ''];
+    return [recmol, ''];
 
 endfunction
 
@@ -1421,6 +1381,29 @@ global function qb_GetAnalysisData [dbkey, analysis, type]
 endfunction
 
 /****************************************************************************
+ *                          qb_GetCoreEnv
+ *
+ *  Get the molecules (receptor, ligand and optional complex), the status,
+ *  and the core options from the database.
+ *
+ ****************************************************************************/
+global function qb_GetCoreEnv [dbkey]
+
+    local recmol = qb_GetEnvTag [dbkey, RECEPTOR];
+    local ligmol = qb_GetEnvTag [dbkey, LIGAND];
+    local complex = qb_GetEnvTag [dbkey, COMPLEX];
+
+    local status = qb_GetEnvTag [dbkey, STATUS];
+    status = tagcat [status, tag tr STATUS_DEFAULTS];
+
+    local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
+    coreopts = tagcat [coreopts, tag tr CORE_OPT_DEFAULTS];
+
+    return [recmol, ligmol, status, coreopts, complex];
+
+endfunction
+
+/****************************************************************************
  *
  *                          qb_GetCorePanel
  *
@@ -1449,6 +1432,19 @@ endfunction
  ****************************************************************************/
 global function qb_GetDefaultsStatus []
     return tag tr STATUS_DEFAULTS;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetElemIndices
+ *
+ *  For the given molecule, get the indices of the given element.
+ *
+ ****************************************************************************/
+global function qb_GetElemIndices [mol, elems]
+
+    local atomindices = cat indicesof [elems, mol(4)(MOL_ATOM_EL)];
+
+    return atomindices;
 endfunction
 
 /****************************************************************************
@@ -1494,67 +1490,18 @@ global function qb_GetEnvTag [dbkey, envtag]
 endfunction
 
 /****************************************************************************
- *                          qb_GetCoreEnv
- *
- *  Get the molecules (receptor, ligand and optional complex), the status,
- *  and the core options from the database.
- *
- ****************************************************************************/
-global function qb_GetCoreEnv [dbkey]
-
-    local recmol = qb_GetEnvTag [dbkey, RECEPTOR];
-    local ligmol = qb_GetEnvTag [dbkey, LIGAND];
-    local complex = qb_GetEnvTag [dbkey, COMPLEX];
-
-    local status = qb_GetEnvTag [dbkey, STATUS];
-    status = tagcat [status, tag tr STATUS_DEFAULTS];
-
-    local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
-    coreopts = tagcat [coreopts, tag tr CORE_OPT_DEFAULTS];
-
-    return [recmol, ligmol, status, coreopts, complex];
-
-endfunction
-
-/****************************************************************************
  *                          qb_GetLigandAtoms
  *
  *  Get the atoms of the ligand in the MOE Window.
  *
  ****************************************************************************/
 global function qb_GetLigandAtoms []
-    local [r, ligatms, errmess] = qb_SplitComplex [];
+
+    local [r, ligatms, errmess] = qb_SplitComplex [0];
 
     return [ligatms, errmess];
 endfunction
 
-/****************************************************************************
- *                          qb_GetLigandAtomsIndices
- *
- *  For the complex in the MOE Window, get the ligand atoms
- *  and the indices of the given element.
- *
- *  Note:  it is assumed that this function is called from a child process
- *  and will exit on an error.
- *
- ****************************************************************************/
-global function qb_GetLigandAtomsIndices [elem]
-
-    if MOE_BATCH then return [[], [], 'No MOE Window!']; endif
-
-    local [atoms, errmess] = qb_GetLigandAtoms [];
-    if atoms === [] then
-        return [[], [], errmess];
-    endif
-
-    local [atomindices] = indicesof [elem, aElement atoms];
-    if atomindices === [] then
-        return [[], [],  
-            fwrite ['There are no {} present in the ligand', elem]];
-    endif
-
-    return [atoms, atomindices, ''];
-endfunction
 
 /****************************************************************************
  *                          qb_GetPoseFields
@@ -1567,13 +1514,41 @@ global function qb_GetPoseFields []
 endfunction
 
 /****************************************************************************
+ *                          qb_GetPoses
+ *
+ ****************************************************************************/
+global function qb_GetPoses [vals]
+
+    local posekey = db_Open [vals.posedb, 'read'];
+    local mess = '';
+    local [fields, ftypes] = db_Fields posekey;
+    local molfield = fields | (ftypes == 'molecule');
+
+    if 1 <> length molfield then
+        mess = 'The poses database has\n'
+            'more than one molecule field.';
+        return [[], mess];
+    endif
+
+    local poses = [];
+    local rowkey = 0;
+    while rowkey = db_NextEntry [posekey, rowkey] loop
+        local [posemol] = db_ReadFields [posekey, rowkey, molfield];
+        poses = append [poses, posemol];
+    endloop
+
+    db_Close posekey;
+
+    return [poses, ''];
+endfunction
+
+/****************************************************************************
  *                          qb_GetRecFields
  *
  ****************************************************************************/
 global function qb_GetRecFields []
 
     return [REC_FIELD, RECCHG_FIELD];
-
 endfunction
 
 /****************************************************************************
@@ -1583,6 +1558,7 @@ endfunction
  *
  ****************************************************************************/
 global function qb_GetWhich [recbad, ligbad]
+
     local which = '';
     if recbad and ligbad then
         which = 'receptor and ligand';
@@ -1603,15 +1579,43 @@ endfunction
  *
  ****************************************************************************/
 global function qb_InitCorePanel [wkey, status, defaults]
+
     status.prevwd = defaults.workdir;
     WindowSetData [wkey, dropfirst defaults];
     WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0],
         recbox: [sensitive: 0], recdb: [allowBlank: 1],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
-        poseschg: [sensitive: 0]]];
-    status = UpdateCharge [wkey, status, 0];
+        poseschg: [sensitive: 0], mode: [text: RUN_MODES | status.allowmode]]];
+    status = qb_UpdateCharge [wkey, status, 0];
 
     return status;
+endfunction
+
+/****************************************************************************
+ *                          qb_IsModeManyToMany
+ *
+ ****************************************************************************/
+global function qb_IsModeManyToMany [coreopts]
+
+    return coreopts.mode === 'Many-to-Many';
+endfunction
+
+/****************************************************************************
+ *                          qb_IsModeOneToMany
+ *
+ ****************************************************************************/
+global function qb_IsModeOneToMany [coreopts]
+
+    return coreopts.mode === 'One-to-Many';
+endfunction
+
+/****************************************************************************
+ *                          qb_IsModeOneToOne
+ *
+ ****************************************************************************/
+global function qb_IsModeOneToOne [coreopts]
+
+    return coreopts.mode === 'One-to-One';
 endfunction
 
 /****************************************************************************
@@ -1638,7 +1642,6 @@ global function qb_LoadCoreScoreDB [dbpath, type]
     local [rec, lig, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
 
     return [dbkey, rec, lig, status, coreopts, complex, ''];
-
 endfunction
 
 /****************************************************************************
@@ -1724,6 +1727,18 @@ global function qb_SaveDivconStatus [dbkey, rowkey, message]
 endfunction
 
 /****************************************************************************
+ *                          qb_SetModeStatus
+ *
+ *  Return the default values for the GUI status.
+ *
+ ****************************************************************************/
+global function qb_SetModeStatus [status, mode]
+    status = tagpoke [status, 'allowmode', mode];
+
+    return status;
+endfunction
+
+/****************************************************************************
  *                          qb_SetUpScoreDB
  *
  *  Create the output database for storing Score results and ensure that
@@ -1743,7 +1758,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
     SetScoreFields [dbkey, coreopts.mode === 'Many-to-Many', fields];
 
     if coreopts.mode === 'One-to-One' or coreopts.mode === 'One-to-Many' then
-        local [receptor, ligand, errmess] = AtomsToMols [];
+        local [receptor, ligand, errmess] = qb_AtomsToMols [];
         if receptor === [] or ligand === [] then
             Warning errmess;
             exit [];
@@ -1838,7 +1853,7 @@ endfunction
  *  Split the set of atoms in the MOE Window into ligand and receptor atoms.
  *
  ****************************************************************************/
-global function qb_SplitComplex []
+global function qb_SplitComplex [testsingle]
 
     local complexatoms = Atoms [];
     if length complexatoms === 0 then
@@ -1847,7 +1862,7 @@ global function qb_SplitComplex []
 
     const COLLECTNAMES = ['QB_LIGAND', 'LIGX_LIGAND'];
     local recatoms, ligatoms;
-    local cname, col, x, makecoll = 0;
+    local cname, col, x;
 
     local colnames = oCollections [];
     for cname in COLLECTNAMES loop
@@ -1863,20 +1878,17 @@ global function qb_SplitComplex []
 
     if length ligatoms === 0 then
         ligatoms  = _Atoms '$$ligand';
-        makecoll = 1;
     endif
 
     if length ligatoms === 0 or length ligatoms >= length complexatoms then
         return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
     endif
 
-    if not SingleMol [ligatoms] then
+    if testsingle and not SingleMol [ligatoms] then
         return [[], [], 'Ligand must to be a single molecule.'];
     endif
 
-    if makecoll then
-        oSetCollection ['QB_LIGAND', ligatoms];
-     endif
+    oSetCollection ['QB_LIGAND', ligatoms];
 
     //  Make sure the receptor atoms maintain their order in complex.
     col = diff [complexatoms, ligatoms];
@@ -1884,7 +1896,6 @@ global function qb_SplitComplex []
     recatoms  = col [x];
 
     return [recatoms, ligatoms, ''];
-
 endfunction
 
 /****************************************************************************
@@ -2044,6 +2055,7 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap,
     else
         return [2, ''];
     endif
+
 endfunction
 
 /****************************************************************************
@@ -2061,7 +2073,6 @@ global function qb_TestDivconMol [which, mol, lonepair, overlap,
     local chn = mol_Create mol;
     local atms = cat cAtoms chn;
 
-
     local [molok, mess] = qb_TestDivcon [which, atms, lonepair, overlap,
         missextraH, MMtype];
 
@@ -2076,7 +2087,39 @@ global function qb_TestDivconMol [which, mol, lonepair, overlap,
     oDestroy chn;
 
     return [molok, mess];
+endfunction
 
+/****************************************************************************
+ *                          qb_UpdateCharge
+ *
+ *  Update the window based on new charge.
+ *
+ ****************************************************************************/
+global function qb_UpdateCharge [wkey, status, warn]
+
+    if MOE_BATCH then return [status, 'No MOE Window!']; endif
+
+    local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
+    if (recchg === [] or recok === [] or ligchg === [] or ligok === []) then
+        if warn then
+            Warning  errmess;
+        endif
+
+        SetChargeStatus [wkey, status];
+        return status;
+    endif
+
+    status.calcchg = 1;
+    status.moerecchg = recchg;
+    status.moeligchg = ligchg;
+
+    status.recchg = select [2, 3, recok];
+    status.ligchg = select [2, 3, ligok];
+
+    WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
+    SetChargeStatus [wkey, status];
+
+    return status;
 endfunction
 
 /****************************************************************************

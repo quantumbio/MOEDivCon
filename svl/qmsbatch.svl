@@ -42,7 +42,9 @@ function qb_QMScore;
  *
  *  Execute QMScore for each row of the scoring database.
  *
- ****************************************************************************/
+  *  WARNING:  breaking into core
+ *
+****************************************************************************/
 global function qb_QMScoreBatch [dbpath]
 
     if not MOE_BATCH then return; endif
