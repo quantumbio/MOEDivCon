@@ -39,6 +39,7 @@ function qb_GetEnvApp;
 function qb_GetEnvTag;
 function qb_GetWhich;
 function qb_InitCorePanel;
+function qb_IsModeOneToOne;
 function qb_LoadCoreScoreDB;
 function qb_SaveAnalysisData;//temp
 function qb_SaveDivconStatus;
@@ -305,6 +306,8 @@ endfunction
  *
  *  Run the One-to-One scoring from the MOE Window.
  *
+ *  WARNING:  breaking into core
+ *
  ****************************************************************************/
 local function RunCalc [dbkey]
     local msgkey = Message [0, 'QMScore is running ...'];
@@ -357,6 +360,8 @@ function qb_GetPoseFields;
  *                          RunOneToManyCalc
  *
  *  Execute QMScore for each row of the scoring database.
+ *
+ *  WARNING:  breaking into core
  *
  ****************************************************************************/
 global function RunOneToManyCalc [oldkey]
@@ -560,7 +565,8 @@ global function qb_QMScoreSetupPanel []
                         vals.shift, vals.analpwd, vals.trainingset]];
                     qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
                         [], QMS_NUM_FIELDS, 'qmscore', 0];
-                    if vals.mode === 'One-to-One' then
+
+                    if qb_IsModeOneToOne [coreopts] then
                         RunCalc [qmskey];
                     else
                         RunOneToManyCalc [qmskey];

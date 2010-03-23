@@ -295,7 +295,7 @@ local function CreateSurfaceMap [restokens]
     const CLASS = 1;  // Connolly
     const RDIST = 10;
 
-    local [recatoms, ligatoms, errmess] = qb_SplitComplex [];
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
     if recatoms === [] or ligatoms === [] then
         Warning errmess;
         return [];

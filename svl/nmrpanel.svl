@@ -3,7 +3,7 @@
  // BEGIN COPYRIGHT
  /***********************************************************************
     Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
-	
+    
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
 
@@ -29,6 +29,7 @@
 #set version '2010.02'
 #set main    'qb_NMRScoreSetupPanel'
 
+function qb_AtomsToMols;
 function qb_CoreHandler;
 function qb_CutReceptor;
 function qb_GetAnalysisData;
@@ -38,14 +39,19 @@ function qb_GetDefaultsCore;
 function qb_GetDefaultsStatus;
 function qb_GetEnvApp;
 function qb_GetEnvTag;
-function qb_GetLigandAtomsIndices;
+function qb_GetElemIndices;
+function qb_GetLigandAtoms;
+function qb_GetPoses;
 function qb_GetWhich;
 function qb_InitCorePanel;
+function qb_IsModeOneToMany;
 function qb_LoadCoreScoreDB;
 function qb_SaveAnalysisData;
 function qb_SaveDivconStatus;
+function qb_SetModeStatus;
 function qb_SetUpScoreDB;
 function qb_TagCoreVals;
+function qb_UpdateCharge;
 function qb_UpdateCorePanel;
 function qb_VerifyDivcon;
 
@@ -63,10 +69,16 @@ const NMR_NUM_FIELDS =
 
 const NMRSCORE_OPT_DEFAULTS =
     [
-    ['guess',        0             ],  // NMRScore defaults start here
+    ['elemH',        1             ],
+    ['elemC',        0             ],
+    ['elemO',        0             ],
+    ['elemN',        0             ],
+    ['elemF',        0             ],
+    ['guess',        0             ],
     ['opt',          1             ],
     ['cut',          0             ],
-    ['radius',       2.5           ]
+    ['radius',       5.0           ],
+    ['allposes',     0             ]
     ];
 
 const GEOM_OPTS =
@@ -75,6 +87,15 @@ const GEOM_OPTS =
     'H only',
     'H and hetero',
     'all atoms'
+    ];
+
+const ELEM_TYPES =
+    [
+    'H',
+    'C',
+    'O',
+    'N',
+    'F'
     ];
 
 const HEADER = 
@@ -98,7 +119,7 @@ const PANEL =
         extendH: 1,
         Checkbox :
             [
-            name: 'cut', text: 'Cut Receptor?',
+            name: 'cut', text: 'Cut?', title: 'Receptor:',
             onTrigger: 'return',
             bubbleHelp:
                 'Cut the receptor at the specified radius.'
@@ -111,7 +132,7 @@ const PANEL =
             [
             name: 'radius', len: 7, extendH: 1, title: 'Radius:',
             type: 'real', allowBlank: 0,
-            shortcut: ['2.5', '3.0', '3.5', '4.0', '4.5', '5.0'],
+            shortcut: ['2.5', '5.0', '7.5', '10.0'],
             bubbleHelp: 'Cut radius in angstrums.'
             ],
         Separator : 
@@ -120,7 +141,7 @@ const PANEL =
             ],
         Button :
             [
-            name: 'showcut', text: 'Show Cut',
+            name: 'showcut', text: 'Apply',
             bubbleHelp: 'Perform cut and show in MOE Window.'
             ],
         Button :
@@ -130,12 +151,63 @@ const PANEL =
             ]
         ],
 
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
     Hbox :
         [
+        Checkbox :
+            [
+            name: 'allposes', text: 'Show all poses?', title: 'Poses:',
+            onTrigger: 'return',
+            bubbleHelp:
+                'Load all of the poses from the database\n'
+                'and show them in the MOE Window.'
+            ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
+    Hbox :
+        [
+        Checkbox :
+            [
+            name: 'elemH', text: 'H', title: 'Chemical Shift Atoms:',
+            onTrigger: 'return',
+            bubbleHelp:
+                ''
+            ],
+        Checkbox :
+            [
+            name: 'elemC', text: 'C', onTrigger: 'return',
+            bubbleHelp:
+                ''
+            ],
+        Checkbox :
+            [
+            name: 'elemO', text: 'O', onTrigger: 'return',
+            bubbleHelp:
+                ''
+            ],
+        Checkbox :
+            [
+            name: 'elemN', text: 'N', onTrigger: 'return',
+            bubbleHelp:
+                ''
+            ],
+        Checkbox :
+            [
+            name: 'elemF', text: 'F', onTrigger: 'return',
+            bubbleHelp:
+                ''
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
         Button :
             [
             name: 'experimental', text: 'Enter/Edit Experimental Data', 
-            extendH: 1,
+            extendH: 0,
             bubbleHelp:
                 'Open dialog to enter the data\n'
                 'for the free and bound ligand.'
@@ -273,7 +345,7 @@ function qb_SaveNMRScore;
  *  Run the One-to-One scoring from the MOE Window.
  *
  ****************************************************************************/
-function RunCalc [dbkey, moeindices, moeatomnames]
+local function RunCalc [dbkey, moeindices, moeatomnames]
     local msgkey = Message [0, 'NMRScore is running ...'];
     sleep -1;    // Allow parent to close input window.
 
@@ -335,7 +407,7 @@ endfunction
  *                          SetupExpDataPanel
  *
  ****************************************************************************/
-global function SetupExpDataPanel [ligatoms, indices, atomfree, atombound]
+local function SetupExpDataPanel [ligatoms, indices, atomfree, atombound]
 
     if MOE_BATCH then return; endif
     if WindowShow ['NMRExperimentalData', 1] then return; endif
@@ -422,6 +494,53 @@ aName ligatoms, indices, atomnames, atomfree, atombound];//DEBUG
     return [free, bound];
 endfunction
 
+/****************************************************************************
+ *                          ShowLigPoses
+ *
+ *  Show either the ligand or all poses in the MOE Window.
+ *
+ ****************************************************************************/
+local function ShowLigPoses [vals, ligmol, ligatoms, posemols, poseatoms]
+
+    local errmess;
+    if vals.allposes then
+        if ligatoms === [] then
+            return [ligatoms, posemols, poseatoms];
+        endif
+
+        if posemols === [] and qb_IsModeOneToMany [vals] then
+            [posemols, errmess] = qb_GetPoses [vals];
+            if posemols === [] then
+                Warning errmess;
+                exit [];
+            endif
+        endif
+
+        oDestroy ligatoms;
+        ligatoms = [];
+
+        poseatoms = cat oAtoms app mol_Create posemols;
+        oSetCollection ['QB_LIGAND', poseatoms];
+        aSetNucleusLook [poseatoms, 'small-sphere'];
+        aSetBondLook [poseatoms, 'cylinder'];
+
+    else
+        if poseatoms === [] then
+            return [ligatoms, posemols, poseatoms];
+        endif
+
+        oDestroy poseatoms;
+        poseatoms = [];
+
+        ligatoms = cat oAtoms mol_Create ligmol;
+        oSetCollection ['QB_LIGAND', ligatoms];
+        aSetNucleusLook [ligatoms, 'small-sphere'];
+        aSetBondLook [ligatoms, 'cylinder'];
+    endif
+
+    return [ligatoms, posemols, poseatoms];
+endfunction
+
 //  Global Functions
 
 /****************************************************************************
@@ -430,7 +549,7 @@ endfunction
  *  Get the core enviroment and application environment.
  *
  ****************************************************************************/
-local function qb_GetNMRSEnv [dbkey]
+global function qb_GetNMRSEnv [dbkey]
 
     local [recset, ligand, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
     local nmrsopts = qb_GetEnvApp [dbkey];
@@ -455,14 +574,21 @@ endfunction
  *
  *                          qb_NMRScoreSetupPanel
  *
+ *  It is assumed that the user will not modify the receptor or ligand
+ *  poses while the NMRScore panel is open.
+ *
  ****************************************************************************/
 global function qb_NMRScoreSetupPanel []
 
     static status;                     //  Shared with child tasks.
     static nmrskey;
-    static complexmol;
-    static elem;
+    static cutrecmol;
+    static origcomplex;
+    static ligmol;
     static ligatoms;
+    static posemols;
+    static poseatoms;
+    static elems;
     static indices;
     static atomfree;
     static atombound;
@@ -470,24 +596,42 @@ global function qb_NMRScoreSetupPanel []
     if MOE_BATCH then return; endif
     if WindowShow ['NMRScorePanel', 1] then return; endif
 
-    local coreopts = [], nmrsopts = [], browsetasks = [];
-    local atomnames = [], indextoks = [];
+    local errmess;
+    origcomplex = mol_Extract Chains [];
+    cutrecmol = [];
+    [ligatoms, errmess] = qb_GetLigandAtoms [];
+    if ligatoms === [] then
+        Warning errmess;
+        return;
+    endif
+
+    ligmol = mol_Extract ligatoms;
+    posemols = [];
+    poseatoms = [];
+    atomfree = [];
+    atombound = [];
+
+    nmrskey = 0;
     status = qb_GetDefaultsStatus [];
+    status = qb_SetModeStatus [status, [1,1,0]];
     local coredflts = qb_GetDefaultsCore [];
     local appdflts = tag tr NMRSCORE_OPT_DEFAULTS;
     coredflts = tagpoke [coredflts, 'scoredb', 'nmrscore.mdb'];
-    nmrskey = 0;
-    complexmol = mol_Extract Chains [];
-    elem = 'H';
-    ligatoms = [];
-    indices = [];
-    atomfree = [];
-    atombound = [];
+
+    elems = ELEM_TYPES | [appdflts.elemH, appdflts.elemC, appdflts.elemO, 
+        appdflts.elemN, appdflts.elemF];;
+    indices = qb_GetElemIndices [ligmol, elems];
+
+    local coreopts = [], nmrsopts = [], browsetasks = [];
+    local curatoms = [], curidx = [];
+    local atomnames = [], indextoks = [];
+
 //DEBUG
-local num = length second qb_GetLigandAtomsIndices [elem];
+local num = length indices;
 atomfree = rep [1.025, num];
 atombound = rep [1.050, num];
 //DEBUG
+
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
     WindowSetData [wkey, appdflts];
@@ -513,22 +657,27 @@ atombound = rep [1.050, num];
                     master: 'parent'] === 'child' then
                 task_prio 0;
 
-                local [cutrecmol, cutligmol, crerrmess] = qb_CutReceptor [0, 
-                    vals.radius];
-                if cutrecmol === [] or cutligmol === [] then
-                    Warning crerrmess;
+                ViewSave 1;
+                if posemols === [] and qb_IsModeOneToMany [vals] then
+                    [posemols, errmess] = qb_GetPoses [vals];
+                    if posemols === [] then
+                        Warning errmess;
+                        exit [];
+                    endif
+                endif
+
+                [cutrecmol, errmess]
+                    = qb_CutReceptor [posemols, vals.radius];
+                if cutrecmol === [] then
+                    Warning errmess;
                     exit [];
                 endif
+
+                status = qb_UpdateCharge [wkey, status, 1];
+
                 WindowSetAttr [wkey, [showcut: [sensitive: 0],
                     original: [sensitive: 1]]];
-	            Close [force:1];
-                local cutlig = mol_Create cutligmol;
-                local cutligatoms = cat oAtoms cutlig;
-                oSetCollection ['QB_LIGAND', cutligatoms];
-                aSetNucleusLook [cutligatoms, 'small-sphere'];
-                aSetBondLook [cutligatoms, 'cylinder'];
-                mol_Create cutrecmol;
-	            View [];
+                View [];
                 exit [];
             endif
 
@@ -537,28 +686,55 @@ atombound = rep [1.050, num];
                     master: 'parent'] === 'child' then
                 task_prio 0;
 
-                if complexmol === [] then
+                if origcomplex === [] then
                     Warning 'No original complex.';
                     exit [];
                 endif
+
+                Close [force:1];
+                mol_Create origcomplex;
+                [ligatoms, errmess] = qb_GetLigandAtoms [];
+                oSetCollection ['QB_LIGAND', ligatoms];
+                aSetNucleusLook [ligatoms, 'small-sphere'];
+                aSetBondLook [ligatoms, 'cylinder'];
+                poseatoms = [];
+
+                [ligatoms, posemols, poseatoms]
+                    = ShowLigPoses [vals, ligmol, ligatoms,
+                    posemols, poseatoms];
+
+                status = qb_UpdateCharge [wkey, status, 1];
+
                 WindowSetAttr [wkey, [showcut: [sensitive: 1],
                     original: [sensitive: 0]]];
-	            Close [force:1];
-                mol_Create complexmol;
-	            View [];
+                ViewLoad 1;
+                View [];
                 exit [];
             endif
 
+        elseif droplast trig === 'elem' then
+            elems = ELEM_TYPES | [vals.elemH, vals.elemC, vals.elemO, 
+                vals.elemN, vals.elemF];
+            indices = qb_GetElemIndices [ligmol, elems];
+
+
         elseif trig === 'experimental' then
+            if vals.allposes then
+                Warning 'Deselect the ligand option "Show all poses?"\n'
+                    'before attempting to enter/edit experimental data.';
+                continue;
+            endif
+
             if second task_fork [statics:'share',
                     master: 'parent'] === 'child' then
 
-                local xerrmess;
                 ViewSave 1;
-                [ligatoms, indices, xerrmess] = qb_GetLigandAtomsIndices [elem];
+                elems = ELEM_TYPES | [vals.elemH, vals.elemC, vals.elemO, 
+                    vals.elemN, vals.elemF];
+                indices = qb_GetElemIndices [ligmol, elems];
                 if ligatoms === [] or indices === [] then
                     ViewLoad 1;
-                    Warning xerrmess;
+                    Warning errmess;
                     exit [];
                 endif
 
@@ -566,6 +742,23 @@ atombound = rep [1.050, num];
                 [atomfree, atombound] = SetupExpDataPanel [ligatoms, indices,
                     atomfree, atombound];
                 ViewLoad 1;
+                exit [];
+            endif
+
+        elseif trig === 'allposes' then
+            if not qb_IsModeOneToMany [vals] then
+                WindowSetData [wkey, [allposes: 0]];
+                continue;
+            endif
+
+            if second task_fork [statics:'share',
+                    master: 'parent'] === 'child' then
+                task_prio 0;
+
+                [ligatoms, posemols, poseatoms]
+                    = ShowLigPoses [vals, ligmol, ligatoms,
+                    posemols, poseatoms];
+
                 exit [];
             endif
 
@@ -578,48 +771,67 @@ atombound = rep [1.050, num];
                         master: 'parent'] === 'child' then
                     task_prio 0;
 
+                    local ldkey;
                     local dbpath = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
-                        local [ldkey, ldcutrec, ldlig, ldsts, ldcoreopts,
-                            ldnmrsopts, ldcomplex, ldfree, ldbound]
+                        [ldkey, cutrecmol, ligmol, status, coreopts,
+                            nmrsopts, origcomplex, atomfree, atombound]
                             = LoadDB [dbpath];
 
-    	                Close [force:1];
-                        if neL [ldcutrec, []] and neL [ldlig, []] then
-                            local ldligmol = mol_Create ldlig;
-                            local ldligatoms = cat oAtoms ldligmol;
-                            oSetCollection ['QB_LIGAND', ldligatoms];
-                            aSetNucleusLook [ldligatoms, 'small-sphere'];
-                            aSetBondLook [ldligatoms, 'cylinder'];
-                            mol_Create ldcutrec;
-        	                View [];
+                        Close [force:1];
+                        if neL [cutrecmol, []] then
+                            mol_Create cutrecmol;
+                            ligatoms = cat oAtoms mol_Create ligmol;
+                            oSetCollection ['QB_LIGAND', ligatoms];
+                            aSetNucleusLook [ligatoms, 'small-sphere'];
+                            aSetBondLook [ligatoms, 'cylinder'];
+                        else
+                            mol_Create origcomplex;
+                            [ligatoms, errmess] = qb_GetLigandAtoms [];
+                            oSetCollection ['QB_LIGAND', ligatoms];
+                            aSetNucleusLook [ligatoms, 'small-sphere'];
+                            aSetBondLook [ligatoms, 'cylinder'];
                         endif
 
-                        status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
-                        complexmol = ldcomplex;
-                        atomfree = ldfree;
-                        atombound = ldbound;
+                        poseatoms = [];
+                        posemols = [];
+                        [ligatoms, posemols, poseatoms]
+                            = ShowLigPoses [nmrsopts, ligmol, ligatoms,
+                            posemols, poseatoms];
+
+                        elems = ELEM_TYPES | [nmrsopts.elemH,
+                            nmrsopts.elemC, nmrsopts.elemO, 
+                            nmrsopts.elemN, nmrsopts.elemF];
+                        indices = qb_GetElemIndices [ligmol, elems];
+
+                        if nmrskey > 0 then
+                            db_Close nmrskey;
+                        endif
+
                         nmrskey = ldkey;
                         dbv_Open db_Filename nmrskey;
-                        db_Close ldkey;
-                        WindowSetData [wkey, ldnmrsopts];
+                        status = qb_UpdateCorePanel [wkey, status, coreopts];
+                        WindowSetAttr [wkey,
+                            [showcut: [sensitive: nmrsopts.cut],
+                            original: [sensitive: 0]]];
+
+                        WindowSetData [wkey, nmrsopts];
+                        View [];
                     endif
 
                 exit [];
                 endif
 
             elseif vals.panel === 'Run' then
-                if isnull atomfree or isnull atombound then
-                    Warning 'Enter experimental values before runnning.';
+                if vals.allposes then
+                    Warning 'Deselect the ligand option "Show all poses?"\n'
+                        'before attempting to run NMRScore.';
                     continue;
                 endif
 
-                local [curligatoms, curindices] = qb_GetLigandAtomsIndices [elem];
-                if not alltrue eqE [curligatoms, ligatoms]
-                        or not alltrue eqE [curindices, indices] then
-                    Warning 'Ligand has been modified.\n'
-                            'Reenter experimental values before runnning.';
+                if isnull atomfree or isnull atombound then
+                    Warning 'Enter experimental values before runnning.';
                     continue;
                 endif
 
@@ -631,36 +843,39 @@ atombound = rep [1.050, num];
 
                     coreopts = qb_TagCoreVals [vals];
                     nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,
-                        [vals.guess, vals.opt, vals.cut, vals.radius]];
+                        [vals.elemH, vals.elemC, vals.elemO, vals.elemN,
+                        vals.elemF, vals.guess, vals.opt, vals.cut,
+                        vals.radius, vals.allposes]];
 
                     //  Make sure atom names are unique for DB fields.
                     atomnames = get [aName ligatoms, indices];
                     indextoks = totok indices;
                     atomnames = tok_cat [indextoks, '-', atomnames];
+                    if nmrskey > 0 then
+                        db_Close nmrskey;
+                    endif
+
                     nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
-                        complexmol, cat [NMR_NUM_FIELDS, atomnames],
+                        origcomplex, cat [NMR_NUM_FIELDS, atomnames],
                         'nmrscore', 0];
                     qb_SaveAnalysisData [nmrskey, 'nmr', 'exp',
                         [atomfree, atombound]];
                     RunCalc [nmrskey, indices, atomnames];
                     dbv_Open db_Filename nmrskey;
-                    db_Close nmrskey;
                     exit [];
                 else
                     break;
                 endif
 
             elseif vals.panel === 'Save' then
-                if isnull atomfree or isnull atombound then
-                    Warning 'Enter experimental values before saving.';
+                if vals.allposes then
+                    Warning 'Deselect the ligand option "Show all poses?"\n'
+                        'before attempting to save NMRScore database.';
                     continue;
                 endif
 
-                [curligatoms, curindices] = qb_GetLigandAtomsIndices [elem];
-                if not alltrue eqE [curligatoms, ligatoms]
-                        or not alltrue eqE [curindices, indices] then
-                    Warning 'Ligand has been modified.\n'
-                            'Reenter experimental values before saving.';
+                if isnull atomfree or isnull atombound then
+                    Warning 'Enter experimental values before saving.';
                     continue;
                 endif
 
@@ -672,19 +887,24 @@ atombound = rep [1.050, num];
 
                     coreopts = qb_TagCoreVals [vals];
                     nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,
-                        [vals.guess, vals.opt, vals.cut, vals.radius]];
+                        [vals.elemH, vals.elemC, vals.elemO, vals.elemN,
+                        vals.elemF, vals.guess, vals.opt, vals.cut, 
+                        vals.radius, vals.allposes]];
 
                     //  Make sure atom names are unique for DB fields.
                     atomnames = get [aName ligatoms, indices];
                     indextoks = totok indices;
                     atomnames = tok_cat [indextoks, '-', atomnames];
+                    if nmrskey > 0 then
+                        db_Close nmrskey;
+                    endif
+
                     nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
-                        complexmol, cat [NMR_NUM_FIELDS, atomnames],
+                        origcomplex, cat [NMR_NUM_FIELDS, atomnames],
                         'nmrscore', 1];
                     qb_SaveAnalysisData [nmrskey, 'nmr', 'exp',
                         [atomfree, atombound]];
                     dbv_Open db_Filename nmrskey;
-                    db_Close nmrskey;
                     exit [];
                 else
                     break;
@@ -695,6 +915,10 @@ atombound = rep [1.050, num];
                browsetasks];
         endif
     endloop
+
+    if nmrskey > 0 then
+        db_Close nmrskey;
+    endif
 
     task_kill browsetasks;
     WindowDestroy wkey;
