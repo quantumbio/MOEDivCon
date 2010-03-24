@@ -99,11 +99,13 @@ else
         return [[], errmess];
     endif
 endif
+
 /*
 local scorepath = coreopts.scoredb;
 scorepath = fbase scorepath;
 scorepath = twrite ['{}.h5', scorepath];
 */
+
 //  exe_open child process inherits parent's environment.
 local process_key = exe_open ['moedivconscoring', subdirname, [], 1];
 local process_keys = [process_key];

@@ -1677,17 +1677,6 @@ global function qb_MergeDB [srcname1, srcname2, dstname]
 endfunction
 
 /****************************************************************************
- *                          qb_SaveEnvAnal
- *
- *  Save the analysis options in the database.
- *
- ****************************************************************************/
-global function qb_SaveEnvAnal [dbkey, analopts]
-
-    db_SetEnv [dbkey, ANALOPTS, twrite ['{v}', analopts]];
-endfunction
-
-/****************************************************************************
  *                          qb_SaveAnalysisData
  *
  *  Save the analysis results in the database.
@@ -1710,6 +1699,7 @@ global function qb_SaveAnalysisData [dbkey, analysis, type, data]
 
 endfunction
 
+
 /****************************************************************************
  *                          qb_SaveDivconStatus
  *
@@ -1724,6 +1714,17 @@ global function qb_SaveDivconStatus [dbkey, rowkey, message]
     local fielddata = tag [STATUS_FIELD, [message]];
     db_Write [dbkey, rowkey, fielddata];
 
+endfunction
+
+/****************************************************************************
+ *                          qb_SaveEnvAnal
+ *
+ *  Save the analysis options in the database.
+ *
+ ****************************************************************************/
+global function qb_SaveEnvAnal [dbkey, analopts]
+
+    db_SetEnv [dbkey, ANALOPTS, twrite ['{v}', analopts]];
 endfunction
 
 /****************************************************************************

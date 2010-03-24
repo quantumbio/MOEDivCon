@@ -24,10 +24,11 @@
 
 #set title   'QuantumBio NMRScore Interface'
 #set class   'QuantumBio'
-#set version '2010.02'
+#set version '2010.01'
 #set main 'qb_NMRScore'
 
 function qb_CheckChgTestDivconMols;
+function qb_GetElemIndices;
 function qb_GetWhich;
 
 /*  NOTE:  If you change the Key lists here, you need to update the
@@ -38,81 +39,144 @@ const GEOM_KEYS =
     [
     'NOOPT',
     'HONLYOPT',
+    'HETEROOPT',
     'ALLOPT'
     ];
 
-global function qb_NMRScore [recmol, ligmol, coreopts, appopts]
+/*  NOTE:  If you change the Element Types here, you need to update them
+ *         in nmrpanel.svl.
+ */
 
-local errmess = "";
+const ELEM_TYPES =
+    [
+    'H',
+    'C',
+    'O',
+    'N',
+    'F'
+    ];
 
-//  If there are any errors, return immediately.  Run all tests.
-local [recmolset, recok, recchgok, ligok, ligchgok, ckmsg]
-    = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
-        coreopts.ligchg, 1, 1, 1, 1];
 
-if not alltrue [recok, recchgok, ligok, ligchgok] then
-    if not alltrue [recok, ligok] then
-        if tok_length ckmsg > 0 then
-            errmess = cat [errmess, swrite ['Skipping!\n{}Skipping!', ckmsg]];
-        else
-            errmess = cat [errmess, 
-                swrite ['Problematic molecule in {}, skipping!\n',
-                qb_GetWhich [not recok, not ligok]]];
+global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
+        indices, free, bound]
+
+    local errmess = "";
+
+    //  If there are any errors, return immediately.  Run all tests.
+    local [recmolset, recok, recchgok, ligok, ligchgok, ckmsg]
+        = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
+            coreopts.ligchg, 1, 1, 1, 1];
+
+    if not alltrue [recok, recchgok, ligok, ligchgok] then
+        if not alltrue [recok, ligok] then
+            if tok_length ckmsg > 0 then
+                errmess = cat [errmess, swrite ['Skipping!\n{}Skipping!',
+                    ckmsg]];
+            else
+                errmess = cat [errmess, 
+                    swrite ['Problematic molecule in {}, skipping!\n',
+                    qb_GetWhich [not recok, not ligok]]];
+            endif
+        endif
+
+        if not alltrue [recchgok, ligchgok] then
+            errmess =  cat [errmess, 
+                swrite ['Problematic charge for {}, skipping!', 
+                qb_GetWhich [not recchgok, not ligchgok]]];
+        endif
+
+        return [[], errmess];
+    endif
+
+    //  If there are any warnings, pass them up.
+    if tok_length ckmsg > 0 then
+        errmess = string ckmsg;
+    endif
+
+    local subdirname, delsubdir = 0;
+    if coreopts.task === [] or coreopts.task === 0 then
+        subdirname = coreopts.workdir;
+    else
+        delsubdir = 1;
+        subdirname = twrite ['{}/qb_out{n:}', coreopts.workdir, coreopts.task];
+        local okay = _fmkdir subdirname;
+        if okay === -1 then
+            errmess = cat [swrite ['Unable to create subdirectory:  {}',
+                subdirname], errmess];
+            return [[], errmess];
         endif
     endif
 
-    if not alltrue [recchgok, ligchgok] then
-        errmess =  cat [errmess, 
-            swrite ['Problematic charge for {}, skipping!', 
-            qb_GetWhich [not recchgok, not ligchgok]]];
-    endif
+    local elems = ELEM_TYPES | [appopts.elemH, appopts.elemC, appopts.elemO, 
+            appopts.elemN, appopts.elemF];
+    local poseidxs = qb_GetElemIndices [ligmol, elems];
 
-    return [[], errmess];
-endif
-
-//  If there are any warnings, pass them up.
-if tok_length ckmsg > 0 then
-    errmess = string ckmsg;
-endif
-
-local subdirname, delsubdir = 0;
-if coreopts.task === [] or coreopts.task === 0 then
-    subdirname = coreopts.workdir;
-else
-    delsubdir = 1;
-    subdirname = twrite ['{}/qb_out{n:}', coreopts.workdir, coreopts.task];
-    local okay = _fmkdir subdirname;
-    if okay === -1 then
-        errmess = cat [swrite ['Unable to create subdirectory:  {}',
-            subdirname], errmess];
+    if not alltrue eqE [indices, poseidxs] then
+        errmess = cat [swrite ['Skipping!  Atom indices are inconsistent:\n'
+            '    Orig: {v}\n    Pose: {v}\n', indices, poseidxs], errmess];
         return [[], errmess];
     endif
-endif
+ 
+    //  exe_open child process inherits parent's environment.
+    local process_key = exe_open ['moedivconnmr', subdirname, [], 1];
+    local process_keys = [process_key];
+    local status = exe_status process_keys;
 
-//  exe_open child process inherits parent's environment.
-local process_key = exe_open ['moedivconnmr', subdirname, [], 1];
-local process_keys = [process_key];
-local status = exe_status process_keys;
+    local prios = exe_getpriority process_keys;
+    exe_setpriority [process_keys, prios];
 
-local prios = exe_getpriority process_keys;
-exe_setpriority [process_keys, prios];
+    local stdin = exe_stdin process_keys;
+    local stdout = exe_stdout process_keys;
+    local stderr = exe_stderr process_keys;
 
-local stdin = exe_stdin process_keys;
-local stdout = exe_stdout process_keys;
-local stderr = exe_stderr process_keys;
+    //  Pass the options and the two backbones to QuantumBio's Divcon NMRScore
+    //
+    //  SplitReceptor ensures that there is only one chain per molecule
+    //  in the receptor collection.
 
-//  Pass the two backbones to QuantumBio's Divcon NMRScore
-//
-//  SplitReceptor ensures that there is only one chain per molecule
-//  in the receptor collection.
+    local idx, retValue, success = 0;
+    /*
+    fwrite [stdin, {c:}\n', GEOM_KEYS(appopts.opt)];
+    fwrite [stdin, {c:}\n', select ['GUESS', 'NOGUESS', appopts.guess]];
+    fwrite [stdin, {n:}\n', length indices];
+    for idx = 1, length indices, 1 loop
+        fwrite [stdin, {n:} {n:} {n:}\n', indices (idx), free (idx),
+            bound (idx)];
+    endloop
+    */
+    local mol, molIndex, residueIndex, residueCount, atomIndex, atomCount;
+    local molCount = length recmolset;
+    fwrite [stdin, '{n:}\n', coreopts.recchg];
+    fwrite [stdin, '{n:}\n', molCount];
+    for molIndex = 1, molCount, 1 loop
+        mol = recmolset(molIndex);
+        atomIndex = 1;
+        residueCount = mol(2)(MOL_CHAIN_NRES)(1);
+        fwrite [stdin, '{n:}\n', residueCount];
+        for residueIndex = 1, residueCount, 1 loop
+            atomCount = mol(3)(MOL_RES_NATOMS)(residueIndex);
+            fwrite [stdin, '{c:} {n:} {n:}\n',
+                mol(3)(MOL_RES_NAME)(residueIndex),
+                mol(3)(MOL_RES_UID)(residueIndex), atomCount];
+           for atomCount loop
+                fwrite [stdin, '{c:} {c:}\n',
+                    mol(4)(MOL_ATOM_NAME)(atomIndex),
+                    mol(4)(MOL_ATOM_EL)(atomIndex)];
+                fwrite [stdin, '{n:.4f} {n:.4f} {n:.4f}\n',
+                    mol(4)(MOL_ATOM_X)(atomIndex),
+                    mol(4)(MOL_ATOM_Y)(atomIndex),
+                    mol(4)(MOL_ATOM_Z)(atomIndex)];
+                atomIndex = atomIndex + 1;
+            endloop
+        endloop
+    endloop
 
-local retValue, success = 0;
-local mol, molIndex, residueIndex, residueCount, atomIndex, atomCount;
-local molCount = length recmolset;
-fwrite [stdin, '{n:}\n', coreopts.recchg];
-fwrite [stdin, '{n:}\n', molCount];
-for molIndex = 1, molCount, 1 loop
-    mol = recmolset(molIndex);
+    [retValue] = fread [stdout, '{n:}\n'];
+
+    //  There is only one ligand molecule.
+    fwrite [stdin, '{n:}\n', coreopts.ligchg];
+    fwrite [stdin, '{n:}\n', 1];
+    mol = ligmol;
     atomIndex = 1;
     residueCount = mol(2)(MOL_CHAIN_NRES)(1);
     fwrite [stdin, '{n:}\n', residueCount];
@@ -120,7 +184,7 @@ for molIndex = 1, molCount, 1 loop
         atomCount = mol(3)(MOL_RES_NATOMS)(residueIndex);
         fwrite [stdin, '{c:} {n:} {n:}\n', mol(3)(MOL_RES_NAME)(residueIndex),
             mol(3)(MOL_RES_UID)(residueIndex), atomCount];
-       for atomCount loop
+        for  atomCount loop
             fwrite [stdin, '{c:} {c:}\n',
                 mol(4)(MOL_ATOM_NAME)(atomIndex),
                 mol(4)(MOL_ATOM_EL)(atomIndex)];
@@ -131,124 +195,98 @@ for molIndex = 1, molCount, 1 loop
             atomIndex = atomIndex + 1;
         endloop
     endloop
-endloop
 
-[retValue] = fread [stdout, '{n:}\n'];
+    [retValue] = fread [stdout, '{n:}\n'];
 
-//  There is only one molecule and one chain in the ligand/poses collection.
-fwrite [stdin, '{n:}\n', coreopts.ligchg];
-fwrite [stdin, '{n:}\n', 1];
-mol = ligmol;
-atomIndex = 1;
-residueCount = mol(2)(MOL_CHAIN_NRES)(1);
-fwrite [stdin, '{n:}\n', residueCount];
-for residueIndex = 1, residueCount, 1 loop
-    atomCount = mol(3)(MOL_RES_NATOMS)(residueIndex);
-    fwrite [stdin, '{c:} {n:} {n:}\n', mol(3)(MOL_RES_NAME)(residueIndex),
-        mol(3)(MOL_RES_UID)(residueIndex), atomCount];
-    for  atomCount loop
-        fwrite [stdin, '{c:} {c:}\n',
-            mol(4)(MOL_ATOM_NAME)(atomIndex),
-            mol(4)(MOL_ATOM_EL)(atomIndex)];
-        fwrite [stdin, '{n:.4f} {n:.4f} {n:.4f}\n',
-            mol(4)(MOL_ATOM_X)(atomIndex),
-            mol(4)(MOL_ATOM_Y)(atomIndex),
-            mol(4)(MOL_ATOM_Z)(atomIndex)];
-        atomIndex = atomIndex + 1;
-    endloop
-endloop
-
-[retValue] = fread [stdout, '{n:}\n'];
-
-local ligatmels = ligmol(4)(MOL_ATOM_EL);
-local numligH = add eqE [ligatmels, 'H'];
-
-local results, return_statement;
-local sleep_time = -1;
-local divconerrmess = "";
-while exe_status process_key loop
-    if not MOE_BATCH then
-        sleep sleep_time;
-    endif
-
-    [[return_statement]] = fread [stdout, '{c:*}'];
-
-    write ['Divcon: {}\n', return_statement];//DEBUG
-
-    if return_statement === "updatescore" then
-        local atomid, atomvalue;
-        local numNMRH;
-        [[numNMRH]] = fread [stdout, '{n:}'];
-print [numligH,'numNMRH', numNMRH];	//DEBUG
-        for numNMRH loop
-            [[atomid]] = fread [stdout, '{n:}'];
-            [[atomvalue]] = fread [stdout, '{n:}'];
-print [atomid, atomvalue];	//DEBUG
-            results = cat [results, [[atomid, atomvalue]]];
-        endloop
-        success = 1;
-        fwrite [stdin, '{c:}\n', 'Ok'];
-
-    elseif return_statement === "QBException" then
-        [[return_statement]] = fread [stdout, '{c:*}'];
-        if neL [return_statement, "Divcon done."] then
-            divconerrmess = cat [divconerrmess, return_statement];
-            [[return_statement]] = fread [stdout, '{c:*}'];
+    //    results has the format:  [nmrscore, [V1, V2, ... , Vn]]
+    local results = [], return_statement;
+    local sleep_time = -1;
+    local divconerrmess = "";
+    while exe_status process_key loop
+        if not MOE_BATCH then
+            sleep sleep_time;
         endif
-        while neL [return_statement, "Divcon done."] loop
-            divconerrmess = cat [divconerrmess, "\n", return_statement];
+
+        [[return_statement]] = fread [stdout, '{c:*}'];
+
+write ['Divcon: {}\n', return_statement];//DEBUG
+
+        if return_statement === "updatescore" then
+            local atomvalues = [];
+            local [[score]] = fread [stdout, '{n:}'];
+            local [[numvals]] = fread [stdout, '{n:}'];
+            for numvals loop
+                local [[cspval]] = fread [stdout, '{n:}'];
+print [cspval];	//DEBUG
+                atomvalues = append [atomvalues, cspval];
+            endloop
+
+            results = [score, atomvalues];
+            success = 1;
+            fwrite [stdin, '{c:}\n', 'Ok'];
+
+        elseif return_statement === "QBException" then
             [[return_statement]] = fread [stdout, '{c:*}'];
-        endloop;
-        fwrite [stdin, '{c:}\n', 'Ok'];
+            if neL [return_statement, "Divcon done."] then
+                divconerrmess = cat [divconerrmess, return_statement];
+                [[return_statement]] = fread [stdout, '{c:*}'];
+            endif
+            while neL [return_statement, "Divcon done."] loop
+                divconerrmess = cat [divconerrmess, "\n", return_statement];
+                [[return_statement]] = fread [stdout, '{c:*}'];
+            endloop;
+            fwrite [stdin, '{c:}\n', 'Ok'];
+        endif
+    endloop
+
+    //  Look for error messages from stderr.
+    local [[newerror]] = fread [stderr, '{c:*}'];
+    while length newerror > 0 loop
+write ['MOEDivcon: {}\n', newerror];//DEBUG
+        errmess = cat [newerror, errmess];
+        [[newerror]] = fread [stderr, '{c:*}'];
+    endloop
+
+    exe_kill  [process_key, 0];
+    exe_kill  process_key;
+    exe_close process_keys;
+
+    //  Clean up working directory.
+    if success === 1 then
+        local templist = flist [subdirname, 'MOE_*.dmx*'];
+        templist = cat [templist, flist [subdirname, 'MOE_*.row*']];
+        templist = cat [templist, flist [subdirname, 'MOE_*.rst*']];
+        templist = cat [templist, flist [subdirname, 'MOE_*.out']];
+        templist = cat [templist, flist [subdirname, 'divcon.log']];
+        templist = cat [templist, flist [subdirname, 'mtkpp.log']];
+        templist = cat [templist, flist [subdirname, 'divcon.hss']];
+        templist = cat [templist, flist [subdirname, 'fort.8']];
+        if delsubdir then
+            templist = cat [templist, subdirname];
+        endif
+
+        local delerr = app _fdelete templist;
+        if anytrue delerr then
+            local errfiles = templist | neE [delerr, 0];
+            errmess = cat [swrite ['Unable to delete files: {v}',
+                errfiles], errmess];
+        endif
     endif
-endloop
 
-//  Look for error messages from stderr.
-local [[newerror]] = fread [stderr, '{c:*}'];
-while length newerror > 0 loop
-    write ['MOEDivcon: {}\n', newerror];//DEBUG
-    errmess = cat [newerror, errmess];
-    [[newerror]] = fread [stderr, '{c:*}'];
-endloop
-
-exe_kill  [process_key, 0];
-exe_kill  process_key;
-exe_close process_keys;
-
-//  Clean up working directory.
-if success === 1 then
-    local templist = flist [subdirname, 'MOE_*.dmx*'];
-    templist = cat [templist, flist [subdirname, 'MOE_*.row*']];
-    templist = cat [templist, flist [subdirname, 'MOE_*.rst*']];
-    templist = cat [templist, flist [subdirname, 'MOE_*.out']];
-    templist = cat [templist, flist [subdirname, 'divcon.log']];
-    templist = cat [templist, flist [subdirname, 'mtkpp.log']];
-    templist = cat [templist, flist [subdirname, 'divcon.hss']];
-    templist = cat [templist, flist [subdirname, 'fort.8']];
-    if delsubdir then
-        templist = cat [templist, subdirname];
-    endif
-
-    local delerr = app _fdelete templist;
-    if anytrue delerr then
-        local errfiles = templist | neE [delerr, 0];
-        errmess = cat [swrite ['Unable to delete files: {v}',
-            errfiles], errmess];
-    endif
-endif
-
-if success === 1 then
-    return [results, errmess];
-else
-    if isnull divconerrmess then divconerrmess = "Unknown error!"; endif
-    if isnull errmess then
-        errmess = cat [divconerrmess, swrite ['\nLog file:  {}:{}/divcon.log',
-            getenv 'HOSTNAME', coreopts.workdir]];
+    if success === 1 then
+        return [results, errmess];
     else
-        errmess = cat [divconerrmess, swrite ['\nLog file:  {}:{}/divcon.log\n',
-            getenv 'HOSTNAME', coreopts.workdir], errmess];
+        if isnull divconerrmess then divconerrmess = "Unknown error!"; endif
+        if isnull errmess then
+            errmess = cat [divconerrmess,
+                swrite ['\nLog file:  {}:{}/divcon.log',
+                getenv 'HOSTNAME', coreopts.workdir]];
+        else
+            errmess = cat [divconerrmess,
+                swrite ['\nLog file:  {}:{}/divcon.log\n',
+                getenv 'HOSTNAME', coreopts.workdir], errmess];
+        endif
+        return [[], errmess];
     endif
-    return [[], errmess];
-endif
 endfunction
 
