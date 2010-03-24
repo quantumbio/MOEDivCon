@@ -89,6 +89,10 @@ const GEOM_OPTS =
     'all atoms'
     ];
 
+/*  NOTE:  If you change the Element Types here, you need to update them
+ *         in nmrinterface.svl.
+ */
+
 const ELEM_TYPES =
     [
     'H',
@@ -345,13 +349,15 @@ function qb_SaveNMRScore;
  *  Run the One-to-One scoring from the MOE Window.
  *
  ****************************************************************************/
-local function RunCalc [dbkey, moeindices, moeatomnames]
+local function RunCalc [dbkey]
     local msgkey = Message [0, 'NMRScore is running ...'];
     sleep -1;    // Allow parent to close input window.
 
     local rowkey = first db_Entries [dbkey];
     local [recset, ligand, status, coreopts, nmrsopts, c]
         = qb_GetNMRSEnv [dbkey];
+    local [indices, names, free, bound] = qb_GetAnalysisData [dbkey,
+        'nmr', 'exp'];
 
     local workdir;
     if coreopts.cwd === 1 then
@@ -361,10 +367,10 @@ local function RunCalc [dbkey, moeindices, moeatomnames]
     endif
 
     coreopts.workdir = workdir;
-    write ['Work Dir:  {}\n', workdir];  //DEBUG
+    write ['Work Dir:  {}\n', workdir];
 
-    local [results, errmess] = qb_NMRScore [recset, ligand, coreopts, nmrsopts];
-
+    local [results, errmess] = qb_NMRScore [recset, ligand, coreopts, nmrsopts,
+        indices, free, bound];
 
     if results === [] then
         if errmess === [] or errmess === '' then
@@ -376,25 +382,18 @@ local function RunCalc [dbkey, moeindices, moeatomnames]
             write ['NMRScore Error:  {}\n', errmess];
         endif
     else
-write ['R:  {v}\n', results];  //DEBUG
-        local indices = app first results;
-write ['I:  {v}\n', indices];  //DEBUG
-        if not alltrue eqE [indices, moeindices] then
-            Warning twrite ['Atom indices are inconsistent:\nMOE: {v}\n'
-                'Divcon: {v}\n', moeindices, indices];
-        else
-            local cspvalues = second tr results;
-write ['C:  {v}\n', cspvalues];  //DEBUG
-write ['N:  {v}\n', moeatomnames];  //DEBUG
-            qb_SaveNMRScore [dbkey, rowkey, 9.99,
-                tag [moeatomnames, cspvalues]];
-            local sucmess = cat [ "Success\n", errmess];
-            if not isnull errmess then
-                sucmess = cat [sucmess, errmess, "\n"];
-            endif
-            qb_SaveDivconStatus [dbkey, rowkey, sucmess];
+        local [score, posevals] = results;
+write ['S: {}\nV: {v}\n', score,  posevals];  //DEBUG
+        qb_SaveNMRScore [dbkey, rowkey, score, tag [names, posevals]];
 
+        local sucmess = "Success";
+        if not isnull errmess then
+            sucmess = cat [sucmess, "-warnings!\n", errmess];
+        else
+            sucmess = cat [sucmess, "\n"];
         endif
+
+        qb_SaveDivconStatus [dbkey, rowkey, sucmess];
     endif
 
     Message [msgkey, 'NMRScore is done.'];
@@ -859,7 +858,7 @@ atombound = rep [1.050, num];
                         origcomplex, cat [NMR_NUM_FIELDS, atomnames],
                         'nmrscore', 0];
                     qb_SaveAnalysisData [nmrskey, 'nmr', 'exp',
-                        [atomfree, atombound]];
+                        [indices, atomnames, atomfree, atombound]];
                     RunCalc [nmrskey, indices, atomnames];
                     dbv_Open db_Filename nmrskey;
                     exit [];
@@ -903,7 +902,7 @@ atombound = rep [1.050, num];
                         origcomplex, cat [NMR_NUM_FIELDS, atomnames],
                         'nmrscore', 1];
                     qb_SaveAnalysisData [nmrskey, 'nmr', 'exp',
-                        [atomfree, atombound]];
+                        [indices, atomnames, atomfree, atombound]];
                     dbv_Open db_Filename nmrskey;
                     exit [];
                 else
