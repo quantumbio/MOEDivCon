@@ -100,11 +100,13 @@ else
     endif
 endif
 
-/*
+
 local scorepath = coreopts.scoredb;
 scorepath = fbase scorepath;
 scorepath = twrite ['{}.h5', scorepath];
-*/
+//@todo make these be the real thing
+local receptorname = 'rec1';
+local ligandname = 'lig1';
 
 //  exe_open child process inherits parent's environment.
 local process_key = exe_open ['moedivconscoring', subdirname, [], 1];
@@ -126,7 +128,9 @@ local stderr = exe_stderr process_keys;
 local retValue, success = 0;
 local mol, molIndex, residueIndex, residueCount, atomIndex, atomCount;
 local molCount = length recmolset;
-//fwrite [stdin, '{c:}\n', scorepath];
+fwrite [stdin, '{c:}\n', scorepath];
+fwrite [stdin, '{c:}\n', receptorname];
+fwrite [stdin, '{c:}\n', ligandname];
 fwrite [stdin, '{c:}\n', HAM_KEYS(appopts.ham)];
 fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
     appopts.scaling === 1]];
