@@ -76,7 +76,6 @@ const NMRSCORE_OPT_DEFAULTS =
     ['elemF',        0             ],
     ['guess',        0             ],
     ['opt',          1             ],
-    ['cut',          0             ],
     ['radius',       5.0           ],
     ['allposes',     0             ]
     ];
@@ -121,21 +120,11 @@ const PANEL =
     Hbox :
         [
         extendH: 1,
-        Checkbox :
-            [
-            name: 'cut', text: 'Cut?', title: 'Receptor:',
-            onTrigger: 'return',
-            bubbleHelp:
-                'Cut the receptor at the specified radius.'
-            ],
-        Separator : 
-            [
-            vertical:0, shadow:'noline', extendH: 0, margin:1
-            ],
+        title: 'Cut Receptor:    ',
         Text :
             [
-            name: 'radius', len: 7, extendH: 1, title: 'Radius:',
-            type: 'real', allowBlank: 0,
+            name: 'radius', len: 7, title: 'Radius:',
+            type: 'real', allowBlank: 1,
             shortcut: ['2.5', '5.0', '7.5', '10.0'],
             bubbleHelp: 'Cut radius in angstrums.'
             ],
@@ -334,10 +323,11 @@ local function LoadDB [dbpath]
 
     local nrmsopts = qb_GetEnvApp [dbkey];
     nrmsopts = tagcat [nrmsopts, tag tr NMRSCORE_OPT_DEFAULTS];
-    local [free, bound] = qb_GetAnalysisData [dbkey, 'nmr', 'exp'];
-    return [dbkey, recset, ligand, status, coreopts, nrmsopts, complex,
-        free, bound];
+    local [indices, names, free, bound] = qb_GetAnalysisData [dbkey,
+        'nmr', 'exp'];
 
+    return [dbkey, recset, ligand, status, coreopts, nrmsopts, complex,
+        indices, names, free, bound];
 endfunction
 
 function qb_GetNMRSEnv;
@@ -515,7 +505,7 @@ local function ShowLigPoses [vals, ligmol, ligatoms, posemols, poseatoms]
             endif
         endif
 
-        oDestroy ligatoms;
+        oDestroy uniq oChains ligatoms;
         ligatoms = [];
 
         poseatoms = cat oAtoms app mol_Create posemols;
@@ -528,7 +518,7 @@ local function ShowLigPoses [vals, ligmol, ligatoms, posemols, poseatoms]
             return [ligatoms, posemols, poseatoms];
         endif
 
-        oDestroy poseatoms;
+        oDestroy uniq oChains poseatoms;
         poseatoms = [];
 
         ligatoms = cat oAtoms mol_Create ligmol;
@@ -580,7 +570,6 @@ endfunction
 global function qb_NMRScoreSetupPanel []
 
     static status;                     //  Shared with child tasks.
-    static nmrskey;
     static cutrecmol;
     static origcomplex;
     static ligmol;
@@ -589,6 +578,7 @@ global function qb_NMRScoreSetupPanel []
     static poseatoms;
     static elems;
     static indices;
+    static atomnames;
     static atomfree;
     static atombound;
 
@@ -607,10 +597,10 @@ global function qb_NMRScoreSetupPanel []
     ligmol = mol_Extract ligatoms;
     posemols = [];
     poseatoms = [];
+    atomnames = [];
     atomfree = [];
     atombound = [];
 
-    nmrskey = 0;
     status = qb_GetDefaultsStatus [];
     status = qb_SetModeStatus [status, [1,1,0]];
     local coredflts = qb_GetDefaultsCore [];
@@ -623,7 +613,7 @@ global function qb_NMRScoreSetupPanel []
 
     local coreopts = [], nmrsopts = [], browsetasks = [];
     local curatoms = [], curidx = [];
-    local atomnames = [], indextoks = [];
+    local indextoks = [];
 
 //DEBUG
 local num = length indices;
@@ -635,23 +625,14 @@ atombound = rep [1.050, num];
     status = qb_InitCorePanel [wkey, status, coredflts];
     WindowSetData [wkey, appdflts];
     WindowSetAttr [wkey, [
-        radius: [sensitive: 0, allowBlank: 1],
-        showcut: [sensitive: 0], original: [sensitive: 0],
+        radius: [sensitive: 1],
+        showcut: [sensitive: 1], original: [sensitive: 0],
         guess: [sensitive: 1], opt: [sensitive:1]]];
     WindowShow [wkey, 1];
 
     loop
         local [vals, trig] = WindowWait wkey;
-        if trig === 'cut' then
-            if vals.cut === 0 then
-                WindowSetAttr [wkey, [radius: [sensitive: 0, allowBlank: 1],
-                    showcut: [sensitive: 0]]];
-            else
-                WindowSetAttr [wkey, [radius: [sensitive: 1, allowBlank: 0],
-                    showcut: [sensitive: 1]]];
-            endif
-
-        elseif trig === 'showcut' then
+        if trig === 'showcut' then
             if second task_fork [statics:'share',
                     master: 'parent'] === 'child' then
                 task_prio 0;
@@ -672,7 +653,8 @@ atombound = rep [1.050, num];
                     exit [];
                 endif
 
-                status = qb_UpdateCharge [wkey, status, 1];
+                status = qb_UpdateCharge [wkey, status, 1, not vals.allposes,
+                    1];
 
                 WindowSetAttr [wkey, [showcut: [sensitive: 0],
                     original: [sensitive: 1]]];
@@ -702,7 +684,8 @@ atombound = rep [1.050, num];
                     = ShowLigPoses [vals, ligmol, ligatoms,
                     posemols, poseatoms];
 
-                status = qb_UpdateCharge [wkey, status, 1];
+                status = qb_UpdateCharge [wkey, status, 1, not vals.allposes,
+                    1];
 
                 WindowSetAttr [wkey, [showcut: [sensitive: 1],
                     original: [sensitive: 0]]];
@@ -770,22 +753,30 @@ atombound = rep [1.050, num];
                         master: 'parent'] === 'child' then
                     task_prio 0;
 
-                    local ldkey;
+                    local ldkey, wascut;
                     local dbpath = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
+                        if neL [ftype dbpath, 'file']
+                                or neL [fext dbpath, 'mdb'] then
+                            Warning 'The NMRScore database doesn\'t exist.';
+                            exit [];
+                        endif
+
                         [ldkey, cutrecmol, ligmol, status, coreopts,
-                            nmrsopts, origcomplex, atomfree, atombound]
-                            = LoadDB [dbpath];
+                            nmrsopts, origcomplex, indices, atomnames,
+                            atomfree, atombound] = LoadDB [dbpath];
 
                         Close [force:1];
                         if neL [cutrecmol, []] then
+                            wascut = 1;
                             mol_Create cutrecmol;
                             ligatoms = cat oAtoms mol_Create ligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
                             aSetNucleusLook [ligatoms, 'small-sphere'];
                             aSetBondLook [ligatoms, 'cylinder'];
                         else
+                            wascut = 0;
                             mol_Create origcomplex;
                             [ligatoms, errmess] = qb_GetLigandAtoms [];
                             oSetCollection ['QB_LIGAND', ligatoms];
@@ -799,21 +790,17 @@ atombound = rep [1.050, num];
                             = ShowLigPoses [nmrsopts, ligmol, ligatoms,
                             posemols, poseatoms];
 
-                        elems = ELEM_TYPES | [nmrsopts.elemH,
-                            nmrsopts.elemC, nmrsopts.elemO, 
-                            nmrsopts.elemN, nmrsopts.elemF];
-                        indices = qb_GetElemIndices [ligmol, elems];
-
-                        if nmrskey > 0 then
-                            db_Close nmrskey;
+                        if status.dbkey > 0 then
+                            db_Close status.dbkey;
+                            status.dbkey = 0;
                         endif
 
-                        nmrskey = ldkey;
-                        dbv_Open db_Filename nmrskey;
+                        status.dbkey = ldkey;
+                        dbv_Open db_Filename status.dbkey;
                         status = qb_UpdateCorePanel [wkey, status, coreopts];
                         WindowSetAttr [wkey,
-                            [showcut: [sensitive: nmrsopts.cut],
-                            original: [sensitive: 0]]];
+                            [showcut: [sensitive: not wascut],
+                            original: [sensitive: wascut]]];
 
                         WindowSetData [wkey, nmrsopts];
                         View [];
@@ -843,24 +830,25 @@ atombound = rep [1.050, num];
                     coreopts = qb_TagCoreVals [vals];
                     nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,
                         [vals.elemH, vals.elemC, vals.elemO, vals.elemN,
-                        vals.elemF, vals.guess, vals.opt, vals.cut,
+                        vals.elemF, vals.guess, vals.opt,
                         vals.radius, vals.allposes]];
 
                     //  Make sure atom names are unique for DB fields.
                     atomnames = get [aName ligatoms, indices];
                     indextoks = totok indices;
                     atomnames = tok_cat [indextoks, '-', atomnames];
-                    if nmrskey > 0 then
-                        db_Close nmrskey;
+                    if status.dbkey > 0 then
+                        db_Close status.dbkey;
+                        status.dbkey = 0;
                     endif
 
-                    nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
+                    status.dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         origcomplex, cat [NMR_NUM_FIELDS, atomnames],
                         'nmrscore', 0];
-                    qb_SaveAnalysisData [nmrskey, 'nmr', 'exp',
+                    qb_SaveAnalysisData [status.dbkey, 'nmr', 'exp',
                         [indices, atomnames, atomfree, atombound]];
-                    RunCalc [nmrskey, indices, atomnames];
-                    dbv_Open db_Filename nmrskey;
+                    RunCalc [status.dbkey, indices, atomnames];
+                    dbv_Open db_Filename status.dbkey;
                     exit [];
                 else
                     break;
@@ -887,26 +875,25 @@ atombound = rep [1.050, num];
                     coreopts = qb_TagCoreVals [vals];
                     nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,
                         [vals.elemH, vals.elemC, vals.elemO, vals.elemN,
-                        vals.elemF, vals.guess, vals.opt, vals.cut, 
+                        vals.elemF, vals.guess, vals.opt,
                         vals.radius, vals.allposes]];
 
                     //  Make sure atom names are unique for DB fields.
                     atomnames = get [aName ligatoms, indices];
                     indextoks = totok indices;
                     atomnames = tok_cat [indextoks, '-', atomnames];
-                    if nmrskey > 0 then
-                        db_Close nmrskey;
+                    if status.dbkey > 0 then
+                        db_Close status.dbkey;
+                        status.dbkey = 0;
                     endif
 
-                    nmrskey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
+                    status.dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         origcomplex, cat [NMR_NUM_FIELDS, atomnames],
                         'nmrscore', 1];
-                    qb_SaveAnalysisData [nmrskey, 'nmr', 'exp',
+                    qb_SaveAnalysisData [status.dbkey, 'nmr', 'exp',
                         [indices, atomnames, atomfree, atombound]];
-                    dbv_Open db_Filename nmrskey;
+                    dbv_Open db_Filename status.dbkey;
                     exit [];
-                else
-                    break;
                 endif
             endif
         else
@@ -915,8 +902,9 @@ atombound = rep [1.050, num];
         endif
     endloop
 
-    if nmrskey > 0 then
-        db_Close nmrskey;
+    if status.dbkey > 0 then
+        db_Close status.dbkey;
+        status.dbkey = 0;
     endif
 
     task_kill browsetasks;

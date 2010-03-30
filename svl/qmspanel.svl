@@ -493,7 +493,6 @@ endfunction
 global function qb_QMScoreSetupPanel []
 
     static status;                     //  Shared with child tasks.
-    static qmskey;
 
     if MOE_BATCH then return; endif
     if WindowShow ['QMScorePanel', 1] then return; endif
@@ -506,7 +505,6 @@ global function qb_QMScoreSetupPanel []
 
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
-    qmskey = 0;
     UpdatePWD [wkey, appdflts.analpwd];
     WindowSetData [wkey, appdflts];
     WindowShow [wkey, 1];
@@ -528,6 +526,12 @@ global function qb_QMScoreSetupPanel []
                     local dbpath = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
+                        if neL [ftype dbpath, 'file']
+                                or neL [fext dbpath, 'mdb'] then
+                            Warning 'The QMScore database doesn\'t exist.';
+                            exit [];
+                        endif
+
                         local [ldkey, ldrec, ldlig, ldsts, ldcoreopts,
                             ldqmropts] = LoadDB [dbpath];
 
@@ -542,10 +546,14 @@ global function qb_QMScoreSetupPanel []
         	                View [];
                         endif
 
+                        if status.dbkey > 0 then
+                            db_Close status.dbkey;
+                            status.dbkey = 0;
+                        endif
+
+                        status.dbkey = ldkey;
+                        dbv_Open db_Filename status.dbkey;
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
-                        qmskey = ldkey;
-                        dbv_Open db_Filename qmskey;
-                        db_Close ldkey;
                         WindowSetData [wkey, ldqmropts];
                     endif
 
@@ -563,17 +571,22 @@ global function qb_QMScoreSetupPanel []
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.ham, vals.scaling, vals.freq, vals.opt,
                         vals.shift, vals.analpwd, vals.trainingset]];
-                    qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
+
+                        if status.dbkey > 0 then
+                            db_Close status.dbkey;
+                            status.dbkey = 0;
+                        endif
+
+                    status.dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
                         [], QMS_NUM_FIELDS, 'qmscore', 0];
 
                     if qb_IsModeOneToOne [coreopts] then
-                        RunCalc [qmskey];
+                        RunCalc [status.dbkey];
                     else
-                        RunOneToManyCalc [qmskey];
+                        RunOneToManyCalc [status.dbkey];
                     endif
 
-                    dbv_Open db_Filename qmskey;
-                    db_Close qmskey;
+                    dbv_Open db_Filename status.dbkey;
                     exit [];
                 else
                     break;
@@ -591,25 +604,34 @@ global function qb_QMScoreSetupPanel []
                         vals.ham, vals.scaling, vals.freq, vals.opt,
                         vals.shift, vals.analpwd, vals.trainingset]];
 
-                    qmskey = qb_SetUpScoreDB [status, coreopts, qmsopts,
+                    if status.dbkey > 0 then
+                        db_Close status.dbkey;
+                        status.dbkey = 0;
+                    endif
+
+                    status.dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', 1];
 //DEBUG
                     if qmsopts.analpwd then
                         local sardata = ReadData [
-                            '~daren/dev/MOEDivcon/heatmapdata3-88.csv'];
-                        qb_SaveAnalysisData [qmskey, 'pwd', 'sar', sardata];
+                            '~daren/dev/MOEDivcon/data/trypsin-heatmap-88.csv'];
+                        qb_SaveAnalysisData [status.dbkey, 'pwd', 'sar', sardata];
                     endif
 //DEBUG
-                    dbv_Open db_Filename qmskey;
-                    db_Close qmskey;
+                    dbv_Open db_Filename status.dbkey;
                     exit [];
                 endif
             endif
         else
            [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
-               browsetasks, qmskey];
+               browsetasks];
         endif
     endloop
+
+    if status.dbkey > 0 then
+        db_Close status.dbkey;
+        status.dbkey = 0;
+    endif
 
     task_kill browsetasks;
     WindowDestroy wkey;
