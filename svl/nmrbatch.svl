@@ -29,6 +29,7 @@
 #set version '2010.02'
 #set main    'qb_NMRScoreBatch'
 
+function qb_GetAnalysisData;
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetNMRSEnv;

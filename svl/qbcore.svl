@@ -59,7 +59,7 @@ const ANALPWDINTER = 'qb_pwdinteraction';
 const ANALNMR = 'qb_nmr';
 const ANALNMREXP = 'qb_nmrexperimental';
 
-//  Charge status
+//  Charge status color
 const CHG_COLOR = 
     [
     'white',
@@ -69,6 +69,7 @@ const CHG_COLOR =
 
 const STATUS_DEFAULTS =
     [
+    ['dbkey',        0             ],
     ['allowmode',    [1,1,1]       ],
     ['prevwd',       ''            ],
     ['calcchg',      0             ],
@@ -366,6 +367,73 @@ const MESS_WINDOW =
 //***********************  Local Functions  *********************************
 
 /****************************************************************************
+ *                          AtomOverlap
+ *
+ *  Determine whether atoms in the bigset overlap with those in the littleset.
+ *  For intramolecular overlap, bigset is the same as littleset.
+ *
+ ****************************************************************************/
+local function AtomOverlap [bigset, littleset]
+    const PACKET = 100;
+    const RADIUS = 1.5;
+    const OVERLAP = 0.5;
+
+    local subsets = split [bigset, PACKET];
+	local prox = prox_open [RADIUS, aPos littleset, RADIUS];
+    local badpairs = [], sub_i;
+    for sub_i = 1, length subsets, 1 loop
+	    local [seg, idx, sqrdist] = prox_find [prox, aPos subsets (sub_i), 0];
+        if length idx === 0 then continue; endif
+
+        local q_i;
+        local atmidx = split [idx, seg];
+        local dists = split [sqrt sqrdist, seg];
+        for q_i = 1, length atmidx, 1 loop
+            if length atmidx (q_i) === 0 then continue; endif
+
+            local qatm = subsets (sub_i)(q_i);
+            local satms = littleset [atmidx (q_i)];
+            local d = dists (q_i);
+            local m = satms <> qatm;
+            satms = satms | m;
+            d = d | m;
+            if length satms === 0 then continue; endif
+
+            m = bOrder [qatm, satms] == 0;
+            satms = satms | m;
+            d = d | m;
+            if length satms === 0 then continue; endif
+
+            m = (aRadius qatm - d + aRadius satms - d) >= OVERLAP;
+            satms = satms | m;
+            if length satms === 0 then continue; endif
+
+            badpairs = cat [badpairs, tr [rep [qatm, length satms], satms]];
+        endloop
+    endloop
+
+	prox_close prox;
+
+//  If intramolecular, remove reflexive duplicate pairs.
+    if bigset === littleset then
+        local ith, ok = rep [1, length badpairs];
+        for ith = 1, length badpairs, 1 loop
+            if ok (ith) then
+                local dup = reverse badpairs (ith);
+                local [didx] = indexof [[dup], badpairs];
+                if didx > 0 then
+                    ok = poke [ok, didx, 0];
+                endif
+            endif
+        endloop
+        
+        badpairs = badpairs | ok;
+    endif
+
+    return badpairs;
+endfunction
+
+/****************************************************************************
  *                          CalcCharge
  *
  *  Determine the total charge of the molecule collection represented by 
@@ -599,6 +667,7 @@ local function ClearChargeStatus [wkey]
 endfunction
 
 function qb_GetEnvTag;
+function qb_InterMoleculeOverlap;
 function qb_TestDivcon;
 function GetStatusMessage;
 function SingleMol;
@@ -610,7 +679,7 @@ function SingleMol;
  *
  ****************************************************************************/
 local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM,
-        recmess]
+        recmol, recmess]
 
     local mess = '', msgkey;
     local [fields, ftypes] = db_Fields poseskey;
@@ -633,6 +702,9 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM,
         msgkey = Message [0, 'Saving database ...'];
         local [osys, nsys] = SystemPush [];
     endif
+
+    local recchn = mol_Create recmol;
+    local recatms = cat oAtoms recchn;
 
     local rowkey = 0, stsmess = "";
     while rowkey = db_NextEntry [poseskey, rowkey] loop
@@ -659,8 +731,14 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM,
 
         local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms, 
             lp, overlap, missH, MM];
+
+        local intermess = '';
+        if overlap then
+            intermess = qb_InterMoleculeOverlap [recatms, ligatms];
+        endif
+
         stsmess = cat [stsmess, GetStatusMessage ['Ligand', chgok],
-            string ligmess];
+            string tok_cat [ligmess, intermess]];
         local chgdata = tag [[LIGCHG_FIELD], [charge]];
         rowdata = cat [chgdata, rowdata];
         local resultrowkey = db_Write [resultskey, 0, rowdata];
@@ -670,6 +748,8 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM,
 
         oDestroy ligch;
     endloop
+
+    oDestroy recchn;
 
     if not MOE_BATCH then
         SystemPop [osys, nsys];
@@ -724,6 +804,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
     endif
 
     local recrowkey = 0, recmsgs = [], stsmess = "";
+    local recchset = [], recatmset = [];
     while recrowkey = db_NextEntry [recskey, recrowkey] loop
         local recrowdata = db_Read [recskey, recrowkey];
         local recmol = tagpeek [recrowdata, recmolfield];
@@ -735,11 +816,12 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
             lp, overlap, missH, MM];
         stsmess = cat [GetStatusMessage ['Receptor', recchgok],
             string recmess];
+        recchset = append [recchset, recchs];
+        recatmset = append [recatmset, recatms];
         recmsgs = append [recmsgs, stsmess];
         local recchgdata = tag [[RECCHG_FIELD], [recchg]];
         recrowdata = cat [recchgdata, recrowdata];
         db_Write [resultskey, 0, recrowdata];
-        oDestroy recchs;
     endloop
 
     db_RenameField [resultskey, recmolfield, REC_FIELD];
@@ -755,7 +837,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         local posech = mol_Create posemol;
         local poseatms = cat cAtoms posech;
         local posechg = 0;
-        stsmess = recmsgs(ith);
+        stsmess = recmsgs (ith);
         if not SingleMol [poseatms] then
             stsmess = cat [stsmess,
                 "Error!  Ligand must to be a single molecule.\n"];
@@ -765,8 +847,14 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         local posechgok = ChargeOK [poseatms, posechg];
         local [poseok, posemess] = qb_TestDivcon ['ligand', poseatms,
             lp, overlap, missH, MM];
+
+        local intermess = '';
+        if overlap then
+            intermess = qb_InterMoleculeOverlap [recatmset (ith), poseatms];
+        endif
+
         stsmess = cat [stsmess, GetStatusMessage ['Ligand', posechgok],
-            string posemess];
+            string tok_cat [posemess, intermess]];
         local posechgdata = tag [[LIGCHG_FIELD], [posechg]];
         poserowdata = cat [posechgdata, poserowdata];
         db_Write [resultskey, resultrowkey, poserowdata];
@@ -776,6 +864,8 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         oDestroy posech;
         ith = ith + 1;
     endloop
+
+    oDestroy recchset;
 
     if not MOE_BATCH then
         SystemPop [osys, nsys];
@@ -939,11 +1029,19 @@ local function TestComplex [lonepairs, overlap, missextraH, MMtype]
     local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatoms,
         lonepairs, overlap, missextraH, MMtype];
 
+    local intermess = '';
+    if overlap then
+        intermess = qb_InterMoleculeOverlap [recatoms, ligatoms];
+        if neL [intermess, ''] then
+            recok = 0;
+            ligok = 0;
+            ligmess = tok_cat [ligmess, intermess];
+        endif
+    endif
+
     return [recok, recmess, ligok, ligmess];
 
 endfunction
-
-function qb_TestDivconMol;
 
 /****************************************************************************
  *                          TestDBMols
@@ -977,16 +1075,42 @@ local function TestDBMols [oldkey, testLP, testOverlap, testH, testMM]
 
     local [osys, nsys] = SystemPush [];
 
+    local recmols, recchns, recatms, recchg;
+    if coreopts.mode === 'One-to-Many' then
+        recmols = qb_GetEnvTag [dbkey, RECEPTOR];
+        recchns = mol_Create recmols;
+        recatms = cat oAtoms recchns;
+    endif
+
     while rowkey = db_NextEntry [dbkey, rowkey] loop
-        local recok = 1, recchgok = 1, recmess = '';
+        local recok = 1, recmess = '';
         local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
-        local [ligok, ligmess] = qb_TestDivconMol ['ligand', ligmol,
+        local ligchn = mol_Create ligmol;
+        local ligatms = cat oAtoms ligchn;
+        local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms,
             testLP, testOverlap, testH, testMM];
         if coreopts.mode === 'Many-to-Many' then
-            local [recmol, recchg] = db_ReadFields [dbkey, rowkey,
-                recflds];
-            [recok, recmess] = qb_TestDivconMol ['receptor', recmol,
+            [recmols, recchg] = db_ReadFields [dbkey, rowkey, recflds];
+            recchns = mol_Create recmols;
+            recatms = cat oAtoms recchns;
+
+            [recok, recmess] = qb_TestDivcon ['receptor', recatms,
                 testLP, testOverlap, testH, testMM];
+        endif
+
+        local intermess = '';
+        if testOverlap then
+            intermess = qb_InterMoleculeOverlap [recatms, ligatms];
+            if neL [intermess, ''] then
+                recok = 0;
+                ligok = 0;
+                ligmess = tok_cat [ligmess, intermess];
+            endif
+        endif
+
+        oDestroy ligchn;
+        if coreopts.mode === 'Many-to-Many' then
+            oDestroy recchns;
         endif
 
         if recok === 2 and ligok === 2 then
@@ -999,6 +1123,10 @@ local function TestDBMols [oldkey, testLP, testOverlap, testH, testMM]
                 cat [string recmess, string ligmess]];
         endif
     endloop
+
+    if coreopts.mode === 'One-to-Many' then
+        oDestroy recchns;
+    endif
 
     SystemPop [osys, nsys];
 
@@ -1132,8 +1260,6 @@ global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
     local mess = '';
     local recchns = mol_Create recmol;
     local recatms = cat cAtoms recchns;
-    local recatmsets = SplitReceptor [recatms];
-    local recmolset = app mol_Extract recatmsets;
     local [recok, recmess] = qb_TestDivcon ['receptor', recatms, 
         lonepair, overlap, missextraH, MMtype];
     mess = tok_cat [mess, recmess];
@@ -1156,6 +1282,19 @@ global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
     local ligchgok = ChargeOK [ligatms, ligchg];
     oDestroy ligchn;
 
+    local intermess = '';
+    if overlap then
+        intermess = qb_InterMoleculeOverlap [recatms, ligatms];
+        if neL [intermess, ''] then
+            recok = 0;
+            ligok = 0;
+            mess = tok_cat [mess, intermess];
+        endif
+    endif
+
+    local recatmsets = SplitReceptor [recatms];
+    local recmolset = app mol_Extract recatmsets;
+
     return [recmolset, recok, recchgok, ligok, ligchgok, mess];
 
 endfunction
@@ -1169,7 +1308,7 @@ function qb_UpdateCharge;
  *  Handle the triggers of the core panel.
  *
  ****************************************************************************/
-global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
+global function qb_CoreHandler [wkey, trig, status, vals, btasks]
 
     local btid;
     if trig === 'mode' then
@@ -1183,21 +1322,39 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
         if allfalse [vals.testLP, vals.testOverlap, vals.testH,
                 vals.testMM] then
             Warning 'No tests selected.';
+            return;
+        endif
 
-        elseif second task_fork [master: 'parent',
+        if second task_fork [master: 'parent',
                 statics:'share'] === 'child' then
             task_prio 0;
-            local msgkey;
+            local recok = 1, recmess = '', ligok = 1, ligmess = '';
+            local msgkey = Message [0, 'Running tests ...'];
 
             if neL [vals.mode, 'Many-to-Many'] then
-                msgkey = Message [0, 'Running tests ...'];
-                local [recok, recmess, ligok, ligmess] = TestComplex [
+                [recok, recmess, ligok, ligmess] = TestComplex [
                     vals.testLP, vals.testOverlap, vals.testH, vals.testMM];
-                Message [msgkey, 'Running tests ... done.'];
+            endif
 
+            if neL [vals.mode, 'One-to-One'] then
+                TestDBMols [status.dbkey, vals.testLP, vals.testOverlap,
+                    vals.testH, vals.testMM];
+            endif
+
+            if vals.mode === 'Many-to-Many'then
+                Message [msgkey, 'Running tests ... done.'];
+                sleep 5;
+                exit [];
+            else
                 if [recok and ligok and recmess === '' and ligmess === ''] then
-                    Warning 'No problems detected.';
-                    exit [];
+                    if vals.mode === 'One-to-One' then
+                        Warning 'No problems detected.';
+                        exit [];
+                    else
+                        Message [msgkey, 'Running tests ... done.'];
+                        sleep 5;
+                        exit [];
+                    endif
                 else
                     local messwin = WindowCreate MESS_WINDOW;
                     WindowSetData [messwin, [mess: string tok_cat [recmess,
@@ -1213,14 +1370,6 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
                 endif
             endif
 
-            if neL [vals.mode, 'One-to-One'] then
-                msgkey = Message [0, 'Running tests ...'];
-                TestDBMols [dbkey, vals.testLP, vals.testOverlap,
-                    vals.testH, vals.testMM];
-                Message [msgkey, 'Running tests ... done.'];
-                sleep 5;
-            endif
-
             exit [];
         endif
 
@@ -1229,7 +1378,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
                 statics:'share'] === 'child' then
             task_prio 0;
 
-            status = qb_UpdateCharge [wkey, status, 1];
+            status = qb_UpdateCharge [wkey, status, 1, 1, 1];
             exit [];
         endif
 
@@ -1238,7 +1387,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks, dbkey]
                 statics:'share'] === 'child' then
             task_prio 0;
 
-            CheckChgDBMols [dbkey];
+            CheckChgDBMols [status.dbkey];
             exit [];
         endif
 
@@ -1572,6 +1721,44 @@ global function qb_GetWhich [recbad, ligbad]
 endfunction
 
 /****************************************************************************
+ *                          qb_InterMoleculeOverlap
+ *
+ *  Determine whether atoms in the receptor atoms overlap with the
+ *  ligand atoms.
+ *
+ *
+ *  Assumption:  recset was created before ligset in the current system.
+ *
+ ****************************************************************************/
+global function qb_InterMoleculeOverlap [recset, ligset]
+
+    local mess = '';
+    local pairs = AtomOverlap [recset, ligset];
+    if length pairs > 0 then
+        local residues = oParent pairs;
+        local rnames = rName residues;
+        local rnums = rNumber residues;
+        local anames = aName pairs;
+        local indices = aNumber pairs;
+        indices = tr indices;
+        indices = [first indices, second indices - length recset];
+        indices = tr indices;
+        local dists = app aDist pairs;
+        local ith; 
+        mess = tok_cat [mess, '    Error!  Overlapping atoms:\n'];
+        for ith = 1, length pairs, 1 loop
+            mess = tok_cat [mess, twrite ['        Receptor {}:  {} in {} {}'
+                    ' is {}A from Ligand {}:  {} in {} {}\n', 
+                indices(ith)(1), anames(ith)(1), rnames(ith)(1),
+                rnums(ith)(1),  dists(ith), indices(ith)(2), 
+                anames(ith)(2), rnames(ith)(2), rnums(ith)(2)]];
+        endloop
+    endif
+
+    return mess;
+endfunction
+
+/****************************************************************************
  *
  *                          qb_InitCorePanel
  *
@@ -1586,7 +1773,7 @@ global function qb_InitCorePanel [wkey, status, defaults]
         recbox: [sensitive: 0], recdb: [allowBlank: 1],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
         poseschg: [sensitive: 0], mode: [text: RUN_MODES | status.allowmode]]];
-    status = qb_UpdateCharge [wkey, status, 0];
+    status = qb_UpdateCharge [wkey, status, 1, 1, 0];
 
     return status;
 endfunction
@@ -1753,13 +1940,14 @@ endfunction
 global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         dbtype, dotests]
 
-    local stsmess = "", recstsmess = "";
-    local recok = 1, recmess = '', ligok = 1, ligmess = '';
+    local errmess = '', stsmess = "", recstsmess = "";
+    local receptor = [], recok = 1, recmess = '';
+    local ligand = [], ligok = 1, ligmess = '';
     local dbkey = db_Open [coreopts.scoredb, 'create'];
     SetScoreFields [dbkey, coreopts.mode === 'Many-to-Many', fields];
 
     if coreopts.mode === 'One-to-One' or coreopts.mode === 'One-to-Many' then
-        local [receptor, ligand, errmess] = qb_AtomsToMols [];
+        [receptor, ligand, errmess] = qb_AtomsToMols [];
         if receptor === [] or ligand === [] then
             Warning errmess;
             exit [];
@@ -1813,7 +2001,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         if coreopts.mode === 'One-to-Many' then
             local pmess = CopyPoseDB [dbkey, posekey, coreopts.testLP,
                 coreopts.testOverlap, coreopts.testH, coreopts.testMM,
-                recstsmess];
+                receptor, recstsmess];
             if neL [pmess, ''] then
                 db_Close posekey;
                 db_Close dbkey;
@@ -1968,29 +2156,21 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap,
 
     //  Look for overlapping atoms
     if overlap then
-        indices = [];
-        local atom, atm_i = 1;
-        for atom in atoms loop
-            local dists = aDist [atom, atoms];
-            local [subindices] = indicesof [1, (dists < 0.5)];
-            subindices = subindices | (subindices < atm_i);
-            indices = cat [indices, cat apt cat [subindices, atm_i]];
-            atm_i = atm_i + 1;
-        endloop
-
-        if length indices > 0 then
-            residues = oParent atoms [indices];
+        local pairs = AtomOverlap [atoms, atoms];
+        if length pairs > 0 then
+            residues = oParent pairs;
             rnames = rName residues;
             rnums = rNumber residues;
-            anames = aName atoms [indices];
-            ith = 0; 
+            anames = aName pairs;
+            indices = aNumber pairs;
+            local dists = app aDist pairs;
             mess = tok_cat [mess, '    Error!  Overlapping atoms:\n'];
-            for ith = 1, length indices, 2 loop
+            for ith = 1, length pairs, 1 loop
                 mess = tok_cat [mess, twrite ['        {}:  {} in {} {}'
-                     ' with {}:  {} in {} {}\n', 
-                    indices(ith), anames(ith), rnames(ith), rnums(ith),
-                    indices(ith+1), anames(ith+1), rnames(ith+1),
-                    rnums(ith+1)]];
+                     ' is {}A from {}:  {} in {} {}\n', 
+                    indices(ith)(1), anames(ith)(1), rnames(ith)(1),
+                    rnums(ith)(1),  dists(ith), indices(ith)(2), 
+                    anames(ith)(2), rnames(ith)(2), rnums(ith)(2)]];
             endloop
 
             error = 1;
@@ -2060,48 +2240,18 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap,
 endfunction
 
 /****************************************************************************
- *                          qb_TestDivconMol
- *
- *  Determine whether there are any detectable problems with the molecule.
- *
- *  Assume that SystemPush [] and SystemPop [] have already been called,
- *  if necessary.
- *
- ****************************************************************************/
-global function qb_TestDivconMol [which, mol, lonepair, overlap,
-        missextraH, MMtype]
-
-    local chn = mol_Create mol;
-    local atms = cat cAtoms chn;
-
-    local [molok, mess] = qb_TestDivcon [which, atms, lonepair, overlap,
-        missextraH, MMtype];
-
-    if which === 'ligand' then
-        if not SingleMol [atms] then
-            mess = tok_cat ['Error!  Ligand must be a single molecule.\n',
-                mess];
-            molok = 0;
-        endif
-    endif
-
-    oDestroy chn;
-
-    return [molok, mess];
-endfunction
-
-/****************************************************************************
  *                          qb_UpdateCharge
  *
  *  Update the window based on new charge.
  *
  ****************************************************************************/
-global function qb_UpdateCharge [wkey, status, warn]
+global function qb_UpdateCharge [wkey, status, rec, lig, warn]
 
     if MOE_BATCH then return [status, 'No MOE Window!']; endif
 
     local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
-    if (recchg === [] or recok === [] or ligchg === [] or ligok === []) then
+    if (rec and (recchg === [] or recok === [])
+            or lig and (ligchg === [] or ligok === [])) then
         if warn then
             Warning  errmess;
         endif
@@ -2111,11 +2261,11 @@ global function qb_UpdateCharge [wkey, status, warn]
     endif
 
     status.calcchg = 1;
-    status.moerecchg = recchg;
-    status.moeligchg = ligchg;
+    if rec then status.moerecchg = recchg; endif
+    if lig then status.moeligchg = ligchg; endif
 
-    status.recchg = select [2, 3, recok];
-    status.ligchg = select [2, 3, ligok];
+    if rec then status.recchg = select [2, 3, recok]; endif
+    if lig then status.ligchg = select [2, 3, ligok]; endif
 
     WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
     SetChargeStatus [wkey, status];
