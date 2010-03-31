@@ -316,7 +316,7 @@ local function LoadDB [dbpath]
 
     local [dbkey, recset, ligand, status, coreopts, complex, mess] = 
         qb_LoadCoreScoreDB [dbpath, 'nmrscore'];
-    if dbkey === 0 and status === [] and coreopts === [] then
+    if dbkey === 0 then
         Warning mess;
         exit [];
     endif
@@ -501,7 +501,7 @@ local function ShowLigPoses [vals, ligmol, ligatoms, posemols, poseatoms]
             [posemols, errmess] = qb_GetPoses [vals];
             if posemols === [] then
                 Warning errmess;
-                exit [];
+                return [[], [], []];
             endif
         endif
 
@@ -699,7 +699,6 @@ atombound = rep [1.050, num];
                 vals.elemN, vals.elemF];
             indices = qb_GetElemIndices [ligmol, elems];
 
-
         elseif trig === 'experimental' then
             if vals.allposes then
                 Warning 'Deselect the ligand option "Show all poses?"\n'
@@ -740,6 +739,10 @@ atombound = rep [1.050, num];
                 [ligatoms, posemols, poseatoms]
                     = ShowLigPoses [vals, ligmol, ligatoms,
                     posemols, poseatoms];
+
+                if ligatoms === [] and posemols === [] and poseatoms === [] then
+                    WindowSetData [wkey, [allposes: 0]];
+                endif
 
                 exit [];
             endif

@@ -31,9 +31,20 @@ function qb_CheckChgTestDivconMols;
 function qb_GetElemIndices;
 function qb_GetWhich;
 
-/*  NOTE:  If you change the Key lists here, you need to update the
- *         Option lists and default indices in nmrpanel.svl.
+/*  NOTE:  If you change the key lists here, you need to update the
+ *         option lists and default indices in qbcore.svl and nmrpanel.svl.
+           The unused Hamilitonians were masked when the core was created.
  */
+
+const HAM_KEYS =
+    [
+    'AM1',
+    'MNDO',
+    'MNDOD',
+    'PDDG-PM3',
+    'PM3',
+    'PM6'
+    ];
 
 const GEOM_KEYS =
     [
@@ -135,7 +146,10 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
     //  in the receptor collection.
 
     local idx, retValue, success = 0;
-    /*
+
+    fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
+    fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
+    coreopts.scaling === 1]];
     fwrite [stdin, {c:}\n', GEOM_KEYS(appopts.opt)];
     fwrite [stdin, {c:}\n', select ['GUESS', 'NOGUESS', appopts.guess]];
     fwrite [stdin, {n:}\n', length indices];
@@ -143,7 +157,7 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
         fwrite [stdin, {n:} {n:} {n:}\n', indices (idx), free (idx),
             bound (idx)];
     endloop
-    */
+
     local mol, molIndex, residueIndex, residueCount, atomIndex, atomCount;
     local molCount = length recmolset;
     fwrite [stdin, '{n:}\n', coreopts.recchg];
