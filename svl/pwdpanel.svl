@@ -42,6 +42,8 @@ function qb_SplitComplex;
 
 function qb_HeatMapSetupPanel;
 
+const PWD_EXPACT_HDR = 'Exp Act';
+
 const MAT_TRANS_MIN = 0x80;
 
 const QBPWD_OPT_DEFAULTS =
@@ -559,6 +561,40 @@ local function NearestAtomColor [pos, rad, acolor, spos]
     local vrgb = [r,g,b] * [invz vsum];
     vrgb = maxE [0, minE [0xFF, vrgb]];
     return bitor bitshl [vrgb,[16,8,0]];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          ReadExpActData
+ *
+ *  Read experimental activity data, separated by white space, from the file 
+ *  and store it in the given QMScore database in the ExpAct field.  It is
+ *  assumed that the orderings are consistent.
+ *
+ ****************************************************************************/
+local function ReadExpActData [expactfn, qmsdbfn]
+
+    local qdbkey = db_Open [qmsdbfn, 'read-write'];
+    local eaf = fopenr filename;
+
+    if neL [nEntries qdbkey, length lines] then
+        Warning twrite ['The number of lines in {}\n'
+            'is unequal to the number of entries in {}', expactfn, qmsdbfn];
+        fclose eaf;
+        db_close qdbkey;
+        return;
+    endif
+
+    db_EnsureField [qdbkey, PWD_EXPACT_HDR, 'double'];
+    local rowkey = 0;
+    while rowkey = db_NextEntry [qdbkey, rowkey] loop
+        local val = fread [eaf, '{n:}'];
+        db_Write [qdbkey, rowkey, tag [PWD_EXPACT_HDR, val]];
+    endloop
+
+    fclose eaf;
+    db_close qdbkey;
 
 endfunction
 

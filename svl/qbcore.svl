@@ -71,6 +71,7 @@ const STATUS_DEFAULTS =
     [
     ['dbkey',        0             ],
     ['allowmode',    [1,1,1]       ],
+    ['allowham',     [1,1,1,1,1,1] ],
     ['prevwd',       ''            ],
     ['calcchg',      0             ],
     ['verified',     0             ],
@@ -96,8 +97,14 @@ const CORE_OPT_DEFAULTS =
     ['testMM',       1             ],
     ['recchg',       0             ],
     ['ligchg',       0             ],
-    ['poseschg',     0             ]
+    ['poseschg',     0             ],
+    ['ham',          5             ],
+    ['scaling',      1             ]
     ];
+
+/*  NOTE:  If you change the options lists here, you need to update the
+ *         keys in interfaces (qmsinterface.svl and nmrinterface.svl).
+ */
 
 const RUN_MODES =
     [
@@ -105,6 +112,23 @@ const RUN_MODES =
     'One-to-Many',
     'Many-to-Many'
     ];
+
+const HAMILTONIANS =
+    [
+    'AM1',
+    'MNDO',
+    'MNDO/d',
+    'PDDG-PM3',
+    'PM3',
+    'PM6'
+    ];
+
+const ALG_OPTS =
+    [
+    'Linear Scaling',
+    'Cubic Scaling'
+    ];
+
 
 const CORE_PANEL =
     [
@@ -267,6 +291,7 @@ const CORE_PANEL =
         ],
 
     Separator : [flushLeft:1, extendH:1, margin:1],
+
     Hbox :
         [
         extendH: 1, title: 'Charges:',
@@ -345,6 +370,36 @@ const CORE_PANEL =
                         'poses in the poses database.'
                     ]
                 ]
+            ]
+        ],
+
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
+    Hbox :
+        [
+        extendH: 1,
+        Option :
+            [
+            name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
+            type: 'int', minWidth: 8,
+            bubbleHelp:
+                ''
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+        Option :
+            [
+            name: 'scaling', title: 'Calculation:', text: ALG_OPTS,
+            type: 'int', minWidth: 8, extendH: 1,
+            bubbleHelp:
+                'Linear vs. Cubic refers to the scaling factor of the\n'
+                'calculation where Linear scales accordingly to O(n)\n'
+                'and Cubic scaling is the more conventional variety\n'
+                '(e.g. O(n^3) or worse) where n corresponds to the number\n'
+                'of electrons in the system. The cross over point is at\n'
+                'approximately 450 atoms.'
             ]
         ],
 
@@ -1772,7 +1827,9 @@ global function qb_InitCorePanel [wkey, status, defaults]
     WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0],
         recbox: [sensitive: 0], recdb: [allowBlank: 1],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
-        poseschg: [sensitive: 0], mode: [text: RUN_MODES | status.allowmode]]];
+        poseschg: [sensitive: 0],
+        ham: [text: HAMILTONIANS | status.allowham],
+        mode: [text: RUN_MODES | status.allowmode]]];
     status = qb_UpdateCharge [wkey, status, 1, 1, 0];
 
     return status;
@@ -1915,9 +1972,33 @@ global function qb_SaveEnvAnal [dbkey, analopts]
 endfunction
 
 /****************************************************************************
+ *                          qb_SetHamDefault
+ *
+ *  Change the allowable hamilitonians in the GUI status.
+ *
+ ****************************************************************************/
+global function qb_SetHamStatus [defopts, ham]
+    defopts = tagpoke [defopts, 'ham', ham];
+
+    return defopts;
+endfunction
+
+/****************************************************************************
+ *                          qb_SetHamStatus
+ *
+ *  Change the allowable hamilitonians in the GUI status.
+ *
+ ****************************************************************************/
+global function qb_SetHamStatus [status, mode]
+    status = tagpoke [status, 'allowham', mode];
+
+    return status;
+endfunction
+
+/****************************************************************************
  *                          qb_SetModeStatus
  *
- *  Return the default values for the GUI status.
+ *  Change the allowable modes in the GUI status.
  *
  ****************************************************************************/
 global function qb_SetModeStatus [status, mode]
@@ -2106,7 +2187,8 @@ global function qb_TagCoreVals [vals]
         vals.scoredb,  vals.recdb, vals.posedb,
         vals.testLP, vals.testOverlap,
         vals.testH, vals.testMM,
-        vals.recchg, vals.ligchg, vals.poseschg]];
+        vals.recchg, vals.ligchg, vals.poseschg,
+        vals.ham, vals.scaling]];
 
     return coreopts;
 endfunction
@@ -2342,7 +2424,7 @@ global function qb_VerifyDivcon [wkey, status, vals]
 
     endif
 
-    Message [msgkey, 'Testing ... done.'];
+    Message [msgkey, []];
     return status;
 
 endfunction

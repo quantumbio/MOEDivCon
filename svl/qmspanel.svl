@@ -52,6 +52,7 @@ function qb_QMScore;
 function qb_QMScoreBatch;
 
 //  Data tags are in the order in which they are returned by Divcon.
+
 const QMS_DATA_TAGS =
     [
     "LIGAND",
@@ -70,6 +71,7 @@ const QMS_DATA_TAGS =
  
 const QMS_NUM_FIELDS =
     [
+    'Exp Act',
     'QMScore',
     'dHf_g',
     'Solv_elec',
@@ -86,25 +88,14 @@ const QMS_NUM_FIELDS =
 /*  NOTE:  If you change the Option lists here, you need to update the
  *         Keys in qmsinterface.svl.
  */
+
 const QMSCORE_OPT_DEFAULTS =
     [
-    ['ham',          5             ],
-    ['scaling',      1             ],
     ['freq',         0             ],
     ['opt',          1             ],
     ['shift',        0.0           ],
     ['analpwd',      0             ],      //  Analysis
     ['trainingset',  0             ]
-    ];
-
-const HAMILTONIANS =
-    [
-    'AM1',
-    'MNDO',
-    'MNDO/d',
-    'PDDG-PM3',
-    'PM3',
-    'PM6'
     ];
 
 const LIG_OPTS =
@@ -113,14 +104,6 @@ const LIG_OPTS =
     'free',
     'bound'
     ];
-
-const ALG_OPTS =
-    [
-    'Linear Scaling',
-    'Cubic Scaling'
-    ];
-
-
 
 const HEADER = 
     [
@@ -145,25 +128,15 @@ const PANEL =
             extendH: 1,
             Option :
                 [
-                name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
-                type: 'int', minWidth: 8,
+                name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
+                type: 'int', minWidth: 5, extendH: 1,
                 bubbleHelp:
-                    ''
-                ]
-            ],
-        Hbox :
-            [
-            Option :
-                [
-                name: 'scaling', title: 'Calculation:', text: ALG_OPTS,
-                type: 'int', minWidth: 8, extendH: 1,
-                bubbleHelp:
-                    'Linear vs. Cubic referrs to the scaling factor of the\n'
-                    'calculation where Linear scales accordingly to O(n)\n'
-                    'and Cubic scaling is the more conventional variety\n'
-                    '(e.g. O(n^3) or worse) where n corresponds to the number\n'
-                    'of electrons in the system. The cross over point is at\n'
-                    'approximately 450 atoms.'
+                    'A QM-based ligand optimization can be performed\n'
+                    'prior to scoring. This optimization may occur\n'
+                    'either while the ligand is docked within the target\n'
+                    'or while the ligand is separate from the target.\n'
+                    'Warning: this optional step will significantly\n'
+                    'increase the CPU cost of the calculation.'
                 ],
             Separator : 
                 [
@@ -176,22 +149,6 @@ const PANEL =
                 shortcut: ['0.0', '2.0', '4.0', '8.0', '16.0'],
                 bubbleHelp:
                     'Initial dynamic level shift (eV).'
-                ]
-            ],
-        Hbox :
-            [
-            extendH: 1,
-            Option :
-                [
-                name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
-                type: 'int', minWidth: 5, extendH: 1,
-                bubbleHelp:
-                    'A QM-based ligand optimization can be performed\n'
-                    'prior to scoring. This optimization may occur\n'
-                    'either while the ligand is docked within the target\n'
-                    'or while the ligand is separate from the target.\n'
-                    'Warning: this optional step will significantly\n'
-                    'increase the CPU cost of the calculation.'
                 ],
             Separator : 
                 [
@@ -269,27 +226,24 @@ function qb_SaveQMScore;
 
 /****************************************************************************
  *
- *                          ReadData
+ *                          ReadHeatMapData
  *
  *  Return data formatted for the heat map.
  *
  ****************************************************************************/
-local function ReadData [filename]
+local function ReadHeatMapData [filename]
 
-    //TODO:  change to use fieldsplit
     local f = fopenr filename;
     local lines = freadb [f, 'line', INT_MAX];
     local line = first lines;
-    local m = line == ",";
-    local strings = split [line | not m, dec mtoc prepend [m, 1]];
+    local strings = wordsplit [line, ","];
     local resnames = app token strings;
     lines = dropfirst lines;
 
     //  ligand labels and values
     local ligdata = [];
     for line in lines loop
-        m = line == ",";
-        strings = split [line | not m, dec mtoc prepend [m, 1]];
+        strings = wordsplit [line, ","];
         local ligname = token first strings;
         strings = dropfirst strings;
         local ligvals = atof app token strings;
@@ -569,8 +523,8 @@ global function qb_QMScoreSetupPanel []
 
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
-                        vals.ham, vals.scaling, vals.freq, vals.opt,
-                        vals.shift, vals.analpwd, vals.trainingset]];
+                        vals.freq, vals.opt, vals.shift,
+                        vals.analpwd, vals.trainingset]];
 
                         if status.dbkey > 0 then
                             db_Close status.dbkey;
@@ -601,8 +555,8 @@ global function qb_QMScoreSetupPanel []
 
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
-                        vals.ham, vals.scaling, vals.freq, vals.opt,
-                        vals.shift, vals.analpwd, vals.trainingset]];
+                        vals.freq, vals.opt, vals.shift,
+                        vals.analpwd, vals.trainingset]];
 
                     if status.dbkey > 0 then
                         db_Close status.dbkey;
@@ -613,7 +567,7 @@ global function qb_QMScoreSetupPanel []
                         [], QMS_NUM_FIELDS, 'qmscore', 1];
 //DEBUG
                     if qmsopts.analpwd then
-                        local sardata = ReadData [
+                        local sardata = ReadHeatMapData [
                             '~daren/dev/MOEDivcon/data/trypsin-heatmap-88.csv'];
                         qb_SaveAnalysisData [status.dbkey, 'pwd', 'sar', sardata];
                     endif
