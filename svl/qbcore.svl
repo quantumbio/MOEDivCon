@@ -69,6 +69,7 @@ const CHG_COLOR =
 
 const STATUS_DEFAULTS =
     [
+    ['appname',      ''            ],
     ['dbkey',        0             ],
     ['allowmode',    [1,1,1]       ],
     ['allowham',     [1,1,1,1,1,1] ],
@@ -86,6 +87,7 @@ const CORE_OPT_DEFAULTS =
     [
     ['task',         0             ],
     ['mode',         'One-to-One'  ],
+    ['allposes',     0             ],
     ['cwd',          0             ],
     ['workdir',      '/tmp'        ],
     ['scoredb',      'qbscore.mdb' ],
@@ -93,6 +95,7 @@ const CORE_OPT_DEFAULTS =
     ['posedb',       ''            ],
     ['testLP',       1             ],
     ['testOverlap',  1             ],
+    ['testHam',      1             ],
     ['testH',        1             ],
     ['testMM',       1             ],
     ['recchg',       0             ],
@@ -122,6 +125,17 @@ const HAMILTONIANS =
     'PM3',
     'PM6'
     ];
+
+const HAM_KEYS =
+    [
+    'AM1',
+    'MNDO',
+    'MNDOD',
+    'PDDGPM3',
+    'PM3',
+    'PM6'
+    ];
+
 
 const ALG_OPTS =
     [
@@ -189,6 +203,18 @@ const CORE_PANEL =
                 '  One ligand docked into one receptor.\n'
                 '  Many ligand poses docked into the same receptor.\n'
                 '  Many ligand poses, each docked into its own receptor.'
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+        Checkbox :
+            [
+            name: 'allposes', text: 'Show all poses?',
+            onTrigger: 'return',
+            bubbleHelp:
+                'Load all of the poses from the database\n'
+                'and show them in the MOE Window.'
             ]
         ],
 
@@ -242,7 +268,7 @@ const CORE_PANEL =
             ],
         Mbox :
             [
-            columns: 3, spacingH: 'medium',
+            columns: 4, spacingH: 'medium',
             extendH: 1, name: 'moltests',
                 Label :
                     [
@@ -263,7 +289,14 @@ const CORE_PANEL =
                     name: 'testOverlap', text: 'Atom Overlap',
                     bubbleHelp:
                         'Check to ensure that there are no\n'
-                        'overlapping atoms (this can be time consuming).'
+                        'overlapping atoms (inter- and intramolecular).'
+                    ],
+                Checkbox :
+                    [
+                    name: 'testHam', text: 'Compatibility',
+                    bubbleHelp:
+                        'Check to ensure that all atoms are\n'
+                        'compatible with the chosen Hamiltonian.'
                     ],
                 Label :
                     [
@@ -335,7 +368,7 @@ const CORE_PANEL =
                     [
                     name: 'recchg', allowBlank: 0,
                     type: 'int', minWidth: 4,
-                    onTrigger: 'validate',
+                    onTrigger: 'return',
                     bubbleHelp:
                         'Total charge of receptor.'
                     ]
@@ -358,7 +391,7 @@ const CORE_PANEL =
                     [
                     name: 'ligchg', allowBlank: 0,
                     type: 'int', minWidth: 4, extendH: 1,
-                    onTrigger: 'validate',
+                    onTrigger: 'return',
                     bubbleHelp:
                         'Total charge of ligand.'
                     ],
@@ -392,7 +425,7 @@ const CORE_PANEL =
         Option :
             [
             name: 'scaling', title: 'Calculation:', text: ALG_OPTS,
-            type: 'int', minWidth: 8, extendH: 1,
+            type: 'int', minWidth: 8,
             bubbleHelp:
                 'Linear vs. Cubic refers to the scaling factor of the\n'
                 'calculation where Linear scales accordingly to O(n)\n'
@@ -646,8 +679,9 @@ local function CheckChgDBMols [oldkey]
     local recflds = qb_GetRecFields [dbkey];
     local ligflds = qb_GetPoseFields [dbkey];
 
+    local osys, nsys;
     if not MOE_BATCH then
-        local [osys, nsys] = SystemPush [];
+        [osys, nsys] = SystemPush [];
     endif
 
     while rowkey = db_NextEntry [dbkey, rowkey] loop
@@ -733,8 +767,8 @@ function SingleMol;
  *  Copy the Poses database into the QMScore output database.
  *
  ****************************************************************************/
-local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM,
-        recmol, recmess]
+local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
+        missH, MM, appname, hamname, recmol, recmess]
 
     local mess = '', msgkey;
     local [fields, ftypes] = db_Fields poseskey;
@@ -753,9 +787,10 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM,
     db_RenameField [resultskey, POSE_FIELD, molfield];
     apt db_EnsureField [resultskey,  fields, ftypes];
 
+    local osys, nsys;
     if not MOE_BATCH then
         msgkey = Message [0, 'Saving database ...'];
-        local [osys, nsys] = SystemPush [];
+        [osys, nsys] = SystemPush [];
     endif
 
     local recchn = mol_Create recmol;
@@ -767,7 +802,7 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM,
 
         local ligmol = tagpeek [rowdata, molfield];
         local ligch = mol_Create ligmol;
-        local ligatms = cat cAtoms ligch;
+        local ligatms = cat oAtoms ligch;
 
         stsmess = recmess;
         if not SingleMol [ligatms] then
@@ -785,7 +820,7 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, missH, MM,
         endif
 
         local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms, 
-            lp, overlap, missH, MM];
+            lp, overlap, hamcompat, missH, MM, appname, hamname];
 
         local intermess = '';
         if overlap then
@@ -825,7 +860,7 @@ endfunction
  *
  ****************************************************************************/
 local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
-        missH, MM]
+        hamcompat, missH, MM, appname, hamname]
 
     local mess = '', msgkey;
     if db_nEntries recskey <> db_nEntries poseskey then
@@ -853,9 +888,10 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
     db_RenameField [resultskey, REC_FIELD, recmolfield];
     apt db_EnsureField [resultskey, recfields, recftypes];
 
+    local osys, nsys;
     if not MOE_BATCH then
         msgkey = Message [0, 'Saving database ...'];
-        local [osys, nsys] = SystemPush [];
+        [osys, nsys] = SystemPush [];
     endif
 
     local recrowkey = 0, recmsgs = [], stsmess = "";
@@ -864,11 +900,11 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         local recrowdata = db_Read [recskey, recrowkey];
         local recmol = tagpeek [recrowdata, recmolfield];
         local recchs = mol_Create recmol;
-        local recatms = cat cAtoms recchs;
+        local recatms = cat oAtoms recchs;
         local recchg = CalcCharge [recatms];
         local recchgok = ChargeOK [recatms, recchg];
         local [recok, recmess] = qb_TestDivcon ['receptor', recatms, 
-            lp, overlap, missH, MM];
+            lp, overlap, hamcompat, missH, MM, appname, hamname];
         stsmess = cat [GetStatusMessage ['Receptor', recchgok],
             string recmess];
         recchset = append [recchset, recchs];
@@ -890,7 +926,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         local poserowdata = db_Read [poseskey, poserowkey];
         local posemol = tagpeek [poserowdata, posemolfield];
         local posech = mol_Create posemol;
-        local poseatms = cat cAtoms posech;
+        local poseatms = cat oAtoms posech;
         local posechg = 0;
         stsmess = recmsgs (ith);
         if not SingleMol [poseatms] then
@@ -901,7 +937,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         posechg = CalcCharge [poseatms];
         local posechgok = ChargeOK [poseatms, posechg];
         local [poseok, posemess] = qb_TestDivcon ['ligand', poseatms,
-            lp, overlap, missH, MM];
+            lp, overlap, hamcompat, missH, MM, appname, hamname];
 
         local intermess = '';
         if overlap then
@@ -940,9 +976,11 @@ endfunction
  *
  ****************************************************************************/
 local function DrawChgStatus [cidx]
+
     local color = CHG_COLOR (cidx);
     local key = gr_create [title: 'status', size: [13, 13], units: 'pt'];
     gr_oval [key, [0, [6,6], [6,6], icolor color, 1, icolor color]];
+
     return key;
 endfunction
 
@@ -962,6 +1000,28 @@ local function GetStatusMessage [which, ok]
 
     return mess;
 
+endfunction
+
+global G_hamsets;
+
+/****************************************************************************
+ *                          HamCompatability
+ *
+ *  Determine whether the atoms are compatible with the given hamiltonian
+ *  and algorithm.
+ *
+ ****************************************************************************/
+local function HamCompatability [appname, hamname, atoms]
+
+    local elems = uniq aElement atoms;
+    local compatlist = tagpeek [G_hamsets, [appname, hamname]];
+    local idx = indexof [elems, compatlist];
+    local m = idx == 0;
+    if anytrue m then
+        return elems | m;
+    endif
+
+    return [];
 endfunction
 
 /****************************************************************************
@@ -1038,6 +1098,7 @@ endfunction
  *
  ****************************************************************************/
 local function SingleMol [atoms]
+
     return 1 === length uniq aMoleculeNumber atoms;
 endfunction
 
@@ -1072,7 +1133,8 @@ endfunction
  *  detectable problems.
  *
  ****************************************************************************/
-local function TestComplex [lonepairs, overlap, missextraH, MMtype]
+local function TestComplex [lonepairs, overlap, hamcompat, missextraH,
+        MMtype, appname, hamname]
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
     if recatoms === [] or ligatoms === [] then
@@ -1080,9 +1142,9 @@ local function TestComplex [lonepairs, overlap, missextraH, MMtype]
     endif
 
     local [recok, recmess] = qb_TestDivcon ['receptor', recatoms, 
-        lonepairs, overlap, missextraH,MMtype];
+        lonepairs, overlap, hamcompat, missextraH, MMtype, appname, hamname];
     local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatoms,
-        lonepairs, overlap, missextraH, MMtype];
+        lonepairs, overlap, hamcompat, missextraH, MMtype, appname, hamname];
 
     local intermess = '';
     if overlap then
@@ -1107,7 +1169,8 @@ endfunction
  *  Note:  this only checks the receptors and ligands in the molecule fields.
  *
  ****************************************************************************/
-local function TestDBMols [oldkey, testLP, testOverlap, testH, testMM]
+local function TestDBMols [oldkey, testLP, testOverlap, testHam, testH,
+        testMM, appname, hamname]
 
     if MOE_BATCH then return; endif
 
@@ -1143,14 +1206,14 @@ local function TestDBMols [oldkey, testLP, testOverlap, testH, testMM]
         local ligchn = mol_Create ligmol;
         local ligatms = cat oAtoms ligchn;
         local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms,
-            testLP, testOverlap, testH, testMM];
+            testLP, testOverlap, testHam, testH, testMM, appname, hamname];
         if coreopts.mode === 'Many-to-Many' then
             [recmols, recchg] = db_ReadFields [dbkey, rowkey, recflds];
             recchns = mol_Create recmols;
             recatms = cat oAtoms recchns;
 
             [recok, recmess] = qb_TestDivcon ['receptor', recatms,
-                testLP, testOverlap, testH, testMM];
+                testLP, testOverlap, testHam, testH, testMM, appname, hamname];
         endif
 
         local intermess = '';
@@ -1197,6 +1260,7 @@ endfunction
  *
  ****************************************************************************/
 local function UpdateCWD [wkey, cwd, wd, prev]
+
     if cwd === 1 then
         WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
         WindowSetData [wkey, [workdir: '']];
@@ -1206,7 +1270,10 @@ local function UpdateCWD [wkey, cwd, wd, prev]
         WindowSetData [wkey, [workdir: prev]];
         return prev;
     endif
+
 endfunction
+
+function qb_ResetLigand;
 
 /****************************************************************************
  *                          UpdateMode
@@ -1214,34 +1281,35 @@ endfunction
  *  Update the window based on new mode value.
  *
  ****************************************************************************/
-local function UpdateMode [wkey, mode, status]
-    if mode === 'One-to-One' then
-        WindowSetAttr [wkey, [
+local function UpdateMode [wkey, vals, status]
+
+    if vals.mode === 'One-to-One' then
+        WindowSetAttr [wkey, [allposes: [sensitive: 0],
             recbox: [sensitive: 0], recdb: [allowBlank: 1], 
             posebox: [sensitive: 0], posedb: [allowBlank: 1], 
             panel:[sensitive: [1,1,1,1]], calcchg: [sensitive: 1],
             chgbox: [sensitive: 1], recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
+        vals = qb_ResetLigand [wkey, vals];
         SetChargeStatus [wkey, status];
-    elseif mode === 'One-to-Many' then
-        WindowSetAttr [wkey, [
+    elseif vals.mode === 'One-to-Many' then
+        WindowSetAttr [wkey, [allposes: [sensitive: 1],
             recbox: [sensitive: 0], recdb: [allowBlank: 1],
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
             panel:[sensitive: [1,1,1,1]], calcchg: [sensitive: 1],
             chgbox: [sensitive: 1], recchg: [allowBlank: 0],
-            ligchg: [allowBlank: 0],
-            poseschg: [sensitive: 1]]];
+            ligchg: [allowBlank: 0], poseschg: [sensitive: 1]]];
         SetChargeStatus [wkey, status];
-    elseif mode === 'Many-to-Many' then
-        WindowSetAttr [wkey, [
+    elseif vals.mode === 'Many-to-Many' then
+        WindowSetAttr [wkey, [allposes: [sensitive: 0],
             recbox: [sensitive: 1], recdb: [allowBlank: 0],
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
             panel:[sensitive: [0,1,1,1]], calcchg: [sensitive: 0],
             chgbox: [sensitive: 0], recchg: [allowBlank: 1],
-            ligchg: [allowBlank: 1],
-            poseschg: [sensitive: 0]]];
+            ligchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
         ClearChargeStatus [wkey];
     endif
+
 endfunction
 
 //************************  Global Functions  *******************************
@@ -1282,7 +1350,7 @@ global function qb_CheckChgDivconMol [mol, chg, single]
 
     local molok = 1, mess = '';
     local chn = mol_Create mol;
-    local atms = cat cAtoms chn;
+    local atms = cat oAtoms chn;
     if single then
         molok = SingleMol [atms];
     endif
@@ -1310,32 +1378,35 @@ endfunction
  *
  ****************************************************************************/
 global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
-        lonepair, overlap, missextraH, MMtype]
+        lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname]
+
+    local osys, nsys;
+    if not MOE_BATCH then
+        [osys, nsys] = SystemPush [];
+    endif
 
     local mess = '';
     local recchns = mol_Create recmol;
-    local recatms = cat cAtoms recchns;
+    local recatms = cat oAtoms recchns;
     local [recok, recmess] = qb_TestDivcon ['receptor', recatms, 
-        lonepair, overlap, missextraH, MMtype];
+        lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname];
     mess = tok_cat [mess, recmess];
     local recchgok = ChargeOK [recatms, recchg];
-    oDestroy recchns;
 
     local ligchn = mol_Create ligmol;
-    local ligatms = cat cAtoms ligchn;
+    local ligatms = cat oAtoms ligchn;
     local ligsingle = SingleMol [ligatms];
     if not ligsingle then
         mess = tok_cat [mess, 'Ligand must be a single molecule.'];
     endif
 
     local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms,
-        lonepair, overlap, missextraH, MMtype];
+        lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname];
     mess = tok_cat [mess, ligmess];
 
     if not ligsingle then ligok = 0; endif
 
     local ligchgok = ChargeOK [ligatms, ligchg];
-    oDestroy ligchn;
 
     local intermess = '';
     if overlap then
@@ -1350,10 +1421,17 @@ global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
     local recatmsets = SplitReceptor [recatms];
     local recmolset = app mol_Extract recatmsets;
 
+    oDestroy recchns;
+    oDestroy ligchn;
+    if not MOE_BATCH then
+        SystemPop [osys, nsys];
+    endif
+
     return [recmolset, recok, recchgok, ligok, ligchgok, mess];
 
 endfunction
 
+function qb_ShowLigPoses;
 function qb_UpdateCharge;
 
 /****************************************************************************
@@ -1366,19 +1444,41 @@ function qb_UpdateCharge;
 global function qb_CoreHandler [wkey, trig, status, vals, btasks]
 
     local btid;
-    if trig === 'mode' then
-        UpdateMode [wkey, vals.mode, status];
-
-    elseif trig === 'cwd' then
+    if trig === 'cwd' then
         status.prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir,
             status.prevwd];
 
+    elseif trig === 'mode' then
+        UpdateMode [wkey, vals, status];
+
+    elseif trig === 'allposes' then
+        if neL [vals.mode, 'One-to-Many'] then
+            WindowSetData [wkey, [allposes: 0]];
+            return [status, btasks];
+        endif
+
+        if second task_fork [statics:'share',
+                master: 'parent'] === 'child' then
+            task_prio 0;
+
+            if not qb_ShowLigPoses [vals] then
+                WindowSetData [wkey, [allposes: 0]];
+            endif
+
+            exit [];
+        endif
+
     elseif trig === 'performtests' then
-        if allfalse [vals.testLP, vals.testOverlap, vals.testH,
+        if allfalse [vals.testLP, vals.testOverlap, vals.testHam, vals.testH,
                 vals.testMM] then
             Warning 'No tests selected.';
             return;
         endif
+
+        if vals.allposes then
+            vals = qb_ResetLigand [wkey, vals];
+        endif
+
 
         if second task_fork [master: 'parent',
                 statics:'share'] === 'child' then
@@ -1388,12 +1488,15 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
 
             if neL [vals.mode, 'Many-to-Many'] then
                 [recok, recmess, ligok, ligmess] = TestComplex [
-                    vals.testLP, vals.testOverlap, vals.testH, vals.testMM];
+                    vals.testLP, vals.testOverlap, vals.testHam,
+                    vals.testH, vals.testMM, status.appname,
+                    (HAM_KEYS | status.allowham)(vals.ham)];
             endif
 
             if neL [vals.mode, 'One-to-One'] then
                 TestDBMols [status.dbkey, vals.testLP, vals.testOverlap,
-                    vals.testH, vals.testMM];
+                    vals.testHam, vals.testH, vals.testMM, status.appname,
+                    (HAM_KEYS | status.allowham)(vals.ham)];
             endif
 
             if vals.mode === 'Many-to-Many'then
@@ -1429,11 +1532,15 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
         endif
 
     elseif trig === 'calcchg' then
+        if vals.allposes then
+            vals = qb_ResetLigand [wkey, vals];
+        endif
+
         if second task_fork [master: 'parent',
                 statics:'share'] === 'child' then
             task_prio 0;
 
-            status = qb_UpdateCharge [wkey, status, 1, 1, 1];
+            status = qb_UpdateCharge [wkey, vals, status, 1];
             exit [];
         endif
 
@@ -1447,6 +1554,10 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
         endif
 
     elseif trig === 'recchg' then
+        if vals.allposes then
+            vals = qb_ResetLigand [wkey, vals];
+        endif
+
         if second task_fork [master: 'parent', 
                 statics:'share'] === 'child' then
             task_prio 0;
@@ -1457,6 +1568,10 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
         endif
 
     elseif trig === 'ligchg' then
+        if vals.allposes then
+            vals = qb_ResetLigand [wkey, vals];
+        endif
+
         if second task_fork [master: 'parent',
                 statics:'share'] === 'child' then
             task_prio 0;
@@ -1615,6 +1730,7 @@ endfunction
  *
  ****************************************************************************/
 global function qb_GetCorePanel []
+
     return CORE_PANEL;
 endfunction
 
@@ -1625,6 +1741,7 @@ endfunction
  *
  ****************************************************************************/
 global function qb_GetDefaultsCore []
+
     return dropfirst tag tr CORE_OPT_DEFAULTS;
 endfunction
 
@@ -1635,6 +1752,7 @@ endfunction
  *
  ****************************************************************************/
 global function qb_GetDefaultsStatus []
+
     return tag tr STATUS_DEFAULTS;
 endfunction
 
@@ -1813,6 +1931,8 @@ global function qb_InterMoleculeOverlap [recset, ligset]
     return mess;
 endfunction
 
+function HamSetsInit;
+
 /****************************************************************************
  *
  *                          qb_InitCorePanel
@@ -1822,15 +1942,18 @@ endfunction
  ****************************************************************************/
 global function qb_InitCorePanel [wkey, status, defaults]
 
+    HamSetsInit [];
+
     status.prevwd = defaults.workdir;
     WindowSetData [wkey, dropfirst defaults];
     WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0],
+        allposes: [sensitive: 0],
         recbox: [sensitive: 0], recdb: [allowBlank: 1],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
         poseschg: [sensitive: 0],
         ham: [text: HAMILTONIANS | status.allowham],
         mode: [text: RUN_MODES | status.allowmode]]];
-    status = qb_UpdateCharge [wkey, status, 1, 1, 0];
+    status = qb_UpdateCharge [wkey, defaults, status, 0];
 
     return status;
 endfunction
@@ -1861,6 +1984,16 @@ global function qb_IsModeOneToOne [coreopts]
 
     return coreopts.mode === 'One-to-One';
 endfunction
+
+/****************************************************************************
+ *                          qb_IsShowingAllPoses
+ *
+ ****************************************************************************/
+global function qb_IsShowingAllPoses [coreopts]
+
+    return coreopts.allposes;
+endfunction
+
 
 /****************************************************************************
  *                          qb_LoadCoreScoreDB
@@ -1921,6 +2054,21 @@ global function qb_MergeDB [srcname1, srcname2, dstname]
 endfunction
 
 /****************************************************************************
+ *                          qb_ResetLigand
+ *
+ *  Remove the poses and restore the original ligand.
+ *
+ ****************************************************************************/
+global function qb_ResetLigand [wkey, vals]
+
+    WindowSetData [wkey, [allposes: 0]];
+    vals = tagpoke [vals, 'allposes', 0];
+    qb_ShowLigPoses [vals];
+
+    return vals;
+endfunction
+
+/****************************************************************************
  *                          qb_SaveAnalysisData
  *
  *  Save the analysis results in the database.
@@ -1972,12 +2120,26 @@ global function qb_SaveEnvAnal [dbkey, analopts]
 endfunction
 
 /****************************************************************************
+ *                          qb_SetAppStatus
+ *
+ *  Change the application in the GUI status.
+ *
+ ****************************************************************************/
+global function qb_SetAppStatus [status, which]
+
+    status = tagpoke [status, 'appname', which];
+
+    return status;
+endfunction
+
+/****************************************************************************
  *                          qb_SetHamDefault
  *
  *  Change the allowable hamilitonians in the GUI status.
  *
  ****************************************************************************/
-global function qb_SetHamStatus [defopts, ham]
+global function qb_SetHamDefault [defopts, ham]
+
     defopts = tagpoke [defopts, 'ham', ham];
 
     return defopts;
@@ -1989,8 +2151,8 @@ endfunction
  *  Change the allowable hamilitonians in the GUI status.
  *
  ****************************************************************************/
-global function qb_SetHamStatus [status, mode]
-    status = tagpoke [status, 'allowham', mode];
+global function qb_SetHamStatus [status, which]
+    status = tagpoke [status, 'allowham', which];
 
     return status;
 endfunction
@@ -2001,8 +2163,8 @@ endfunction
  *  Change the allowable modes in the GUI status.
  *
  ****************************************************************************/
-global function qb_SetModeStatus [status, mode]
-    status = tagpoke [status, 'allowmode', mode];
+global function qb_SetModeStatus [status, which]
+    status = tagpoke [status, 'allowmode', which];
 
     return status;
 endfunction
@@ -2040,8 +2202,9 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         if dotests then
             recstsmess = GetStatusMessage ['Receptor', neL [status.recchg, 3]];
             [recok, recmess, ligok, ligmess] = TestComplex [
-                coreopts.testLP, coreopts.testOverlap, coreopts.testH,
-                coreopts.testMM];
+                coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
+                coreopts.testH, coreopts.testMM, status.appname,
+                (HAM_KEYS | status.allowham)(coreopts.ham)];
         endif
 
         if tok_length recmess > 0 then
@@ -2081,7 +2244,9 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
 
         if coreopts.mode === 'One-to-Many' then
             local pmess = CopyPoseDB [dbkey, posekey, coreopts.testLP,
-                coreopts.testOverlap, coreopts.testH, coreopts.testMM,
+                coreopts.testOverlap, coreopts.testHam, coreopts.testH,
+                coreopts.testMM, status.appname,
+                (HAM_KEYS | status.allowham)(coreopts.ham),
                 receptor, recstsmess];
             if neL [pmess, ''] then
                 db_Close posekey;
@@ -2098,8 +2263,9 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
             endif
 
             local rmess = CopyRecPoseDB [dbkey, reckey, posekey, 
-                coreopts.testLP, coreopts.testOverlap, coreopts.testH, 
-                coreopts.testMM];
+                coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
+                coreopts.testH, coreopts.testMM, status.appname,
+                (HAM_KEYS | status.allowham)(coreopts.ham)];
             if neL [rmess, ''] then
                 db_Close reckey;
                 db_Close posekey;
@@ -2115,6 +2281,65 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
     endif
 
     return dbkey;
+endfunction
+
+/****************************************************************************
+ *                          qb_ShowLigPoses
+ *
+ *  Show either the ligand or all poses in the MOE Window.
+ *
+ ****************************************************************************/
+global function qb_ShowLigPoses [vals]
+
+    static ligmol, ligatoms, posemols, poseatoms;
+
+    local errmess;
+    //  If first entry, set up ligmol
+    if ligmol === [] and posemols === [] then
+        [ligatoms, errmess] = qb_GetLigandAtoms [];
+        if ligatoms === [] then
+            Warning errmess;
+            return 0;
+        endif
+
+        ligmol = mol_Extract ligatoms;
+    endif
+
+    if vals.allposes then
+        if ligatoms === [] then
+            return 1;
+        endif
+
+        if posemols === [] and vals.mode === 'One-to-Many' then
+            [posemols, errmess] = qb_GetPoses [vals];
+            if posemols === [] then
+                Warning errmess;
+                return 0;
+            endif
+        endif
+
+        oDestroy uniq oChains ligatoms;
+        ligatoms = [];
+
+        poseatoms = cat oAtoms app mol_Create posemols;
+        oSetCollection ['QB_LIGAND', poseatoms];
+        aSetNucleusLook [poseatoms, 'small-sphere'];
+        aSetBondLook [poseatoms, 'cylinder'];
+    else
+        if poseatoms === [] then
+            return 1;
+        endif
+
+        oDestroy uniq oChains poseatoms;
+        poseatoms = [];
+
+        ligatoms = cat oAtoms mol_Create ligmol;
+        oSetCollection ['QB_LIGAND', ligatoms];
+        aSetNucleusLook [ligatoms, 'small-sphere'];
+        aSetBondLook [ligatoms, 'cylinder'];
+    endif
+
+    return 1;
 endfunction
 
 /****************************************************************************
@@ -2183,9 +2408,9 @@ global function qb_TagCoreVals [vals]
 
     local coreopts = tag [first tr CORE_OPT_DEFAULTS, [
         second first CORE_OPT_DEFAULTS,
-        vals.mode, vals.cwd, vals.workdir,
+        vals.mode, vals.allposes, vals.cwd, vals.workdir,
         vals.scoredb,  vals.recdb, vals.posedb,
-        vals.testLP, vals.testOverlap,
+        vals.testLP, vals.testOverlap, vals.testHam,
         vals.testH, vals.testMM,
         vals.recchg, vals.ligchg, vals.poseschg,
         vals.ham, vals.scaling]];
@@ -2207,8 +2432,8 @@ endfunction
  *  H counts:  ignore amines (MOE treats terminal amines as ammonium cations).
  *
  ****************************************************************************/
-global function qb_TestDivcon [which, atoms, lonepair, overlap, 
-        missextraH, MMtype]
+global function qb_TestDivcon [which, atoms, lonepair, overlap, hamcompat,
+        missextraH, MMtype, appname, hamname]
 
     local warn = 0, error = 0, mess = '';
     local indices, residues, rnames, rnums, anames, ith; 
@@ -2255,6 +2480,21 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap,
                     anames(ith)(2), rnames(ith)(2), rnums(ith)(2)]];
             endloop
 
+            error = 1;
+        endif
+    endif
+
+    //  Look for incompatible atoms for hamiltonian
+    if hamcompat then
+        local badelems = HamCompatability [appname, hamname, atoms];
+        if length badelems > 0 then
+            mess = tok_cat [mess, '    Error!  Incompatible atoms for'
+            ' selected Hamiltonian:\n       '];
+            for ith = 1, length badelems, 1 loop
+                mess = tok_cat [mess, ' ', badelems (ith)];
+            endloop
+
+            mess = tok_cat [mess, '\n'];
             error = 1;
         endif
     endif
@@ -2327,13 +2567,13 @@ endfunction
  *  Update the window based on new charge.
  *
  ****************************************************************************/
-global function qb_UpdateCharge [wkey, status, rec, lig, warn]
+global function qb_UpdateCharge [wkey, vals, status, rec, lig, warn]
 
-    if MOE_BATCH then return [status, 'No MOE Window!']; endif
+    if MOE_BATCH then return status; endif
 
     local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
-    if (rec and (recchg === [] or recok === [])
-            or lig and (ligchg === [] or ligok === [])) then
+    if (recchg === [] or recok === []
+            or (not vals.allposes and (ligchg === [] or ligok === []))) then
         if warn then
             Warning  errmess;
         endif
@@ -2343,11 +2583,11 @@ global function qb_UpdateCharge [wkey, status, rec, lig, warn]
     endif
 
     status.calcchg = 1;
-    if rec then status.moerecchg = recchg; endif
-    if lig then status.moeligchg = ligchg; endif
+    status.moerecchg = recchg;
+    if not vals.allposes then status.moeligchg = ligchg; endif
 
-    if rec then status.recchg = select [2, 3, recok]; endif
-    if lig then status.ligchg = select [2, 3, ligok]; endif
+    status.recchg = select [2, 3, recok];
+    if not vals.allposes then status.ligchg = select [2, 3, ligok]; endif
 
     WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
     SetChargeStatus [wkey, status];
@@ -2367,7 +2607,7 @@ global function qb_UpdateCorePanel [wkey, status, coreopts]
     WindowSetData [wkey, dropfirst coreopts];
     status = CheckCharge [wkey, status, coreopts.recchg, coreopts.ligchg,
         neL [coreopts.mode, 'Many-to-Many']];
-    UpdateMode [wkey, coreopts.mode, status];
+    UpdateMode [wkey, coreopts, status];
     status.prevwd = UpdateCWD [wkey, coreopts.cwd, coreopts.workdir, 
         coreopts.workdir];
 
@@ -2397,7 +2637,8 @@ global function qb_VerifyDivcon [wkey, status, vals]
     status = CheckCharge [wkey, status, vals.recchg, vals.ligchg];
     local recchgok = neL [status.recchg, 3];
     local ligchgok = neL [status.ligchg, 3];
-    local [recok, rm, ligok, lm] = TestComplex [1, 1, 0, 0];
+    local [recok, rm, ligok, lm] = TestComplex [1, 1, 1, 0, 0, status.appname,
+        (HAM_KEYS | status.allowham)(vals.ham)];
 
     if not alltrue [recok, recchgok, ligok, ligchgok] then
         if not alltrue [recok, ligok] then

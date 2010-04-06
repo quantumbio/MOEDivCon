@@ -438,6 +438,8 @@ local function GetAnalData [dbpath, type]
 
 endfunction
 
+function ReadExpActData;
+
 /****************************************************************************
  *                          LoadDB
  *
@@ -458,6 +460,8 @@ local function LoadDB [dbpath]
 
     local pwdopts = qb_GetEnvAnal [dbkey];
     pwdopts = tagcat [pwdopts, tag tr QBPWD_OPT_DEFAULTS];
+
+    ReadExpActData ['~daren/dev/MOEDivcon/data/trypsin-activity-88.txt', dbpath];
 
     return [dbkey, recset, ligand, coreopts, pwdopts];
 
@@ -576,15 +580,7 @@ endfunction
 local function ReadExpActData [expactfn, qmsdbfn]
 
     local qdbkey = db_Open [qmsdbfn, 'read-write'];
-    local eaf = fopenr filename;
-
-    if neL [nEntries qdbkey, length lines] then
-        Warning twrite ['The number of lines in {}\n'
-            'is unequal to the number of entries in {}', expactfn, qmsdbfn];
-        fclose eaf;
-        db_close qdbkey;
-        return;
-    endif
+    local eaf = fopenr expactfn;
 
     db_EnsureField [qdbkey, PWD_EXPACT_HDR, 'double'];
     local rowkey = 0;
@@ -594,7 +590,7 @@ local function ReadExpActData [expactfn, qmsdbfn]
     endloop
 
     fclose eaf;
-    db_close qdbkey;
+    db_Close qdbkey;
 
 endfunction
 
@@ -848,9 +844,9 @@ global function qb_QBPWDSetupPanel []
                     pwdfilename = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull pwdfilename then
+                        pwdfilename = first pwdfilename;
                         local [ldkey, ldrec, ldlig, ldcoreopts, ldpwdopts]
                             = LoadDB [pwdfilename];
-
                         if neL [ldcoreopts.mode, 'Many-to-Many'] then
                             Close [force:1];
                             if neL [ldrec, []] and neL [ldlig, []] then
@@ -867,6 +863,8 @@ global function qb_QBPWDSetupPanel []
                         pwdkey = ldkey;
                         db_Close ldkey;
                         WindowSetData [wkey, ldpwdopts];
+                    else
+                        pwdfilename = '';
                     endif
 
                     exit [];
