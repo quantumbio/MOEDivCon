@@ -1,0 +1,69 @@
+#svl
+//    hamcompat.svl    
+//
+//    Atoms that are compatible with each Hamiltonian implemented
+//    by QuantumBio Divcon.
+
+#set title   'QuantumBio Hamiltonian Compatibility'
+#set class   'QuantumBio'
+#set version '2010.01'
+
+global G_hamsets;
+
+global function HamSetsInit []
+
+G_hamsets = 
+    [
+    nmr:
+        [
+        AM1:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Al', 'Si', 'P',
+            'S', 'Cl', 'K', 'Ca', 'Zn', 'Ge', 'Br', 'I', 'Hg'
+            ],
+        MNDO:
+            [
+            'H', 'C', 'N', 'O', 'P', 'S', 'Cl', 'B', 'F', 'Zn', 'Br'
+            ]
+        ],
+    qms:
+        [
+        AM1:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Al', 'Si', 'P',
+            'S', 'Cl', 'K', 'Ca', 'Zn', 'Ge', 'Br', 'I', 'Hg'
+            ],
+        MNDO:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Al', 'Si', 'P',
+            'S', 'Cl', 'Zn', 'Ge', 'Br', 'Sn', 'I', 'Hg', 'Pb'
+            ],
+        MNDOD:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si',
+            'P', 'S', 'Cl', 'Zn', 'Br', 'Cd', 'I', 'Hg'
+            ],
+        PDDGPM3:
+            [
+            'H', 'C', 'N', 'O', 'F', 'S', 'Cl', 'Br', 'I'
+            ],
+        PM3:
+            [
+            'H', 'Be', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si', 'P', 'S',
+            'Cl', 'K', 'Ca', 'Zn', 'Ga', 'Ge', 'Ar', 'Se', 'Br', 'Cd', 'In',
+            'Sn', 'Sb', 'Te', 'I', 'Hg', 'Tl', 'Pb', 'Bi'
+            ],
+        PM6:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si',
+            'P', 'S', 'Cl', 'K', 'Fe', 'Zn', 'Br', 'Cd', 'I', 'Hg'
+            ],
+        QBM1:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si',
+            'P', 'S', 'Cl', 'K', 'Fe', 'Zn', 'Br', 'Cd', 'I', 'Hg'
+            ]
+        ]
+    ];
+
+endfunction

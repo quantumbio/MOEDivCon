@@ -40,7 +40,7 @@ const HAM_KEYS =
     'AM1',
     'MNDO',
     'MNDOD',
-    'PDDG-PM3',
+    'PDDGPM3',
     'PM3',
     'PM6'
     ];
@@ -59,7 +59,8 @@ global function qb_QMScore [recmol, ligmol, coreopts, appopts]
     //  If there are any errors, return immediately.  Run all error tests.
     local [recmolset, recok, recchgok, ligok, ligchgok, ckmsg]
         = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
-            coreopts.ligchg, 1, 1, coreopts.testH, coreopts.testMM];
+            coreopts.ligchg, 1, 1, 1, coreopts.testH, coreopts.testMM,
+            'qms', HAM_KEYS (coreopts.ham)];
 
     if not alltrue [recok, recchgok, ligok, ligchgok] then
         if not alltrue [recok, ligok] then

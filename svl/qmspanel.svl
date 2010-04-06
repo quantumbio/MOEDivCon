@@ -40,9 +40,12 @@ function qb_GetEnvTag;
 function qb_GetWhich;
 function qb_InitCorePanel;
 function qb_IsModeOneToOne;
+function qb_IsShowingAllPoses;
+function qb_ResetLigand;
 function qb_LoadCoreScoreDB;
 function qb_SaveAnalysisData;//temp
 function qb_SaveDivconStatus;
+function qb_SetAppStatus;
 function qb_SetUpScoreDB;
 function qb_TagCoreVals;
 function qb_UpdateCorePanel;
@@ -453,6 +456,7 @@ global function qb_QMScoreSetupPanel []
 
     local coreopts = [], qmsopts = [], browsetasks = [];
     status = qb_GetDefaultsStatus [];
+    status = qb_SetAppStatus [status, 'qms'];
     local coredflts = qb_GetDefaultsCore [];
     local appdflts = tag tr QMSCORE_OPT_DEFAULTS;
     coredflts = tagpoke [coredflts, 'scoredb', 'qmscore.mdb'];
@@ -500,12 +504,19 @@ global function qb_QMScoreSetupPanel []
         	                View [];
                         endif
 
+write ['LoadKey:  {}  {}\nBefore:  {v}\n', ldkey, db_Filename ldkey, status];//DEBUG
+
                         if status.dbkey > 0 then
                             db_Close status.dbkey;
                             status.dbkey = 0;
                         endif
 
+write ['Closed:  {v}\n', status];//DEBUG
+
                         status.dbkey = ldkey;
+
+write ['After:  {v}\n', status];//DEBUG
+
                         dbv_Open db_Filename status.dbkey;
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
                         WindowSetData [wkey, ldqmropts];
@@ -515,6 +526,10 @@ global function qb_QMScoreSetupPanel []
                 endif
 
             elseif vals.panel === 'Run' then
+
+                if qb_IsShowingAllPoses [vals] then
+                    vals = qb_ResetLigand [wkey, vals];
+                endif
 
                 if second task_fork [statics:'share'] === 'child' then
 
@@ -548,6 +563,10 @@ global function qb_QMScoreSetupPanel []
 
             elseif vals.panel === 'Save' then
 
+                if qb_IsShowingAllPoses [vals] then
+                    vals = qb_ResetLigand [wkey, vals];
+                endif
+
                 if second task_fork [statics:'share'] === 'child' then
 
                     status = qb_VerifyDivcon [wkey, status, vals];
@@ -558,13 +577,20 @@ global function qb_QMScoreSetupPanel []
                         vals.freq, vals.opt, vals.shift,
                         vals.analpwd, vals.trainingset]];
 
+write ['Saved Before:  {}\n', status,debug];//DEBUG
+
                     if status.dbkey > 0 then
                         db_Close status.dbkey;
                         status.dbkey = 0;
                     endif
 
+write ['Save Closed:  {}\n', status.debug];//DEBUG
+
                     status.dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', 1];
+
+write ['Saved Created:  {v}\n', status.debug];//DEBUG
+
 //DEBUG
                     if qmsopts.analpwd then
                         local sardata = ReadHeatMapData [

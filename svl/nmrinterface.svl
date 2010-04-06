@@ -39,11 +39,7 @@ function qb_GetWhich;
 const HAM_KEYS =
     [
     'AM1',
-    'MNDO',
-    'MNDOD',
-    'PDDG-PM3',
-    'PM3',
-    'PM6'
+    'MNDO'
     ];
 
 const GEOM_KEYS =
@@ -76,7 +72,8 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
     //  If there are any errors, return immediately.  Run all tests.
     local [recmolset, recok, recchgok, ligok, ligchgok, ckmsg]
         = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
-            coreopts.ligchg, 1, 1, 1, 1];
+            coreopts.ligchg, 1, 1, 1, coreopts.testH, coreopts.testMM,
+            'nmr', HAM_KEYS (coreopts.ham)];
 
     if not alltrue [recok, recchgok, ligok, ligchgok] then
         if not alltrue [recok, ligok] then
@@ -149,12 +146,12 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
 
     fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
     fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
-    coreopts.scaling === 1]];
-    fwrite [stdin, {c:}\n', GEOM_KEYS(appopts.opt)];
-    fwrite [stdin, {c:}\n', select ['GUESS', 'NOGUESS', appopts.guess]];
-    fwrite [stdin, {n:}\n', length indices];
+        coreopts.scaling === 1]];
+    fwrite [stdin, '{c:}\n', GEOM_KEYS(appopts.opt)];
+    fwrite [stdin, '{c:}\n', select ['GUESS', 'NOGUESS', appopts.guess]];
+    fwrite [stdin, '{n:}\n', length indices];
     for idx = 1, length indices, 1 loop
-        fwrite [stdin, {n:} {n:} {n:}\n', indices (idx), free (idx),
+        fwrite [stdin, '{n:} {n:} {n:}\n', indices (idx), free (idx),
             bound (idx)];
     endloop
 
