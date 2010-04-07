@@ -550,8 +550,8 @@ global function qb_NMRScoreSetupPanel []
     status = qb_SetHamStatus [status, [1,1,0,0,0,0]];
     local coredflts = qb_GetDefaultsCore [];
     coredflts = qb_SetHamDefault [coredflts, 2];
+    coredflts.scoredb = 'nmrscore.mdb';
     local appdflts = tag tr NMRSCORE_OPT_DEFAULTS;
-    coredflts = tagpoke [coredflts, 'scoredb', 'nmrscore.mdb'];
 
     elems = ELEM_TYPES | [appdflts.elemH, appdflts.elemC, appdflts.elemO, 
         appdflts.elemN, appdflts.elemF];;
@@ -626,7 +626,6 @@ atombound = rep [1.050, num];
                 poseatoms = [];
 
                qb_ShowLigPoses [vals];
-
                 status = qb_UpdateCharge [wkey, vals, status, 1];
 
                 WindowSetAttr [wkey, [showcut: [sensitive: 1],
@@ -649,7 +648,7 @@ atombound = rep [1.050, num];
             if second task_fork [statics:'share',
                     master: 'parent'] === 'child' then
 
-                ViewSave 1;
+                ViewSave 2;
                 elems = ELEM_TYPES | [vals.elemH, vals.elemC, vals.elemO, 
                     vals.elemN, vals.elemF];
                 indices = qb_GetElemIndices [ligmol, elems];
@@ -662,7 +661,7 @@ atombound = rep [1.050, num];
                 View ligatoms;
                 [atomfree, atombound] = SetupExpDataPanel [ligatoms, indices,
                     atomfree, atombound];
-                ViewLoad 1;
+                ViewLoad 2;
                 exit [];
             endif
 

@@ -22,6 +22,7 @@ ol  {list-style-type: decimal;}
 ol ol {list-style-type: lower-latin;}
 ol#tocl {list-style-type: upper-roman;}
 ol ol#tocl {list-style-type: upper-latin;}
+ol ol ol#tocl {list-style-type: decimal}
 th.white {font: bold 2.0em Helvetica, sans-serif; color: white}
 th.green {font: bold 2.0em Helvetica, sans-serif; color: green}
 th.yellow {font: bold 2.0em Helvetica, sans-serif; color: yellow}
@@ -55,13 +56,13 @@ QuantumBio Homepage
   data="images/qb_logo.png" type=image/png title="QuantumBio Homepage">
 QuantumBio Homepage
 </object> </a>
-<h1>MOEDivcon QMScore</h1>
+<h1>MOEDivcon Suite</h1>
 <hr>
 
 <h2><a name="ToC"></a>Table of Contents</h2>
 <ol id=tocl>
   <li><a href="#ToC">Table of Contents</a>
-  <li><a href="#intro">QMScore Introduction</a>
+  <li><a href="#intro">Introduction</a>
   <li><a href="#install">Installation</a>
   <li><a href="#start">Getting Started</a>
   <ol id=tocl>
@@ -69,44 +70,79 @@ QuantumBio Homepage
     <li><a href="#start-onetomany">One-to-Many Mode</a>
     <li><a href="#start-manytomany">Many-to-Many Mode</a>
   </ol>
-  <li><a href="#test">Molecule Tests</a>
-  <ol id=tocl>
-    <li><a href="#test-lp">Lone Pairs</a>
-    <li><a href="#test-overlap">Atom Overlap</a>
-    <li><a href="#test-h">Missing/Extra H</a>
-    <li><a href="#test-mm">Undefined MM Atom Type</a>
-  </ol>
-  <li><a href="#charge">Charges</a>
-  <ol id=tocl>
-    <li><a href="#charge-status">Status</a>
-    <li><a href="#charge-onetomany">One-to-Many Mode</a>
-    <li><a href="#charge-manytomany">Many-to-Many Mode</a>
-    <li><a href="#charge-editing">Editing</a>
-  </ol>
-  <li><a href="#load">Load and Save</a>
-  <li><a href="#clean">Postexecution Cleanup</a>
-  <li><a href="#parallel">Batch and Parallel Execution</a>
-  <ol  id=tocl>
-    <li><a href="#parallel-mode">Parallel Mapping Mode</a>
-    <li><a href="#parallel-moebatch">Running Moebatch</a>
-  </ol>
-  <li><a href="#options">Options</a>
-  <ol id=tocl>
-    <li><a href="#options-outdb">Output MOE Database</a>
-    <li><a href="#options-workdir">Working Directory</a>
-    <li><a href="#options-ham">Hamiltonian</a>
-    <li><a href="#options-scaling">Scaling</a>
-    <li><a href="#options-shift">Shift</a>
-    <li><a href="#options-opt">Ligand Optimization</a>
-    <li><a href="#options-freq">Frequency</a>
-  </ol>
-  <li><a href="#heatmap">Heat Map</a>
+  <li><a href='#core'>MOEDivcon Core</a>
+    <ol id=tocl>
+      <li><a href="#test">Molecule Tests</a>
+      <ol id=tocl>
+        <li><a href="#test-lp">Lone Pairs</a>
+        <li><a href="#test-overlap">Atom Overlap</a>
+        <li><a href="#test-hamcompat">Hamiltonian Compatibility</a>
+        <li><a href="#test-h">Missing/Extra H</a>
+        <li><a href="#test-mm">Undefined MM Atom Type</a>
+      </ol>
+      <li><a href="#charge">Charges</a>
+      <ol id=tocl>
+        <li><a href="#charge-status">Status</a>
+        <li><a href="#charge-onetomany">One-to-Many Mode</a>
+        <li><a href="#charge-manytomany">Many-to-Many Mode</a>
+        <li><a href="#charge-editing">Editing</a>
+      </ol>
+      <li><a href="#load">Load and Save</a>
+      <li><a href="#clean">Postexecution Cleanup</a>
+      <li><a href="#parallel">Batch and Parallel Execution</a>
+      <ol  id=tocl>
+        <li><a href="#parallel-mode">Parallel Mapping Mode</a>
+        <li><a href="#parallel-moebatch">Running Moebatch</a>
+      </ol>
+      <li><a href="#options">Options</a>
+      <ol id=tocl>
+        <li><a href="#options-outdb">Output MOE Database</a>
+        <li><a href="#options-workdir">Working Directory</a>
+        <li><a href="#options-ham">Hamiltonian</a>
+        <li><a href="#options-scaling">Scaling</a>
+      </ol>
+    </ol>
+  <li><a href="#nmr">MOEDivcon NMRScore</a>
+    <ol id=tocl>
+      <li><a href="#nmr-intro">Introduction</a>
+      <li><a href=="#nmr-cut">Receptor Cut</a>
+      <li><a href=="#nmr-exp">Experimental Chemical Shift</a>
+      <li><a href="#nmr-opts">Options</a>
+      <ol id=tocl>
+        <li><a href="#nmr-options-opt">Ligand Optimization</a>
+        <li><a href="#nmr-options-guess">Guess</a>
+      </ol>
+      <li><a href="#nmr-results">Results</a>
+    </ol>
+  <li><a href="#qms">MOEDivcon QMScore</a>
+    <ol id=tocl>
+      <li><a href="#qms-intro">Introduction</a>
+      <li><a href="#qms-opts">Options</a>
+      <ol id=tocl>
+        <li><a href="#qms-options-shift">Shift</a>
+        <li><a href="#qms-options-opt">Ligand Optimization</a>
+        <li><a href="#qms-options-freq">Frequency</a>
+      </ol>
+      <li><a href="#qms-results">Results</a>
+    </ol>
+  <li><a href="#pwd">MOEDivcon QB-PWD Analysis</a>
+    <ol id=tocl>
+      <li><a href="#pwd-intro">Introduction</a>
+      <li><a href="#pwd-opts">Options</a>
+      <ol>
+        <li><a href="#pwd-options-shift">Shift</a>
+        <li><a href="#pwd-options-opt">Ligand Optimization</a>
+        <li><a href="#pwd-options-freq">Frequency</a>
+      </ol>
+      <li><a href="#pwd-results">Results</a>
+    </ol>
+  <li><a href="#heatmap">MOEDivcon Heat Map</a>
   <ol id=tocl>
     <li><a href="#heatmap-selection">Selection</a>
     <li><a href="#heatmap-saveprint">Save and Print</a>
     <li><a href="#heatmap-animation">Animation</a>
-    <li><a href="#heatmap-setup">Setup</a>
   </ol>
+
   <li><a href="#trouble">Troubleshooting</a>
   <li><a href="#contact">Support Contact Information</a></ol>
 
