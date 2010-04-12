@@ -436,7 +436,7 @@ endfunction
 global function qb_SaveQMScore [mdbkey, rowkey, scoredata]
 
     if alltrue (QMS_DATA_TAGS === app first scoredata) then
-        db_Write [mdbkey, rowkey, tag [QMS_NUM_FIELDS, 
+        db_Write [mdbkey, rowkey, tag [dropfirst QMS_NUM_FIELDS, 
             dropfirst app second scoredata]];
     endif
 
