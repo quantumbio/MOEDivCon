@@ -127,12 +127,12 @@ const HAMILTONIANS =
 
 const HAM_KEYS =
     [
-    'AM1',
-    'MNDO',
-    'MNDOD',
-    'PDDGPM3',
-    'PM3',
-    'PM6'
+    'am1',
+    'mndo',
+    'mndod',
+    'pddgpm3',
+    'pm3',
+    'pm6'
     ];
 
 const ALG_OPTS =
