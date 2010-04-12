@@ -70,7 +70,6 @@ const CHG_COLOR =
 const STATUS_DEFAULTS =
     [
     ['appname',      ''            ],
-    ['dbkey',        0             ],
     ['allowmode',    [1,1,1]       ],
     ['allowham',     [1,1,1,1,1,1] ],
     ['prevwd',       ''            ],
@@ -659,20 +658,16 @@ function qb_SaveDivconStatus;
  *  Note:  this only checks the receptors and ligands in the molecule fields.
  *
  ****************************************************************************/
-local function CheckChgDBMols [oldkey]
+local function CheckChgDBMols [dbpath]
 
-    if oldkey === 0 then
-        Warning 'The MOEDivcon database hasn\'t been created.';
-        return;
-    endif
+    local dbkey = db_Open [dbpath, 'read-write'];
 
     local dblist = dbv_KeyList [];
-    if isnull dblist or isnull indexof [oldkey, dblist] then
+    if isnull dblist or isnull indexof [dbkey, dblist] then
         Warning 'The MOEDivcon database isn\'t open.';
         return;
     endif
 
-    local dbkey = db_Open [oldkey, 'read-write'];
     local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
     local rowkey = 0;
     local recflds = qb_GetRecFields [dbkey];
@@ -697,7 +692,7 @@ local function CheckChgDBMols [oldkey]
 
         if alltrue [recok, recchgok, ligok, ligchgok] then
             local [oldstatus] = db_ReadFields [dbkey, rowkey, STATUS_FIELD];
-            if not isnull oldstatus then
+            if not isnull findmatch ['*Problematic charge*', token oldstatus] then
                 qb_SaveDivconStatus [dbkey, rowkey,
                     "Charges are compatible with Divcon.\n"];
             endif
@@ -1108,7 +1103,7 @@ endfunction
  *  individual molecules (connected pieces) in the receptor.
  *
  ****************************************************************************/
-local function SplitReceptor [receptoratoms]
+global function SplitReceptor [receptoratoms]
 
     if receptoratoms === [] then return []; endif
 
@@ -1168,23 +1163,18 @@ endfunction
  *  Note:  this only checks the receptors and ligands in the molecule fields.
  *
  ****************************************************************************/
-local function TestDBMols [oldkey, testLP, testOverlap, testHam, testH,
+local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
         testMM, appname, hamname]
 
     if MOE_BATCH then return; endif
 
-    if oldkey === 0 then
-        Warning 'The MOEDivcon database hasn\'t been created.';
-        return;
-    endif
-
+    local dbkey = db_Open [dbpath, 'read-write'];
     local dblist = dbv_KeyList [];
-    if isnull dblist or isnull indexof [oldkey, dblist] then
+    if isnull dblist or isnull indexof [dbkey, dblist] then
         Warning 'The MOEDivcon database isn\'t open.';
         return;
     endif
 
-    local dbkey = db_Open [oldkey, 'read-write'];
     local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
     local rowkey = 0;
     local recflds = qb_GetRecFields [dbkey];
@@ -1230,7 +1220,7 @@ local function TestDBMols [oldkey, testLP, testOverlap, testHam, testH,
             oDestroy recchns;
         endif
 
-        if recok === 2 and ligok === 2 then
+        if recmess === '' and ligmess === '' then
             local [oldstatus] = db_ReadFields [dbkey, rowkey, STATUS_FIELD];
             if not isnull oldstatus then
                 qb_SaveDivconStatus [dbkey, rowkey, "No problems detected.\n"];
@@ -1369,7 +1359,7 @@ endfunction
  *                          qb_CheckChgTestDivconMols
  *
  *  Determine whether the given molecules and their total charges are
- *  problematic for Divcon.  Return the receptor collection separated
+ *  problematic for Divcon.  Return the receptor and ligand chains separated
  *  into individual molecules to be compatible with Divcon's backbone.
  *
  *  Assume that SystemPush [] and SystemPop [] have already been called,
@@ -1378,11 +1368,6 @@ endfunction
  ****************************************************************************/
 global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
         lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname]
-
-    local osys, nsys;
-    if not MOE_BATCH then
-        [osys, nsys] = SystemPush [];
-    endif
 
     local mess = '';
     local recchns = mol_Create recmol;
@@ -1418,15 +1403,9 @@ global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
     endif
 
     local recatmsets = SplitReceptor [recatms];
-    local recmolset = app mol_Extract recatmsets;
+    recchns = app uniq app oChains recatmsets;
 
-    oDestroy recchns;
-    oDestroy ligchn;
-    if not MOE_BATCH then
-        SystemPop [osys, nsys];
-    endif
-
-    return [recmolset, recok, recchgok, ligok, ligchgok, mess];
+    return [recchns, recok, recchgok, ligchn, ligok, ligchgok, mess];
 
 endfunction
 
@@ -1482,6 +1461,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
         if second task_fork [master: 'parent',
                 statics:'share'] === 'child' then
             task_prio 0;
+
             local recok = 1, recmess = '', ligok = 1, ligmess = '';
             local msgkey = Message [0, 'Running tests ...'];
 
@@ -1493,19 +1473,20 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
             endif
 
             if neL [vals.mode, 'One-to-One'] then
-                TestDBMols [status.dbkey, vals.testLP, vals.testOverlap,
+                TestDBMols [vals.scoredb, vals.testLP, vals.testOverlap,
                     vals.testHam, vals.testH, vals.testMM, status.appname,
                     (HAM_KEYS | status.allowham)(vals.ham)];
             endif
 
-            if vals.mode === 'Many-to-Many'then
+            if vals.mode === 'Many-to-Many' then
                 Message [msgkey, 'Running tests ... done.'];
                 sleep 5;
                 exit [];
             else
                 if [recok and ligok and recmess === '' and ligmess === ''] then
                     if vals.mode === 'One-to-One' then
-                        Warning 'No problems detected.';
+                        Warning 'No problems detected\n'
+                            'for complex in MOE Window.';
                         exit [];
                     else
                         Message [msgkey, 'Running tests ... done.'];
@@ -1548,7 +1529,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
                 statics:'share'] === 'child' then
             task_prio 0;
 
-            CheckChgDBMols [status.dbkey];
+            CheckChgDBMols [vals.scoredb];
             exit [];
         endif
 
@@ -1895,7 +1876,6 @@ endfunction
  *  Determine whether atoms in the receptor atoms overlap with the
  *  ligand atoms.
  *
- *
  *  Assumption:  recset was created before ligset in the current system.
  *
  ****************************************************************************/
@@ -2051,6 +2031,67 @@ global function qb_MergeDB [srcname1, srcname2, dstname]
 endfunction
 
 /****************************************************************************
+ *                          qb_PassBackbone
+ *
+ *  Pass the receptor, split into separate molecules, and the ligand down
+ *  to divcon through the given outpipe.
+ *
+ *  Assumption:  recset was created before ligset in the current system.
+ *
+ ****************************************************************************/
+global function qb_PassBackbone [inpipe, outpipe, recchains, ligchain]
+
+    local ligatoms = cat cAtoms ligchain;
+    local recatoms = cat cAtoms recchains;
+    local [ligvdw_r,ligvdw_e] = get [pot_Parm_vdw [ligatoms, ligatoms], [2,3]];
+    local [recvdw_r,recvdw_e] = get [pot_Parm_vdw [recatoms, recatoms], [2,3]];
+
+    local handshake, chain, residue, atom, xyz, idx;
+    xyz = tr aPos recatoms;
+    fwrite [outpipe, '{n:}\n', length recchains];
+    for chain in recchains loop
+        fwrite [outpipe, '{n:}\n', cResidueCount chain];
+        for residue in cat cResidues chain loop
+            fwrite [outpipe, '{c:} {n:} {n:}\n', 
+                rName residue,rUID residue, rAtomCount residue];
+            for atom in cat rAtoms residue loop
+                idx = aNumber atom;
+                fwrite [outpipe, '{c:} {c:} {c:}\n',
+                    aName atom, aElement atom, aMMType atom];
+                fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n',
+                    xyz(idx)(1), xyz(idx)(2), xyz(idx)(3)];
+                fwrite [outpipe, '{n:.4f} {n:.4f}\n',
+                    recvdw_r (idx),recvdw_e (idx)];
+            endloop
+        endloop
+    endloop
+
+    [handshake] = fread [inpipe, '{n:}\n'];
+
+    //  There is only one molecule and one chain in the ligand/poses collection.
+    xyz = tr aPos ligatoms;
+    fwrite [outpipe, '{n:}\n', 1];
+    chain = ligchain;
+    fwrite [outpipe, '{n:}\n', cResidueCount chain];
+    for residue in cat cResidues chain loop
+        fwrite [outpipe, '{c:} {n:} {n:}\n', 
+            rName residue,rUID residue, rAtomCount residue];
+        for atom in cat rAtoms residue loop
+            idx = aNumber atom - length recatoms;
+            fwrite [outpipe, '{c:} {c:} {c:}\n',
+                aName atom, aElement atom, aMMType atom];
+            fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n',
+                xyz(idx)(1), xyz(idx)(2), xyz(idx)(3)];
+            fwrite [outpipe, '{n:.4f} {n:.4f}\n',
+                ligvdw_r (idx),ligvdw_e (idx)];
+        endloop
+    endloop
+
+    [handshake] = fread [inpipe, '{n:}\n'];
+
+endfunction
+
+/****************************************************************************
  *                          qb_ResetLigand
  *
  *  Remove the poses and restore the original ligand.
@@ -2087,7 +2128,6 @@ global function qb_SaveAnalysisData [dbkey, analysis, type, data]
     endif
 
 endfunction
-
 
 /****************************************************************************
  *                          qb_SaveDivconStatus
@@ -2564,7 +2604,7 @@ endfunction
  *  Update the window based on new charge.
  *
  ****************************************************************************/
-global function qb_UpdateCharge [wkey, vals, status, rec, lig, warn]
+global function qb_UpdateCharge [wkey, vals, status, warn]
 
     if MOE_BATCH then return status; endif
 

@@ -377,7 +377,7 @@ global function RunOneToManyCalc [oldkey]
             msgkey = Message [msgkey, 
                 twrite ['QMScore Error on pose {}:\n    {}\n', rowcnt,
                     errmess]];
-            sleep 5;
+            sleep 3;
         else
             qb_SaveQMScore [dbkey, rowkey, results];
             local sucmess = "Success";
@@ -454,7 +454,7 @@ global function qb_QMScoreSetupPanel []
     if MOE_BATCH then return; endif
     if WindowShow ['QMScorePanel', 1] then return; endif
 
-    local coreopts = [], qmsopts = [], browsetasks = [];
+    local coreopts = [], qmsopts = [], browsetasks = [], dbkey = 0;
     status = qb_GetDefaultsStatus [];
     status = qb_SetAppStatus [status, 'qms'];
     local coredflts = qb_GetDefaultsCore [];
@@ -504,20 +504,8 @@ global function qb_QMScoreSetupPanel []
         	                View [];
                         endif
 
-write ['LoadKey:  {}  {}\nBefore:  {v}\n', ldkey, db_Filename ldkey, status];//DEBUG
-
-                        if status.dbkey > 0 then
-                            db_Close status.dbkey;
-                            status.dbkey = 0;
-                        endif
-
-write ['Closed:  {v}\n', status];//DEBUG
-
-                        status.dbkey = ldkey;
-
-write ['After:  {v}\n', status];//DEBUG
-
-                        dbv_Open db_Filename status.dbkey;
+                        dbv_Open db_Filename ldkey;
+                        db_Close ldkey;
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
                         WindowSetData [wkey, ldqmropts];
                     endif
@@ -541,21 +529,17 @@ write ['After:  {v}\n', status];//DEBUG
                         vals.freq, vals.opt, vals.shift,
                         vals.analpwd, vals.trainingset]];
 
-                        if status.dbkey > 0 then
-                            db_Close status.dbkey;
-                            status.dbkey = 0;
-                        endif
-
-                    status.dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
+                    dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
                         [], QMS_NUM_FIELDS, 'qmscore', 0];
 
                     if qb_IsModeOneToOne [coreopts] then
-                        RunCalc [status.dbkey];
+                        RunCalc [dbkey];
                     else
-                        RunOneToManyCalc [status.dbkey];
+                        RunOneToManyCalc [dbkey];
                     endif
 
-                    dbv_Open db_Filename status.dbkey;
+                    dbv_Open db_Filename dbkey;
+                    db_Close dbkey;
                     exit [];
                 else
                     break;
@@ -577,28 +561,18 @@ write ['After:  {v}\n', status];//DEBUG
                         vals.freq, vals.opt, vals.shift,
                         vals.analpwd, vals.trainingset]];
 
-write ['Saved Before:  {}\n', status,debug];//DEBUG
-
-                    if status.dbkey > 0 then
-                        db_Close status.dbkey;
-                        status.dbkey = 0;
-                    endif
-
-write ['Save Closed:  {}\n', status.debug];//DEBUG
-
-                    status.dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
+                    dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', 1];
-
-write ['Saved Created:  {v}\n', status.debug];//DEBUG
 
 //DEBUG
                     if qmsopts.analpwd then
                         local sardata = ReadHeatMapData [
                             '~daren/dev/MOEDivcon/data/trypsin-heatmap-88.csv'];
-                        qb_SaveAnalysisData [status.dbkey, 'pwd', 'sar', sardata];
+                        qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
                     endif
 //DEBUG
-                    dbv_Open db_Filename status.dbkey;
+                    dbv_Open db_Filename dbkey;
+                    db_Close dbkey;
                     exit [];
                 endif
             endif
@@ -607,11 +581,6 @@ write ['Saved Created:  {v}\n', status.debug];//DEBUG
                browsetasks];
         endif
     endloop
-
-    if status.dbkey > 0 then
-        db_Close status.dbkey;
-        status.dbkey = 0;
-    endif
 
     task_kill browsetasks;
     WindowDestroy wkey;
