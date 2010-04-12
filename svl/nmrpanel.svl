@@ -56,6 +56,7 @@ function qb_SetHamDefault;
 function qb_SetModeStatus;
 function qb_SetUpScoreDB;
 function qb_ShowLigPoses;
+function qb_SplitComplex;
 function qb_TagCoreVals;
 function qb_UpdateCharge;
 function qb_UpdateCorePanel;
@@ -365,7 +366,9 @@ local function RunCalc [dbkey]
         endif
     else
         local [score, posevals] = results;
+
 write ['S: {}\nV: {v}\n', score,  posevals];  //DEBUG
+
         qb_SaveNMRScore [dbkey, rowkey, score, tag [names, posevals]];
 
         local sucmess = "Success";
@@ -514,8 +517,9 @@ global function qb_NMRScoreSetupPanel []
 
     static status;                     //  Shared with child tasks.
     static cutrecmol;
-    static origcomplex;
-    static ligmol;
+    static origrecmol;
+    static origligmol;
+    static recatoms;
     static ligatoms;
     static posemols;
     static poseatoms;
@@ -529,15 +533,15 @@ global function qb_NMRScoreSetupPanel []
     if WindowShow ['NMRScorePanel', 1] then return; endif
 
     local errmess;
-    origcomplex = mol_Extract Chains [];
-    cutrecmol = [];
-    [ligatoms, errmess] = qb_GetLigandAtoms [];
-    if ligatoms === [] then
+    [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
+    if recatoms === [] or ligatoms === [] then
         Warning errmess;
         return;
     endif
 
-    ligmol = mol_Extract ligatoms;
+    origrecmol = mol_Extract recatoms;
+    origligmol = mol_Extract ligatoms;
+    cutrecmol = [];
     posemols = [];
     poseatoms = [];
     atomnames = [];
@@ -555,9 +559,9 @@ global function qb_NMRScoreSetupPanel []
 
     elems = ELEM_TYPES | [appdflts.elemH, appdflts.elemC, appdflts.elemO, 
         appdflts.elemN, appdflts.elemF];;
-    indices = qb_GetElemIndices [ligmol, elems];
+    indices = qb_GetElemIndices [origligmol, elems];
 
-    local coreopts = [], nmrsopts = [], browsetasks = [];
+    local coreopts = [], nmrsopts = [], browsetasks = [], dbkey = 0;
     local curatoms = [], curidx = [];
     local indextoks = [];
 
@@ -612,14 +616,14 @@ atombound = rep [1.050, num];
                     master: 'parent'] === 'child' then
                 task_prio 0;
 
-                if origcomplex === [] then
+                if origrecmol === [] or origligmol === [] then
                     Warning 'No original complex.';
                     exit [];
                 endif
 
                 Close [force:1];
-                mol_Create origcomplex;
-                [ligatoms, errmess] = qb_GetLigandAtoms [];
+                mol_Create origrecmol;
+                ligatoms = cat cAtoms mol_Create origligmol;
                 oSetCollection ['QB_LIGAND', ligatoms];
                 aSetNucleusLook [ligatoms, 'small-sphere'];
                 aSetBondLook [ligatoms, 'cylinder'];
@@ -638,7 +642,7 @@ atombound = rep [1.050, num];
         elseif droplast trig === 'elem' then
             elems = ELEM_TYPES | [vals.elemH, vals.elemC, vals.elemO, 
                 vals.elemN, vals.elemF];
-            indices = qb_GetElemIndices [ligmol, elems];
+            indices = qb_GetElemIndices [origligmol, elems];
 
         elseif trig === 'experimental' then
             if qb_IsShowingAllPoses [vals] then
@@ -649,11 +653,13 @@ atombound = rep [1.050, num];
                     master: 'parent'] === 'child' then
 
                 ViewSave 2;
+
                 elems = ELEM_TYPES | [vals.elemH, vals.elemC, vals.elemO, 
                     vals.elemN, vals.elemF];
-                indices = qb_GetElemIndices [ligmol, elems];
-                if ligatoms === [] or indices === [] then
-                    ViewLoad 1;
+                indices = qb_GetElemIndices [origligmol, elems];
+
+                [ligatoms, errmess] = qb_GetLigandAtoms [];
+                if ligatoms === [] then
                     Warning errmess;
                     exit [];
                 endif
@@ -684,22 +690,22 @@ atombound = rep [1.050, num];
                             exit [];
                         endif
 
-                        [ldkey, cutrecmol, ligmol, status, coreopts,
-                            nmrsopts, origcomplex, indices, atomnames,
-                            atomfree, atombound] = LoadDB [dbpath];
+                        [ldkey, cutrecmol, origligmol, status, coreopts,
+                            nmrsopts, [origrecmol, origligmol], indices,
+                            atomnames, atomfree, atombound] = LoadDB [dbpath];
 
                         Close [force:1];
                         if neL [cutrecmol, []] then
                             wascut = 1;
                             mol_Create cutrecmol;
-                            ligatoms = cat oAtoms mol_Create ligmol;
+                            ligatoms = cat oAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
                             aSetNucleusLook [ligatoms, 'small-sphere'];
                             aSetBondLook [ligatoms, 'cylinder'];
                         else
                             wascut = 0;
-                            mol_Create origcomplex;
-                            [ligatoms, errmess] = qb_GetLigandAtoms [];
+                            mol_Create origrecmol;
+                            ligatoms = cat cAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
                             aSetNucleusLook [ligatoms, 'small-sphere'];
                             aSetBondLook [ligatoms, 'cylinder'];
@@ -707,15 +713,10 @@ atombound = rep [1.050, num];
 
                         poseatoms = [];
                         posemols = [];
-                        qb_ShowLigPoses [nmrsopts];
+                        qb_ShowLigPoses [coreopts];
 
-                        if status.dbkey > 0 then
-                            db_Close status.dbkey;
-                            status.dbkey = 0;
-                        endif
-
-                        status = tagpoke [status, 'dbkey', ldkey];
-                        dbv_Open db_Filename status.dbkey;
+                        dbv_Open db_Filename ldkey;
+                        db_Close ldkey;
                         status = qb_UpdateCorePanel [wkey, status, coreopts];
                         WindowSetAttr [wkey,
                             [showcut: [sensitive: not wascut],
@@ -751,21 +752,23 @@ atombound = rep [1.050, num];
                         vals.radius]];
 
                     //  Make sure atom names are unique for DB fields.
+                    [ligatoms, errmess] = qb_GetLigandAtoms [];
+                    if ligatoms === [] then
+                        Warning errmess;
+                        exit [];
+                    endif
+
                     atomnames = get [aName ligatoms, indices];
                     indextoks = totok indices;
                     atomnames = tok_cat [indextoks, '-', atomnames];
-                    if status.dbkey > 0 then
-                        db_Close status.dbkey;
-                        status.dbkey = 0;
-                    endif
-
-                    status.dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
-                        origcomplex, cat [NMR_NUM_FIELDS, atomnames],
-                        'nmrscore', 0];
-                    qb_SaveAnalysisData [status.dbkey, 'nmr', 'exp',
+                    dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
+                        [origrecmol, origligmol],
+                        cat [NMR_NUM_FIELDS, atomnames], 'nmrscore', 0];
+                    qb_SaveAnalysisData [dbkey, 'nmr', 'exp',
                         [indices, atomnames, atomfree, atombound]];
-                    RunCalc [status.dbkey, indices, atomnames];
-                    dbv_Open db_Filename status.dbkey;
+                    RunCalc [dbkey, indices, atomnames];
+                    dbv_Open db_Filename dbkey;
+                    db_Close dbkey;
                     exit [];
                 else
                     break;
@@ -794,20 +797,22 @@ atombound = rep [1.050, num];
                         vals.radius]];
 
                     //  Make sure atom names are unique for DB fields.
+                    [ligatoms, errmess] = qb_GetLigandAtoms [];
+                    if ligatoms === [] then
+                        Warning errmess;
+                        exit [];
+                    endif
+
                     atomnames = get [aName ligatoms, indices];
                     indextoks = totok indices;
                     atomnames = tok_cat [indextoks, '-', atomnames];
-                    if status.dbkey > 0 then
-                        db_Close status.dbkey;
-                        status.dbkey = 0;
-                    endif
-
-                    status.dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
-                        origcomplex, cat [NMR_NUM_FIELDS, atomnames],
-                        'nmrscore', 1];
-                    qb_SaveAnalysisData [status.dbkey, 'nmr', 'exp',
+                    dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
+                        [origrecmol, origligmol],
+                        cat [NMR_NUM_FIELDS, atomnames], 'nmrscore', 1];
+                    qb_SaveAnalysisData [dbkey, 'nmr', 'exp',
                         [indices, atomnames, atomfree, atombound]];
-                    dbv_Open db_Filename status.dbkey;
+                    dbv_Open db_Filename dbkey;
+                    db_Close dbkey;
                     exit [];
                 endif
             endif
@@ -816,11 +821,6 @@ atombound = rep [1.050, num];
                browsetasks];
         endif
     endloop
-
-    if status.dbkey > 0 then
-        db_Close status.dbkey;
-        status.dbkey = 0;
-    endif
 
     task_kill browsetasks;
     WindowDestroy wkey;

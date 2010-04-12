@@ -30,6 +30,7 @@
 function qb_CheckChgTestDivconMols;
 function qb_GetElemIndices;
 function qb_GetWhich;
+function qb_PassBackbone;
 
 /*  NOTE:  If you change the key lists here, you need to update the
  *         option lists and default indices in qbcore.svl and nmrpanel.svl.
@@ -67,10 +68,13 @@ const ELEM_TYPES =
 global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
         indices, free, bound]
 
-    local errmess = "";
+    local osys, nsys, errmess = "";
+    if not MOE_BATCH then
+        [osys, nsys] = SystemPush [];
+    endif
 
     //  If there are any errors, return immediately.  Run all tests.
-    local [recmolset, recok, recchgok, ligok, ligchgok, ckmsg]
+    local [recchains, recok, recchgok, ligchain, ligok, ligchgok, ckmsg]
         = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
             coreopts.ligchg, 1, 1, 1, coreopts.testH, coreopts.testMM,
             'nmr', HAM_KEYS (coreopts.ham)];
@@ -93,6 +97,12 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
                 qb_GetWhich [not recchgok, not ligchgok]]];
         endif
 
+        oDestroy recchains;
+        oDestroy ligchain;
+        if not MOE_BATCH then
+            SystemPop [osys, nsys];
+        endif
+
         return [[], errmess];
     endif
 
@@ -111,6 +121,13 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
         if okay === -1 then
             errmess = cat [swrite ['Unable to create subdirectory:  {}',
                 subdirname], errmess];
+
+            oDestroy recchains;
+            oDestroy ligchain;
+            if not MOE_BATCH then
+                SystemPop [osys, nsys];
+            endif
+
             return [[], errmess];
         endif
     endif
@@ -122,6 +139,13 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
     if not alltrue eqE [indices, poseidxs] then
         errmess = cat [swrite ['Skipping!  Atom indices are inconsistent:\n'
             '    Orig: {v}\n    Pose: {v}\n', indices, poseidxs], errmess];
+
+        oDestroy recchains;
+        oDestroy ligchain;
+        if not MOE_BATCH then
+            SystemPop [osys, nsys];
+        endif
+
         return [[], errmess];
     endif
  
@@ -142,7 +166,7 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
     //  SplitReceptor ensures that there is only one chain per molecule
     //  in the receptor collection.
 
-    local idx, retValue, success = 0;
+    local idx, success = 0;
 
     fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
     fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
@@ -155,59 +179,16 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
             bound (idx)];
     endloop
 
-    local mol, molIndex, residueIndex, residueCount, atomIndex, atomCount;
-    local molCount = length recmolset;
     fwrite [stdin, '{n:}\n', coreopts.recchg];
-    fwrite [stdin, '{n:}\n', molCount];
-    for molIndex = 1, molCount, 1 loop
-        mol = recmolset(molIndex);
-        atomIndex = 1;
-        residueCount = mol(2)(MOL_CHAIN_NRES)(1);
-        fwrite [stdin, '{n:}\n', residueCount];
-        for residueIndex = 1, residueCount, 1 loop
-            atomCount = mol(3)(MOL_RES_NATOMS)(residueIndex);
-            fwrite [stdin, '{c:} {n:} {n:}\n',
-                mol(3)(MOL_RES_NAME)(residueIndex),
-                mol(3)(MOL_RES_UID)(residueIndex), atomCount];
-           for atomCount loop
-                fwrite [stdin, '{c:} {c:}\n',
-                    mol(4)(MOL_ATOM_NAME)(atomIndex),
-                    mol(4)(MOL_ATOM_EL)(atomIndex)];
-                fwrite [stdin, '{n:.4f} {n:.4f} {n:.4f}\n',
-                    mol(4)(MOL_ATOM_X)(atomIndex),
-                    mol(4)(MOL_ATOM_Y)(atomIndex),
-                    mol(4)(MOL_ATOM_Z)(atomIndex)];
-                atomIndex = atomIndex + 1;
-            endloop
-        endloop
-    endloop
-
-    [retValue] = fread [stdout, '{n:}\n'];
-
-    //  There is only one ligand molecule.
     fwrite [stdin, '{n:}\n', coreopts.ligchg];
-    fwrite [stdin, '{n:}\n', 1];
-    mol = ligmol;
-    atomIndex = 1;
-    residueCount = mol(2)(MOL_CHAIN_NRES)(1);
-    fwrite [stdin, '{n:}\n', residueCount];
-    for residueIndex = 1, residueCount, 1 loop
-        atomCount = mol(3)(MOL_RES_NATOMS)(residueIndex);
-        fwrite [stdin, '{c:} {n:} {n:}\n', mol(3)(MOL_RES_NAME)(residueIndex),
-            mol(3)(MOL_RES_UID)(residueIndex), atomCount];
-        for  atomCount loop
-            fwrite [stdin, '{c:} {c:}\n',
-                mol(4)(MOL_ATOM_NAME)(atomIndex),
-                mol(4)(MOL_ATOM_EL)(atomIndex)];
-            fwrite [stdin, '{n:.4f} {n:.4f} {n:.4f}\n',
-                mol(4)(MOL_ATOM_X)(atomIndex),
-                mol(4)(MOL_ATOM_Y)(atomIndex),
-                mol(4)(MOL_ATOM_Z)(atomIndex)];
-            atomIndex = atomIndex + 1;
-        endloop
-    endloop
 
-    [retValue] = fread [stdout, '{n:}\n'];
+    qb_PassBackbone [stdout, stdin, recchains, ligchain];
+
+    oDestroy recchains;
+    oDestroy ligchain;
+    if not MOE_BATCH then
+        SystemPop [osys, nsys];
+    endif
 
     //    results has the format:  [nmrscore, [V1, V2, ... , Vn]]
     local results = [], return_statement;
