@@ -39,8 +39,8 @@ function qb_PassBackbone;
 
 const HAM_KEYS =
     [
-    'AM1',
-    'MNDO'
+    'am1_nmr',
+    'mndo_nmr'
     ];
 
 const GEOM_KEYS =
