@@ -1,0 +1,121 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information,
+ including trade secrets, belonging to QuantumBio Inc. and/or its
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly
+ prohibited without prior written authorization by the management of
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif
+
+#set title   'QuantumBio Analysis Interface'
+#set class   'QuantumBio'
+#set version '2010.02'
+#set main 'qb_Analysis'
+
+global function qb_Analysis []
+
+local errmess = "";
+
+
+local scorepath = './divcon.h5';
+scorepath = fbase scorepath;
+scorepath = twrite ['{}.h5', scorepath];
+
+//  exe_open child process inherits parent's environment.
+local process_key = exe_open ['moedivconanalysis', '.', [], 1];
+local process_keys = [process_key];
+local status = exe_status process_keys;
+
+local prios = exe_getpriority process_keys;
+exe_setpriority [process_keys, prios];
+
+local stdin = exe_stdin process_keys;
+local stdout = exe_stdout process_keys;
+
+//  Pass the target ligand pairs to QuantumBio's Divcon QSAR Analysis
+//
+
+local retValue, success = 0;
+local pairCount = 5;
+local molIndex;
+local targets = ['trypsin1', 'trypsin2', 'trypsin3', 'trypsin4', 'trypsin5'];
+local ligands = ['ligand1', 'ligand2', 'ligand3', 'ligand4', 'ligand5'];
+fwrite [stdin, '{c:}\n', 'sar'];
+fwrite [stdin, '{c:}\n', scorepath];
+fwrite [stdin, '{n:}\n', pairCount];
+for molIndex = 1, pairCount, 1 loop
+    fwrite [stdin, '{c:}\n', targets[molIndex]];
+    fwrite [stdin, '{c:}\n', ligands[molIndex]];
+endloop
+
+[retValue] = fread [stdout, '{n:}\n'];
+print retValue;
+print exe_status   process_keys;
+
+const NUMRESULTS = 11;
+local results, return_statement;
+local sleep_time = -1;
+local divconerrmess = "";
+while exe_status process_key loop
+    if not MOE_BATCH then
+        sleep sleep_time;
+    endif
+
+    [[return_statement]] = fread [stdout, '{c:*}'];
+
+    write ['Divcon: {}\n', return_statement];//DEBUG
+
+    if return_statement === "updateanalysis" then
+        local name, nameValue;
+        local parameter, parameterValue;
+/*        [[name]] = fread [stdout, '{c:*}'];
+        [[nameValue]] = fread [stdout, '{c:*}'];
+        results = cat [results, [[name, nameValue]]];
+        for NUMRESULTS loop
+            [[parameter]] = fread [stdout, '{c:*}'];
+            [[parameterValue]] = fread [stdout, '{n:}'];
+            results = cat [results, [[parameter, parameterValue]]];
+        endloop
+*/
+        success = 1;
+        fwrite [stdin, '{c:}\n', 'Ok'];
+
+    elseif return_statement === "QBException" then
+        [[return_statement]] = fread [stdout, '{c:*}'];
+        if neL [return_statement, "Analysis done."] then
+            divconerrmess = cat [divconerrmess, return_statement];
+            [[return_statement]] = fread [stdout, '{c:*}'];
+        endif
+        while neL [return_statement, "Analysis done."] loop
+            divconerrmess = cat [divconerrmess, "\n", return_statement];
+            [[return_statement]] = fread [stdout, '{c:*}'];
+        endloop;
+        fwrite [stdin, '{c:}\n', 'Ok'];
+    endif
+endloop
+
+print exe_status   process_keys;
+
+exe_kill  [process_key, 0];
+exe_kill  process_key;
+exe_close process_keys;
+
+endfunction
+
+local function main [] = qb_Analysis [];
+
