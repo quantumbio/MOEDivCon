@@ -137,6 +137,7 @@ global function qb_QMScoreBatch [dbpath]
 
     if qmsopts.analpwd then
     //TODO:  perform analysis
+
 write ['Training set:  {}\n', qmsopts.trainingset];//DEBUG
 
     //TODO:  save analysis results
