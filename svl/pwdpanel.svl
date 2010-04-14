@@ -49,21 +49,33 @@ const MAT_TRANS_MIN = 0x80;
 const QBPWD_OPT_DEFAULTS =
     [
     ['analysis',     1             ],
-    ['cutoff',       1             ],
-    ['sigma',        2.0           ],
-    ['mapncolors',  15             ],
-    ['mapmono',      1             ],
-    ['mapnticks',    5             ]
+    ['sf-e-ab',      1             ],
+    ['sf-e-abp',     0             ],
+    ['sf-e-abc',     0             ],
+    ['sf-e-vdw',     0             ],
+    ['sf-e-r6',      0             ],
+    ['sf-e-r12'      0             ],
+    ['sf-e-ele',     0             ],
+    ['trainingset',  0             ],
+    ['numcomps',     10            ],
+    ['numscramble',  10            ],
+    ['optLV',        0             ],
+    ['optLVval',     0             ],
+    ['prune-zero',   0.95          ],
+    ['prune-sd',     0.05          ],
+    ['numtopres',    25            ]
     ];
 
 const ANALYSIS =
     [
+    'PLS Results',
     'SAR',
     'Interaction'
     ];
 
 const ANALKEYS =
     [
+    'pls',
     'sar',
     'inter'
     ];
@@ -86,6 +98,26 @@ const PANEL =
         [
         Hbox :
             [
+            Text :
+                [
+                name: 'trainingset', title: 'Training set size:',
+                len: 5, extendH: 0, 
+                type: 'int', allowBlank: 0,
+                bubbleHelp:
+                    'Size of the training set (the first N\n'
+                    'receptors and/or ligands are treated\n'
+                    'as the training set during PLS analysis.'
+                ]
+            ]
+        ],
+
+        
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
+    Vbox :
+        [
+        Hbox :
+            [
             extendH: 1,
             Option :
                 [
@@ -93,75 +125,35 @@ const PANEL =
                 type: 'int', minWidth: 8,
                 bubbleHelp:
                     ''
-                ]
-            ]
-        ],
-
-    Separator : [flushLeft:1, extendH:1, margin:1],
-
-    Vbox :
-        [
-        title: 'Heat Map:     ',
-        Hbox :
-            [
-            extendH: 1,
-            Vbox :
-                [
-                Checkbox :
-                    [
-                    name: 'cutoff', text: 'Cutoff', onTrigger: 'return',
-                    bubbleHelp:
-                        'Determine minimum and maximum cuts using the\n'
-                        'standard deviation of a subset of the map data.\n'
-                        'Otherwise, use absolute minimum and maximum.'
-                    ],
-                Text :
-                    [
-                    name: 'sigma', len: 7, extendH: 1,
-                    title: 'Number of sigmas:',
-                    type: 'real', allowBlank: 0,
-                    shortcut: ['1.0', '2.0', '3.0', '4.0', '5.0', '6.0'],
-                    bubbleHelp: 'Number of standard deviations used to\n'
-                        'calculate the minimum and maximum cutoffs.'
-                    ]
                 ],
             Separator : 
                 [
                 vertical:0, shadow:'noline', extendH: 0, margin:1
                 ],
-            Vbox :
+            Button :
                 [
-                Hbox :
-                    [
-                    Text :
-                        [
-                        name: 'mapncolors', len: 7, extendH: 1, 
-                        title: 'Number of colors:',
-                        type: 'int', allowBlank: 0,
-                        shortcut: ['3', '7', '15', '31'],
-                        bubbleHelp: 'Number of distinct colors.'
-                        ],
-                    Separator : 
-                        [
-                        vertical:0, shadow:'noline', extendH: 0, margin:1
-                        ],
-                    Checkbox :
-                        [
-                        name: 'mapmono', text: 'Monochromatic',
-                        bubbleHelp:
-                            'Use a monochrome color scheme.'
-                        ]
-                    ],
-                Text :
-                    [
-                    name: 'mapnticks', len: 7, extendH: 1, 
-                    title: 'Number of ticks:',
-                    type: 'int', allowBlank: 0,
-                    shortcut: ['3', '5', '7', '9'],
-                    bubbleHelp: 'Number of labeled ticks on color scale.'
-                    ]
+                name: 'analview', text: 'View',
+                bubbleHelp:
+                    'View the analytic results (table or heat map).'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Button :
+                [
+                name: 'analsave', text: 'Save',
+                bubbleHelp:
+                    'Save the analytic results in a csv file.'
                 ]
             ]
+        ],
+        
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
+    Vbox :
+        [
+        title: 'Heat Map:     ',
         ],
 
     Separator : [flushLeft:1, extendH:1, margin:1]
