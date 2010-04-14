@@ -97,8 +97,8 @@ const QMSCORE_OPT_DEFAULTS =
     ['freq',         0             ],
     ['opt',          1             ],
     ['shift',        0.0           ],
-    ['analpwd',      0             ],      //  Analysis
-    ['trainingset',  0             ]
+    ['analpwd',      0             ]       //  Generate PWD row data
+
     ];
 
 const LIG_OPTS =
@@ -186,16 +186,6 @@ const PANEL =
             [
             vertical:0, shadow:'noline', extendH: 1, margin:1
             ],
-        Text :
-            [
-            name: 'trainingset', title: 'Training set size:',
-            len: 20, extendH: 0, 
-            type: 'int', allowBlank: 0,
-            bubbleHelp:
-                'Size of the training set (the first N\n'
-                'receptors and/or ligands are treated\n'
-                'as the training set during analysis.'
-            ]
         ],
 
     Separator : [flushLeft:1, extendH:1, margin:1]
@@ -394,21 +384,6 @@ global function RunOneToManyCalc [oldkey]
 
 endfunction
 
-/****************************************************************************
- *                          UpdatePWD
- *
- *  Update the window based on new PWD value.
- *
- ****************************************************************************/
-local function UpdatePWD [wkey, pwd]
-
-    if pwd === 0 then
-        WindowSetAttr [wkey, [trainingset: [sensitive: 0, allowBlank: 1]]];
-    else
-        WindowSetAttr [wkey, [trainingset: [sensitive: 1, allowBlank: 0]]];
-    endif
-endfunction
-
 
 //  Global Functions
 
@@ -527,7 +502,7 @@ global function qb_QMScoreSetupPanel []
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.freq, vals.opt, vals.shift,
-                        vals.analpwd, vals.trainingset]];
+                        vals.analpwd]];
 
                     dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
                         [], QMS_NUM_FIELDS, 'qmscore', 0];
@@ -559,7 +534,7 @@ global function qb_QMScoreSetupPanel []
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
                         vals.freq, vals.opt, vals.shift,
-                        vals.analpwd, vals.trainingset]];
+                        vals.analpwd]];
 
                     dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', 1];
