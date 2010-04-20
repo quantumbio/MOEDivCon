@@ -43,7 +43,6 @@ function qb_IsModeOneToOne;
 function qb_IsShowingAllPoses;
 function qb_ResetLigand;
 function qb_LoadCoreScoreDB;
-function qb_SaveAnalysisData;//temp
 function qb_SaveDivconStatus;
 function qb_SetAppStatus;
 function qb_SetUpScoreDB;
@@ -177,7 +176,6 @@ const PANEL =
         Checkbox :
             [
             name: 'analpwd', text: 'PWD', title: 'Analysis:',
-            onTrigger: 'return',
             bubbleHelp:
                 'Perform pair-wise decomposition analysis\n'
                 'after the QMScore calculations.'
@@ -185,7 +183,7 @@ const PANEL =
         Separator : 
             [
             vertical:0, shadow:'noline', extendH: 1, margin:1
-            ],
+            ]
         ],
 
     Separator : [flushLeft:1, extendH:1, margin:1]
@@ -216,37 +214,6 @@ endfunction
 
 function qb_GetQMSEnv;
 function qb_SaveQMScore;
-
-/****************************************************************************
- *
- *                          ReadHeatMapData
- *
- *  Return data formatted for the heat map.
- *
- ****************************************************************************/
-local function ReadHeatMapData [filename]
-
-    local f = fopenr filename;
-    local lines = freadb [f, 'line', INT_MAX];
-    local line = first lines;
-    local strings = wordsplit [line, ","];
-    local resnames = app token strings;
-    lines = dropfirst lines;
-
-    //  ligand labels and values
-    local ligdata = [];
-    for line in lines loop
-        strings = wordsplit [line, ","];
-        local ligname = token first strings;
-        strings = dropfirst strings;
-        local ligvals = atof app token strings;
-        ligdata = append [ligdata, [ligname, ligvals]];
-    endloop
-
-    fclose f;
-
-    return [resnames, ligdata];
-endfunction
 
 /****************************************************************************
  *                          RunCalc
@@ -438,16 +405,12 @@ global function qb_QMScoreSetupPanel []
 
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
-    UpdatePWD [wkey, appdflts.analpwd];
     WindowSetData [wkey, appdflts];
     WindowShow [wkey, 1];
 
     loop
         local [vals, trig] = WindowWait wkey;
-        if trig === 'analpwd' then
-            UpdatePWD [wkey, vals.analpwd];
-
-       elseif trig === 'panel' then
+        if trig === 'panel' then
             if vals.panel === 'Close' then 
                 break;
 
@@ -539,13 +502,6 @@ global function qb_QMScoreSetupPanel []
                     dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', 1];
 
-//DEBUG
-                    if qmsopts.analpwd then
-                        local sardata = ReadHeatMapData [
-                            '~daren/dev/MOEDivcon/data/trypsin-heatmap-88.csv'];
-                        qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
-                    endif
-//DEBUG
                     dbv_Open db_Filename dbkey;
                     db_Close dbkey;
                     exit [];

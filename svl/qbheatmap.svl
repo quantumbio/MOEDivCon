@@ -181,62 +181,61 @@ const PANEL =
         Hbox :
             [
             extendH: 1,
-            Vbox :
+            Checkbox :
                 [
-                Checkbox :
-                    [
-                    name: 'cutoff', text: 'Cutoff', onTrigger: 'return',
-                    bubbleHelp:
-                        'Determine minimum and maximum cuts using the\n'
-                        'standard deviation of a subset of the map data.\n'
-                        'Otherwise, use absolute minimum and maximum.'
-                    ],
-                Text :
-                    [
-                    name: 'sigma', len: 7, extendH: 1,
-                    title: 'Number of sigmas:',
-                    type: 'real', allowBlank: 0,
-                    shortcut: ['1.0', '2.0', '3.0', '4.0', '5.0', '6.0'],
-                    bubbleHelp: 'Number of standard deviations used to\n'
-                        'calculate the minimum and maximum cutoffs.'
-                    ]
+                name: 'cutoff', text: 'Cutoff', onTrigger: 'return',
+                bubbleHelp:
+                    'Determine minimum and maximum cuts using the\n'
+                    'standard deviation of a subset of the map data.\n'
+                    'Otherwise, use absolute minimum and maximum.'
                 ],
             Separator : 
                 [
                 vertical:0, shadow:'noline', extendH: 0, margin:1
                 ],
-            Vbox :
+            Text :
                 [
-                Hbox :
-                    [
-                    Text :
-                        [
-                        name: 'mapncolors', len: 7, extendH: 1, 
-                        title: 'Number of colors:',
-                        type: 'int', allowBlank: 0,
-                        shortcut: ['3', '7', '15', '31'],
-                        bubbleHelp: 'Number of distinct colors.'
-                        ],
-                    Separator : 
-                        [
-                        vertical:0, shadow:'noline', extendH: 0, margin:1
-                        ],
-                    Checkbox :
-                        [
-                        name: 'mapmono', text: 'Monochromatic',
-                        bubbleHelp:
-                            'Use a monochrome color scheme.'
-                        ]
-                    ],
-                Text :
-                    [
-                    name: 'mapnticks', len: 7, extendH: 1, 
-                    title: 'Number of ticks:',
-                    type: 'int', allowBlank: 0,
-                    shortcut: ['3', '5', '7', '9'],
-                    bubbleHelp: 'Number of labeled ticks on color scale.'
-                    ]
+                name: 'sigma', len: 7,
+                title: 'Number of sigmas:',
+                type: 'real', allowBlank: 0,
+                shortcut: ['1.0', '2.0', '3.0', '4.0', '5.0', '6.0'],
+                bubbleHelp: 'Number of standard deviations used to\n'
+                    'calculate the minimum and maximum cutoffs.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Text :
+                [
+                name: 'ncolors', len: 7,
+                title: 'Number of colors:',
+                type: 'int', allowBlank: 0,
+                shortcut: ['3', '7', '15', '31'],
+                bubbleHelp: 'Number of distinct colors.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Checkbox :
+                [
+                name: 'mono', text: 'Monochromatic',
+                bubbleHelp:
+                    'Use a monochrome color scheme.'
+                ],
+            Text :
+                [
+                name: 'nticks', len: 7,
+                title: 'Number of ticks:',
+                type: 'int', allowBlank: 0,
+                shortcut: ['3', '5', '7', '9'],
+                bubbleHelp: 'Number of labeled ticks on color scale.'
                 ]
+            ],
+        Separator : 
+            [
+            vertical:1, shadow:'noline', extendV: 0, margin:1
             ]
         ]
     ];
@@ -356,12 +355,6 @@ local function CalculateMinMax [data, num]
 
     local rowdata = data (DATA_ROWDATA);
     local numbers = cat app third rowdata;
-/*
-    for row in rowdata loop
-        numbers = cat [numbers, keep [third row, cols]];
-    endloop
-*/
-
     local minnum = min numbers;
     local maxnum = max numbers;
 
@@ -585,9 +578,6 @@ local function DrawMap [data, numrows, numcols, mincut, maxcut, colors, ticks]
 
     local csstep = tcs_h / (ticks - 1);
     local delta = (maxcut - mincut) / (ticks - 1);
-
-write ['csw {}, csh {}, tcsw {}, tcsh {}, csx {}, cxy {}\nstep {}, delta {}\n', 
-cs_w, cs_h, tcs_w, tcs_h, cs_x, cs_y, csstep, delta];//DEBUG
 
 
     for ith = 0, ticks - 1, 1 loop
@@ -967,7 +957,8 @@ endfunction
  *  Redraw the Heat Map and Scale with new parameters.  
  *
  ****************************************************************************/
-local function RedrawMapScale [data, opts, numsignifcols]
+local function RedrawMapScale [data, opts, numsignifcols, mincut, maxcut,
+        colors]
 
     static prevcutoff, prevsigma, prevncolors, prevmono, prevnticks;
 
@@ -979,38 +970,10 @@ local function RedrawMapScale [data, opts, numsignifcols]
     elseif anytrue neE [[prevcutoff, prevsigma, prevncolors, prevmono],
         [opts.cutoff, opts.sigma, opts.ncolors, opts.mono]] then
         drawmap = 1; drawscale = 1;
-    elseif neL [prevnticks, vals.nticks] then
+    elseif neL [prevnticks, opts.nticks] then
         drawscale = 1;
     else
-        return [newmap, newscale];
-    endif
-
-    local mincut, maxcut, errmess;
-    if cutoff then
-        [mincut, maxcut, errmess] = CalculateCuts [data, opts.sigma, 
-            numsignifcols, opts.ncolors];
-        if mincut === [] or maxcut === [] then
-            Warning errmess;
-            return  [newmap, newscale];
-        endif
-    else
-        [mincut, maxcut, errmess] = CalculateMinMax [data, opts.ncolors];
-        if mincut === [] or maxcut === [] then
-            Warning errmess;
-            return  [newmap, newscale];
-        endif
-    endif
-
-    local colors;
-    if monochrome then
-        [colors, errmess] = GetMonoColors [mincut, maxcut, opts.ncolors];
-    else
-        [colors, errmess] = GetColors [mincut, maxcut, opts.ncolors];
-    endif
-
-    if colors === [] then
-        Warning errmess;
-        return [newmap, newscale];
+        return [newmap, newscale, mincut, maxcut, colors];
     endif
 
     local [titles, colnames, colabbrevs, rowdata] = data;
@@ -1018,16 +981,35 @@ local function RedrawMapScale [data, opts, numsignifcols]
     local numrows = length rowdata;
     local page_w = (numcols + 1) * (CELL_WD + MOE_PAD_W) + MOE_PAD_W;
     local page_h = (numrows + 1) * (CELL_HT + MOE_PAD_H) + MOE_PAD_H;
-
-    if drawscale then
-        local scalecell_h = floor (page_h / opts.ncolors);
-        local scalecell_w =  SCALE_CELL_WD;
-        local [scalekey, s_w, s_h] = DrawColorScale [colors, scalecell_w,
-            scalecell_h, mincut, maxcut, opts.nticks];
-        newscale = scalekey;
-    endif
+    local errmess;
 
     if drawmap then
+        if opts.cutoff then
+            [mincut, maxcut, errmess] = CalculateCuts [data, opts.sigma, 
+                numsignifcols, opts.ncolors];
+            if mincut === [] or maxcut === [] then
+                Warning errmess;
+                return  [newmap, newscale, mincut, maxcut, colors];
+            endif
+        else
+            [mincut, maxcut, errmess] = CalculateMinMax [data, opts.ncolors];
+            if mincut === [] or maxcut === [] then
+                Warning errmess;
+                return  [newmap, newscale, mincut, maxcut, colors];
+            endif
+        endif
+
+        if opts.mono then
+            [colors, errmess] = GetMonoColors [mincut, maxcut, opts.ncolors];
+        else
+            [colors, errmess] = GetColors [mincut, maxcut, opts.ncolors];
+        endif
+
+        if colors === [] then
+            Warning errmess;
+            return [newmap, newscale, mincut, maxcut, colors];
+        endif
+
         //  Color map cells and store row labels
         local row_i, col_i, bgraphics = [];
         for row_i = 1, numrows, 1 loop
@@ -1053,13 +1035,21 @@ local function RedrawMapScale [data, opts, numsignifcols]
         newmap = bgraphics;
     endif
 
+    if drawscale then
+        local scalecell_h = floor (page_h / opts.ncolors);
+        local scalecell_w =  SCALE_CELL_WD;
+        local [scalekey, s_w, s_h] = DrawColorScale [colors, scalecell_w,
+            scalecell_h, mincut, maxcut, opts.nticks];
+        newscale = scalekey;
+    endif
+
     prevcutoff = opts.cutoff;
     prevsigma = opts.sigma;
     prevncolors = opts.ncolors;
     prevmono = opts.mono;
     prevnticks = opts.nticks;
 
-    return [newmap, newscale];
+    return [newmap, newscale, mincut, maxcut, colors];
 endfunction
 
 /****************************************************************************
@@ -1127,6 +1117,22 @@ local function TruncateRows [data]
 
 endfunction
 
+/****************************************************************************
+ *                          UpdateCutoff
+ *
+ *  Update the window based on new cutoff value.
+ *
+ ****************************************************************************/
+local function UpdateCutoff [wkey, cutoff]
+
+    if cutoff === 0 then
+        WindowSetAttr [wkey, [sigma: [sensitive: 0, allowBlank: 1]]];
+    else
+        WindowSetAttr [wkey, [sigma: [sensitive: 1, allowBlank: 0]]];
+    endif
+endfunction
+
+
 //  Global Functions
 
 /****************************************************************************
@@ -1169,13 +1175,16 @@ endfunction
  *
  ****************************************************************************/
 global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
-        help]
+        help, closefun]
+    static selrow, selcol;
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB Heat Map', 1] then return; endif
 
+    local bgraphics = [], scalekey = [], mincut = [], maxcut = [], colors = [];
     local optdflts = tag tr OPT_DEFAULTS;
     optdflts.mapradio = initsel;
+    selrow = initsel; selcol = 0;
 
     //  Currently, only 30 columns and 40 rows are allowed.
     data = TruncateCols [data];
@@ -1186,8 +1195,10 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
     local page_w = (numcols + 1) * (CELL_WD + MOE_PAD_W) + MOE_PAD_W;
     local page_h = (numrows + 1) * (CELL_HT + MOE_PAD_H) + MOE_PAD_H;
 
-    local [bgraphics, scalekey] = RedrawMapScale [data, optdflts,
-        numsignifcols];
+    [bgraphics, scalekey, mincut, maxcut, colors]
+        = RedrawMapScale [data, optdflts, numsignifcols, mincut, maxcut,
+        colors];
+
     local bhelp = [];
     if help then
         bhelp = GetHelp [data];
@@ -1229,10 +1240,10 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
     gr_destroy scalekey;
     app gr_destroy bgraphics;
 
-    local [selrow, selcol] = IndexToRowCol [initsel, numrows, numcols];
+    [selrow, selcol] = IndexToRowCol [initsel, numrows, numcols];
     local selerrmess = call [selfun, [data, selrow, selcol, mincut,
         maxcut, colors]];
-    if not isnull errmess and neL [errmess, ''] then
+    if not isnull selerrmess and neL [selerrmess, ''] then
         WindowDestroy wkey;
         Warning selerrmess;
         return;
@@ -1241,18 +1252,22 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
     loop
         local [vals, trig] = WindowWait wkey;
         if trig === 'panel' then
-            if vals.panel === 'Close' then 
+            if vals.panel === 'Close' then
+                local closeerrmess = call [closefun, []];
+                if not isnull closeerrmess and neL [closeerrmess, ''] then
+                    Warning closeerrmess;
+                endif
                 break;
 
             elseif vals.panel === 'Save' then
                 local simgkey = DrawMap [data, numrows, numcols, mincut, 
-                    maxcut, colors, ticks];
+                    maxcut, colors, vals.nticks];
                 gr_export simgkey;
                 gr_destroy simgkey;
 
             elseif vals.panel === 'Print' then
                 local pimgkey = DrawMap [data, numrows, numcols, mincut, 
-                    maxcut, colors, ticks];
+                    maxcut, colors, vals.nticks];
                 gr_print pimgkey;
                 gr_destroy pimgkey;
 
@@ -1263,8 +1278,10 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                 WindowShow [wkey, 1];
 
             elseif vals.panel === 'Apply' then
-                [bgraphics, scalekey] = RedrawMapScale [data, optdflts,
-                    numsignifcols];
+                [bgraphics, scalekey, mincut, maxcut, colors]
+                    = RedrawMapScale [data, vals, numsignifcols, mincut,
+                    maxcut, colors];
+
                 if not isnull bgraphics then
                      WindowSetAttr [wkey, [mapradio: [graphics: bgraphics]]];
                 endif
@@ -1272,13 +1289,23 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                 if not isnull scalekey then
                      WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
                 endif
+
+                selerrmess = call [selfun, [data, selrow, selcol, mincut,
+                    maxcut, colors]];
+                if not isnull selerrmess and neL [selerrmess, ''] then
+                    Warning selerrmess;
+                    break;
+                endif
             endif
+
+        elseif trig === 'cutoff' then
+            UpdateCutoff [wkey, vals.cutoff];
 
         elseif trig === 'mapradio' then
             [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows, numcols];
             selerrmess = call [selfun, [data, selrow, selcol, mincut,
                 maxcut, colors]];
-            if not isnull errmess and neL [errmess, ''] then
+            if not isnull selerrmess and neL [selerrmess, ''] then
                 Warning selerrmess;
                 break;
             endif

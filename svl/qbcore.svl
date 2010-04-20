@@ -54,8 +54,9 @@ const NMRSCORE = 'qb_nmrscoredb';
 
 const ANALYSIS = 'qb_analysistype';
 const ANALPWD = 'qb_pwd';
-const ANALPWDSAR = 'qb_pwdSAR';
+const ANALPWDPLS = 'qb_pwdPLS';
 const ANALPWDINTER = 'qb_pwdinteraction';
+const ANALPWDSAR = 'qb_pwdSAR';
 const ANALNMR = 'qb_nmr';
 const ANALNMREXP = 'qb_nmrexperimental';
 
@@ -1660,13 +1661,17 @@ global function qb_GetAnalysisData [dbkey, analysis, type]
 
     local datatok, data = [];
     if analysis === 'pwd' then
-        if type === 'sar' then
-            datatok = db_GetEnv [dbkey, ANALPWDSAR];
+        if type === 'pls' then
+            datatok = db_GetEnv [dbkey, ANALPWDPLS];
             [[data]] = sread [string datatok, '{v}'];
         elseif type === 'inter' then
             datatok = db_GetEnv [dbkey, ANALPWDINTER];
             [[data]] = sread [string datatok, '{v}'];
+        elseif type === 'sar' then
+            datatok = db_GetEnv [dbkey, ANALPWDSAR];
+            [[data]] = sread [string datatok, '{v}'];
         endif
+
     elseif analysis === 'nmr' then
         if type === 'exp' then
             datatok = db_GetEnv [dbkey, ANALNMREXP];
