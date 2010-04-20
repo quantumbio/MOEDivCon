@@ -37,6 +37,7 @@ function qb_GetAnalysisData;
 function qb_GetEnvAnal;
 function qb_GetPoseFields;
 function qb_LoadCoreScoreDB;
+function qb_SaveAnalysisData;//temp
 function qb_SaveEnvAnal;
 function qb_SplitComplex;
 
@@ -48,36 +49,34 @@ const MAT_TRANS_MIN = 0x80;
 
 const QBPWD_OPT_DEFAULTS =
     [
-    ['analysis',     1             ],
-    ['sf-e-ab',      1             ],
-    ['sf-e-abp',     0             ],
-    ['sf-e-abc',     0             ],
-    ['sf-e-vdw',     0             ],
-    ['sf-e-r6',      0             ],
-    ['sf-e-r12'      0             ],
-    ['sf-e-ele',     0             ],
-    ['trainingset',  0             ],
+    ['analysis',     3             ],
+    ['sf_e_ab',      1             ],
+    ['sf_e_abp',     0             ],
+    ['sf_e_abc',     0             ],
+    ['sf_e_vdw',     0             ],
+    ['sf_e_r6',      0             ],
+    ['sf_e_r12',     0             ],
+    ['sf_e_ele',     0             ],
+    ['prune_zero',   95            ],
+    ['prune_sd',     0.05          ],
+    ['numtopres',    25            ],
     ['numcomps',     10            ],
-    ['numscramble',  10            ],
-    ['optLV',        0             ],
-    ['optLVval',     0             ],
-    ['prune-zero',   0.95          ],
-    ['prune-sd',     0.05          ],
-    ['numtopres',    25            ]
+    ['trainingset',  0             ],
+    ['numscramble',  10            ]
     ];
 
 const ANALYSIS =
     [
-    'PLS Results',
-    'SAR',
-    'Interaction'
+    'PLS Results Table',
+    'Interaction Heat Map',
+    'SAR Heat Map'
     ];
 
 const ANALKEYS =
     [
     'pls',
-    'sar',
-    'inter'
+    'inter',
+    'sar'
     ];
 
 const HEADER = 
@@ -86,18 +85,143 @@ const HEADER =
     title: 'QB-PWD',
     windowName: 'QB-PWDPanel',
     text: ['Apply', 'Load', 'Close'],
-    onTrigger: ['validate', 'return', 'return'],
-    bubbleHelp: ['Generate surface and heat map.',
-            'Load QB-PWD analysis results from a QMScore database.', 
+    onTrigger: ['return', 'return', 'return'],
+    bubbleHelp: ['Perform QB-PWD analysis.',
+            'Load QB-PWD data from a QMScore database.', 
             '']
     ];
 
 const PANEL =
     [
+    Data : [name: 'numscramble'],
     Vbox :
         [
+        name: 'analbox',
         Hbox :
             [
+            title: 'Scoring     ',
+            extendH: 1,
+            Checkbox :
+                [
+                name: 'sf_e_ab', text: 'E_AB', title: 'QM:',
+                bubbleHelp:
+                    'E_AB is the exchange between atoms.'
+                ],
+            Checkbox :
+                [
+                name: 'sf_e_abp', text: 'E_ABp',
+                bubbleHelp:
+                    'E_ABp is the electron-electron repulsion.'
+                ],
+            Checkbox :
+                [
+                name: 'sf_e_abc', text: 'E_ABc',
+                bubbleHelp:
+                    'E_ABc is the core-electron interaction.'
+                ]
+            ],
+
+        Hbox :
+            [
+            title: 'Function    ',
+            extendH: 1,
+            Checkbox :
+                [
+                name: 'sf_e_vdw', text: 'E_VDW', title: 'MM:',
+                bubbleHelp:
+                    ''
+                ],
+            Checkbox :
+                [
+                name: 'sf_e_r6', text: 'E_R6',
+                bubbleHelp:
+                    ''
+                ],
+            Checkbox :
+                [
+                name: 'sf_e_r12', text: 'E_R12',
+                bubbleHelp:
+                    ''
+                ],
+            Checkbox :
+                [
+                name: 'sf_e_ele', text: 'E_Ele',
+                bubbleHelp:
+                    ''
+                ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            title: 'Residues    ',
+            extendH: 1,
+            Label :
+                [
+                font: 'mediumBold', text: 'Pruning:',
+                bubbleHelp:
+                    ''
+                ],
+            Text :
+                [
+                name: 'prune_zero', allowBlank: 0,
+                title: 'Maximum percent zero:',
+                type: 'int', len: 5,
+                bubbleHelp:
+                    ''
+                ],
+            Label :
+                [
+                font: 'mediumBold', text: '%',
+                bubbleHelp:
+                    ''
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Text :
+                [
+                name: 'prune_sd', allowBlank: 0, title: 'Minimum SD:',
+                type: 'real', len: 5,
+                bubbleHelp:
+                    ''
+                ]
+            ],
+
+        Hbox :
+            [
+            title: '            ',
+            extendH: 1,
+            Text :
+                [
+                name: 'numtopres', allowBlank: 0,
+                title: 'Number of top scorers:',
+                type: 'int', len: 5,
+                bubbleHelp:
+                    ''
+                ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            title: 'PLS         ',
+            extendH: 1,
+            Text :
+                [
+                name: 'numcomps', allowBlank: 0,
+                title: 'Number of components:',
+                type: 'int', len: 5,
+                bubbleHelp:
+                    ''
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
             Text :
                 [
                 name: 'trainingset', title: 'Training set size:',
@@ -114,48 +238,40 @@ const PANEL =
         
     Separator : [flushLeft:1, extendH:1, margin:1],
 
-    Vbox :
+    Hbox :
         [
-        Hbox :
+        name: 'selbox',
+        title: 'Analysis    ',
+        extendH: 1,
+        Option :
             [
-            extendH: 1,
-            Option :
-                [
-                name: 'analysis', title: 'Analysis:', text: ANALYSIS,
-                type: 'int', minWidth: 8,
-                bubbleHelp:
-                    ''
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Button :
-                [
-                name: 'analview', text: 'View',
-                bubbleHelp:
-                    'View the analytic results (table or heat map).'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Button :
-                [
-                name: 'analsave', text: 'Save',
-                bubbleHelp:
-                    'Save the analytic results in a csv file.'
-                ]
+            name: 'analysis', text: ANALYSIS,
+            type: 'int', minWidth: 8,
+            bubbleHelp:
+                ''
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+        Button :
+            [
+            name: 'analview', text: 'View',
+            bubbleHelp:
+                'View the analytic results (table or heat map).'
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+        Button :
+            [
+            name: 'analsave', text: 'Save',
+            bubbleHelp:
+                'Save the analytic results in a csv file.'
             ]
         ],
         
-    Separator : [flushLeft:1, extendH:1, margin:1],
-
-    Vbox :
-        [
-        title: 'Heat Map:     ',
-        ],
-
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
@@ -297,6 +413,7 @@ local function CreateSurfaceMap [restokens]
 
     local dist = CalcDist [restokens, recatoms, ligatoms];
     dist = dist / 2;
+
 write ['Dist:  {}\n', dist];//DEBUG
 
     local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
@@ -410,20 +527,27 @@ local function GetAnalData [dbpath, type]
     local data = qb_GetAnalysisData [dbkey, 'pwd', type];
     db_Close dbkey;
 
-    local [resnames, ligdata] = data;
-    local resabbrevs = apt tok_drop [resnames, 3];
-    local lignames = app first ligdata;
-    local ligabbrevs = apt tok_keep [lignames, -3];
-    local ligvals = app second ligdata;
-    data = [['SAR Map', 'Ligands', 'Residues'], resnames, resabbrevs,
-        tr [lignames, ligabbrevs, ligvals]];
+    if data === [] then
+        return [];
+    endif
 
-    local missing = CheckResidues [second data];
-    if length missing > 0 then
-        Warning twrite ['The following residues are not \n'
-            'present in receptor in MOE Window:\n{v}\n',
-            missing];
-        exit [];
+    //  Create abbreviated names for heat map and check residues
+    if type === 'sar' or type === 'inter' then
+        local [resnames, ligdata] = data;
+        local resabbrevs = apt tok_drop [resnames, 3];
+        local lignames = app first ligdata;
+        local ligabbrevs = apt tok_keep [lignames, -3];
+        local ligvals = app second ligdata;
+        data = [['SAR Map', 'Ligands', 'Residues'], resnames, resabbrevs,
+            tr [lignames, ligabbrevs, ligvals]];
+
+        local missing = CheckResidues [second data];
+        if length missing > 0 then
+            Warning twrite ['The following residues are not \n'
+                'present in receptor in MOE Window:\n{v}\n',
+                missing];
+            exit [];
+        endif
     endif
 
     return data;
@@ -431,6 +555,7 @@ local function GetAnalData [dbpath, type]
 endfunction
 
 function ReadExpActData;
+function ReadHeatMapData;
 
 /****************************************************************************
  *                          LoadDB
@@ -454,6 +579,12 @@ local function LoadDB [dbpath]
     pwdopts = tagcat [pwdopts, tag tr QBPWD_OPT_DEFAULTS];
 
     ReadExpActData ['~daren/dev/MOEDivcon/data/trypsin-activity-88.txt', dbpath];
+
+//DEBUG
+    local sardata = ReadHeatMapData [
+        '~daren/dev/MOEDivcon/data/trypsin-heatmap-88.csv'];
+    qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
+//DEBUG
 
     return [dbkey, recset, ligand, coreopts, pwdopts];
 
@@ -587,6 +718,37 @@ local function ReadExpActData [expactfn, qmsdbfn]
 endfunction
 
 /****************************************************************************
+ *
+ *                          ReadHeatMapData
+ *
+ *  Return data formatted for the heat map.
+ *
+ ****************************************************************************/
+local function ReadHeatMapData [filename]
+
+    local f = fopenr filename;
+    local lines = freadb [f, 'line', INT_MAX];
+    local line = first lines;
+    local strings = wordsplit [line, ","];
+    local resnames = app token strings;
+    lines = dropfirst lines;
+
+    //  ligand labels and values
+    local ligdata = [];
+    for line in lines loop
+        strings = wordsplit [line, ","];
+        local ligname = token first strings;
+        strings = dropfirst strings;
+        local ligvals = atof app token strings;
+        ligdata = append [ligdata, [ligname, ligvals]];
+    endloop
+
+    fclose f;
+
+    return [resnames, ligdata];
+endfunction
+
+/****************************************************************************
  *                          SaveOptions
  *
  *  Save the analysis data.
@@ -635,21 +797,6 @@ local function UpdateComplex [lignum]
 endfunction
 
 /****************************************************************************
- *                          UpdateCutoff
- *
- *  Update the window based on new cutoff value.
- *
- ****************************************************************************/
-local function UpdateCutoff [wkey, cutoff]
-
-    if cutoff === 0 then
-        WindowSetAttr [wkey, [sigma: [sensitive: 0, allowBlank: 1]]];
-    else
-        WindowSetAttr [wkey, [sigma: [sensitive: 1, allowBlank: 0]]];
-    endif
-endfunction
-
-/****************************************************************************
  *
  *                          UpdateResidue
  *
@@ -694,12 +841,27 @@ endfunction
 
 /****************************************************************************
  *
+ *                          qb_QBPWDCloseHandler
+ *
+ ****************************************************************************/
+global function qb_QBPWDCloseHandler []
+
+    ClearSurfaceMap G_surface.title;
+    aSetLabelRes [G_surface.resatms, 0];
+    G_surface = [];
+
+endfunction
+
+/****************************************************************************
+ *
  *                          qb_QBPWDSelectHandler
  *
  ****************************************************************************/
 global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
         colors]
     
+write ['{v}\n{v}\n{v}\n{v}\n', data(1), data(2), data(3), data(4)];//DEBUG
+
     local [titles, resnames, resabbrevs, rowdata] = data;
     local restok = '', ligtok = '', ligabbrev = '', ligdata = [];
     if selrow === 0 and selcol === 0 then
@@ -760,34 +922,88 @@ global function qb_QBPWDSetupPanel []
     const INITLIG = 1;
     const SIGNIFRES = 5;
 
-    static pwdkey;                     //  Shared with child tasks.
-    static pwdfilename;
+    static pwdfilename;                     //  Shared with child tasks.
     static pwddata;
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB-PWDPanel', 1] then return; endif
 
-    local appdflts = tag tr QBPWD_OPT_DEFAULTS;
-    local wkey = WindowCreate cat [HEADER, PANEL];
-    pwdkey = 0;
     pwdfilename = '';
-    pwddata = [[], []];
+    pwddata = [[], [], []];
+
+    local appdflts = tag tr QBPWD_OPT_DEFAULTS;
+    local pwdopts = [];
+    local wkey = WindowCreate cat [HEADER, PANEL];
+
     G_surface = [];
     WindowSetData [wkey, appdflts];
+    WindowSetAttr [wkey, [analbox: [sensitive: 0], selbox: [sensitive: 0],
+        panel: [sensitive: [0,1,1]]]];
     WindowShow [wkey, 1];
 
     loop
         local [vals, trig] = WindowWait wkey;
 
-        if trig === 'cutoff' then
-            UpdateCutoff [wkey, vals.cutoff];
+        if trig === 'analview' then
+
+            if second task_fork [statics:'share', 
+                    master:'parent'] === 'child' then
+
+                // Load and setup data
+                if isnull peek [pwddata, vals.analysis] then
+                    pwddata = poke [pwddata, vals.analysis, 
+                        GetAnalData [pwdfilename, 
+                        ANALKEYS (vals.analysis)]];
+                    if isnull peek [pwddata, vals.analysis] then
+                        Warning 'No analysis data to view.';
+                        exit [];
+                    endif
+                endif
+
+                if ANALKEYS (vals.analysis) === 'pls' then
+
+                exit [];
+                endif
+
+                //  Create surface if necessary
+                if isnull G_surface then
+                    local msgkey = Message [0, 'Calculating surface ...'];
+                    CreateSurfaceMap [second pwddata (vals.analysis)];
+                    msgkey = Message [msgkey, ''];
+                endif
+
+                //  Make sure ligand atoms sets are loaded.
+                if isnull G_surface.ligmols then
+                    LoadLigs [pwdfilename];
+                endif
+
+                //  Make sure first ligand is in MOE Window
+                UpdateComplex INITLIG;
+                qb_HeatMapSetupPanel [pwddata (vals.analysis),
+                    SIGNIFRES, 'qb_QBPWDSelectHandler', INITLIG, 1,
+                    'qb_QBPWDCloseHandler'];
+
+                exit [];
+            endif
+
+        elseif trig === 'analsave' then
+
+                if second task_fork [statics:'share', 
+                        master:'parent'] === 'child' then
+
+//TODO:
+                    exit [];
+                endif
 
         elseif trig === 'panel' then
             if vals.panel === 'Close' then
 	            if tok_length pwdfilename > 0 then
-                    local pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
-                            vals.analysis, vals.cutoff, vals.sigma,
-                            vals.mapncolors, vals.mapmono, vals.mapnticks]];
+                    pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
+                        vals.analysis, vals.sf_e_ab, vals.sf_e_abp,
+                        vals.sf_e_abc, vals.sf_e_vdw, vals.sf_e_r6,
+                        vals.sf_e_r12, vals.sf_e_ele, vals.prune_zero,
+                        vals.prune_sd, vals.numtopres, vals.numcomps,
+                        vals.trainingset, vals.numscramble]];
                     SaveOptions [pwdfilename, pwdopts];
                 endif
                 break;
@@ -797,32 +1013,16 @@ global function qb_QBPWDSetupPanel []
                 if second task_fork [statics:'share', 
                         master:'parent'] === 'child' then
 
-                    // Load and setup data
-                    if isnull peek [pwddata, vals.analysis] then
-                        pwddata = poke [pwddata, vals.analysis, 
-                            GetAnalData [pwdfilename, 
-                            ANALKEYS (vals.analysis)]];
-                    endif
+                    pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
+                        vals.analysis, vals.sf_e_ab, vals.sf_e_abp,
+                        vals.sf_e_abc, vals.sf_e_vdw, vals.sf_e_r6,
+                        vals.sf_e_r12, vals.sf_e_ele, vals.prune_zero,
+                        vals.prune_sd, vals.numtopres, vals.numcomps,
+                        vals.trainingset, vals.numscramble]];
 
-                    //  Create surface if necessary
-                    if isnull G_surface then
-                        local msgkey = Message [0, 'Calculating surface ...'];
-                        CreateSurfaceMap [second pwddata (vals.analysis)];
-                        msgkey = Message [msgkey, ''];
-                    endif
+//TODO: Calculate and save analysis data
 
-                    //  Make sure ligand atoms sets are loaded.
-                    if isnull G_surface.ligmols then
-                        LoadLigs [pwdfilename];
-                    endif
-
-                    //  Make sure first ligand is in MOE Window
-                    UpdateComplex INITLIG;
-                    qb_HeatMapSetupPanel [pwddata (vals.analysis),
-                        vals.cutoff, vals.sigma, SIGNIFRES, 
-                        vals.mapncolors, vals.mapmono, vals.mapnticks, 
-                        'qb_QBPWDSelectHandler', INITLIG, 1];
-
+                    WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
                     exit [];
                 endif
 
@@ -830,8 +1030,6 @@ global function qb_QBPWDSetupPanel []
                 if second task_fork [master: 'parent',
                         statics:'share'] === 'child' then
                     task_prio 0;
-
-//TODO:  message and disable window while loading
 
                     pwdfilename = FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
@@ -852,13 +1050,14 @@ global function qb_QBPWDSetupPanel []
                             endif
                         endif
 
-                        pwdkey = ldkey;
                         db_Close ldkey;
                         WindowSetData [wkey, ldpwdopts];
                     else
                         pwdfilename = '';
                     endif
 
+                    WindowSetAttr [wkey, [analbox: [sensitive: 1],
+                        panel: [sensitive: [1,1,1]]]];
                     exit [];
                 endif
             endif
