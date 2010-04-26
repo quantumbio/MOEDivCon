@@ -55,6 +55,8 @@ const LIG_KEYS =
 
 global function qb_QMScore [recmol, ligmol, coreopts, appopts]
 
+    load 'hamcompat.svl';
+
     local osys, nsys, errmess = "";
     if not MOE_BATCH then
         [osys, nsys] = SystemPush [];
