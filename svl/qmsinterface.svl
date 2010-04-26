@@ -253,11 +253,11 @@ global function qb_QMScore [recmol, ligmol, coreopts, appopts]
         if isnull errmess then
             errmess = cat [divconerrmess,
                 swrite ['\nLog file:  {}:{}/divcon.log\n',
-                getenv 'HOSTNAME', coreopts.workdir]];
+                getenv 'HOSTNAME', subdirname]];
         else
             errmess = cat [divconerrmess,
                 swrite ['\nLog file:  {}:{}/divcon.log\n',
-                getenv 'HOSTNAME', coreopts.workdir], errmess];
+                getenv 'HOSTNAME', subdirname], errmess];
         endif
         return [[], errmess];
     endif

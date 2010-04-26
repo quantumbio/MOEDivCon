@@ -274,11 +274,11 @@ write ['MOEDivcon: {}\n', newerror];//DEBUG
         if isnull errmess then
             errmess = cat [divconerrmess,
                 swrite ['\nLog file:  {}:{}/divcon.log',
-                getenv 'HOSTNAME', coreopts.workdir]];
+                getenv 'HOSTNAME', subdirname]];
         else
             errmess = cat [divconerrmess,
                 swrite ['\nLog file:  {}:{}/divcon.log\n',
-                getenv 'HOSTNAME', coreopts.workdir], errmess];
+                getenv 'HOSTNAME', subdirname], errmess];
         endif
         return [[], errmess];
     endif
