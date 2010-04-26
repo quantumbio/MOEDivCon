@@ -10,7 +10,9 @@
 
 global G_hamsets;
 
-global function HamSetsInit []
+global function qb_HamSetsInit []
+
+if not isnull G_hamsets then return; endif
 
 G_hamsets = 
     [

@@ -29,6 +29,7 @@
 
 function qb_CheckChgTestDivconMols;
 function qb_GetWhich;
+function qb_HamSetsInit;
 function qb_PassBackbone;
 
 /*  NOTE:  If you change the key lists here, you need to update the
@@ -53,9 +54,10 @@ const LIG_KEYS =
     'COMPLEXOPT'
     ];
 
-global function qb_QMScore [recmol, ligmol, coreopts, appopts]
 
-    load 'hamcompat.svl';
+global G_hamsets;
+
+global function qb_QMScore [recmol, ligmol, coreopts, appopts]
 
     local osys, nsys, errmess = "";
     if not MOE_BATCH then
@@ -63,6 +65,7 @@ global function qb_QMScore [recmol, ligmol, coreopts, appopts]
     endif
 
     //  If there are any errors, return immediately.  Run all error tests.
+    qb_HamSetsInit [];
     local [recchains, recok, recchgok, ligchain, ligok, ligchgok, ckmsg]
         = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
             coreopts.ligchg, 1, 1, 1, coreopts.testH, coreopts.testMM,
