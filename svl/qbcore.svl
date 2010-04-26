@@ -1008,6 +1008,8 @@ global G_hamsets;
  ****************************************************************************/
 local function HamCompatability [appname, hamname, atoms]
 
+write ['Hamsets:  {v}\n', G_hamsets];
+
     local elems = uniq aElement atoms;
     local compatlist = tagpeek [G_hamsets, [appname, hamname]];
     local idx = indexof [elems, compatlist];
