@@ -54,9 +54,6 @@ const LIG_KEYS =
     'COMPLEXOPT'
     ];
 
-
-global G_hamsets;
-
 global function qb_QMScore [recmol, ligmol, coreopts, appopts]
 
     local osys, nsys, errmess = "";
