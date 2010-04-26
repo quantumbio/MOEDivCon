@@ -1008,7 +1008,7 @@ global G_hamsets;
  ****************************************************************************/
 local function HamCompatability [appname, hamname, atoms]
 
-write ['Hamsets:  {v}\n', G_hamsets];
+write ['Hamsets:  {v}\n', G_hamsets];//DEBUG
 
     local elems = uniq aElement atoms;
     local compatlist = tagpeek [G_hamsets, [appname, hamname]];
@@ -1914,7 +1914,7 @@ global function qb_InterMoleculeOverlap [recset, ligset]
     return mess;
 endfunction
 
-function HamSetsInit;
+function qb_HamSetsInit;
 
 /****************************************************************************
  *
@@ -1925,7 +1925,7 @@ function HamSetsInit;
  ****************************************************************************/
 global function qb_InitCorePanel [wkey, status, defaults]
 
-    HamSetsInit [];
+    qb_HamSetsInit [];
 
     status.prevwd = defaults.workdir;
     WindowSetData [wkey, dropfirst defaults];
