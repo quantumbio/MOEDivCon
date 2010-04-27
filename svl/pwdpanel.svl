@@ -61,8 +61,12 @@ const QBPWD_OPT_DEFAULTS =
     ['prune_sd',     0.05          ],
     ['numtopres',    25            ],
     ['numcomps',     10            ],
-    ['trainingset',  0             ],
-    ['numscramble',  10            ]
+    ['trainingset',  0             ]
+    ];
+
+const SCOREFUNENGERGIES =
+    [
+    "E_AB", "E_ABp", "E_ABc", "E_VDW", "E_R6", "E_R12", "E_ELE"
     ];
 
 const ANALYSIS =
@@ -93,7 +97,6 @@ const HEADER =
 
 const PANEL =
     [
-    Data : [name: 'numscramble'],
     Vbox :
         [
         name: 'analbox',
@@ -1003,7 +1006,7 @@ global function qb_QBPWDSetupPanel []
                         vals.sf_e_abc, vals.sf_e_vdw, vals.sf_e_r6,
                         vals.sf_e_r12, vals.sf_e_ele, vals.prune_zero,
                         vals.prune_sd, vals.numtopres, vals.numcomps,
-                        vals.trainingset, vals.numscramble]];
+                        vals.trainingset]];
                     SaveOptions [pwdfilename, pwdopts];
                 endif
                 break;
@@ -1018,7 +1021,7 @@ global function qb_QBPWDSetupPanel []
                         vals.sf_e_abc, vals.sf_e_vdw, vals.sf_e_r6,
                         vals.sf_e_r12, vals.sf_e_ele, vals.prune_zero,
                         vals.prune_sd, vals.numtopres, vals.numcomps,
-                        vals.trainingset, vals.numscramble]];
+                        vals.trainingset]];
 
 //TODO: Calculate and save analysis data
 
