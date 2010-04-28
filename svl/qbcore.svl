@@ -57,6 +57,9 @@ const ANALPWD = 'qb_pwd';
 const ANALPWDPLS = 'qb_pwdPLS';
 const ANALPWDINTER = 'qb_pwdinteraction';
 const ANALPWDSAR = 'qb_pwdSAR';
+const ANALPWDACT = 'qb_pwdactivity';
+const ANALPWDOPTLV = 'qb_pwdoptLV';
+
 const ANALNMR = 'qb_nmr';
 const ANALNMREXP = 'qb_nmrexperimental';
 
@@ -1410,6 +1413,7 @@ global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
 
 endfunction
 
+function qb_CreateMessWin;
 function qb_ShowLigPoses;
 function qb_UpdateCharge;
 
@@ -1495,17 +1499,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
                         exit [];
                     endif
                 else
-                    local messwin = WindowCreate MESS_WINDOW;
-                    WindowSetData [messwin, [mess: string tok_cat [recmess,
-                        ligmess]]];
-                    WindowShow [messwin, 1];
-                    loop
-                        local [v, t] = WindowWait messwin;
-                        if t === 'mpanel' and v.mpanel === 'Close' then
-                            WindowDestroy messwin;
-                            exit [];
-                        endif
-                    endloop
+                    qb_CreateMessWin string tok_cat [recmess, ligmess];
                 endif
             endif
 
@@ -1579,6 +1573,28 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
     endif
 
     return [status, btasks];
+endfunction
+
+/****************************************************************************
+ *                          qb_CreateMessWin
+ *
+ *  Create a window to show a message to the user that can handle longer
+ *  messages better than MOE's Warning or Message.
+ *
+ ****************************************************************************/
+global function qb_CreateMessWin [message]
+
+    local messwin = WindowCreate MESS_WINDOW;
+    WindowSetData [messwin, [mess: message]]];
+    WindowShow [messwin, 1];
+    loop
+        local [v, t] = WindowWait messwin;
+        if t === 'mpanel' and v.mpanel === 'Close' then
+            WindowDestroy messwin;
+            exit [];
+        endif
+    endloop
+
 endfunction
 
 /****************************************************************************
@@ -1669,6 +1685,12 @@ global function qb_GetAnalysisData [dbkey, analysis, type]
             [[data]] = sread [string datatok, '{v}'];
         elseif type === 'sar' then
             datatok = db_GetEnv [dbkey, ANALPWDSAR];
+            [[data]] = sread [string datatok, '{v}'];
+        elseif type === 'act' then
+            datatok = db_GetEnv [dbkey, ANALPWDACT];
+            [[data]] = sread [string datatok, '{v}'];
+        elseif type === 'optlv' then
+            datatok = db_GetEnv [dbkey, ANALPWDOPTLV];
             [[data]] = sread [string datatok, '{v}'];
         endif
 
@@ -2121,10 +2143,16 @@ global function qb_SaveAnalysisData [dbkey, analysis, type, data]
 
     if analysis === 'pwd' then
         db_SetEnv [dbkey, ANALYSIS, ANALPWD];
-        if type === 'sar' then
+        if type === 'pls' then
+            db_SetEnv [dbkey, ANALPWDPLS, twrite ['{v}', data]];
+        elseif type === 'sar' then
             db_SetEnv [dbkey, ANALPWDSAR, twrite ['{v}', data]];
         elseif type === 'inter' then
             db_SetEnv [dbkey, ANALPWDINTER, twrite ['{v}', data]];
+        elseif type === 'act' then
+            db_SetEnv [dbkey, ANALPWDACT, twrite ['{v}', data]];
+        elseif type === 'optlv' then
+            db_SetEnv [dbkey, ANALPWDOPTLV, twrite ['{v}', data]];
         endif
     elseif analysis === 'nmr' then
         if type === 'exp' then

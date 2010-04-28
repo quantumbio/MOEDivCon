@@ -25,97 +25,167 @@
 #set title   'QuantumBio Analysis Interface'
 #set class   'QuantumBio'
 #set version '2010.02'
-#set main 'qb_Analysis'
+#set main 'qb_PWDAnalysis'
 
-global function qb_Analysis []
+function qb_SaveAnalysisData;
 
-local errmess = "";
+const ENGERGIES =
+    [
+    "E_AB", "E_ABp", "E_ABc", "E_VDW", "E_R6", "E_R12", "E_ELE"
+    ];
 
+global function qb_PWDAnalysis [qmsfilename]
 
-local scorepath = './divcon.h5';
-scorepath = fbase scorepath;
-scorepath = twrite ['{}.h5', scorepath];
+    local plsdata = [], sardata = [], interdata = [], actdata = [], optLV = [];
+    errmess = "";
 
-//  exe_open child process inherits parent's environment.
-local process_key = exe_open ['moedivconanalysis', '.', [], 1];
-local process_keys = [process_key];
-local status = exe_status process_keys;
+    local scorepath = './divcon.h5';
+    scorepath = fbase scorepath;
+    scorepath = twrite ['{}.h5', scorepath];
 
-local prios = exe_getpriority process_keys;
-exe_setpriority [process_keys, prios];
+    //  exe_open child process inherits parent's environment.
+    local process_key = exe_open ['moedivconanalysis', '.', [], 1];
+    local process_keys = [process_key];
+    local status = exe_status process_keys;
 
-local stdin = exe_stdin process_keys;
-local stdout = exe_stdout process_keys;
+    local prios = exe_getpriority process_keys;
+    exe_setpriority [process_keys, prios];
 
-//  Pass the target ligand pairs to QuantumBio's Divcon QSAR Analysis
-//
+    local stdin = exe_stdin process_keys;
+    local stdout = exe_stdout process_keys;
+    local stderr = exe_stderr process_keys;
 
-local retValue, success = 0;
-local pairCount = 5;
-local molIndex;
-local targets = ['trypsin1', 'trypsin2', 'trypsin3', 'trypsin4', 'trypsin5'];
-local ligands = ['ligand1', 'ligand2', 'ligand3', 'ligand4', 'ligand5'];
-fwrite [stdin, '{c:}\n', 'sar'];
-fwrite [stdin, '{c:}\n', scorepath];
-fwrite [stdin, '{n:}\n', pairCount];
-for molIndex = 1, pairCount, 1 loop
-    fwrite [stdin, '{c:}\n', targets[molIndex]];
-    fwrite [stdin, '{c:}\n', ligands[molIndex]];
-endloop
+    //  Get necessary data from Database
+    local qmsdbkey = db_Open [qmsfilename, 'read-write'];
+    local pwdopts = qb_GetEnvAnal qmsdbkey;
+    local numpairs = db_nEntries qmsdbkey;
+    local activities = db_ReadColumn [qmsdbkey, pwdopts.expact_hdr]; 
+    local energies = ENGERGIES | [pwdopts.sf_e_ab, pwdopts.sf_e_abp,
+        pwdopts.sf_e_abc, pwdopts.sf_e_vdw, pwdopts.sf_e_r6, pwdopts.sf_e_r12,
+        pwdopts.sf_e_ele];
 
-[retValue] = fread [stdout, '{n:}\n'];
-print retValue;
-print exe_status   process_keys;
+    //  Pass the target-ligand pairs, activities and options to 
+    //  QuantumBio's Divcon PWD Analysis
+    local retValue, success = 0;
+    local idx;
+    fwrite [stdin, '{c:}\n', 'pwd'];
+    fwrite [stdin, '{c:}\n', scorepath];
+    fwrite [stdin, '{c:}\n', pwdopts.title];
+    fwrite [stdin, '{n:}\n', pwdopts.prune_zero / 100];
+    fwrite [stdin, '{n:}\n', pwdopts.prune_sd];
+    fwrite [stdin, '{n:}\n', pwdopts.numtopres];
+    fwrite [stdin, '{n:}\n', pwdopts.numcomps];
+    fwrite [stdin, '{n:}\n', pwdopts.trainingset];
+    fwrite [stdin, '{n:}\n', length energies];
+    for idx = 1, length energies, 1 loop
+        fwrite [stdin, '{c:}\n', energies[idx]];
+    endloop
 
-const NUMRESULTS = 11;
-local results, return_statement;
-local sleep_time = -1;
-local divconerrmess = "";
-while exe_status process_key loop
-    if not MOE_BATCH then
-        sleep sleep_time;
-    endif
+    fwrite [stdin, '{n:}\n', numpairs];
+    for idx = 1, numpairs, 1 loop
+        fwrite [stdin, '{c:}\n', twrite ['rec{}', idx]];
+        fwrite [stdin, '{c:}\n', twrite ['lig{}', idx]];
+        fwrite [stdin, '{n:}\n', activities[idx]];
+    endloop
 
-    [[return_statement]] = fread [stdout, '{c:*}'];
+    [retValue] = fread [stdout, '{n:}\n'];
 
-    write ['Divcon: {}\n', return_statement];//DEBUG
+    print retValue;//DEBUG
+    print exe_status process_keys;//DEBUG
 
-    if return_statement === "updateanalysis" then
-        local name, nameValue;
-        local parameter, parameterValue;
-/*        [[name]] = fread [stdout, '{c:*}'];
-        [[nameValue]] = fread [stdout, '{c:*}'];
-        results = cat [results, [[name, nameValue]]];
-        for NUMRESULTS loop
-            [[parameter]] = fread [stdout, '{c:*}'];
-            [[parameterValue]] = fread [stdout, '{n:}'];
-            results = cat [results, [[parameter, parameterValue]]];
-        endloop
-*/
-        success = 1;
-        fwrite [stdin, '{c:}\n', 'Ok'];
-
-    elseif return_statement === "QBException" then
-        [[return_statement]] = fread [stdout, '{c:*}'];
-        if neL [return_statement, "Analysis done."] then
-            divconerrmess = cat [divconerrmess, return_statement];
-            [[return_statement]] = fread [stdout, '{c:*}'];
+    const NUMRESULTS = 11;
+    local return_statement;
+    local sleep_time = -1;
+    local divconerrmess = "";
+    while exe_status process_key loop
+        if not MOE_BATCH then
+            sleep sleep_time;
         endif
-        while neL [return_statement, "Analysis done."] loop
-            divconerrmess = cat [divconerrmess, "\n", return_statement];
+
+        [[return_statement]] = fread [stdout, '{c:*}'];
+
+        write ['Divcon: {}\n', return_statement];//DEBUG
+
+        if return_statement === "updateanalysis" then
+            local name, nameValue;
+            local parameter, parameterValue;
+/*
+            [[name]] = fread [stdout, '{c:*}'];
+            [[nameValue]] = fread [stdout, '{c:*}'];
+            results = cat [results, [[name, nameValue]]];
+            for NUMRESULTS loop
+                [[parameter]] = fread [stdout, '{c:*}'];
+                [[parameterValue]] = fread [stdout, '{n:}'];
+                results = cat [results, [[parameter, parameterValue]]];
+            endloop
+*/
+
+            success = 1;
+            fwrite [stdin, '{c:}\n', 'Ok'];
+
+        elseif return_statement === "QBException" then
             [[return_statement]] = fread [stdout, '{c:*}'];
-        endloop;
-        fwrite [stdin, '{c:}\n', 'Ok'];
+            if neL [return_statement, "Analysis done."] then
+                divconerrmess = cat [divconerrmess, return_statement];
+                [[return_statement]] = fread [stdout, '{c:*}'];
+            endif
+            while neL [return_statement, "Analysis done."] loop
+                divconerrmess = cat [divconerrmess, "\n", return_statement];
+                [[return_statement]] = fread [stdout, '{c:*}'];
+            endloop;
+            fwrite [stdin, '{c:}\n', 'Ok'];
+        endif
+    endloop
+
+    //  Look for error messages from stderr.
+    local [[newerror]] = fread [stderr, '{c:*}'];
+    while length newerror > 0 loop
+        write ['MOEDivcon: {}\n', newerror];//DEBUG
+        errmess = cat [newerror, errmess];
+        [[newerror]] = fread [stderr, '{c:*}'];
+    endloop
+
+    print exe_status process_keys;//DEBUG
+
+    exe_kill  [process_key, 0];
+    exe_kill  process_key;
+    exe_close process_keys;
+
+    if success === 1 then
+        if not isnull plsdata then
+            qb_SaveAnalysisData [qmsdbkey, 'pwd', 'pls', plsdata];
+        endif
+
+        if not isnull sardata then
+            qb_SaveAnalysisData [qmsdbkey, 'pwd', 'sar', sardata];
+        endif
+
+        if not isnull interdata then
+            qb_SaveAnalysisData [qmsdbkey, 'pwd', 'inter', interdata];
+        endif
+
+        if not isnull actdata then
+            qb_SaveAnalysisData [qmsdbkey, 'pwd', 'act', actdata];
+        endif
+
+        if not isnull optLV then
+            qb_SaveAnalysisData [qmsdbkey, 'pwd', 'optlv', optLV];
+        endif
+    else
+        if isnull divconerrmess then divconerrmess = "Unknown error!"; endif
+        if isnull errmess then
+            errmess = cat [divconerrmess,
+                swrite ['\nLog file:  {}:{}/divcon.log\n',
+                getenv 'HOSTNAME', subdirname]];
+        else
+            errmess = cat [divconerrmess,
+                swrite ['\nLog file:  {}:{}/divcon.log\n',
+                getenv 'HOSTNAME', subdirname], errmess];
+        endif
     endif
-endloop
 
-print exe_status   process_keys;
+    db_Close qmsdbkey;
 
-exe_kill  [process_key, 0];
-exe_kill  process_key;
-exe_close process_keys;
-
+    return errmess;
 endfunction
-
-local function main [] = qb_Analysis [];
 

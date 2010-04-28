@@ -33,6 +33,7 @@ function grid_isoidx_emit;
 function msurf_MolecularSurface;
 function pboltz_AtomParameters;
 
+function qb_CreateMessWin;
 function qb_GetAnalysisData;
 function qb_GetEnvAnal;
 function qb_GetPoseFields;
@@ -43,12 +44,16 @@ function qb_SplitComplex;
 
 function qb_HeatMapSetupPanel;
 
+function qb_PWDAnalysis;
+
+
 const PWD_EXPACT_HDR = 'Exp Act';
 
 const MAT_TRANS_MIN = 0x80;
 
 const QBPWD_OPT_DEFAULTS =
     [
+    ['title',        'PWD Analysis'],
     ['analysis',     3             ],
     ['sf_e_ab',      1             ],
     ['sf_e_abp',     0             ],
@@ -57,16 +62,12 @@ const QBPWD_OPT_DEFAULTS =
     ['sf_e_r6',      0             ],
     ['sf_e_r12',     0             ],
     ['sf_e_ele',     0             ],
+    ['expact_hdr',   PWD_EXPACT_HDR],
     ['prune_zero',   95            ],
     ['prune_sd',     0.05          ],
     ['numtopres',    25            ],
     ['numcomps',     10            ],
     ['trainingset',  0             ]
-    ];
-
-const SCOREFUNENGERGIES =
-    [
-    "E_AB", "E_ABp", "E_ABc", "E_VDW", "E_R6", "E_R12", "E_ELE"
     ];
 
 const ANALYSIS =
@@ -100,6 +101,21 @@ const PANEL =
     Vbox :
         [
         name: 'analbox',
+        Hbox :
+            [
+            title: 'Title       ',
+            extendH: 1,
+            Text :
+                [
+                name: 'title', allowBlank: 0,
+                type: 'char', len: 40,
+                bubbleHelp:
+                    ''
+                ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
         Hbox :
             [
             title: 'Scoring     ',
@@ -148,10 +164,35 @@ const PANEL =
                 ],
             Checkbox :
                 [
-                name: 'sf_e_ele', text: 'E_Ele',
+                name: 'sf_e_ele', text: 'E_ELE',
                 bubbleHelp:
                     ''
                 ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            title: 'Activities  ',
+            extendH: 1,
+            Text :
+                [
+                name: 'expact_hdr', allowBlank: 0, title: 'Field:',
+                type: 'char', len: 40,
+                bubbleHelp:
+                    ''
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Button :
+                [
+                name: 'loadact', text: 'Load',
+                bubbleHelp:
+                    ''
+                                            ]
             ],
 
         Separator : [flushLeft:1, extendH:1, margin:1],
@@ -581,8 +622,6 @@ local function LoadDB [dbpath]
     local pwdopts = qb_GetEnvAnal [dbkey];
     pwdopts = tagcat [pwdopts, tag tr QBPWD_OPT_DEFAULTS];
 
-    ReadExpActData ['~daren/dev/MOEDivcon/data/trypsin-activity-88.txt', dbpath];
-
 //DEBUG
     local sardata = ReadHeatMapData [
         '~daren/dev/MOEDivcon/data/trypsin-heatmap-88.csv'];
@@ -703,16 +742,16 @@ endfunction
  *  assumed that the orderings are consistent.
  *
  ****************************************************************************/
-local function ReadExpActData [expactfn, qmsdbfn]
+local function ReadExpActData [expactfn, qmsdbfn, header]
 
     local qdbkey = db_Open [qmsdbfn, 'read-write'];
     local eaf = fopenr expactfn;
 
-    db_EnsureField [qdbkey, PWD_EXPACT_HDR, 'double'];
+    db_EnsureField [qdbkey, header, 'double'];
     local rowkey = 0;
     while rowkey = db_NextEntry [qdbkey, rowkey] loop
         local val = fread [eaf, '{n:}'];
-        db_Write [qdbkey, rowkey, tag [PWD_EXPACT_HDR, val]];
+        db_Write [qdbkey, rowkey, tag [header, val]];
     endloop
 
     fclose eaf;
@@ -754,7 +793,7 @@ endfunction
 /****************************************************************************
  *                          SaveOptions
  *
- *  Save the analysis data.
+ *  Save the analysis data in the QMScore database.
  *
  *  Note:  it is assumed that this function is called from a child process
  *  and will exit on an error.
@@ -765,11 +804,12 @@ local function SaveOptions [dbpath, options]
     if MOE_BATCH then return []; endif
 
     if neL [ftype dbpath, 'file'] or neL [fext dbpath, 'mdb'] then
-        Warning 'The PWD database doesn\'t exist.';
+        Warning 'The QMScore database doesn\'t exist.';
         exit [];
     endif
 
     local dbkey = db_Open [dbpath, 'read-write'];
+
     local data = qb_SaveEnvAnal [dbkey, options];
     db_Close dbkey;
 
@@ -994,36 +1034,85 @@ global function qb_QBPWDSetupPanel []
                 if second task_fork [statics:'share', 
                         master:'parent'] === 'child' then
 
-//TODO:
+//TODO:  Save analysis data in csv format
+
                     exit [];
                 endif
 
+        elseif trig === 'loadact' then
+            if second task_fork [master: 'parent',
+                    statics:'share'] === 'child' then
+                task_prio 0;
+
+                if neL [ftype pwdfilename, 'file']
+                        or neL [fext pwdfilename, 'mdb'] then
+                    Warning fwrite ['Cannot find the QMScore database:  {}.',
+                        pwdfilename];
+                    exit [];
+                endif
+
+                local actfile = FilePrompt [title: 'Load Activities File', 
+                    filter: '*.csv', allowEmptyList: 0];
+                if not isnull actfile then
+                    ReadExpActData [actfile, pwdfilename, vals.expact_hdr];
+                endif
+
+                exit [];
+            endif
+
         elseif trig === 'panel' then
+
             if vals.panel === 'Close' then
 	            if tok_length pwdfilename > 0 then
                     pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
+                        vals.title,
                         vals.analysis, vals.sf_e_ab, vals.sf_e_abp,
                         vals.sf_e_abc, vals.sf_e_vdw, vals.sf_e_r6,
                         vals.sf_e_r12, vals.sf_e_ele, vals.prune_zero,
-                        vals.prune_sd, vals.numtopres, vals.numcomps,
-                        vals.trainingset]];
+                        vals.prune_sd, vals.expact_hdr,
+                        vals.numtopres, vals.numcomps, vals.trainingset]];
                     SaveOptions [pwdfilename, pwdopts];
                 endif
                 break;
 
             elseif vals.panel === 'Apply' then
 
+
                 if second task_fork [statics:'share', 
                         master:'parent'] === 'child' then
 
+                    if neL [ftype pwdfilename, 'file']
+                            or neL [fext pwdfilename, 'mdb'] then
+                        Warning fwrite ['Can\'t find the QMScore database: {}.',
+                            pwdfilename];
+                        exit [];
+                    endif
+
+                    acts = db_ReadColumn [pwdfilename, vals.expact_hdr] then
+                    if isnull acts then
+                        Warning fwrite ['Missing activities in database: {}.',
+                            pwdfilename];
+                        exit [];
+
+                    endif
+
                     pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
+                        vals.title,
                         vals.analysis, vals.sf_e_ab, vals.sf_e_abp,
                         vals.sf_e_abc, vals.sf_e_vdw, vals.sf_e_r6,
                         vals.sf_e_r12, vals.sf_e_ele, vals.prune_zero,
-                        vals.prune_sd, vals.numtopres, vals.numcomps,
-                        vals.trainingset]];
+                        vals.prune_sd, vals.expact_hdr,
+                        vals.numtopres, vals.numcomps, vals.trainingset]];
+                    SaveOptions [pwdfilename, pwdopts];
 
-//TODO: Calculate and save analysis data
+                    local msgkey = Message [0, 'PWD Analysis is running ...'];
+                    local errmess = qb_PWDAnalysis [qmsfilename];
+                    Message [msgkey, 'PWD Analysis is done.'];
+                    if length errmess > 0 then
+                        qb_CreateMessWin errmess;
+                    else
+                        sleep 3;
+                    endif
 
                     WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
                     exit [];
@@ -1070,6 +1159,8 @@ global function qb_QBPWDSetupPanel []
     ClearSurfaceMap G_surface.title;
     aSetLabelRes [G_surface.resatms, 0];
     G_surface = [];
+
+    task_kill browsetasks;
     WindowDestroy wkey;
 
 endfunction
