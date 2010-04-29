@@ -1499,7 +1499,8 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
                         exit [];
                     endif
                 else
-                    qb_CreateMessWin string tok_cat [recmess, ligmess];
+                    qb_CreateMessWin [string tok_cat [recmess, ligmess]];
+                    exit [];
                 endif
             endif
 
@@ -1590,10 +1591,11 @@ global function qb_CreateMessWin [message]
     loop
         local [v, t] = WindowWait messwin;
         if t === 'mpanel' and v.mpanel === 'Close' then
-            WindowDestroy messwin;
-            exit [];
+            break;
         endif
     endloop
+
+    WindowDestroy messwin;
 
 endfunction
 
