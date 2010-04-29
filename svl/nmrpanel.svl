@@ -76,11 +76,7 @@ const NMR_NUM_FIELDS =
 
 const NMRSCORE_OPT_DEFAULTS =
     [
-    ['elemH',        1             ],
-    ['elemC',        0             ],
-    ['elemO',        0             ],
-    ['elemN',        0             ],
-    ['elemF',        0             ],
+    ['csp',          1             ],
     ['guess',        0             ],
     ['opt',          1             ],
     ['radius',       5.0           ]
@@ -94,18 +90,13 @@ const GEOM_OPTS =
     'all atoms'
     ];
 
-/*  NOTE:  If you change the Element Types here, you need to update them
- *         in nmrinterface.svl.
- */
-
-const ELEM_TYPES =
+const CSP_OPTS =
     [
-    'H',
-    'C',
-    'O',
-    'N',
-    'F'
+    'H only',
+    'C only',
+    'all atoms'
     ];
+
 
 const HEADER = 
     [
@@ -154,36 +145,13 @@ const PANEL =
 
     Hbox :
         [
-        Checkbox :
+        Option :
             [
-            name: 'elemH', text: 'H', title: 'Chemical Shift Atoms:',
-            onTrigger: 'return',
+            name: 'csp', text: CSP_OPTS, title: 'Chemical Shift Atoms:',
+            type: 'int', minWidth: 11, onTrigger: 'return',
             bubbleHelp:
-                ''
-            ],
-        Checkbox :
-            [
-            name: 'elemC', text: 'C', onTrigger: 'return',
-            bubbleHelp:
-                ''
-            ],
-        Checkbox :
-            [
-            name: 'elemO', text: 'O', onTrigger: 'return',
-            bubbleHelp:
-                ''
-            ],
-        Checkbox :
-            [
-            name: 'elemN', text: 'N', onTrigger: 'return',
-            bubbleHelp:
-                ''
-            ],
-        Checkbox :
-            [
-            name: 'elemF', text: 'F', onTrigger: 'return',
-            bubbleHelp:
-                ''
+                'The set of atoms on which to perform\n'
+                'chemical shift perturbation.'
             ],
         Separator : 
             [
@@ -523,7 +491,6 @@ global function qb_NMRScoreSetupPanel []
     static ligatoms;
     static posemols;
     static poseatoms;
-    static elems;
     static indices;
     static atomnames;
     static atomfree;
@@ -557,9 +524,7 @@ global function qb_NMRScoreSetupPanel []
     coredflts.scoredb = 'nmrscore.mdb';
     local appdflts = tag tr NMRSCORE_OPT_DEFAULTS;
 
-    elems = ELEM_TYPES | [appdflts.elemH, appdflts.elemC, appdflts.elemO, 
-        appdflts.elemN, appdflts.elemF];;
-    indices = qb_GetElemIndices [origligmol, elems];
+    indices = qb_GetElemIndices [origligmol, appdflts.csp];
 
     local coreopts = [], nmrsopts = [], browsetasks = [], dbkey = 0;
     local curatoms = [], curidx = [];
@@ -639,10 +604,8 @@ atombound = rep [1.050, num];
                 exit [];
             endif
 
-        elseif droplast trig === 'elem' then
-            elems = ELEM_TYPES | [vals.elemH, vals.elemC, vals.elemO, 
-                vals.elemN, vals.elemF];
-            indices = qb_GetElemIndices [origligmol, elems];
+        elseif droplast trig === 'csp' then
+            indices = qb_GetElemIndices [origligmol, vals.csp];
 
         elseif trig === 'experimental' then
             if qb_IsShowingAllPoses [vals] then
@@ -654,9 +617,7 @@ atombound = rep [1.050, num];
 
                 ViewSave 2;
 
-                elems = ELEM_TYPES | [vals.elemH, vals.elemC, vals.elemO, 
-                    vals.elemN, vals.elemF];
-                indices = qb_GetElemIndices [origligmol, elems];
+                 indices = qb_GetElemIndices [origligmol, vals.csp];
 
                 [ligatoms, errmess] = qb_GetLigandAtoms [];
                 if ligatoms === [] then
@@ -747,8 +708,7 @@ atombound = rep [1.050, num];
 
                     coreopts = qb_TagCoreVals [vals];
                     nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,
-                        [vals.elemH, vals.elemC, vals.elemO, vals.elemN,
-                        vals.elemF, vals.guess, vals.opt,
+                        [vals.csp, vals.guess, vals.opt,
                         vals.radius]];
 
                     //  Make sure atom names are unique for DB fields.
@@ -792,8 +752,7 @@ atombound = rep [1.050, num];
 
                     coreopts = qb_TagCoreVals [vals];
                     nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,
-                        [vals.elemH, vals.elemC, vals.elemO, vals.elemN,
-                        vals.elemF, vals.guess, vals.opt,
+                        [vals.csp, vals.guess, vals.opt,
                         vals.radius]];
 
                     //  Make sure atom names are unique for DB fields.
