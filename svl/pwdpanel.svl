@@ -59,12 +59,12 @@ const QBPWD_OPT_DEFAULTS =
     ['sf_e_abp',     0             ],
     ['sf_e_abc',     0             ],
     ['sf_e_vdw',     0             ],
-    ['sf_e_r6',      0             ],
+    ['sf_e_r6',      1             ],
     ['sf_e_r12',     0             ],
     ['sf_e_ele',     0             ],
-    ['expact_hdr',   PWD_EXPACT_HDR],
     ['prune_zero',   95            ],
     ['prune_sd',     0.05          ],
+    ['expact_hdr',   PWD_EXPACT_HDR],
     ['numtopres',    25            ],
     ['numcomps',     10            ],
     ['trainingset',  0             ]
@@ -622,14 +622,7 @@ local function LoadDB [dbpath]
     local pwdopts = qb_GetEnvAnal [dbkey];
     pwdopts = tagcat [pwdopts, tag tr QBPWD_OPT_DEFAULTS];
 
-//DEBUG
-    local sardata = ReadHeatMapData [
-        '~daren/dev/MOEDivcon/data/trypsin-heatmap-88.csv'];
-    qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
-//DEBUG
-
     return [dbkey, recset, ligand, coreopts, pwdopts];
-
 endfunction
 
 /****************************************************************************
@@ -1104,15 +1097,25 @@ global function qb_QBPWDSetupPanel []
                         vals.prune_sd, vals.expact_hdr,
                         vals.numtopres, vals.numcomps, vals.trainingset]];
                     SaveOptions [pwdfilename, pwdopts];
-
+//*DEBUG
                     msgkey = Message [0, 'PWD Analysis is running ...'];
                     local errmess = qb_PWDAnalysis [pwdfilename];
                     Message [msgkey, 'PWD Analysis is done.'];
                     if length errmess > 0 then
-                        qb_CreateMessWin errmess;
+                        qb_CreateMessWin [errmess];
                     else
                         sleep 3;
                     endif
+//DEBUG*/
+
+//DEBUG
+    local dbkey = db_Open [pwdfilename, 'read-write'];
+    local sardata = ReadHeatMapData [
+        '~daren/dev/MOEDivcon/data/trypsin-heatmap-88.csv'];
+    qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
+    db_Close dbkey;
+//DEBUG
+
 
                     WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
                     exit [];
