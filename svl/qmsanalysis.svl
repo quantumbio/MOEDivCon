@@ -27,6 +27,7 @@
 #set version '2010.02'
 #set main 'qb_PWDAnalysis'
 
+function qb_GetEnvAnal;
 function qb_SaveAnalysisData;
 
 const ENGERGIES =
@@ -37,7 +38,7 @@ const ENGERGIES =
 global function qb_PWDAnalysis [qmsfilename]
 
     local plsdata = [], sardata = [], interdata = [], actdata = [], optLV = [];
-    errmess = "";
+    local errmess = "";
 
     local scorepath = './divcon.h5';
     scorepath = fbase scorepath;
@@ -173,15 +174,6 @@ global function qb_PWDAnalysis [qmsfilename]
         endif
     else
         if isnull divconerrmess then divconerrmess = "Unknown error!"; endif
-        if isnull errmess then
-            errmess = cat [divconerrmess,
-                swrite ['\nLog file:  {}:{}/divcon.log\n',
-                getenv 'HOSTNAME', subdirname]];
-        else
-            errmess = cat [divconerrmess,
-                swrite ['\nLog file:  {}:{}/divcon.log\n',
-                getenv 'HOSTNAME', subdirname], errmess];
-        endif
     endif
 
     db_Close qmsdbkey;
