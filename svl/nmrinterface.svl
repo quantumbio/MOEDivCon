@@ -57,20 +57,12 @@ const GEOM_KEYS =
     'HETEROOPT',
     'ALLOPT'
     ];
-
-/*  NOTE:  If you change the Element Types here, you need to update them
- *         in nmrpanel.svl.
- */
-
-const ELEM_TYPES =
+const CSP_KEYS =
     [
-    'H',
-    'C',
-    'O',
-    'N',
-    'F'
+    'H_ONLY',
+    'C_ONLY',
+    'ALL'
     ];
-
 
 global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
         indices, free, bound]
@@ -140,9 +132,7 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
         endif
     endif
 
-    local elems = ELEM_TYPES | [appopts.elemH, appopts.elemC, appopts.elemO, 
-            appopts.elemN, appopts.elemF];
-    local poseidxs = qb_GetElemIndices [ligmol, elems];
+    local poseidxs = qb_GetElemIndices [ligmol, appopts.csp];
 
     if not alltrue eqE [indices, poseidxs] then
         errmess = cat [swrite ['Skipping!  Atom indices are inconsistent:\n'
@@ -181,11 +171,7 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
         coreopts.scaling === 1]];
     fwrite [stdin, '{c:}\n', GEOM_KEYS(appopts.opt)];
     fwrite [stdin, '{c:}\n', select ['GUESS', 'NOGUESS', appopts.guess]];
-    fwrite [stdin, '{n:}\n', length indices];
-    for idx = 1, length indices, 1 loop
-        fwrite [stdin, '{n:} {n:} {n:}\n', indices (idx), free (idx),
-            bound (idx)];
-    endloop
+    fwrite [stdin, '{c:}\n', CSP_KEYS(appopts.csp)];
 
     fwrite [stdin, '{n:}\n', coreopts.recchg];
     fwrite [stdin, '{n:}\n', coreopts.ligchg];

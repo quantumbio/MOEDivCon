@@ -1765,12 +1765,20 @@ endfunction
 /****************************************************************************
  *                          qb_GetElemIndices
  *
- *  For the given molecule, get the indices of the given element.
+ *  For the given molecule, get the indices of the H, C, or all atoms.
  *
  ****************************************************************************/
-global function qb_GetElemIndices [mol, elems]
+global function qb_GetElemIndices [mol, which]
 
-    local atomindices = cat indicesof [elems, mol(4)(MOL_ATOM_EL)];
+    local atomindices;
+
+    if which === 1 then
+        atomindices = cat indicesof ['H', mol(4)(MOL_ATOM_EL)];
+    elseif which === 2 then
+        atomindices = cat indicesof ['C', mol(4)(MOL_ATOM_EL)];
+    else
+        atomindices = igen add mol(3)(MOL_RES_NATOMS);
+    endif
 
     return atomindices;
 endfunction
@@ -2463,6 +2471,26 @@ global function qb_SplitComplex [testsingle]
     recatoms  = col [x];
 
     return [recatoms, ligatoms, ''];
+endfunction
+
+/****************************************************************************
+ *
+ *                          qb_StandardDeviation
+ *
+ *  Return the average and standard deviation of the flat vector of numbers.
+ *
+ ****************************************************************************/
+global function qb_StandardDeviation [nums]
+
+    local n = length nums;
+    if n === 0 then
+        return 0;
+    endif
+    local avg = (add nums) / n;
+    local sigma = sqrt ((add (sqr (nums - avg))) / n);
+
+    return [avg, sigma];
+
 endfunction
 
 /****************************************************************************
