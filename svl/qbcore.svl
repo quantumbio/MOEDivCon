@@ -1585,7 +1585,7 @@ endfunction
 global function qb_CreateMessWin [message]
 
     local messwin = WindowCreate MESS_WINDOW;
-    WindowSetData [messwin, [mess: message]]];
+    WindowSetData [messwin, [mess: message]];
     WindowShow [messwin, 1];
     loop
         local [v, t] = WindowWait messwin;

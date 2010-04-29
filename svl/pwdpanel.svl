@@ -974,6 +974,7 @@ global function qb_QBPWDSetupPanel []
     pwdfilename = '';
     pwddata = [[], [], []];
 
+    local msgkey;
     local appdflts = tag tr QBPWD_OPT_DEFAULTS;
     local pwdopts = [];
     local wkey = WindowCreate cat [HEADER, PANEL];
@@ -1010,7 +1011,7 @@ global function qb_QBPWDSetupPanel []
 
                 //  Create surface if necessary
                 if isnull G_surface then
-                    local msgkey = Message [0, 'Calculating surface ...'];
+                    msgkey = Message [0, 'Calculating surface ...'];
                     CreateSurfaceMap [second pwddata (vals.analysis)];
                     msgkey = Message [msgkey, ''];
                 endif
@@ -1088,12 +1089,11 @@ global function qb_QBPWDSetupPanel []
                         exit [];
                     endif
 
-                    acts = db_ReadColumn [pwdfilename, vals.expact_hdr] then
+                    local acts = db_ReadColumn [pwdfilename, vals.expact_hdr];
                     if isnull acts then
                         Warning fwrite ['Missing activities in database: {}.',
                             pwdfilename];
                         exit [];
-
                     endif
 
                     pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
@@ -1105,8 +1105,8 @@ global function qb_QBPWDSetupPanel []
                         vals.numtopres, vals.numcomps, vals.trainingset]];
                     SaveOptions [pwdfilename, pwdopts];
 
-                    local msgkey = Message [0, 'PWD Analysis is running ...'];
-                    local errmess = qb_PWDAnalysis [qmsfilename];
+                    msgkey = Message [0, 'PWD Analysis is running ...'];
+                    local errmess = qb_PWDAnalysis [pwdfilename];
                     Message [msgkey, 'PWD Analysis is done.'];
                     if length errmess > 0 then
                         qb_CreateMessWin errmess;
@@ -1160,7 +1160,6 @@ global function qb_QBPWDSetupPanel []
     aSetLabelRes [G_surface.resatms, 0];
     G_surface = [];
 
-    task_kill browsetasks;
     WindowDestroy wkey;
 
 endfunction
