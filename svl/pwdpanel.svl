@@ -58,7 +58,6 @@ const QBPWD_OPT_DEFAULTS =
     ['sf_e_ab',      1             ],
     ['sf_e_abp',     0             ],
     ['sf_e_abc',     0             ],
-    ['sf_e_vdw',     0             ],
     ['sf_e_r6',      1             ],
     ['sf_e_r12',     0             ],
     ['sf_e_ele',     0             ],
@@ -126,11 +125,19 @@ const PANEL =
                 bubbleHelp:
                     'E_AB is the exchange between atoms.'
                 ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
             Checkbox :
                 [
                 name: 'sf_e_abp', text: 'E_ABp',
                 bubbleHelp:
                     'E_ABp is the electron-electron repulsion.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
                 ],
             Checkbox :
                 [
@@ -146,21 +153,23 @@ const PANEL =
             extendH: 1,
             Checkbox :
                 [
-                name: 'sf_e_vdw', text: 'E_VDW', title: 'MM:',
+                name: 'sf_e_r6', text: 'E_R6', title: 'MM:',
                 bubbleHelp:
                     ''
                 ],
-            Checkbox :
+            Separator : 
                 [
-                name: 'sf_e_r6', text: 'E_R6',
-                bubbleHelp:
-                    ''
+                vertical:0, shadow:'noline', extendH: 0, margin:1
                 ],
             Checkbox :
                 [
                 name: 'sf_e_r12', text: 'E_R12',
                 bubbleHelp:
                     ''
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
                 ],
             Checkbox :
                 [
@@ -563,7 +572,7 @@ local function GetAnalData [dbpath, type]
     if MOE_BATCH then return []; endif
 
     if neL [ftype dbpath, 'file'] or neL [fext dbpath, 'mdb'] then
-        Warning 'The PWD database doesn\'t exist.';
+        Warning twrite ['{}\n is not a QMScore/PWD database.', dbpath];
         exit [];
     endif
 
@@ -640,7 +649,7 @@ local function LoadLigs [pwdfilename]
     if MOE_BATCH then return []; endif
 
     if neL [ftype pwdfilename, 'file'] or neL [fext pwdfilename, 'mdb'] then
-        Warning 'The PWD database doesn\'t exist.';
+        Warning twrite['{}\nis not a QMScore/PWD database.', pwdfilename];
         exit [];
     endif
 
@@ -737,6 +746,8 @@ endfunction
  ****************************************************************************/
 local function ReadExpActData [expactfn, qmsdbfn, header]
 
+write ['Act file:  {}\n', expactfn];//DEBUG
+
     local qdbkey = db_Open [qmsdbfn, 'read-write'];
     local eaf = fopenr expactfn;
 
@@ -797,7 +808,7 @@ local function SaveOptions [dbpath, options]
     if MOE_BATCH then return []; endif
 
     if neL [ftype dbpath, 'file'] or neL [fext dbpath, 'mdb'] then
-        Warning 'The QMScore database doesn\'t exist.';
+        Warning twrite ['{}\n is not a QMScore/PWD database.', dbpath];
         exit [];
     endif
 
@@ -1038,12 +1049,13 @@ global function qb_QBPWDSetupPanel []
 
                 if neL [ftype pwdfilename, 'file']
                         or neL [fext pwdfilename, 'mdb'] then
-                    Warning fwrite ['Cannot find the QMScore database:  {}.',
+                    Warning 
+                        twrite ['Cannot find the QMScore/PWD database:\n{}.',
                         pwdfilename];
                     exit [];
                 endif
 
-                local actfile = FilePrompt [title: 'Load Activities File', 
+                local actfile = first FilePrompt [title: 'Load Activities File', 
                     filter: '*.csv', allowEmptyList: 0];
                 if not isnull actfile then
                     ReadExpActData [actfile, pwdfilename, vals.expact_hdr];
@@ -1059,7 +1071,7 @@ global function qb_QBPWDSetupPanel []
                     pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
                         vals.title,
                         vals.analysis, vals.sf_e_ab, vals.sf_e_abp,
-                        vals.sf_e_abc, vals.sf_e_vdw, vals.sf_e_r6,
+                        vals.sf_e_abc, vals.sf_e_r6,
                         vals.sf_e_r12, vals.sf_e_ele, vals.prune_zero,
                         vals.prune_sd, vals.expact_hdr,
                         vals.numtopres, vals.numcomps, vals.trainingset]];
@@ -1073,16 +1085,19 @@ global function qb_QBPWDSetupPanel []
                 if second task_fork [statics:'share', 
                         master:'parent'] === 'child' then
 
+write ['File:  {}\n', pwdfilename];//DEBUG
+
                     if neL [ftype pwdfilename, 'file']
                             or neL [fext pwdfilename, 'mdb'] then
-                        Warning fwrite ['Can\'t find the QMScore database: {}.',
+                        Warning 
+                            twrite ['Can\'t find the QMScore/PWD database: {}.',
                             pwdfilename];
                         exit [];
                     endif
 
                     local acts = db_ReadColumn [pwdfilename, vals.expact_hdr];
                     if isnull acts then
-                        Warning fwrite ['Missing activities in database: {}.',
+                        Warning twrite ['Missing activities in database: {}.',
                             pwdfilename];
                         exit [];
                     endif
@@ -1090,7 +1105,7 @@ global function qb_QBPWDSetupPanel []
                     pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
                         vals.title,
                         vals.analysis, vals.sf_e_ab, vals.sf_e_abp,
-                        vals.sf_e_abc, vals.sf_e_vdw, vals.sf_e_r6,
+                        vals.sf_e_abc, vals.sf_e_r6,
                         vals.sf_e_r12, vals.sf_e_ele, vals.prune_zero,
                         vals.prune_sd, vals.expact_hdr,
                         vals.numtopres, vals.numcomps, vals.trainingset]];
@@ -1124,10 +1139,18 @@ global function qb_QBPWDSetupPanel []
                         statics:'share'] === 'child' then
                     task_prio 0;
 
-                    pwdfilename = FilePrompt [title: 'Load Database', 
+                    local tempfile = first FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
-                    if not isnull pwdfilename then
-                        pwdfilename = first pwdfilename;
+                    if not isnull tempfile then
+                        if neL [ftype tempfile, 'file']
+                                or neL [fext tempfile, 'mdb'] then
+                            Warning 
+                                twrite ['{}\nis not a QMScore/PWD database.',
+                                tempfile];
+                            exit [];
+                        endif
+
+                        pwdfilename = tempfile;
                         local [ldkey, ldrec, ldlig, ldcoreopts, ldpwdopts]
                             = LoadDB [pwdfilename];
                         if neL [ldcoreopts.mode, 'Many-to-Many'] then
@@ -1145,12 +1168,12 @@ global function qb_QBPWDSetupPanel []
 
                         db_Close ldkey;
                         WindowSetData [wkey, ldpwdopts];
+                        WindowSetAttr [wkey, [analbox: [sensitive: 1],
+                            panel: [sensitive: [1,1,1]]]];
                     else
                         pwdfilename = '';
                     endif
 
-                    WindowSetAttr [wkey, [analbox: [sensitive: 1],
-                        panel: [sensitive: [1,1,1]]]];
                     exit [];
                 endif
             endif

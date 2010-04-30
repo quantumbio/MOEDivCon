@@ -1924,6 +1924,7 @@ global function qb_InterMoleculeOverlap [recset, ligset]
         local residues = oParent pairs;
         local rnames = rName residues;
         local rnums = rNumber residues;
+        local ruids = rUID residues;
         local anames = aName pairs;
         local indices = aNumber pairs;
         indices = tr indices;
@@ -1933,11 +1934,12 @@ global function qb_InterMoleculeOverlap [recset, ligset]
         local ith; 
         mess = tok_cat [mess, '    Error!  Overlapping atoms:\n'];
         for ith = 1, length pairs, 1 loop
-            mess = tok_cat [mess, twrite ['        Receptor {}:  {} in {} {}'
-                    ' is {}A from Ligand {}:  {} in {} {}\n', 
-                indices(ith)(1), anames(ith)(1), rnames(ith)(1),
-                rnums(ith)(1),  dists(ith), indices(ith)(2), 
-                anames(ith)(2), rnames(ith)(2), rnums(ith)(2)]];
+            mess = tok_cat [mess, 
+                twrite ['        Receptor {}: {} in {}: {} {}'
+                ' is {}A from Ligand {}: {} in {}: {} {}\n', 
+                indices(ith)(1), anames(ith)(1), rnums(ith)(1), rnames(ith)(1),
+                ruids(ith)(1),  dists(ith), indices(ith)(2), 
+                anames(ith)(2), rnums(ith)(2), rnames(ith)(2), ruids(ith)(2)]];
         endloop
     endif
 
@@ -2090,7 +2092,7 @@ global function qb_PassBackbone [inpipe, outpipe, recchains, ligchain]
         fwrite [outpipe, '{n:}\n', cResidueCount chain];
         for residue in cat cResidues chain loop
             fwrite [outpipe, '{c:} {n:} {n:}\n', 
-                rName residue,rUID residue, rAtomCount residue];
+                rName residue, rUID residue, rAtomCount residue];
             for atom in cat rAtoms residue loop
                 idx = aNumber atom;
                 fwrite [outpipe, '{c:} {c:} {c:}\n',
@@ -2112,7 +2114,7 @@ global function qb_PassBackbone [inpipe, outpipe, recchains, ligchain]
     fwrite [outpipe, '{n:}\n', cResidueCount chain];
     for residue in cat cResidues chain loop
         fwrite [outpipe, '{c:} {n:} {n:}\n', 
-            rName residue,rUID residue, rAtomCount residue];
+            rName residue, rUID residue, rAtomCount residue];
         for atom in cat rAtoms residue loop
             idx = aNumber atom - length recatoms;
             fwrite [outpipe, '{c:} {c:} {c:}\n',
@@ -2561,7 +2563,7 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap, hamcompat,
         missextraH, MMtype, appname, hamname]
 
     local warn = 0, error = 0, mess = '';
-    local indices, residues, rnames, rnums, anames, ith; 
+    local indices, residues, rnames, rnums, ruids, anames, ith; 
  
     local elements = aElement atoms;
     local ions = aIon atoms;
@@ -2573,13 +2575,15 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap, hamcompat,
             residues = oParent atoms [indices];
             rnames = rName residues;
             rnums = rNumber residues;
+            ruids = rUID residues;
             anames = aName atoms [indices];
             ith = 0; 
             mess = tok_cat [mess, '    Error!  LP atoms:\n'];
             for length indices loop
                 ith = ith + 1;
-                mess = tok_cat [mess, twrite ['        {}:  {} in {} {}\n', 
-                    indices(ith), anames(ith), rnames(ith), rnums(ith)]];
+                mess = tok_cat [mess, twrite ['        {}: {} in {}: {} {}\n', 
+                    indices(ith), anames(ith), rnums(ith), rnames(ith),
+                    ruids(ith)]];
             endloop
 
             error = 1;
@@ -2593,16 +2597,18 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap, hamcompat,
             residues = oParent pairs;
             rnames = rName residues;
             rnums = rNumber residues;
+            ruids = rUID residues;
             anames = aName pairs;
             indices = aNumber pairs;
             local dists = app aDist pairs;
             mess = tok_cat [mess, '    Error!  Overlapping atoms:\n'];
             for ith = 1, length pairs, 1 loop
-                mess = tok_cat [mess, twrite ['        {}:  {} in {} {}'
-                     ' is {}A from {}:  {} in {} {}\n', 
-                    indices(ith)(1), anames(ith)(1), rnames(ith)(1),
-                    rnums(ith)(1),  dists(ith), indices(ith)(2), 
-                    anames(ith)(2), rnames(ith)(2), rnums(ith)(2)]];
+                mess = tok_cat [mess, twrite ['        {}: {} in {}: {} {}'
+                     ' is {}A from {}: {} in {}: {} {}\n', 
+                    indices(ith)(1), anames(ith)(1), rnums(ith)(1), 
+                    rnames(ith)(1), ruids(ith)(1),  dists(ith), indices(ith)(2), 
+                    anames(ith)(2), rnums(ith)(2), rnames(ith)(2),
+                    ruids(ith)(2)]];
             endloop
 
             error = 1;
@@ -2635,13 +2641,15 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap, hamcompat,
             residues = oParent atoms [indices];
             rnames = rName residues;
             rnums = rNumber residues;
+            ruids = rUID residues;
             anames = aName atoms [indices];
             ith = 0; 
             mess = tok_cat [mess, '    Warning!  Check H on atoms:\n'];
             for length indices loop
                 ith = ith + 1;
-                mess = tok_cat [mess, twrite ['        {}:  {} in {} {}\n', 
-                    indices(ith), anames(ith), rnames(ith), rnums(ith)]];
+                mess = tok_cat [mess, twrite ['        {}: {} in {}: {} {}\n', 
+                    indices(ith), anames(ith), rnums(ith), rnames(ith),
+                    ruids(ith)]];
             endloop
 
             warn = 1;
@@ -2656,14 +2664,16 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap, hamcompat,
             residues = oParent atoms [indices];
             rnames = rName residues;
             rnums = rNumber residues;
+            ruids = rUID residues;
             anames = aName atoms [indices];
             ith = 0; 
             mess = tok_cat [mess, 
                 '    Warning!  Unknown MM types for atoms:\n'];
             for length indices loop
                 ith = ith + 1;
-                mess = tok_cat [mess, twrite ['        {}:  {} in {} {}\n', 
-                    indices(ith), anames(ith), rnames(ith), rnums(ith)]];
+                mess = tok_cat [mess, twrite ['        {}: {} in {}: {} {}\n', 
+                    indices(ith), anames(ith), rnums(ith), rnames(ith),
+                    ruids(ith)]];
             endloop
 
             warn = 1;
