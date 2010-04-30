@@ -32,7 +32,7 @@ function qb_SaveAnalysisData;
 
 const ENGERGIES =
     [
-    "E_AB", "E_ABp", "E_ABc", "E_VDW", "E_R6", "E_R12", "E_ELE"
+    "E_AB", "E_ABp", "E_ABc", "E_R6", "E_R12", "E_ELE"
     ];
 
 global function qb_PWDAnalysis [qmsfilename]
@@ -62,12 +62,12 @@ global function qb_PWDAnalysis [qmsfilename]
     local numpairs = db_nEntries qmsdbkey;
     local activities = db_ReadColumn [qmsdbkey, pwdopts.expact_hdr]; 
     local energies = ENGERGIES | [pwdopts.sf_e_ab, pwdopts.sf_e_abp,
-        pwdopts.sf_e_abc, pwdopts.sf_e_vdw, pwdopts.sf_e_r6, pwdopts.sf_e_r12,
+        pwdopts.sf_e_abc, pwdopts.sf_e_r6, pwdopts.sf_e_r12,
         pwdopts.sf_e_ele];
 
     //  Pass the target-ligand pairs, activities and options to 
     //  QuantumBio's Divcon PWD Analysis
-    local retValue, success = 0;
+    local handshake, success = 0;
     local idx;
     fwrite [stdin, '{c:}\n', 'pwd'];
     fwrite [stdin, '{c:}\n', scorepath];
@@ -89,10 +89,10 @@ global function qb_PWDAnalysis [qmsfilename]
         fwrite [stdin, '{n:}\n', activities[idx]];
     endloop
 
-    [retValue] = fread [stdout, '{n:}\n'];
+    [[handshake]] = fread [stdout, '{n:}\n'];
 
-    print retValue;//DEBUG
-    print exe_status process_keys;//DEBUG
+write ['Handshake: {}\n', handshake];//DEBUG
+write ['Parameters exe_status:  {}\n', exe_status process_keys];//DEBUG
 
     const NUMRESULTS = 11;
     local return_statement;
@@ -146,7 +146,7 @@ global function qb_PWDAnalysis [qmsfilename]
         [[newerror]] = fread [stderr, '{c:*}'];
     endloop
 
-    print exe_status process_keys;//DEBUG
+write ['Results exe_status:  {}\n', exe_status process_keys];//DEBUG
 
     exe_kill  [process_key, 0];
     exe_kill  process_key;
