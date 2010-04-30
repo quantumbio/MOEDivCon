@@ -2144,6 +2144,31 @@ global function qb_ResetLigand [wkey, vals]
 endfunction
 
 /****************************************************************************
+ *
+ *                          qb_RMSD
+ *
+ *  Return the root mean square deviation of the calculated and observed
+ *  data.
+ *
+ ****************************************************************************/
+global function qb_RMSD [calc, obs]
+
+    local n = length calc;
+    if neL [n, length obs] then
+        return REAL_MIN;
+    endif
+
+    if n === 0 then
+        return 0;
+    endif
+
+    local sigma = sqrt ((add (sqr (calc - obs))) / n);
+
+    return sigma;
+
+endfunction
+
+/****************************************************************************
  *                          qb_SaveAnalysisData
  *
  *  Save the analysis results in the database.

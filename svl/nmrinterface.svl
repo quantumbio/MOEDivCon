@@ -32,6 +32,7 @@ function qb_GetElemIndices;
 function qb_GetWhich;
 function qb_HamSetsInit;
 function qb_PassBackbone;
+function qb_RMSD;
 
 /*  NOTE:  If you change the key lists here, you need to update the
  *         option lists and default indices in qbcore.svl and nmrpanel.svl.
@@ -198,15 +199,25 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
 write ['Divcon: {}\n', return_statement];//DEBUG
 
         if return_statement === "updatescore" then
-            local atomvalues = [];
-            local [[score]] = fread [stdout, '{n:}'];
+            local atomindices = [], atomvalues = [];
             local [[numvals]] = fread [stdout, '{n:}'];
             for numvals loop
+                local [[cspidx]] = fread [stdout, '{n:}'];
                 local [[cspval]] = fread [stdout, '{n:}'];
-print [cspval];	//DEBUG
+print [cspidx, cspval];//DEBUG
+                atomindices = append [atomindices, cspidx];
                 atomvalues = append [atomvalues, cspval];
             endloop
 
+            if not alltrue eqE [indices, atomindices] then
+                errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
+                    '    Orig: {v}\n    Divcon: {v}\n', indices, atomindices],
+                    errmess];
+                return [[], errmess];
+            endif
+
+            local score = qb_RMSD [atomvalues, free - bound];
+print [score];//DEBUG
             results = [score, atomvalues];
             success = 1;
             fwrite [stdin, '{c:}\n', 'Ok'];
