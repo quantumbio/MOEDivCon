@@ -209,6 +209,13 @@ print [cspidx, cspval];//DEBUG
                 atomvalues = append [atomvalues, cspval];
             endloop
 
+            if neL [length indices, length atomindices] then
+                errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
+                    '    Orig: {v}\n    Divcon: {v}\n', indices, atomindices],
+                    errmess];
+                return [[], errmess];
+            endif
+
             if not alltrue eqE [indices, atomindices] then
                 errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
                     '    Orig: {v}\n    Divcon: {v}\n', indices, atomindices],
