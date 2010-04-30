@@ -24,7 +24,7 @@
 
 //    pwdpanel.svl    User-interface entrypoint to QB-PWD calculations
 
-#set title   'QuantumBio PWD'
+#set title   'QuantumBio PWD Panel'
 #set class   'QuantumBio'
 #set version '2010.02'
 #set main    'qb_QBPWDSetupPanel'
@@ -896,8 +896,6 @@ endfunction
 global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
         colors]
     
-write ['{v}\n{v}\n{v}\n{v}\n', data(1), data(2), data(3), data(4)];//DEBUG
-
     local [titles, resnames, resabbrevs, rowdata] = data;
     local restok = '', ligtok = '', ligabbrev = '', ligdata = [];
     if selrow === 0 and selcol === 0 then
@@ -998,8 +996,8 @@ global function qb_QBPWDSetupPanel []
                 endif
 
                 if ANALKEYS (vals.analysis) === 'pls' then
-
-                exit [];
+//TODO:  Table
+                    exit [];
                 endif
 
                 //  Create surface if necessary
