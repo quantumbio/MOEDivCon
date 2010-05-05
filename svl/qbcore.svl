@@ -31,7 +31,7 @@
 function _Atoms;
 
 //  Database Fields
-const POSE_FIELD = 'Ligand/Pose';
+const LIG_FIELD = 'Ligand/Pose';
 const LIGCHG_FIELD = 'Lig Chg';
 
 const REC_FIELD = 'Receptor';
@@ -782,7 +782,7 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
     local coreopts = qb_GetEnvTag [resultskey, COREOPTS];
 
     //  HACK alert:  temporarily renames mol field to make copying easier
-    db_RenameField [resultskey, POSE_FIELD, molfield];
+    db_RenameField [resultskey, LIG_FIELD, molfield];
     apt db_EnsureField [resultskey,  fields, ftypes];
 
     local osys, nsys;
@@ -844,7 +844,7 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
         Message [msgkey, 'Saving database ... done.'];
     endif
 
-    db_RenameField [resultskey, molfield, POSE_FIELD];
+    db_RenameField [resultskey, molfield, LIG_FIELD];
 
     return mess;
 endfunction
@@ -915,7 +915,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
 
     db_RenameField [resultskey, recmolfield, REC_FIELD];
 
-    db_RenameField [resultskey, POSE_FIELD, posemolfield];
+    db_RenameField [resultskey, LIG_FIELD, posemolfield];
     apt db_EnsureField [resultskey, posefields, poseftypes];
 
     local poserowkey = 0, resultrowkey = 0, ith = 1;
@@ -961,7 +961,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         Message [msgkey, 'Saving database ... done.'];
     endif
 
-    db_RenameField [resultskey, posemolfield, POSE_FIELD];
+    db_RenameField [resultskey, posemolfield, LIG_FIELD];
 
     return mess;
 endfunction
@@ -1079,7 +1079,7 @@ local function SetScoreFields [dbkey, addreceptor, fields]
         db_EnsureField [dbkey, RECCHG_FIELD, 'int'];
     endif
 
-    db_EnsureField [dbkey, POSE_FIELD, 'molecule'];
+    db_EnsureField [dbkey, LIG_FIELD, 'molecule'];
     db_EnsureField [dbkey, LIGCHG_FIELD, 'int'];
     db_EnsureField [dbkey, STATUS_FIELD, 'char'];
 
@@ -1845,7 +1845,7 @@ endfunction
  ****************************************************************************/
 global function qb_GetPoseFields []
 
-    return [POSE_FIELD, LIGCHG_FIELD];
+    return [LIG_FIELD, LIGCHG_FIELD];
 
 endfunction
 
@@ -2032,6 +2032,18 @@ global function qb_LoadCoreScoreDB [dbpath, type]
     endif
 
     local [rec, lig, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
+
+    if coreopts.mode === 'Many-to-Many' then
+        local rowkey = db_NextEntry [dbkey, 0];
+        local [rec, recchg] = db_ReadFields [dbkey, rowkey,
+            [REC_FIELD, RECCHG_FIELD]];
+        local [lig, ligchg] = db_ReadFields [dbkey, rowkey,
+            [LIG_FIELD, LIGCHG_FIELD]];
+
+    coreopts.recchg = recchg;
+    coreopts.ligchg = ligchg;
+
+    endif
 
     return [dbkey, rec, lig, status, coreopts, complex, ''];
 endfunction
@@ -2338,6 +2350,12 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         endif
 
     else
+        //  Reset the status and coreopts charge information (no rec/lig)
+        status = tagput [status, ['calcchg', 'verified', 'recchg', 'ligchg',
+            'moerecchg', 'moeligchg'], [0, 0, 1, 1, 0, 0]];
+        coreopts.recchg = 0;
+        coreopts.ligchg = 0;
+
         SaveEnv [dbkey, [], [], status, coreopts, appopts, complex, dbtype];
     endif
 
