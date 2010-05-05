@@ -52,8 +52,8 @@ const CELL_HT = 10;
 const MOE_PAD_W = 3.7;
 const MOE_PAD_H = 3.0;
 
-const MAX_ROWS = 40;
-const MAX_COLS = 30;
+const MAX_ROWS = 40;            //  Used for truncation of table data
+const MAX_COLS = 30;            //  Used for truncation of table data
 
 //  Data
 const DATA_TITLES = 1;
@@ -98,6 +98,10 @@ const OPT_DEFAULTS =
     ['nticks',       5             ]
     ];
 
+const SIGMAS = ['1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0'];
+const NUM_COLORS = ['4', '8', '12', '16', '24', '32'];
+const NUM_TICKS  = ['5', '9', '13', '17', '25', '33'];
+
 //  Window GUI
 const HEADER = 
     [
@@ -112,7 +116,7 @@ const PANEL =
     [
     Vbox :
         [
-        Hbox :
+        HSIGMASbox :
             [
             extendH: 1,
             Label :
@@ -198,7 +202,7 @@ const PANEL =
                 name: 'sigma', len: 7,
                 title: 'Number of sigmas:',
                 type: 'real', allowBlank: 0,
-                shortcut: ['1.0', '2.0', '3.0', '4.0', '5.0', '6.0'],
+                shortcut: SIGMAS,
                 bubbleHelp: 'Number of standard deviations used to\n'
                     'calculate the minimum and maximum cutoffs.'
                 ],
@@ -211,7 +215,7 @@ const PANEL =
                 name: 'ncolors', len: 7,
                 title: 'Number of colors:',
                 type: 'int', allowBlank: 0,
-                shortcut: ['3', '7', '15', '31'],
+                shortcut: NUM_COLORS,
                 bubbleHelp: 'Number of distinct colors.'
                 ],
             Separator : 
@@ -229,7 +233,7 @@ const PANEL =
                 name: 'nticks', len: 7,
                 title: 'Number of ticks:',
                 type: 'int', allowBlank: 0,
-                shortcut: ['3', '5', '7', '9'],
+                shortcut: NUM_TICKS,
                 bubbleHelp: 'Number of labeled ticks on color scale.'
                 ]
             ],
