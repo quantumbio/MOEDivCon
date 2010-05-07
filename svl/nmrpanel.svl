@@ -487,6 +487,8 @@ global function qb_NMRScoreSetupPanel []
     static cutrecmol;
     static origrecmol;
     static origligmol;
+    static orignuc;
+    static origbnd;
     static recatoms;
     static ligatoms;
     static posemols;
@@ -508,6 +510,8 @@ global function qb_NMRScoreSetupPanel []
 
     origrecmol = mol_Extract recatoms;
     origligmol = mol_Extract ligatoms;
+    orignuc = '';
+    origbnd = '';
     cutrecmol = [];
     posemols = [];
     poseatoms = [];
@@ -553,6 +557,8 @@ atombound = rep [1.050, num];
                 task_prio 0;
 
                 ViewSave 1;
+                orignuc = aNucleusLook ligatoms;
+                origbnd = aBondLook ligatoms;
                 if posemols === [] and qb_IsModeOneToMany [vals] then
                     [posemols, errmess] = qb_GetPoses [vals];
                     if posemols === [] then
@@ -590,8 +596,8 @@ atombound = rep [1.050, num];
                 mol_Create origrecmol;
                 ligatoms = cat cAtoms mol_Create origligmol;
                 oSetCollection ['QB_LIGAND', ligatoms];
-                aSetNucleusLook [ligatoms, 'small-sphere'];
-                aSetBondLook [ligatoms, 'cylinder'];
+//DEBUG                aSetNucleusLook [ligatoms, 'small-sphere'];//DEBUG
+//DEBUG                aSetBondLook [ligatoms, 'cylinder'];//DEBUG
                 poseatoms = [];
 
                qb_ShowLigPoses [vals];
@@ -599,6 +605,8 @@ atombound = rep [1.050, num];
 
                 WindowSetAttr [wkey, [showcut: [sensitive: 1],
                     original: [sensitive: 0]]];
+                aSetNucleusLook [ligatoms, orignuc];
+                aSetBondLook [ligatoms, origbnd];
                 ViewLoad 1;
                 View [];
                 exit [];
@@ -608,6 +616,9 @@ atombound = rep [1.050, num];
             indices = qb_GetElemIndices [origligmol, vals.csp];
 
         elseif trig === 'experimental' then
+
+            if WindowShow ['NMRExperimentalData', 1] then continue; endif
+
             if qb_IsShowingAllPoses [vals] then
                 vals = qb_ResetLigand [wkey, vals];
             endif
@@ -615,20 +626,27 @@ atombound = rep [1.050, num];
             if second task_fork [statics:'share',
                     master: 'parent'] === 'child' then
 
-                ViewSave 2;
-
                  indices = qb_GetElemIndices [origligmol, vals.csp];
-
                 [ligatoms, errmess] = qb_GetLigandAtoms [];
                 if ligatoms === [] then
                     Warning errmess;
                     exit [];
                 endif
 
+                ViewSave 2;
+                local lignuc = aNucleusLook ligatoms (1);
+                local ligbnd = aBondLook ligatoms (1);
+
+                aSetNucleusLook [ligatoms, 'small-sphere'];
+                aSetBondLook [ligatoms, 'cylinder'];
                 View ligatoms;
                 [atomfree, atombound] = SetupExpDataPanel [ligatoms, indices,
                     atomfree, atombound];
+
+                aSetNucleusLook [ligatoms, lignuc];
+                aSetBondLook [ligatoms, ligbnd];
                 ViewLoad 2;
+
                 exit [];
             endif
 
@@ -661,15 +679,15 @@ atombound = rep [1.050, num];
                             mol_Create cutrecmol;
                             ligatoms = cat oAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
-                            aSetNucleusLook [ligatoms, 'small-sphere'];
-                            aSetBondLook [ligatoms, 'cylinder'];
+//DEBUG                            aSetNucleusLook [ligatoms, 'small-sphere'];//DEBUG
+//DEBUG                            aSetBondLook [ligatoms, 'cylinder'];//DEBUG
                         else
                             wascut = 0;
                             mol_Create origrecmol;
                             ligatoms = cat cAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
-                            aSetNucleusLook [ligatoms, 'small-sphere'];
-                            aSetBondLook [ligatoms, 'cylinder'];
+//DEBUG                            aSetNucleusLook [ligatoms, 'small-sphere'];//DEBUG
+//DEBUG                            aSetBondLook [ligatoms, 'cylinder'];//DEBUG
                         endif
 
                         poseatoms = [];

@@ -222,7 +222,11 @@ const PANEL =
                 title: 'Maximum percent zero:',
                 type: 'int', len: 5,
                 bubbleHelp:
-                    ''
+                    'Prune residues which have greater than the\n'
+                    'specified % of zero values for the selected\n'
+                    'energies for the ligands in the training set;\n'
+                    'that is; those distant from the pocket with\n'
+                    'very little interaction with the ligands.'
                 ],
             Label :
                 [
@@ -239,7 +243,11 @@ const PANEL =
                 name: 'prune_sd', allowBlank: 0, title: 'Minimum SD:',
                 type: 'real', len: 5,
                 bubbleHelp:
-                    ''
+                    'Prune residues which have a smaller standard\n'
+                    'deviation over the values of the selected energies\n'
+                    'for the ligands in the training set than the\n'
+                    'specified SD; that is, exclude those that do have\n'
+                    'not distinguishing characteristic.'
                 ]
             ],
 
@@ -253,7 +261,8 @@ const PANEL =
                 title: 'Number of top scorers:',
                 type: 'int', len: 5,
                 bubbleHelp:
-                    ''
+                    'Keep only the specified number of top scoring\n'
+                    'residues to show in the Heat Map (max 30).'
                 ]
             ],
 
@@ -488,6 +497,9 @@ write ['Dist:  {}\n', dist];//DEBUG
         ligpos  : aPos ligatoms,
         ligidx  : 0,
         ligmols : [],
+        origvw  : 7,
+        orignuk : '',
+        origbnd : '',
         restok  : '',
         resatms : [],
         dist    : dist,
@@ -521,7 +533,12 @@ write ['Dist:  {}\n', dist];//DEBUG
     GVertex [G_surface.gobj, G_surface.surfdim, s_idx, G_surface.colconst,
       s_vpt, s_vnorm];
 
+    ViewSave G_surface.origvw;
+    G_surface.orignuc = aNucleusLook G_surface.lig (1);
+    G_surface.origbnd = aBondLook G_surface.lig (1);
+
     aSetNucleusLook [G_surface.lig, 'sphere'];
+    aSetBondLook [G_surface.lig, 'none'];
     View G_surface.lig;
 
 endfunction
@@ -832,6 +849,8 @@ local function UpdateComplex [lignum]
     if length G_surface.lig === 0 then return; endif
 
     local lignuc = aNucleusLook G_surface.lig (1);
+    local ligbnd = aBondLook G_surface.lig (1);
+
     oDestroy uniq oChains G_surface.lig;
     local ligchn = mol_Create G_surface.ligmols (lignum);
 
@@ -840,6 +859,7 @@ local function UpdateComplex [lignum]
 
     oSetCollection ['QB_LIGAND', G_surface.lig];
     aSetNucleusLook [G_surface.lig, lignuc];
+    aSetBondLook [G_surface.lig, ligbnd];
 
 endfunction
 
@@ -893,9 +913,14 @@ endfunction
  ****************************************************************************/
 global function qb_QBPWDCloseHandler []
 
-    ClearSurfaceMap G_surface.title;
-    aSetLabelRes [G_surface.resatms, 0];
-    G_surface = [];
+    if not isnull G_surface then
+        ClearSurfaceMap G_surface.title;
+        aSetLabelRes [G_surface.resatms, 0];
+        aSetNucleusLook [G_surface.lig, G_surface.orignuc];
+        aSetBondLook [G_surface.lig, G_surface.origbnd];
+        ViewLoad G_surface.origvw;
+        G_surface = [];
+    endif
 
 endfunction
 
@@ -1085,8 +1110,6 @@ global function qb_QBPWDSetupPanel []
                 if second task_fork [statics:'share', 
                         master:'parent'] === 'child' then
 
-write ['File:  {}\n', pwdfilename];//DEBUG
-
                     if neL [ftype pwdfilename, 'file']
                             or neL [fext pwdfilename, 'mdb'] then
                         Warning 
@@ -1110,16 +1133,15 @@ write ['File:  {}\n', pwdfilename];//DEBUG
                         vals.prune_sd, vals.expact_hdr,
                         vals.numtopres, vals.numcomps, vals.trainingset]];
                     SaveOptions [pwdfilename, pwdopts];
-//*DEBUG
+
                     msgkey = Message [0, 'PWD Analysis is running ...'];
                     local errmess = qb_PWDAnalysis [pwdfilename];
                     Message [msgkey, 'PWD Analysis is done.'];
                     if length errmess > 0 then
-                        qb_CreateMessWin [errmess];
+                        qb_CreateMessWin [errmess, 10, 160];
                     else
                         sleep 3;
                     endif
-//DEBUG*/
 
 //DEBUG
     local dbkey = db_Open [pwdfilename, 'read-write'];
@@ -1128,7 +1150,6 @@ write ['File:  {}\n', pwdfilename];//DEBUG
     qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
     db_Close dbkey;
 //DEBUG
-
 
                     WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
                     exit [];
@@ -1153,17 +1174,16 @@ write ['File:  {}\n', pwdfilename];//DEBUG
                         pwdfilename = tempfile;
                         local [ldkey, ldrec, ldlig, ldcoreopts, ldpwdopts]
                             = LoadDB [pwdfilename];
-                        if neL [ldcoreopts.mode, 'Many-to-Many'] then
-                            Close [force:1];
-                            if neL [ldrec, []] and neL [ldlig, []] then
-                                local ldligmol = mol_Create ldlig;
-                                local ldligatoms = cat oAtoms ldligmol;
-                                oSetCollection ['QB_LIGAND', ldligatoms];
-                                aSetNucleusLook [ldligatoms, 'small-sphere'];
-                                aSetBondLook [ldligatoms, 'cylinder'];
-                                mol_Create ldrec;
-                                View [];
-                            endif
+
+                        Close [force:1];
+                        if neL [ldrec, []] and neL [ldlig, []] then
+                            local ldligmol = mol_Create ldlig;
+                            local ldligatoms = cat oAtoms ldligmol;
+                            oSetCollection ['QB_LIGAND', ldligatoms];
+                            aSetNucleusLook [ldligatoms, 'small-sphere'];
+                            aSetBondLook [ldligatoms, 'cylinder'];
+                            mol_Create ldrec;
+                            View [];
                         endif
 
                         db_Close ldkey;
@@ -1180,10 +1200,7 @@ write ['File:  {}\n', pwdfilename];//DEBUG
         endif
     endloop
 
-    ClearSurfaceMap G_surface.title;
-    aSetLabelRes [G_surface.resatms, 0];
-    G_surface = [];
-
+    qb_QBPWDCloseHandler [];
     WindowDestroy wkey;
 
 endfunction

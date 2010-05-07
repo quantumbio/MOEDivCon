@@ -449,7 +449,7 @@ const MESS_WINDOW =
     onTrigger: ['return'],
     Edit :
         [
-        name:'mess', len: 40, width: 80
+        name:'mess'
         ]
     ];
 
@@ -1490,8 +1490,9 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
             else
                 if [recok and ligok and recmess === '' and ligmess === ''] then
                     if vals.mode === 'One-to-One' then
-                        Warning 'No problems detected\n'
-                            'for complex in MOE Window.';
+                        qb_CreateMessWin [
+                            "No problems detected for complex in MOE Window.",
+                            1, 40];
                         exit [];
                     else
                         Message [msgkey, 'Running tests ... done.'];
@@ -1580,12 +1581,17 @@ endfunction
  *                          qb_CreateMessWin
  *
  *  Create a window to show a message to the user that can handle longer
- *  messages better than MOE's Warning or Message.
+ *  messages better than MOE's Warning or Message.  If wd is not specified,
+ *  then 80 is used.  If len and wd are not specifiec, 40 and 80 are used.
  *
  ****************************************************************************/
-global function qb_CreateMessWin [message]
+global function qb_CreateMessWin [message, len, wd]
+
+    local [msglen, msgwd] = select [[40, 80], [len, wd], 
+        [isnull len, isnull wd]];
 
     local messwin = WindowCreate MESS_WINDOW;
+    WindowSetAttr [messwin, [mess: [len: msglen, width: msgwd]]];
     WindowSetData [messwin, [mess: message]];
     WindowShow [messwin, 1];
     loop
@@ -1855,6 +1861,14 @@ endfunction
  ****************************************************************************/
 global function qb_GetPoses [vals]
 
+    if vals.posedb === '' then return [[], 'No pose file.']; endif
+
+    if neL [ftype vals.posedb, 'file'] then return [[],
+        twrite ['{}\n is not a file.', vals.posedb]]; endif
+
+    if neL [fext vals.posedb, 'mdb'] then return [[],
+        twrite ['{}\n is not a pose database.', vals.posedb]]; endif
+
     local posekey = db_Open [vals.posedb, 'read'];
     local mess = '';
     local [fields, ftypes] = db_Fields posekey;
@@ -2033,15 +2047,17 @@ global function qb_LoadCoreScoreDB [dbpath, type]
 
     local [rec, lig, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
 
+
     if coreopts.mode === 'Many-to-Many' then
+        local recchg, ligchg;
         local rowkey = db_NextEntry [dbkey, 0];
-        local [rec, recchg] = db_ReadFields [dbkey, rowkey,
+        [rec, recchg] = db_ReadFields [dbkey, rowkey,
             [REC_FIELD, RECCHG_FIELD]];
-        local [lig, ligchg] = db_ReadFields [dbkey, rowkey,
+        [lig, ligchg] = db_ReadFields [dbkey, rowkey,
             [LIG_FIELD, LIGCHG_FIELD]];
 
-    coreopts.recchg = recchg;
-    coreopts.ligchg = ligchg;
+        coreopts.recchg = recchg;
+        coreopts.ligchg = ligchg;
 
     endif
 
@@ -2416,7 +2432,7 @@ endfunction
  ****************************************************************************/
 global function qb_ShowLigPoses [vals]
 
-    static ligmol, ligatoms, posemols, poseatoms;
+    static ligmol, ligatoms, posemols, poseatoms, posedb;
 
     local errmess;
     //  If first entry, set up ligmol
@@ -2428,6 +2444,7 @@ global function qb_ShowLigPoses [vals]
         endif
 
         ligmol = mol_Extract ligatoms;
+        posedb = '';
     endif
 
     if vals.allposes then
@@ -2435,7 +2452,8 @@ global function qb_ShowLigPoses [vals]
             return 1;
         endif
 
-        if posemols === [] and vals.mode === 'One-to-Many' then
+        if (neL [posedb, vals.posedb] or posemols === [])
+                and vals.mode === 'One-to-Many' then
             [posemols, errmess] = qb_GetPoses [vals];
             if posemols === [] then
                 Warning errmess;
