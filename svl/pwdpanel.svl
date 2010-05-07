@@ -278,7 +278,7 @@ const PANEL =
                 title: 'Number of components:',
                 type: 'int', len: 5,
                 bubbleHelp:
-                    ''
+                    'Number of '
                 ],
             Separator : 
                 [
