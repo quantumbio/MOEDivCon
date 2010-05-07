@@ -92,10 +92,10 @@ const OPT_DEFAULTS =
     [
     ['mapradio',     1             ],
     ['cutoff',       1             ],
-    ['sigma',        2.0           ],
-    ['ncolors',     15             ],
+    ['sigma',        3.0           ],
+    ['ncolors',     16             ],
     ['mono',         1             ],
-    ['nticks',       5             ]
+    ['nticks',       9             ]
     ];
 
 const SIGMAS = ['1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0'];
@@ -116,7 +116,7 @@ const PANEL =
     [
     Vbox :
         [
-        HSIGMASbox :
+        Hbox :
             [
             extendH: 1,
             Label :
@@ -1276,6 +1276,16 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                 Animate ['row', data, numrows, numcols, selfun, mincut, 
                     maxcut, colors];
                 WindowShow [wkey, 1];
+
+                //  Show previous selection after animation
+                [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows,
+                    numcols];
+                selerrmess = call [selfun, [data, selrow, selcol, mincut,
+                    maxcut, colors]];
+                if not isnull selerrmess and neL [selerrmess, ''] then
+                    Warning selerrmess;
+                    break;
+                endif
 
             elseif vals.panel === 'Apply' then
                 [bgraphics, scalekey, mincut, maxcut, colors]
