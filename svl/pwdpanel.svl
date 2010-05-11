@@ -290,9 +290,9 @@ const PANEL =
                 len: 5, extendH: 0, 
                 type: 'int', allowBlank: 0,
                 bubbleHelp:
-                    'Size of the training set (the first N\n'
-                    'receptors and/or ligands are treated\n'
-                    'as the training set during PLS analysis.'
+                    'Size of the training set (the first N ligands\n'
+                    'or receptors/ligand pairs are treated as\n'
+                    'the training set during PLS analysis).'
                 ]
             ]
         ],
@@ -584,7 +584,7 @@ endfunction
  *  and will exit on an error.
  *
  ****************************************************************************/
-local function GetAnalData [dbpath, type]
+local function GetAnalData [dbpath, title, type]
 
     if MOE_BATCH then return []; endif
 
@@ -608,7 +608,14 @@ local function GetAnalData [dbpath, type]
         local lignames = app first ligdata;
         local ligabbrevs = apt tok_keep [lignames, -3];
         local ligvals = app second ligdata;
-        data = [['SAR Map', 'Ligands', 'Residues'], resnames, resabbrevs,
+        local maptitle;
+        if type === 'sar' then
+            maptitle = twrite ['{} SAR Map', title];
+        else
+            maptitle = twrite ['{} Interaction Map', title];
+        endif
+
+        data = [[maptitle, 'Ligands', 'Residues'], resnames, resabbrevs,
             tr [lignames, ligabbrevs, ligvals]];
 
         local missing = CheckResidues [second data];
@@ -1023,7 +1030,7 @@ global function qb_QBPWDSetupPanel []
                 // Load and setup data
                 if isnull peek [pwddata, vals.analysis] then
                     pwddata = poke [pwddata, vals.analysis, 
-                        GetAnalData [pwdfilename, 
+                        GetAnalData [pwdfilename, vals.title,
                         ANALKEYS (vals.analysis)]];
                     if isnull peek [pwddata, vals.analysis] then
                         Warning 'No analysis data to view.';
