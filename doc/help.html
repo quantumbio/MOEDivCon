@@ -975,6 +975,10 @@ description of each factor in formula.</todo>
 <p>
 <todo> Lance, write the intro to QB-PWD analysis.</todo>
 
+<p>
+<warn>The current implementation of QB-PWD analysis can only handle 
+cases where the ligand consists of a single "residue".</warn>
+
 <h3><a name="pwd-options"></a>Options</h3>
 <p>
 Here we include a more detailed description of the options in the MOEDivcon
@@ -998,20 +1002,36 @@ description of each energy term.</todo>
 
 <h4><a name="pwd-options-residues"></a>Residues</h4>
 <p>
+In order to produce meaningful results during the PLS statistical analysis,
+it is necessary to prune out residues that do not contribute any information.
 
 <h5><a name="pwd-options-residues-pzero"></a>Pruning:  Percent Zero</h5>
 <p>
-<todo>Daren</todo>
+Residues that are distant from the pocket have little if any interaction with
+the poses and have mostly zero values for the energy terms in the scoring
+function.  The inclusion of these residues in the analysis can distort the
+PLS calculations.  Any residues with more than the given percentage of zero
+energy values are pruned.  The default is set at 95 percent zero values.
 
 <h5><a name="pwd-options-residues-pSD"></a>Pruning:  Minimum SD</h5>
 <p>
-<todo>Daren</todo>
+Residues that have the same interaction, whether weak or strong, with all of
+the poses offer little information in discriminating one pose from another.
+The PLS calculations are more reliable if these residues are not included in
+the analysis.  Any residues with a smaller standard deviation of energy
+values than the given SD are pruned. The default SD is set at 0.05.
 
 
 <h5><a name="pwd-options-residues-ntop"></a>Number of Top Scoring Residues</h5>
 <p>
-<todo>Daren</todo>
-
+Even with the pruning above, the majority of the remaining residues often
+contribute little to the scoring function of the poses and offer little
+information in the Interaction and SAR Heat Maps.  You can specify here the
+number of top scoring residues to keep, which depends on the nature and size
+of the protein pocket.
+<p>
+Note that the current implementation of QB Heat Map can show a maximum of
+30 residues.
 
 <h4><a name="pwd-options-pls"></a>PLS</h4>
 <p>
@@ -1044,8 +1064,23 @@ description of each energy term.</todo>
 
 <h3><a name="pwd-workflow"></a>Workflow</h3>
 <p>
-<todo>Daren</todo>
-
+The workflow of QB-PWD Analysis is captured in the following steps:
+<ol>
+  <li>Execute a batch run of QMScore with PWD selected on a set of receptor(s) 
+      and poses.
+  <li>Open the QB-PWD panel:  
+      <w>Compute</w>&rarr;<w>Simulations</w>&rarr;<w>QuantumBio</w>&rarr;<w>QB-PWD</w>.
+  <li>Click on <w>Load</w> to open the QMScore MDB database containing the 
+      results of the QMScore batch run.
+  <li>Choose the options for the PWD analysis and click <w>Apply</w>.
+  <li>After the PLS analysis is complete, select a dataset.
+  <li>Click <w>View</w>.  If the Interaction or SAR dataset is selected, 
+      the surface of the protein pocket is shown in the MOE Window and a
+      QB Heat Map is created to present the data.  Otherwise, a table
+      of the selected dataset is shown.
+  <li>Click <w>Save</w> to save the selected dataset in a 
+      csv-formatted file.
+</ol>
 
 <h2><a name="heatmap"></a>MOEDivcon Heat Map</h2>
 <p>
