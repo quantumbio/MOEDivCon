@@ -1141,6 +1141,7 @@ global function qb_QBPWDSetupPanel []
                         vals.numtopres, vals.numcomps, vals.trainingset]];
                     SaveOptions [pwdfilename, pwdopts];
 
+/*
                     msgkey = Message [0, 'PWD Analysis is running ...'];
                     local errmess = qb_PWDAnalysis [pwdfilename];
                     Message [msgkey, 'PWD Analysis is done.'];
@@ -1149,6 +1150,7 @@ global function qb_QBPWDSetupPanel []
                     else
                         sleep 3;
                     endif
+*/
 
 //DEBUG
     local dbkey = db_Open [pwdfilename, 'read-write'];

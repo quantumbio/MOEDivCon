@@ -141,6 +141,7 @@ QuantumBio Homepage
       <li><a href="#pwd-intro">Introduction</a>
       <li><a href="#pwd-options">Options</a>
       <ol id=tocl>
+        <li><a href="#pwd-options-title">Title</a>
         <li><a href="#pwd-options-scorefun">Scoring Functions</a>
         <li><a href="#pwd-options-residues">Residues</a>
         <li><a href="#pwd-options-pls">PLS</a>
@@ -984,6 +985,13 @@ cases where the ligand consists of a single "residue".</warn>
 Here we include a more detailed description of the options in the MOEDivcon
 QB-PWD panel.
 
+<h4><a name="pwd-options-title"></a>Title</h4>
+<p>
+Enter a title for the QB-PWD analysis.  The title will be used to label the
+Interaction and SAR Heat Maps and data tables, to form the filenames for 
+datasets saved in csv-format, and to label the analytical
+data in persistent storage.
+
 <h4><a name="pwd-options-scorefun"></a>Scoring Function</h4>
 <p>
 <todo> Lance, write the description to the Scoring function and give a short
@@ -1035,32 +1043,51 @@ Note that the current implementation of QB Heat Map can show a maximum of
 
 <h4><a name="pwd-options-pls"></a>PLS</h4>
 <p>
-<todo>Daren</todo>
+Partial Least Squares models are built to describe the structure-activity of
+the ligand poses.  Internal validation is carried out using Leave-One-Out (LOO)
+cross-validation for the training set and the optimal dimensionality of each
+model is assigned from its cross-validation predictive ability.  The optimal
+PLS model is determined by the cross-validated correlation coefficient 
+(Q<sup>2</sup>) values.
 
 
 <h5><a name="pwd-options-pls-ncomps"></a>Number of Components</h5>
 <p>
-<todo>Daren</todo>
+Enter the number of components to include in the model during the PLS analysis.
 
 
 <h5><a name="pwd-options-pls-trainset"></a>Training Set Size</h5>
 <p>
-<todo>Daren</todo>
-
+Enter the size of the training set.  The first N poses (Pose 1 ... Pose N) are
+treated as the training set, and the remaining are treated as the prediction
+set.  The receptor and ligand molecules can be ordered so that the training set
+molecules appear first when the receptor and pose MDB databases are created, or
+the entries in the databases can be rearranged after the database have been
+created (see the MOE documentation).
 
 <h3><a name="pwd-analysis"></a>Analysis</h3>
 <p>
-<todo>Daren</todo>
+There are several post analysis datasets that you can select:
+<ul>
+  <li>PLS Results Table:  
+  <li>Interaction Heat Map:  
+  <li>SAR Heat Map:  
+</ul>
 
+More will become available in the near future.
 <h4><a name="pwd-analysis-view"></a>View</h4>
 <p>
-<todo>Daren</todo>
-
+Click on the <w>View</w> button to view the selected dataset.  If the
+Interaction or SAR dataset is selected, the surface of the protein pocket
+is shown in the MOE Window and a QB Heat Map is created to present the data. 
+Otherwise, a table of the selected dataset is shown.
 
 <h4><a name="pwd-analysis-save"></a>Save</h4>
 <p>
-<todo>Daren</todo>
-
+Click on the <w>Save</w> button to save the selected dataset to a csv-format
+file, which is uses the filename 
+<inline> &lt;Title&gt;-&lt;dataset&gt;.csv</inline> in the current working
+directory.
 
 <h3><a name="pwd-workflow"></a>Workflow</h3>
 <p>
@@ -1071,8 +1098,10 @@ The workflow of QB-PWD Analysis is captured in the following steps:
   <li>Open the QB-PWD panel:  
       <w>Compute</w>&rarr;<w>Simulations</w>&rarr;<w>QuantumBio</w>&rarr;<w>QB-PWD</w>.
   <li>Click on <w>Load</w> to open the QMScore MDB database containing the 
-      results of the QMScore batch run.
-  <li>Choose the options for the PWD analysis and click <w>Apply</w>.
+      results of the QMScore/QB-PWD batch run.
+  <li>Select the options for the PWD analysis.  If you haven't done so already,
+      load the experimental activities into the QMScore/QB-PWD database.
+      Click <w>Apply</w>.
   <li>After the PLS analysis is complete, select a dataset.
   <li>Click <w>View</w>.  If the Interaction or SAR dataset is selected, 
       the surface of the protein pocket is shown in the MOE Window and a
@@ -1488,7 +1517,7 @@ email: support@quantumbioinc.com
 
 
 <hr>
-<p>&copy;2009 by QuantumBio, Inc.
+<p>&copy;2009-2010 by QuantumBio, Inc.
 
 </body>
 
