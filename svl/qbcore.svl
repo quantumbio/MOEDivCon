@@ -829,7 +829,7 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
             string tok_cat [ligmess, intermess]];
         local ligname = tok_cat ['lig', totok ith];
         if tok_length ligmol(1)(MOL_NAME) > 0 then
-            ligname = tok_cat [ligname, ' - ', ligmol(1)(MOL_NAME)];
+            ligname = tok_cat [ligname, '=', ligmol(1)(MOL_NAME)];
         endif
 
         ligmol(1)(MOL_NAME) = ligname;
@@ -918,7 +918,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         recmsgs = append [recmsgs, stsmess];
         local recname = tok_cat ['rec', totok ith];
         if tok_length recmol(1)(MOL_NAME) > 0 then
-            recname = tok_cat [recname, ' - ', recmol(1)(MOL_NAME)];
+            recname = tok_cat [recname, '=', recmol(1)(MOL_NAME)];
         endif
 
         recmol(1)(MOL_NAME) = recname;
@@ -963,7 +963,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
             string tok_cat [posemess, intermess]];
         local ligname = tok_cat ['lig', totok ith];
         if tok_length posemol(1)(MOL_NAME) > 0 then
-            ligname = tok_cat [ligname, ' - ', posemol(1)(MOL_NAME)];
+            ligname = tok_cat [ligname, '=', posemol(1)(MOL_NAME)];
         endif
 
         posemol(1)(MOL_NAME) = ligname;
@@ -2357,14 +2357,14 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
 
         local ligname = tok_cat ['lig', totok 1];
         if tok_length ligand(1)(MOL_NAME) > 0 then
-            ligname = tok_cat [ligname, ' - ', ligand(1)(MOL_NAME)];
+            ligname = tok_cat [ligname, '=', ligand(1)(MOL_NAME)];
         endif
 
         ligand(1)(MOL_NAME) = ligname;
 
         local recname = tok_cat ['rec', totok 1];
         if tok_length receptor(1)(MOL_NAME) > 0 then
-            recname = tok_cat [recname, ' - ', receptor(1)(MOL_NAME)];
+            recname = tok_cat [recname, '=', receptor(1)(MOL_NAME)];
         endif
 
         receptor(1)(MOL_NAME) = recname;

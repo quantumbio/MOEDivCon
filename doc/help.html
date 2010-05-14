@@ -1069,9 +1069,24 @@ created (see the MOE documentation).
 <p>
 There are several post analysis datasets that you can select:
 <ul>
-  <li>PLS Results Table:  
-  <li>Interaction Heat Map:  
-  <li>SAR Heat Map:  
+  <li>PLS Results Table:  a table that shows the following stastical results
+      for each number of latent variables (1 to number of components) used in
+      the  construction of the PLS models:  
+    <ul>
+      <li>X_Expl:  percent explanation of X variance
+      <li>Act_Expl: percent explanation of <todo>Lance ???</todo>
+      <li>R2:  correlation coefficient (R<sup>2</sup>)
+      <li>Q2: cross-validated correlation coefficient (Q<sup>2</sup>)
+      <li>SDEC:  standard deviation of error of calculation
+      <li>SDEP:  standard deviation of error of prediction
+      <li>SDEP_Ext: standard deviation of error of prediction, external data set 
+      <li>R2_Ext:  correlation coefficient, external data set
+    </ul>
+  <li>Interaction Heat Map:  a heat map that makes it easy to
+      identify the residues that have the largest absolute effect on ligand
+      binding.
+  <li>SAR Heat Map:  a heat map that highlights residues that are most 
+      critical to discriminating between more and less potent ligands.
 </ul>
 
 More will become available in the near future.
