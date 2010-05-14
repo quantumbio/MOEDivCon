@@ -794,7 +794,7 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
     local recchn = mol_Create recmol;
     local recatms = cat oAtoms recchn;
 
-    local rowkey = 0, stsmess = "";
+    local rowkey = 0, ith = 1, stsmess = "";
     while rowkey = db_NextEntry [poseskey, rowkey] loop
         local rowdata = db_Read [poseskey, rowkey];
 
@@ -827,6 +827,13 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
 
         stsmess = cat [stsmess, GetStatusMessage ['Ligand', chgok],
             string tok_cat [ligmess, intermess]];
+        local ligname = tok_cat ['lig', totok ith];
+        if tok_length ligmol(1)(MOL_NAME) > 0 then
+            ligname = tok_cat [ligname, ' - ', ligmol(1)(MOL_NAME)];
+        endif
+
+        ligmol(1)(MOL_NAME) = ligname;
+        rowdata = tagpoke [rowdata, molfield, ligmol];
         local chgdata = tag [[LIGCHG_FIELD], [charge]];
         rowdata = cat [chgdata, rowdata];
         local resultrowkey = db_Write [resultskey, 0, rowdata];
@@ -835,6 +842,7 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
         endif
 
         oDestroy ligch;
+        ith = ith + 1;
     endloop
 
     oDestroy recchn;
@@ -892,7 +900,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         [osys, nsys] = SystemPush [];
     endif
 
-    local recrowkey = 0, recmsgs = [], stsmess = "";
+    local recrowkey = 0, ith = 1, recmsgs = [], stsmess = "";
     local recchset = [], recatmset = [];
     while recrowkey = db_NextEntry [recskey, recrowkey] loop
         local recrowdata = db_Read [recskey, recrowkey];
@@ -908,9 +916,17 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         recchset = append [recchset, recchs];
         recatmset = append [recatmset, recatms];
         recmsgs = append [recmsgs, stsmess];
+        local recname = tok_cat ['rec', totok ith];
+        if tok_length recmol(1)(MOL_NAME) > 0 then
+            recname = tok_cat [recname, ' - ', recmol(1)(MOL_NAME)];
+        endif
+
+        recmol(1)(MOL_NAME) = recname;
+        recrowdata = tagpoke [recrowdata, recmolfield, recmol];
         local recchgdata = tag [[RECCHG_FIELD], [recchg]];
         recrowdata = cat [recchgdata, recrowdata];
         db_Write [resultskey, 0, recrowdata];
+        ith = ith + 1;
     endloop
 
     db_RenameField [resultskey, recmolfield, REC_FIELD];
@@ -918,7 +934,8 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
     db_RenameField [resultskey, LIG_FIELD, posemolfield];
     apt db_EnsureField [resultskey, posefields, poseftypes];
 
-    local poserowkey = 0, resultrowkey = 0, ith = 1;
+    ith = 1;
+    local poserowkey = 0, resultrowkey = 0;
     while poserowkey = db_NextEntry [poseskey, poserowkey] loop
         resultrowkey = db_NextEntry [resultskey, resultrowkey];
         local poserowdata = db_Read [poseskey, poserowkey];
@@ -944,6 +961,13 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
 
         stsmess = cat [stsmess, GetStatusMessage ['Ligand', posechgok],
             string tok_cat [posemess, intermess]];
+        local ligname = tok_cat ['lig', totok ith];
+        if tok_length posemol(1)(MOL_NAME) > 0 then
+            ligname = tok_cat [ligname, ' - ', posemol(1)(MOL_NAME)];
+        endif
+
+        posemol(1)(MOL_NAME) = ligname;
+        poserowdata = tagpoke [poserowdata, posemolfield, posemol];
         local posechgdata = tag [[LIGCHG_FIELD], [posechg]];
         poserowdata = cat [posechgdata, poserowdata];
         db_Write [resultskey, resultrowkey, poserowdata];
@@ -2330,6 +2354,20 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
             Warning errmess;
             exit [];
         endif
+
+        local ligname = tok_cat ['lig', totok 1];
+        if tok_length ligand(1)(MOL_NAME) > 0 then
+            ligname = tok_cat [ligname, ' - ', ligand(1)(MOL_NAME)];
+        endif
+
+        ligand(1)(MOL_NAME) = ligname;
+
+        local recname = tok_cat ['rec', totok 1];
+        if tok_length receptor(1)(MOL_NAME) > 0 then
+            recname = tok_cat [recname, ' - ', receptor(1)(MOL_NAME)];
+        endif
+
+        receptor(1)(MOL_NAME) = recname;
 
         SaveEnv [dbkey, receptor, ligand, status, coreopts, appopts, complex, 
             dbtype];

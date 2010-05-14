@@ -148,6 +148,10 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
         return [[], errmess];
     endif
  
+    local scorepath = coreopts.scoredb;
+    scorepath = fbase scorepath;
+    scorepath = twrite ['{}.h5', scorepath];
+
     //  exe_open child process inherits parent's environment.
     local process_key = exe_open ['moedivconnmr', subdirname, [], 1];
     local process_keys = [process_key];
@@ -167,6 +171,9 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
 
     local idx, success = 0;
 
+    fwrite [stdin, '{c:}\n', scorepath];
+    fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
+    fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
     fwrite [stdin, '{c:}\n', DIVCON_HAM_KEYS(coreopts.ham)];
     fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
         coreopts.scaling === 1]];

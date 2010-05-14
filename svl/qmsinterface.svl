@@ -100,16 +100,10 @@ global function qb_QMScore [recmol, ligmol, coreopts, appopts]
         errmess = string ckmsg;
     endif
 
-    local receptorname, ligandname;
     local subdirname, delsubdir = 0;
     if coreopts.task === [] or coreopts.task === 0 then
-        receptorname = 'receptor';
-        ligandname = 'ligand';
         subdirname = coreopts.workdir;
     else
-        receptorname = twrite ['rec{}', coreopts.task];
-        ligandname = twrite ['lig{}', coreopts.task];
-
         delsubdir = 1;
         subdirname = twrite ['{}/qb_out{n:}', coreopts.workdir, coreopts.task];
         local okay = _fmkdir subdirname;
@@ -150,8 +144,8 @@ global function qb_QMScore [recmol, ligmol, coreopts, appopts]
 
     local success = 0;
     fwrite [stdin, '{c:}\n', scorepath];
-    fwrite [stdin, '{c:}\n', receptorname];
-    fwrite [stdin, '{c:}\n', ligandname];
+    fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
+    fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
     fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', appopts.analpwd]];
     fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
     fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
