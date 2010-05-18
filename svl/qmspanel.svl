@@ -499,7 +499,7 @@ global function qb_QMScoreSetupPanel []
                         vals.analpwd]];
 
                     dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
-                        [], QMS_NUM_FIELDS, 'qmscore', 1];
+                        [], QMS_NUM_FIELDS, 'qmscore', status.notforced];
 
                     dbv_Open db_Filename dbkey;
                     db_Close dbkey;
