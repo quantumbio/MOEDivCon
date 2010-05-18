@@ -239,7 +239,8 @@ local function RunCalc [dbkey]
     coreopts.workdir = workdir;
     write ['Work Dir:  {}\n', workdir];
 
-    local [results, errmess] = qb_QMScore [recset, ligand, coreopts, qmsopts];
+    local [results, errmess] = qb_QMScore [recset, ligand, coreopts, qmsopts,
+        status.notforced];
 
     if results === [] then
         if errmess === [] or errmess === '' then
@@ -294,7 +295,7 @@ global function RunOneToManyCalc [oldkey]
 
     //  Extract molecules and run options from the database environment
     local dbkey = db_Open [oldkey, 'read-write'];
-    local [recmols, l, s, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
+    local [recmols, l, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
 
     local msgkey = 0;
     local workdir;
@@ -321,7 +322,7 @@ global function RunOneToManyCalc [oldkey]
         local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
         coreopts.ligchg = posechg;
         local [results, errmess] = qb_QMScore [recmols, posemol, coreopts,
-            qmsopts];
+            qmsopts, status.notforced];
 
         if results === [] then
             if errmess === [] or errmess === '' then

@@ -65,7 +65,7 @@ const CSP_KEYS =
     'ALL'
     ];
 
-global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
+global function qb_NMRScore [recmol, ligmol, coreopts, appopts, errortests,
         indices, free, bound]
 
     local osys, nsys, errmess = "";
@@ -77,8 +77,8 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
     qb_HamSetsInit [];
     local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
         = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
-            coreopts.ligchg, status.notforced, status.notforced,
-            status.notforced, coreopts.testH, coreopts.testMM,
+            coreopts.ligchg, errortests, errortests, errortests,
+            coreopts.testH, coreopts.testMM,
             'nmr', HAM_KEYS (coreopts.ham)];
 
     if not alltrue [recok, recchgok, ligok, ligchgok] then

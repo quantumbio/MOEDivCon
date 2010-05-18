@@ -321,7 +321,7 @@ local function RunCalc [dbkey]
     write ['Work Dir:  {}\n', workdir];
 
     local [results, errmess] = qb_NMRScore [recset, ligand, coreopts, nmrsopts,
-        indices, free, bound];
+        status.notforced, indices, free, bound];
 
     if results === [] then
         if errmess === [] or errmess === '' then

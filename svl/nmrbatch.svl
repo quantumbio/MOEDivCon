@@ -53,7 +53,7 @@ global function qb_NMRScoreBatch [dbpath]
     //  Extract molecules, run options and experimental data from the
     //  database environment
     local dbkey = db_Open [dbpath, 'read-write'];
-    local [recmols, ligmol, s, coreopts, nmropts] = qb_GetNMRSEnv [dbkey];
+    local [recmols, ligmol, status, coreopts, nmropts] = qb_GetNMRSEnv [dbkey];
     local [indices, names, free, bound] = qb_GetAnalysisData [dbkey,
         'nmr', 'exp'];
 
@@ -97,7 +97,7 @@ global function qb_NMRScoreBatch [dbpath]
         local [[results, errmess], code, seqno, indkey] = mpu_batch [
             select ['', 'call', rowkey === 0],
             'qb_NMRScore', [recmols, posemol, coreopts, nmropts,
-            indices, free, bound], [rowkey, tid]];
+            status.notforced, indices, free, bound], [rowkey, tid]];
 
         if rowkey <> 0 then
             write ['Scoring pose {} of {}\n', rowcnt, nrows];
