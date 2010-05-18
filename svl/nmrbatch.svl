@@ -94,6 +94,7 @@ global function qb_NMRScoreBatch [dbpath]
         coreopts.ligchg = posechg;
         coreopts.recchg = recchg;
 
+        sleep 10;
         local [[results, errmess], code, seqno, indkey] = mpu_batch [
             select ['', 'call', rowkey === 0],
             'qb_NMRScore', [recmols, posemol, coreopts, nmropts,

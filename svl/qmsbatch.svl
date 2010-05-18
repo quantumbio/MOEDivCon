@@ -90,6 +90,7 @@ global function qb_QMScoreBatch [dbpath]
         coreopts.ligchg = posechg;
         coreopts.recchg = recchg;
 
+        sleep 10;
         local [[results, errmess], code, seqno, indkey] = mpu_batch [
             select ['', 'call', rowkey === 0],
             'qb_QMScore', [recmols, posemol, coreopts, qmsopts,
@@ -112,7 +113,6 @@ global function qb_QMScoreBatch [dbpath]
                     swrite ['Error:  {}\n', errmess]];
                 write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
             else
-                sleep 10;
                 qb_SaveQMScore [dbkey, indkey(1), results];
                 local sucmess = "Success";
                 if not isnull errmess then
