@@ -79,6 +79,7 @@ const STATUS_DEFAULTS =
     ['prevwd',       ''            ],
     ['calcchg',      0             ],
     ['verified',     0             ],
+    ['notforced',    1             ],
     ['recchg',       1             ],
     ['ligchg',       1             ],
     ['moerecchg',    0             ],
@@ -1125,23 +1126,22 @@ local function SingleMol [atoms]
 endfunction
 
 /****************************************************************************
- *                          SplitReceptor
+ *                          SplitCollection
  *
- *  Given a set of receptor atoms, returns subsets which represent
- *  individual molecules (connected pieces) in the receptor.
+ *  Given a set of atoms, returns subsets which represent
+ *  individual molecules (connected pieces) in the collection.
  *
  ****************************************************************************/
-global function SplitReceptor [receptoratoms]
+global function SplitCollection [atoms]
 
-    if receptoratoms === [] then return []; endif
+    if atoms === [] then return []; endif
 
     local atomsets = [];
-    local [recidx, reccnt] = sac aMoleculeNumber receptoratoms;
-    if length reccnt > 1 then
-        receptoratoms = receptoratoms [recidx];
-        atomsets = split [receptoratoms, reccnt];
+    local [idx, cnt] = sac aMoleculeNumber atoms;
+    if length cnt > 1 then
+        atomsets = split [atoms [idx], cnt];
     else
-        atomsets = [receptoratoms];
+        atomsets = [atoms];
     endif
 
     return atomsets;
@@ -1220,8 +1220,8 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
     while rowkey = db_NextEntry [dbkey, rowkey] loop
         local recok = 1, recmess = '';
         local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
-        local ligchn = mol_Create ligmol;
-        local ligatms = cat oAtoms ligchn;
+        local ligchns = mol_Create ligmol;
+        local ligatms = cat oAtoms ligchns;
         local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms,
             testLP, testOverlap, testHam, testH, testMM, appname, hamname];
         if coreopts.mode === 'Many-to-Many' then
@@ -1243,7 +1243,7 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
             endif
         endif
 
-        oDestroy ligchn;
+        oDestroy ligchns;
         if coreopts.mode === 'Many-to-Many' then
             oDestroy recchns;
         endif
@@ -1387,26 +1387,25 @@ endfunction
  *                          qb_CheckChgTestDivconMols
  *
  *  Determine whether the given molecules and their total charges are
- *  problematic for Divcon.  Return the receptor and ligand chains separated
+ *  problematic for Divcon.  Return the receptor and ligand residues separated
  *  into individual molecules to be compatible with Divcon's backbone.
  *
  *  Assume that SystemPush [] and SystemPop [] have already been called,
- *  if necessary.
+ *  if necessary.  Caller is responsible for destroying objects in newly
+ *  created system.
  *
  ****************************************************************************/
 global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
         lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname]
 
     local mess = '';
-    local recchns = mol_Create recmol;
-    local recatms = cat oAtoms recchns;
+    local recatms = cat oAtoms mol_Create recmol;
     local [recok, recmess] = qb_TestDivcon ['receptor', recatms, 
         lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname];
     mess = tok_cat [mess, recmess];
     local recchgok = ChargeOK [recatms, recchg];
 
-    local ligchn = mol_Create ligmol;
-    local ligatms = cat oAtoms ligchn;
+    local ligatms = cat oAtoms mol_Create ligmol;
     local ligsingle = SingleMol [ligatms];
     if not ligsingle then
         mess = tok_cat [mess, 'Ligand must be a single molecule.'];
@@ -1430,10 +1429,20 @@ global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
         endif
     endif
 
-    local recatmsets = SplitReceptor [recatms];
-    recchns = app uniq app oChains recatmsets;
+    local recatmsets = SplitCollection [recatms];
+    local ligatmsets = SplitCollection [ligatms];
 
-    return [recchns, recok, recchgok, ligchn, ligok, ligchgok, mess];
+    local recressets = app uniq app oResidues recatmsets;
+    local ligressets = app uniq app oResidues ligatmsets;
+
+local f = fopenw '/tmp/split.txt';//DEBUG
+fwrite [f, 'Receptor:  {}  {v}\n{v}\n{v}\n', length recressets,//DEBUG
+app length recressets, rName recressets, rNumber recressets];//DEBUG
+fwrite [f, 'Ligand:  {}  {v}\n{v}\n{v}\n', length ligressets,//DEBUG
+app length ligressets, rName ligressets, rNumber ligressets];//DEBUG
+fclose f;
+
+    return [recressets, recok, recchgok, ligressets, ligok, ligchgok, mess];
 
 endfunction
 
@@ -2124,25 +2133,39 @@ endfunction
 /****************************************************************************
  *                          qb_PassBackbone
  *
- *  Pass the receptor, split into separate molecules, and the ligand down
- *  to divcon through the given outpipe.
+ *  Pass the receptor and ligand, split into separate molecules, down to
+ *  divcon through the given outpipe.
  *
- *  Assumption:  recset was created before ligset in the current system.
+ *  Assumption:  recressets was created before ligressets in the current system.
  *
  ****************************************************************************/
-global function qb_PassBackbone [inpipe, outpipe, recchains, ligchain]
+global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
 
-    local ligatoms = cat cAtoms ligchain;
-    local recatoms = cat cAtoms recchains;
+write ['Receptor:  {}  {v}\n{v}\n{v}\n', length recressets,//DEBUG
+app length recressets, rName recressets, rNumber recressets];//DEBUG
+write ['Ligand:  {}  {v}\n{v}\n{v}\n', length ligressets,//DEBUG
+app length ligressets, rName ligressets, rNumber ligressets];//DEBUG
+
+    local recatoms = cat oAtoms cat recressets;
+    local ligatoms = cat oAtoms cat ligressets;
+
+local f = fopenw '/tmp/fatty.txt';//DEBUG
+fwrite [f, 'Rlen:  {}\n{v}\n{v}\n', length recatoms,//DEBUG
+aName recatoms, aNumber recatoms];//DEBUG
+
     local [ligvdw_r,ligvdw_e] = get [pot_Parm_vdw [ligatoms, ligatoms], [2,3]];
     local [recvdw_r,recvdw_e] = get [pot_Parm_vdw [recatoms, recatoms], [2,3]];
 
-    local handshake, chain, residue, atom, xyz, idx;
+    local handshake, resset, residue, atom, xyz, idx;
     xyz = tr aPos recatoms;
-    fwrite [outpipe, '{n:}\n', length recchains];
-    for chain in recchains loop
-        fwrite [outpipe, '{n:}\n', cResidueCount chain];
-        for residue in cat cResidues chain loop
+
+fwrite [f, 'Rlen:  {}  xyz len {}\n{v}\n{v}\n', length recatoms, length xyz,//DEBUG
+aName recatoms, aNumber recatoms];//DEBUG
+
+    fwrite [outpipe, '{n:}\n', length recressets];
+    for resset in recressets loop
+        fwrite [outpipe, '{n:}\n', length resset];
+        for residue in resset loop
             fwrite [outpipe, '{c:} {n:} {n:}\n', 
                 rName residue, rUID residue, rAtomCount residue];
             for atom in cat rAtoms residue loop
@@ -2159,22 +2182,28 @@ global function qb_PassBackbone [inpipe, outpipe, recchains, ligchain]
 
     [handshake] = fread [inpipe, '{n:}\n'];
 
-    //  There is only one molecule and one chain in the ligand/poses collection.
+    //  There should be only one molecule (residue set) in the ligand/pose
+    //  collection, but we treat all collections similarly.
     xyz = tr aPos ligatoms;
-    fwrite [outpipe, '{n:}\n', 1];
-    chain = ligchain;
-    fwrite [outpipe, '{n:}\n', cResidueCount chain];
-    for residue in cat cResidues chain loop
-        fwrite [outpipe, '{c:} {n:} {n:}\n', 
-            rName residue, rUID residue, rAtomCount residue];
-        for atom in cat rAtoms residue loop
-            idx = aNumber atom - length recatoms;
-            fwrite [outpipe, '{c:} {c:} {c:}\n',
-                aName atom, aElement atom, aMMType atom];
-            fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n',
-                xyz(idx)(1), xyz(idx)(2), xyz(idx)(3)];
-            fwrite [outpipe, '{n:.4f} {n:.4f}\n',
-                ligvdw_r (idx),ligvdw_e (idx)];
+
+fwrite [f, 'Llen:  {}  xyz len {}\n{v}\n', length ligatoms, length xyz, aNumber ligatoms];//DEBUG
+fclose f;//DEBUG
+
+    fwrite [outpipe, '{n:}\n', length ligressets];
+    for resset in ligressets loop
+        fwrite [outpipe, '{n:}\n', length resset];
+        for residue in resset loop
+            fwrite [outpipe, '{c:} {n:} {n:}\n', 
+                rName residue, rUID residue, rAtomCount residue];
+            for atom in cat rAtoms residue loop
+                idx = aNumber atom - length recatoms;
+                fwrite [outpipe, '{c:} {c:} {c:}\n',
+                    aName atom, aElement atom, aMMType atom];
+                fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n',
+                    xyz(idx)(1), xyz(idx)(2), xyz(idx)(3)];
+                fwrite [outpipe, '{n:.4f} {n:.4f}\n',
+                    ligvdw_r (idx),ligvdw_e (idx)];
+            endloop
         endloop
     endloop
 
@@ -2405,8 +2434,8 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
 
     else
         //  Reset the status and coreopts charge information (no rec/lig)
-        status = tagput [status, ['calcchg', 'verified', 'recchg', 'ligchg',
-            'moerecchg', 'moeligchg'], [0, 0, 1, 1, 0, 0]];
+        status = tagput [status, ['calcchg', 'verified', 'notforced', 'recchg',
+            'ligchg', 'moerecchg', 'moeligchg'], [0, 0, 1, 1, 1, 0, 0]];
         coreopts.recchg = 0;
         coreopts.ligchg = 0;
 
@@ -2837,6 +2866,7 @@ global function qb_VerifyDivcon [wkey, status, vals]
 
     if vals.mode === 'Many-to-Many' then
         status.verified = 1;
+        status.notforced = 1;
         return status;
     endif
 
@@ -2865,13 +2895,15 @@ global function qb_VerifyDivcon [wkey, status, vals]
         ynmess = tok_cat [ynmess, 'Continue anyway?'];
         if YesNo ynmess then
             status.verified = 1;
+            status.notforced = 0;
         else
             status.verified = 0;
+            status.notforced = 1;
         endif
 
     else
         status.verified = 1;
-
+        status.notforced = 1;
     endif
 
     Message [msgkey, []];

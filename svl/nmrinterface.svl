@@ -75,9 +75,10 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
 
     //  If there are any errors, return immediately.  Run all error tests.
     qb_HamSetsInit [];
-    local [recchains, recok, recchgok, ligchain, ligok, ligchgok, ckmsg]
+    local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
         = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
-            coreopts.ligchg, 1, 1, 1, coreopts.testH, coreopts.testMM,
+            coreopts.ligchg, status.notforced, status.notforced,
+            status.notforced, coreopts.testH, coreopts.testMM,
             'nmr', HAM_KEYS (coreopts.ham)];
 
     if not alltrue [recok, recchgok, ligok, ligchgok] then
@@ -98,8 +99,8 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
                 qb_GetWhich [not recchgok, not ligchgok]]];
         endif
 
-        oDestroy recchains;
-        oDestroy ligchain;
+        oDestroy uniq cat oChains cat recressets;
+        oDestroy uniq cat oChains cat ligressets;
         if not MOE_BATCH then
             SystemPop [osys, nsys];
         endif
@@ -123,8 +124,8 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
             errmess = cat [swrite ['Unable to create subdirectory:  {}',
                 subdirname], errmess];
 
-            oDestroy recchains;
-            oDestroy ligchain;
+            oDestroy uniq cat oChains cat recressets;
+            oDestroy uniq cat oChains cat ligressets;
             if not MOE_BATCH then
                 SystemPop [osys, nsys];
             endif
@@ -139,8 +140,8 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
         errmess = cat [swrite ['Skipping!  Atom indices are inconsistent:\n'
             '    Orig: {v}\n    Pose: {v}\n', indices, poseidxs], errmess];
 
-        oDestroy recchains;
-        oDestroy ligchain;
+        oDestroy uniq cat oChains cat recressets;
+        oDestroy uniq cat oChains cat ligressets;
         if not MOE_BATCH then
             SystemPop [osys, nsys];
         endif
@@ -184,10 +185,10 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts,
     fwrite [stdin, '{n:}\n', coreopts.recchg];
     fwrite [stdin, '{n:}\n', coreopts.ligchg];
 
-    qb_PassBackbone [stdout, stdin, recchains, ligchain];
+    qb_PassBackbone [stdout, stdin, recressets, ligressets];
 
-    oDestroy recchains;
-    oDestroy ligchain;
+    oDestroy uniq cat oChains cat recressets;
+    oDestroy uniq cat oChains cat ligressets;
     if not MOE_BATCH then
         SystemPop [osys, nsys];
     endif
