@@ -28,7 +28,6 @@ ol ol#tocl {list-style-type: upper-latin;}
 ol ol ol#tocl {list-style-type: decimal}
 th.white {font: bold 2.0em Helvetica, sans-serif; color: white}
 th.green {font: bold 2.0em Helvetica, sans-serif; color: green}
-th.yellow {font: bold 2.0em Helvetica, sans-serif; color: yellow}
 th.red {font: bold 2.0em Helvetica, sans-serif; color: red}
 w {text-decoration: underline;}
 x {font-weight: bold;}
@@ -111,6 +110,7 @@ QuantumBio Homepage
   <li><a href="#nmr">MOEDivcon NMRScore</a>
     <ol id=tocl>
       <li><a href="#nmr-intro">Introduction</a>
+      <li><a href="#nmr-workflow">Workflow</a>
       <li><a href="#nmr-cut">Receptor Cut</a>
       <li><a href="#nmr-csp">Chemical Shift Atoms</a>
       <ol id=tocl>
@@ -122,7 +122,6 @@ QuantumBio Homepage
         <li><a href="#nmr-options-opt">Ligand Optimization</a>
         <li><a href="#nmr-options-guess">Guess</a>
       </ol>
-      <li><a href="#nmr-workflow">Workflow</a>
       <li><a href="#nmr-results">Results</a>
     </ol>
   <li><a href="#qms">MOEDivcon QMScore</a>
@@ -139,6 +138,12 @@ QuantumBio Homepage
   <li><a href="#pwd">MOEDivcon QB-PWD Analysis</a>
     <ol id=tocl>
       <li><a href="#pwd-intro">Introduction</a>
+      <li><a href="#pwd-workflow">Workflow</a>
+      <li><a href="#pwd-analysis">Analysis</a>
+      <ol id=tocl>
+        <li><a href="#pwd-analysis-view">View</a>
+        <li><a href="#pwd-analysis-save">Save</a>
+      </ol>
       <li><a href="#pwd-options">Options</a>
       <ol id=tocl>
         <li><a href="#pwd-options-title">Title</a>
@@ -146,12 +151,6 @@ QuantumBio Homepage
         <li><a href="#pwd-options-residues">Residues</a>
         <li><a href="#pwd-options-pls">PLS</a>
       </ol>
-      <li><a href="#pwd-analysis">Analysis</a>
-      <ol id=tocl>
-        <li><a href="#pwd-analysis-view">View</a>
-        <li><a href="#pwd-analysis-save">Save</a>
-      </ol>
-      <li><a href="#pwd-workflow">Workflow</a>
     </ol>
   <li><a href="#heatmap">MOEDivcon Heat Map</a>
   <ol id=tocl>
@@ -477,6 +476,30 @@ If there exists an element in either the receptor or ligand for which the
 selected Hamiltonian has not been parameterized, DivCon is going to eventually
 abort its calculation.  This test captures that failure event before performing
 any time-consuming calculations.
+<p>
+The elements parameterized for each Hamiltonian are listed below:
+
+<ul>NMRScore:
+  <li>AM1:  H, Li, Be, B, C, N, O, F, Na, Al, Si, P,
+            S, Cl, K, Ca, Zn, Ge, Br, I, Hg
+  <li>MNDO: H, C, N, O, P, S, Cl, B, F, Zn, Br
+</ul>
+
+<ul>QMScore:
+  <li>AM1: H, Li, Be, B, C, N, O, F, Na, Al, Si, P,
+            S, Cl, K, Ca, Zn, Ge, Br, I, Hg
+  <li>MNDO:  H, Li, Be, B, C, N, O, F, Na, Al, Si, P,
+            S, Cl, Zn, Ge, Br, Sn, I, Hg, Pb
+  <li>MNDO/d:  H, Li, Be, B, C, N, O, F, Na, Mg, Al, Si,
+            P, S, Cl, Zn, Br, Cd, I, Hg
+  <li>PDDG-PM3:   H, C, N, O, F, S, Cl, Br, I
+  <li>PM3:  H, Be, C, N, O, F, Na, Mg, Al, Si, P, S,
+            Cl, K, Ca, Zn, Ga, Ge, Ar, Se, Br, Cd, In,
+            Sn, Sb, Te, I, Hg, Tl, Pb, Bi
+  <li>PM6:  H, Li, Be, B, C, N, O, F, Na, Mg, Al, Si,
+            P, S, Cl, K, Fe, Zn, Br, Cd, I, Hg
+</ul>
+
 
 <h4><a name="core-test-h"></a>Missing/Extra H</h4>
 <p>
@@ -875,20 +898,39 @@ electrons in the system. The cross over point is at approximately 450 atoms.
 <p>
 <todo> Lance, write intro to NMRScore. </todo>
 
+<h3><a name="nmr-workflow"></a>Workflow</h3>
+<p>
+The NMRScore workflow is somewhat complicated by convergence issues due to the
+sensitivity of the parameters of the Hamiltonians available for NMR 
+calculations.  
+
 <h3><a name="nmr-cut"></a>Receptor Cut</h3>
 <p>
-<todo>Daren</todo>
+If convergence issues arise, one possible solution is to cut the receptor.
+Once you have specified the radius,  all capped residues within the given
+radius from the ligand are preserved.  You always have the option of
+returning to original receptor by clicking on the <w>Original</w> button.
 
 <h3><a name="nmr-csp"></a>Chemical Shift Atoms</h3>
 <p>
 <todo> Lance, write explanation of CSP. </todo>
 <h4><a name="nmr-csp-type"></a>Atom Type</h4>
 <p>
-<todo>Daren</todo>
+There are currently three choices of atom types for the ligand atoms to undergo
+chemical shift evaluation:
+<ul>
+  <li>H only:  only the hydrogen atoms in the ligand are scored.
+  <li>C only:  only the carbon atoms in the ligand are scored.
+  <li>all atoms: all atoms in the ligand are scored.
+</ul>
 
 <h4><a name="nmr-csp-exp"></a>Experimental Data</h4>
 <p>
-<todo>Daren</todo>
+Once you have selected the atom type, you need to supply the experimental
+NMR data for those atoms.  When you click on the 
+<w>Enter/Edit Experimental Data</w> button, a panel opens to allow you enter
+or edit the data and the MOE Window zooms in on the ligand.  If you click on 
+an atom label in the panel, the atom is labeled in the MOE Window.
 
 <h3><a name="nmr-options"></a>Options</h3>
 <p>
@@ -897,17 +939,15 @@ NMRScore panel.
 
 <h4><a name="nmr-options-opt"></a>Ligand Optimization</h4>
 <p>
-<todo>Daren</todo>
+If a previous run of NMRScore did not converge, you may opt to have DivCon
+perform a QM optimization of the ligand before attempting to calculate the
+NMRScore.
 
 <h4><a name="nmr-options-guess"></a>Guess</h4>
 <p>
 <todo> Lance, describe what the guess is.</todo>
 <p>
 <todo>How is it generated and how we are going to find it.</todo>
-
-<h3><a name="nmr-workflow"></a>Workflow</h3>
-<p>
-<todo>Daren</todo>
 
 <h3><a name="nmr-results"></a>Results</h3>
 <p>
@@ -979,6 +1019,67 @@ description of each factor in formula.</todo>
 <p>
 <warn>The current implementation of QB-PWD analysis can only handle 
 cases where the ligand consists of a single "residue".</warn>
+
+<h3><a name="pwd-workflow"></a>Workflow</h3>
+<p>
+The workflow of QB-PWD Analysis is captured in the following steps:
+<ol>
+  <li>Execute a batch run of QMScore with PWD selected on a set of receptor(s) 
+      and poses.
+  <li>Open the QB-PWD panel:  
+      <w>Compute</w>&rarr;<w>Simulations</w>&rarr;<w>QuantumBio</w>&rarr;<w>QB-PWD</w>.
+  <li>Click on <w>Load</w> to open the QMScore MDB database containing the 
+      results of the QMScore/QB-PWD batch run.
+  <li>Select the options for the PWD analysis.  If you haven't done so already,
+      load the experimental activities into the QMScore/QB-PWD database.
+      Click <w>Apply</w>.
+  <li>After the PLS analysis is complete, select a dataset.
+  <li>Click <w>View</w>.  If the Interaction or SAR dataset is selected, 
+      the surface of the protein pocket is shown in the MOE Window and a
+      QB Heat Map is created to present the data.  Otherwise, a table
+      of the selected dataset is shown.
+  <li>Click <w>Save</w> to save the selected dataset in a 
+      csv-formatted file.
+</ol>
+
+<h3><a name="pwd-analysis"></a>Analysis</h3>
+<p>
+There are several post analysis datasets that you can select:
+<ul>
+  <li>PLS Results Table:  a table that shows the following statistical results
+      for each number of latent variables (1 to number of components) used in
+      the  construction of the PLS models:  
+    <ul>
+      <li>X_Expl:  percent explanation of X variance
+      <li>Act_Expl: percent explanation of activity
+      <li>R2:  correlation coefficient (R<sup>2</sup>)
+      <li>Q2: cross-validated correlation coefficient (Q<sup>2</sup>)
+      <li>SDEC:  standard deviation of error of calculation
+      <li>SDEP:  standard deviation of error of prediction
+      <li>SDEP_Ext: standard deviation of error of prediction, external data set 
+      <li>R2_Ext:  correlation coefficient, external data set
+    </ul>
+  <li>Interaction Heat Map:  a heat map that makes it easy to
+      identify the residues that have the largest absolute effect on ligand
+      binding.
+  <li>SAR Heat Map:  a heat map that highlights residues that are most 
+      critical to discriminating between more and less potent ligands.
+</ul>
+
+More will become available in the near future.
+<h4><a name="pwd-analysis-view"></a>View</h4>
+<p>
+Click on the <w>View</w> button to view the selected dataset.  If the
+Interaction or SAR dataset is selected, the surface of the protein pocket
+is shown in the MOE Window and a QB Heat Map is created to present the data. 
+Otherwise, a table of the selected dataset is shown.
+
+<h4><a name="pwd-analysis-save"></a>Save</h4>
+<p>
+Click on the <w>Save</w> button to save the selected dataset to a csv-format
+file, which is uses the filename 
+<inline> &lt;Title&gt;-&lt;dataset&gt;.csv</inline> in the current working
+directory.
 
 <h3><a name="pwd-options"></a>Options</h3>
 <p>
@@ -1064,67 +1165,6 @@ set.  The receptor and ligand molecules can be ordered so that the training set
 molecules appear first when the receptor and pose MDB databases are created, or
 the entries in the databases can be rearranged after the database have been
 created (see the MOE documentation).
-
-<h3><a name="pwd-analysis"></a>Analysis</h3>
-<p>
-There are several post analysis datasets that you can select:
-<ul>
-  <li>PLS Results Table:  a table that shows the following stastical results
-      for each number of latent variables (1 to number of components) used in
-      the  construction of the PLS models:  
-    <ul>
-      <li>X_Expl:  percent explanation of X variance
-      <li>Act_Expl: percent explanation of <todo>Lance ???</todo>
-      <li>R2:  correlation coefficient (R<sup>2</sup>)
-      <li>Q2: cross-validated correlation coefficient (Q<sup>2</sup>)
-      <li>SDEC:  standard deviation of error of calculation
-      <li>SDEP:  standard deviation of error of prediction
-      <li>SDEP_Ext: standard deviation of error of prediction, external data set 
-      <li>R2_Ext:  correlation coefficient, external data set
-    </ul>
-  <li>Interaction Heat Map:  a heat map that makes it easy to
-      identify the residues that have the largest absolute effect on ligand
-      binding.
-  <li>SAR Heat Map:  a heat map that highlights residues that are most 
-      critical to discriminating between more and less potent ligands.
-</ul>
-
-More will become available in the near future.
-<h4><a name="pwd-analysis-view"></a>View</h4>
-<p>
-Click on the <w>View</w> button to view the selected dataset.  If the
-Interaction or SAR dataset is selected, the surface of the protein pocket
-is shown in the MOE Window and a QB Heat Map is created to present the data. 
-Otherwise, a table of the selected dataset is shown.
-
-<h4><a name="pwd-analysis-save"></a>Save</h4>
-<p>
-Click on the <w>Save</w> button to save the selected dataset to a csv-format
-file, which is uses the filename 
-<inline> &lt;Title&gt;-&lt;dataset&gt;.csv</inline> in the current working
-directory.
-
-<h3><a name="pwd-workflow"></a>Workflow</h3>
-<p>
-The workflow of QB-PWD Analysis is captured in the following steps:
-<ol>
-  <li>Execute a batch run of QMScore with PWD selected on a set of receptor(s) 
-      and poses.
-  <li>Open the QB-PWD panel:  
-      <w>Compute</w>&rarr;<w>Simulations</w>&rarr;<w>QuantumBio</w>&rarr;<w>QB-PWD</w>.
-  <li>Click on <w>Load</w> to open the QMScore MDB database containing the 
-      results of the QMScore/QB-PWD batch run.
-  <li>Select the options for the PWD analysis.  If you haven't done so already,
-      load the experimental activities into the QMScore/QB-PWD database.
-      Click <w>Apply</w>.
-  <li>After the PLS analysis is complete, select a dataset.
-  <li>Click <w>View</w>.  If the Interaction or SAR dataset is selected, 
-      the surface of the protein pocket is shown in the MOE Window and a
-      QB Heat Map is created to present the data.  Otherwise, a table
-      of the selected dataset is shown.
-  <li>Click <w>Save</w> to save the selected dataset in a 
-      csv-formatted file.
-</ol>
 
 <h2><a name="heatmap"></a>MOEDivcon Heat Map</h2>
 <p>
