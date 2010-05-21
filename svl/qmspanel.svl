@@ -95,7 +95,7 @@ const QMSCORE_OPT_DEFAULTS =
     ['freq',         0             ],
     ['opt',          1             ],
     ['shift',        0.0           ],
-    ['analpwd',      0             ]       //  Generate PWD row data
+    ['analpwd',      1             ]       //  Generate PWD row data
 
     ];
 
