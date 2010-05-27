@@ -1153,11 +1153,15 @@ global function qb_QBPWDSetupPanel []
 */
 
 //DEBUG
+    msgkey = Message [0, 'PWD Analysis is running ...'];
     local dbkey = db_Open [pwdfilename, 'read-write'];
     local sardata = ReadHeatMapData [
-        '~daren/dev/MOEDivcon/data/trypsin-heatmap-88.csv'];
+        'sar_heatmap.csv'];
     qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
     db_Close dbkey;
+    sleep 5;
+    Message [msgkey, 'PWD Analysis is done.'];
+    sleep 3;
 //DEBUG
 
                     WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
