@@ -1155,13 +1155,14 @@ global function qb_QBPWDSetupPanel []
 //DEBUG
     msgkey = Message [0, 'PWD Analysis is running ...'];
     local dbkey = db_Open [pwdfilename, 'read-write'];
-    local sardata = ReadHeatMapData [
-        'sar_heatmap.csv'];
+    local sardata = ReadHeatMapData 'sar_heatmap.csv';
     qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
+    local interdata = ReadHeatMapData 'inter_heatmap.csv';
+    qb_SaveAnalysisData [dbkey, 'pwd', 'inter', interdata];
     db_Close dbkey;
-    sleep 5;
-    Message [msgkey, 'PWD Analysis is done.'];
     sleep 3;
+    Message [msgkey, 'PWD Analysis is done.'];
+    sleep 2;
 //DEBUG
 
                     WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
