@@ -320,10 +320,10 @@ local function CalculateCuts [data, numsigma, cols, num]
     local [avg, sigma] = StandardDeviation [numbers];
 
     local mincut, maxcut;
-    if minnum === 0 and maxnum > 0 and num > 0 then
+    if minnum >= 0 and maxnum > 0 and num > 0 then
         mincut = 0;
         maxcut = 2 * (avg + (numsigma * sigma));
-    elseif maxnum === 0 and minnum < 0 and num > 0 then
+    elseif maxnum <= 0 and minnum < 0 and num > 0 then
         mincut  = 2 * (avg - (numsigma * sigma));
         maxcut = 0;
     elseif minnum < 0 and maxnum > 0 and num > 0 then
@@ -361,10 +361,10 @@ local function CalculateMinMax [data, num]
     local maxnum = max numbers;
 
     local mincut, maxcut;
-    if minnum === 0 and maxnum > 0 and num > 0 then
+    if minnum >= 0 and maxnum > 0 and num > 0 then
         mincut = 0;
         maxcut = maxnum;
-    elseif maxnum === 0 and minnum < 0 and num > 0 then
+    elseif maxnum <= 0 and minnum < 0 and num > 0 then
         mincut  = minnum;
         maxcut = 0;
     elseif minnum < 0 and maxnum > 0 and num > 0 then
@@ -1191,6 +1191,7 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
     data = TruncateRows [data];
     local [titles, colnames, colabbrevs, rowdata] = data;
     local numcols = length colnames;
+    numsignifcols = select [numcols, numsignifcols, numcols < numsignifcols];
     local numrows = length rowdata;
     local page_w = (numcols + 1) * (CELL_WD + MOE_PAD_W) + MOE_PAD_W;
     local page_h = (numrows + 1) * (CELL_HT + MOE_PAD_H) + MOE_PAD_H;
