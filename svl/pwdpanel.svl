@@ -109,7 +109,8 @@ const PANEL =
                 name: 'title', allowBlank: 0,
                 type: 'char', len: 40,
                 bubbleHelp:
-                    ''
+                    'The title is used to label heat maps\n'
+                    'and tables, and to form filenames.'
                 ]
             ],
 
@@ -155,7 +156,7 @@ const PANEL =
                 [
                 name: 'sf_e_r6', text: 'E_R6', title: 'MM:',
                 bubbleHelp:
-                    ''
+                    'E_R6 is the van der Waals repulsive component.'
                 ],
             Separator : 
                 [
@@ -165,7 +166,7 @@ const PANEL =
                 [
                 name: 'sf_e_r12', text: 'E_R12',
                 bubbleHelp:
-                    ''
+                    'E_R12 is the van der Waals attractive component.'
                 ],
             Separator : 
                 [
@@ -175,7 +176,7 @@ const PANEL =
                 [
                 name: 'sf_e_ele', text: 'E_ELE',
                 bubbleHelp:
-                    ''
+                    'E_ELE is the electrostatic component.'
                 ]
             ],
 
@@ -190,7 +191,8 @@ const PANEL =
                 name: 'expact_hdr', allowBlank: 0, title: 'Field:',
                 type: 'char', len: 40,
                 bubbleHelp:
-                    ''
+                    'The MOE database field name for\n'
+                    'the experimental activity values.'
                 ],
             Separator : 
                 [
@@ -200,8 +202,9 @@ const PANEL =
                 [
                 name: 'loadact', text: 'Load',
                 bubbleHelp:
-                    ''
-                                            ]
+                    'Load in the experimental activity data\n'
+                    'from a csv file using the given field name.'
+                ]
             ],
 
         Separator : [flushLeft:1, extendH:1, margin:1],
@@ -212,9 +215,7 @@ const PANEL =
             extendH: 1,
             Label :
                 [
-                font: 'mediumBold', text: 'Pruning:',
-                bubbleHelp:
-                    ''
+                font: 'mediumBold', text: 'Pruning:'
                 ],
             Text :
                 [
@@ -230,9 +231,7 @@ const PANEL =
                 ],
             Label :
                 [
-                font: 'mediumBold', text: '%',
-                bubbleHelp:
-                    ''
+                font: 'mediumBold', text: '%'
                 ],
             Separator : 
                 [
@@ -278,7 +277,8 @@ const PANEL =
                 title: 'Number of components:',
                 type: 'int', len: 5,
                 bubbleHelp:
-                    'Number of '
+                    'Number of components to include in\n'
+                    'the model during PLS analysis.'
                 ],
             Separator : 
                 [
@@ -310,7 +310,7 @@ const PANEL =
             name: 'analysis', text: ANALYSIS,
             type: 'int', minWidth: 8,
             bubbleHelp:
-                ''
+                'Chose an analysis data set to view and/or save.'
             ],
         Separator : 
             [

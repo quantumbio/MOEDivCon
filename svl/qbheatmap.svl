@@ -109,7 +109,13 @@ const HEADER =
     title: 'QB Heat Map',
     windowName: 'QB Heat Map',
     text: ['Apply', 'Animate', 'Print', 'Save', 'Close'],
-    onTrigger: ['return', 'return', 'return', 'return', 'return']
+    onTrigger: ['return', 'return', 'return', 'return', 'return'],
+    bubbleHelp: ['Apply changes to the heat map settings.',
+        'Step through each row of the heat map showing the\n'
+        'changing ligand interactions on the pocket surface.', 
+        'Print the heat map.', 
+        'Save the heat map.',
+        '']
     ];
 
 const PANEL =
@@ -191,7 +197,7 @@ const PANEL =
                 bubbleHelp:
                     'Determine minimum and maximum cuts using the\n'
                     'standard deviation of a subset of the map data.\n'
-                    'Otherwise, use absolute minimum and maximum.'
+                    'Otherwise, use the absolute minimum and maximum.'
                 ],
             Separator : 
                 [
@@ -226,7 +232,8 @@ const PANEL =
                 [
                 name: 'mono', text: 'Monochromatic',
                 bubbleHelp:
-                    'Use a monochrome color scheme.'
+                    'Use a monochrome color scheme\n'
+                    '(red positive, blue negative).'
                 ],
             Text :
                 [
