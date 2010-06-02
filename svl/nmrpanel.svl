@@ -162,7 +162,7 @@ const PANEL =
             name: 'experimental', text: 'Enter/Edit Experimental Data', 
             extendH: 0,
             bubbleHelp:
-                'Open dialog to enter the data\n'
+                'Open a panel to enter the data\n'
                 'for the free and bound ligand.'
             ]
         ],
@@ -177,7 +177,7 @@ const PANEL =
             name: 'opt', title: 'Geometry Optimization:', 
             text: GEOM_OPTS, type: 'int', minWidth: 11, extendH: 1,
             bubbleHelp:
-            'Geometry optimization will often improve chances\n'
+            'QM geometry optimization will often improve chances\n'
             'of convergence:\n'
             ' * none:  no optimization step is performed.\n'
             ' * H only:  all proton positions in the complex are\n'
@@ -198,7 +198,7 @@ const PANEL =
             [
             name: 'guess', text: 'Guess',
             bubbleHelp:
-                'Perform Single Point calculation to\n'
+                'Perform a Single Point calculation to\n'
                 'initialize density matrix.\n'
                 'Warning: may not always\n'
                 'improve convergence.'
