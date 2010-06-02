@@ -2102,7 +2102,7 @@ endfunction
  *
  *  Perform a naive merge of the two databases (that is, assume the first
  *  row of data in srcname1 corresponds to the first row of data srcname2,
- *  etc.).  Only the fields are merged, the environment is ignored.
+ *  etc.).
  *
  ****************************************************************************/
 global function qb_MergeDB [srcname1, srcname2, dstname]
@@ -2123,6 +2123,21 @@ global function qb_MergeDB [srcname1, srcname2, dstname]
         local rowdata2 = db_Read [srckey2, rowkey2];
         db_Write [dstkey, 0, cat [rowdata1, rowdata2]];
     endloop
+
+    local envir, field, value;
+    envir = db_Environment srcname1;
+    if not isnull envir then
+        for [field, value] in envir loop
+            db_SetEnv [dstkey, field, value];
+        endloop
+    endif
+
+    envir = db_Environment srcname2;
+    if not isnull envir then
+        for [field, value] in envir loop
+            db_SetEnv [dstkey, field, value];
+        endloop
+    endif
 
     db_Close dstkey;
     db_Close srckey1;
