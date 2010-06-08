@@ -72,6 +72,7 @@ const QBPWD_OPT_DEFAULTS =
 const ANALYSIS =
     [
     'PLS Results Table',
+    'Activities Table',
     'Interaction Heat Map',
     'SAR Heat Map'
     ];
@@ -79,6 +80,7 @@ const ANALYSIS =
 const ANALKEYS =
     [
     'pls',
+    'act',
     'inter',
     'sar'
     ];
@@ -343,6 +345,8 @@ const PANEL =
 
 //  Local Functions
 
+function MatchResidue;
+
 /****************************************************************************
  *
  *                          CalcDist
@@ -356,7 +360,7 @@ local function CalcDist [restokens, recatoms, ligatoms]
     for atom in recatoms loop
         local residue = aResidue atom;
         local restok = twrite ['{}{}', rName residue, rUID residue];
-        local idx = indexof [restok, restokens];
+        local idx = MatchResidue [restok, restokens];
         if idx > 0 then
             dist = max [max aDist [atom, ligatoms], dist];
         endif
@@ -432,7 +436,7 @@ local function ColorAtoms [data, ligidx, residx, recatoms,
     for atom in recatoms loop
         local residue = aResidue atom;
         local restok = twrite ['{}{}', rName residue, rUID residue];
-        local idx = indexof [restok, restokens];
+        local idx = MatchResidue [restok, restokens];
         if idx > 0 and (residx === 0 or residx === idx) then
             local cidx, value = rowvals (idx);
             if value <= mincut then
@@ -561,7 +565,13 @@ local function FindResidue [restok]
     local residues = Residues [];
     local resnames = rName residues;
     local rname = tok_keep [restok, 3];
-    local [indices] = indicesof [rname, resnames];
+    if rname === 'CYS' then
+        rname = ['CYS', 'CYX'];
+    elseif rname === 'HIS' then
+        rname = ['HIS', 'HID', 'HIE', 'HIP'];
+    endif
+
+    local indices = cat indicesof [rname, resnames];
     if length indices > 0 then
         local rnum = atoi tok_drop [restok, 3];
         local idx_i = indexof [rnum, rUID residues [indices]];
@@ -572,7 +582,6 @@ local function FindResidue [restok]
     endif
 
     return [residx, resatms];
-
 endfunction
 
 /****************************************************************************
@@ -601,6 +610,19 @@ local function GetAnalData [dbpath, title, type]
         return [];
     endif
 
+    local maptitle;
+    if type === 'sar' then
+        maptitle = twrite ['{} SAR Map', title];
+    elseif type === 'inter' then
+        maptitle = twrite ['{} Interaction Map', title];
+    elseif type === 'act' then
+        maptitle = twrite ['{} Activities Table', title];
+    elseif type === 'pls' then
+        maptitle = twrite ['{} PLS Results Table', title];
+    else
+        maptitle = title;
+    endif
+
     //  Create abbreviated names for heat map and check residues
     if type === 'sar' or type === 'inter' then
         local [resnames, ligdata] = data;
@@ -608,13 +630,6 @@ local function GetAnalData [dbpath, title, type]
         local lignames = app first ligdata;
         local ligabbrevs = apt tok_keep [lignames, -3];
         local ligvals = app second ligdata;
-        local maptitle;
-        if type === 'sar' then
-            maptitle = twrite ['{} SAR Map', title];
-        else
-            maptitle = twrite ['{} Interaction Map', title];
-        endif
-
         data = [[maptitle, 'Ligands', 'Residues'], resnames, resabbrevs,
             tr [lignames, ligabbrevs, ligvals]];
 
@@ -625,14 +640,13 @@ local function GetAnalData [dbpath, title, type]
                 missing];
             exit [];
         endif
+    elseif type === 'act' or type === 'pls' then
+        data = [maptitle, data];
     endif
 
     return data;
 
 endfunction
-
-function ReadExpActData;
-function ReadHeatMapData;
 
 /****************************************************************************
  *                          LoadDB
@@ -691,6 +705,31 @@ local function LoadLigs [pwdfilename]
     G_surface.ligmols = ligmols;
     db_Close dbkey;
 
+endfunction
+
+/****************************************************************************
+ *                          MatchResidue
+ *
+ *  Look up the residue by NameUID token.  If not found, check to make sure
+ *  MOE didn't rename it.
+ *
+ ****************************************************************************/
+local function MatchResidue [restok, restokset]
+
+    local residx = indexof [restok, restokset];
+    if residx === 0 then
+        local rname = tok_keep [restok, 3];
+        local rnum = atoi tok_drop [restok, 3];
+        if rname === 'CYX' then
+            restok = twrite ['{}{}', 'CYS', rnum];
+        elseif rname === 'HID' or rname === 'HIE' or rname === 'HIP' then
+            restok = twrite ['{}{}', 'HIS', rnum];
+        endif
+
+        residx = indexof [restok, restokset];
+    endif
+
+    return residx;
 endfunction
 
 /****************************************************************************
@@ -789,12 +828,12 @@ endfunction
 
 /****************************************************************************
  *
- *                          ReadHeatMapData
+ *                          ReadMatrixData
  *
  *  Return data formatted for the heat map.
  *
  ****************************************************************************/
-local function ReadHeatMapData [filename]
+local function ReadMatrixData [filename]
 
     local f = fopenr filename;
     local lines = freadb [f, 'line', INT_MAX];
@@ -842,6 +881,33 @@ local function SaveOptions [dbpath, options]
     db_Close dbkey;
 
 endfunction
+
+
+/****************************************************************************
+ *                          ShowTable
+ *
+ *  Format the table data and display it in the message window.
+ *
+ *
+ ****************************************************************************/
+local function ShowTable [data, type]
+
+    local function writeNfield [nf]
+        return twrite ['{n:15}', nf];
+    endfunction
+
+    local function writeTfield [tf]
+        return twrite ['{t:15}', tf];
+    endfunction
+
+    local [title, [colNames, rowdata]] = data;
+    local buffer = twrite ['{t:50}\n', title];
+    buffer = tok_cat [buffer, tok_cat app writeTfield colNames, '\n'];
+
+    qb_CreateMessWin [string buffer, 40, 80];
+
+endfunction
+
 
 /****************************************************************************
  *
@@ -1039,7 +1105,7 @@ global function qb_QBPWDSetupPanel []
                 endif
 
                 if ANALKEYS (vals.analysis) === 'pls' then
-//TODO:  Table
+                    ShowTable [pwddata (vals.analysis), 'pls'];
                     exit [];
                 endif
 
@@ -1155,14 +1221,16 @@ global function qb_QBPWDSetupPanel []
 //DEBUG
     msgkey = Message [0, 'PWD Analysis is running ...'];
     local dbkey = db_Open [pwdfilename, 'read-write'];
-    local sardata = ReadHeatMapData 'sar_heatmap.csv';
+    local plsdata = ReadMatrixData 'pls_table.csv';
+    qb_SaveAnalysisData [dbkey, 'pwd', 'pls', plsdata];
+    local actdata = ReadMatrixData 'act_table.csv';
+    qb_SaveAnalysisData [dbkey, 'pwd', 'act', actdata];
+    local sardata = ReadMatrixData 'sar_heatmap.csv';
     qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
-    local interdata = ReadHeatMapData 'inter_heatmap.csv';
+    local interdata = ReadMatrixData 'inter_heatmap.csv';
     qb_SaveAnalysisData [dbkey, 'pwd', 'inter', interdata];
     db_Close dbkey;
-    sleep 3;
     Message [msgkey, 'PWD Analysis is done.'];
-    sleep 2;
 //DEBUG
 
                     WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
