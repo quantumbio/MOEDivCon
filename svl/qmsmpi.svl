@@ -134,8 +134,8 @@ global function qb_QMScoreMPI [dbpath]
 
         //  Run all error tests unless forced not to do so.
         local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
-            = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
-                coreopts.ligchg, status.notforced, status.notforced, 
+            = qb_CheckChgTestDivconMols [recmol, recchg, posemol, posechg,
+                status.notforced, status.notforced, 
                 status.notforced, coreopts.testH, coreopts.testMM,
                 'qms', HAM_KEYS (coreopts.ham)];
 
