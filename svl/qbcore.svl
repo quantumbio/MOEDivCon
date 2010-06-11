@@ -1435,13 +1435,6 @@ global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
     local recressets = app uniq app oResidues recatmsets;
     local ligressets = app uniq app oResidues ligatmsets;
 
-local f = fopenw '/tmp/split.txt';//DEBUG
-fwrite [f, 'Receptor:  {}  {v}\n{v}\n{v}\n', length recressets,//DEBUG
-app length recressets, rName recressets, rNumber recressets];//DEBUG
-fwrite [f, 'Ligand:  {}  {v}\n{v}\n{v}\n', length ligressets,//DEBUG
-app length ligressets, rName ligressets, rNumber ligressets];//DEBUG
-fclose f;
-
     return [recressets, recok, recchgok, ligressets, ligok, ligchgok, mess];
 
 endfunction
@@ -1732,7 +1725,7 @@ global function qb_GetAnalysisData [dbkey, analysis, type]
             [[data]] = sread [string datatok, '{v}'];
         elseif type === 'optlv' then
             datatok = db_GetEnv [dbkey, ANALPWDOPTLV];
-            [[data]] = sread [string datatok, '{v}'];
+            [[data]] = sread [string datatok, '{}'];      //  Single integer
         endif
 
     elseif analysis === 'nmr' then
@@ -2156,27 +2149,14 @@ endfunction
  ****************************************************************************/
 global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
 
-write ['Receptor:  {}  {v}\n{v}\n{v}\n', length recressets,//DEBUG
-app length recressets, rName recressets, rNumber recressets];//DEBUG
-write ['Ligand:  {}  {v}\n{v}\n{v}\n', length ligressets,//DEBUG
-app length ligressets, rName ligressets, rNumber ligressets];//DEBUG
-
     local recatoms = cat oAtoms cat recressets;
     local ligatoms = cat oAtoms cat ligressets;
-
-local f = fopenw '/tmp/fatty.txt';//DEBUG
-fwrite [f, 'Rlen:  {}\n{v}\n{v}\n', length recatoms,//DEBUG
-aName recatoms, aNumber recatoms];//DEBUG
 
     local [ligvdw_r,ligvdw_e] = get [pot_Parm_vdw [ligatoms, ligatoms], [2,3]];
     local [recvdw_r,recvdw_e] = get [pot_Parm_vdw [recatoms, recatoms], [2,3]];
 
     local handshake, resset, residue, atom, xyz, idx;
     xyz = tr aPos recatoms;
-
-fwrite [f, 'Rlen:  {}  xyz len {}\n{v}\n{v}\n', length recatoms, length xyz,//DEBUG
-aName recatoms, aNumber recatoms];//DEBUG
-
     fwrite [outpipe, '{n:}\n', length recressets];
     for resset in recressets loop
         fwrite [outpipe, '{n:}\n', length resset];
@@ -2200,10 +2180,6 @@ aName recatoms, aNumber recatoms];//DEBUG
     //  There should be only one molecule (residue set) in the ligand/pose
     //  collection, but we treat all collections similarly.
     xyz = tr aPos ligatoms;
-
-fwrite [f, 'Llen:  {}  xyz len {}\n{v}\n', length ligatoms, length xyz, aNumber ligatoms];//DEBUG
-fclose f;//DEBUG
-
     fwrite [outpipe, '{n:}\n', length ligressets];
     for resset in ligressets loop
         fwrite [outpipe, '{n:}\n', length resset];
@@ -2285,7 +2261,7 @@ global function qb_SaveAnalysisData [dbkey, analysis, type, data]
         elseif type === 'act' then
             db_SetEnv [dbkey, ANALPWDACT, twrite ['{v}', data]];
         elseif type === 'optlv' then
-            db_SetEnv [dbkey, ANALPWDOPTLV, twrite ['{v}', data]];
+            db_SetEnv [dbkey, ANALPWDOPTLV, twrite ['{}', data]]; //  Integer
         endif
     elseif analysis === 'nmr' then
         if type === 'exp' then

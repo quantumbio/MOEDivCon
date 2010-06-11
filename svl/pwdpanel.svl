@@ -77,12 +77,14 @@ const ANALYSIS =
     'SAR Heat Map'
     ];
 
+const ANALOPTLV = 5;
 const ANALKEYS =
     [
     'pls',
     'act',
     'inter',
-    'sar'
+    'sar',
+    'optlv'
     ];
 
 const HEADER = 
@@ -890,19 +892,31 @@ endfunction
  *
  *
  ****************************************************************************/
-local function ShowTable [data, type]
+local function ShowTable [data, postscript]
 
     local function writeNfield [nf]
-        return twrite ['{n:15}', nf];
+        return twrite ['{n:10.5f}', nf];
     endfunction
 
     local function writeTfield [tf]
-        return twrite ['{t:15}', tf];
+        return twrite ['{t:10}', tf];
     endfunction
 
     local [title, [colNames, rowdata]] = data;
-    local buffer = twrite ['{t:50}\n', title];
+    local buffer = twrite ['{t:50}\n\n', title];
+    buffer = tok_cat [buffer, writeTfield ' '];
     buffer = tok_cat [buffer, tok_cat app writeTfield colNames, '\n'];
+
+    local row;
+    for row in rowdata loop
+        local [lbl, values] = row;
+        buffer = tok_cat [buffer, writeTfield lbl];
+        buffer = tok_cat [buffer, tok_cat app writeNfield values, '\n'];
+    endloop
+
+    if neL [postscript, ''] then
+        buffer = tok_cat [buffer, postscript];
+    endif
 
     qb_CreateMessWin [string buffer, 40, 80];
 
@@ -1105,7 +1119,19 @@ global function qb_QBPWDSetupPanel []
                 endif
 
                 if ANALKEYS (vals.analysis) === 'pls' then
-                    ShowTable [pwddata (vals.analysis), 'pls'];
+                    if isnull peek [pwddata, ANALOPTLV] then
+                        pwddata = poke [pwddata, ANALOPTLV, 
+                            GetAnalData [pwdfilename, vals.title,
+                            ANALKEYS (ANALOPTLV)]];
+                    endif
+
+                    ShowTable [pwddata (vals.analysis),
+                        twrite ['\nOptimal LV:  {}\n', pwddata (ANALOPTLV)]];
+                    exit [];
+                endif
+
+                if ANALKEYS (vals.analysis) === 'act' then
+                    ShowTable [pwddata (vals.analysis), ''];
                     exit [];
                 endif
 
@@ -1229,6 +1255,8 @@ global function qb_QBPWDSetupPanel []
     qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
     local interdata = ReadMatrixData 'inter_heatmap.csv';
     qb_SaveAnalysisData [dbkey, 'pwd', 'inter', interdata];
+    local optlvdata = [4];
+    qb_SaveAnalysisData [dbkey, 'pwd', 'optlv', optlvdata];
     db_Close dbkey;
     Message [msgkey, 'PWD Analysis is done.'];
 //DEBUG
