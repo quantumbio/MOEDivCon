@@ -52,7 +52,7 @@ const CELL_HT = 10;
 const MOE_PAD_W = 3.7;
 const MOE_PAD_H = 3.0;
 
-const MAX_ROWS = 40;            //  Used for truncation of table data
+const MAX_ROWS = 60;            //  Used for truncation of table data
 const MAX_COLS = 30;            //  Used for truncation of table data
 
 //  Data
