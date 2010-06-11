@@ -135,9 +135,9 @@ global function qb_QMScoreMPI [dbpath]
         //  Run all error tests unless forced not to do so.
         local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
             = qb_CheckChgTestDivconMols [recmol, recchg, posemol, posechg,
-                status.notforced, status.notforced, 
-                status.notforced, coreopts.testH, coreopts.testMM,
-                'qms', HAM_KEYS (coreopts.ham)];
+                status.notforced, status.notforced, status.notforced,
+                coreopts.testH, coreopts.testMM, 'qms',
+                HAM_KEYS (coreopts.ham)];
 
 write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
 
@@ -152,7 +152,7 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
             write ['Sending pose {} of {}\n', rowcnt, nrows];
             fwrite [stdin, '{n:}\n', rowcnt];
             fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
-            fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
+            fwrite [stdin, '{c:}\n', posemol(1)(MOL_NAME)];
             fwrite [stdin, '{n:}\n', recchg];
             fwrite [stdin, '{n:}\n', posechg];
 
