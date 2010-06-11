@@ -139,6 +139,8 @@ global function qb_QMScoreMPI [dbpath]
                 status.notforced, coreopts.testH, coreopts.testMM,
                 'qms', HAM_KEYS (coreopts.ham)];
 
+write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
+
         if alltrue [recok, recchgok, ligok, ligchgok] then
             numokay = numokay + 1;
 
