@@ -71,7 +71,7 @@ const LIG_KEYS =
  *
  *
 ****************************************************************************/
-global function qb_QMScoreMPI [dbpath, errortests]
+global function qb_QMScoreMPI [dbpath]
 
     if not MOE_BATCH then return; endif
 
@@ -115,7 +115,8 @@ global function qb_QMScoreMPI [dbpath, errortests]
     fwrite [stdin, '{n:}\n', qmsopts.shift];
     fwrite [stdin, '{n:}\n', nrows];
 
-    //  For each receptor/pose in the database, check if okay
+    //  For each receptor/pose in the database, check tests, then send down
+    //  to moedivconmpi
     local rowkey = 0, rowcnt = 0, numokay = 0, warnings = [];
     for rowkey in dbrowkeys loop
         local errmess = '', success = 0;
@@ -134,8 +135,8 @@ global function qb_QMScoreMPI [dbpath, errortests]
         //  Run all error tests unless forced not to do so.
         local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
             = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
-                coreopts.ligchg, errortests, errortests, errortests,
-                coreopts.testH, coreopts.testMM,
+                coreopts.ligchg, status.notforced, status.notforced, 
+                status.notforced, coreopts.testH, coreopts.testMM,
                 'qms', HAM_KEYS (coreopts.ham)];
 
         if alltrue [recok, recchgok, ligok, ligchgok] then
