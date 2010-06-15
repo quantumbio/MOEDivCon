@@ -198,15 +198,16 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
         local results = [], return_statement = [];
         local divconerrmess = "";
 
-        [[rowcnt]] = fread [stdout, '{n:}'];
-        write ['Getting results for pose {} ({} of {})\n', rowcnt, 
-            result_ith, numokay];
-
         [[return_statement]] = fread [stdout, '{c:*}'];
 
         write ['Divcon: {}\n', return_statement];//DEBUG
 
         if return_statement === "success" then
+
+            [[rowcnt]] = fread [stdout, '{n:}'];
+            write ['Getting results for pose {} ({} of {})\n', rowcnt, 
+                result_ith, numokay];
+
             local name, nameValue;
             local parameter, parameterValue;
             [[name]] = fread [stdout, '{c:*}'];
@@ -229,8 +230,14 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
             endif
 
             qb_SaveDivconStatus [dbkey, dbrowkeys(rowcnt), sucmess];
+            result_ith = result_ith + 1;
 
         elseif return_statement === "error" then
+
+            [[rowcnt]] = fread [stdout, '{n:}'];
+            write ['Getting error message for pose {} ({} of {})\n', rowcnt, 
+                result_ith, numokay];
+
             [[return_statement]] = fread [stdout, '{c:*}'];
             if neL [return_statement, "Divcon done."] then
                 divconerrmess = cat [divconerrmess, return_statement];
@@ -249,9 +256,12 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
             endif
 
             qb_SaveDivconStatus [dbkey, dbrowkeys(rowcnt), divconerrmess];
+            result_ith = result_ith + 1;
+
+        else
+            write ['what is: {}\n', return_statement];  //  abort?
         endif
 
-        result_ith = result_ith + 1;
     endloop
 
     //  Look for error messages from stderr.
