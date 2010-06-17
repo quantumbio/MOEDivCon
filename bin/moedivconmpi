@@ -19,4 +19,4 @@ if [ -z "$QBENVSET" ]; then
     . $QBHOME/etc/qbenv.sh
 fi
 
-mpirun -np 2 moedivconmpi.bin $@ - 
+mpirun -np 2  -x QBHOME -x PATH -x LD_LIBRARY_PATH -machinefile $PBS_NODEFILE moedivconmpi.bin $@ - 
