@@ -612,17 +612,17 @@ local function GetAnalData [dbpath, title, type]
         return [];
     endif
 
-    local maptitle;
+    local fulltitle;
     if type === 'sar' then
-        maptitle = twrite ['{} SAR Map', title];
+        fulltitle = twrite ['{} SAR Map', title];
     elseif type === 'inter' then
-        maptitle = twrite ['{} Interaction Map', title];
+        fulltitle = twrite ['{} Interaction Map', title];
     elseif type === 'act' then
-        maptitle = twrite ['{} Activities Table', title];
+        fulltitle = twrite ['{} Activities Table', title];
     elseif type === 'pls' then
-        maptitle = twrite ['{} PLS Results Table', title];
+        fulltitle = twrite ['{} PLS Results Table', title];
     else
-        maptitle = title;
+        fulltitle = title;
     endif
 
     //  Create abbreviated names for heat map and check residues
@@ -632,7 +632,7 @@ local function GetAnalData [dbpath, title, type]
         local lignames = app first ligdata;
         local ligabbrevs = apt tok_keep [lignames, -3];
         local ligvals = app second ligdata;
-        data = [[maptitle, 'Ligands', 'Residues'], resnames, resabbrevs,
+        data = [[fulltitle, 'Ligands', 'Residues'], resnames, resabbrevs,
             tr [lignames, ligabbrevs, ligvals]];
 
         local missing = CheckResidues [second data];
@@ -643,7 +643,7 @@ local function GetAnalData [dbpath, title, type]
             exit [];
         endif
     elseif type === 'act' or type === 'pls' then
-        data = [maptitle, data];
+        data = [fulltitle, data];
     endif
 
     return data;
@@ -841,22 +841,73 @@ local function ReadMatrixData [filename]
     local lines = freadb [f, 'line', INT_MAX];
     local line = first lines;
     local strings = wordsplit [line, ","];
-    local resnames = app token strings;
+    local colnames = app token strings;
     lines = dropfirst lines;
 
-    //  ligand labels and values
-    local ligdata = [];
+    //  row labels and values
+    local rowdata = [];
     for line in lines loop
         strings = wordsplit [line, ","];
-        local ligname = token first strings;
+        local rowname = token first strings;
         strings = dropfirst strings;
-        local ligvals = atof app token strings;
-        ligdata = append [ligdata, [ligname, ligvals]];
+        local rowvals = atof app token strings;
+        rowdata = append [rowdata, [rowname, rowvals]];
     endloop
 
     fclose f;
 
-    return [resnames, ligdata];
+    return [colnames, rowdata];
+endfunction
+
+/****************************************************************************
+ *
+ *                          SaveMatrixData
+ *
+ *  Save the matrix data in csv format.
+ *
+ ****************************************************************************/
+local function ReadMatrixData [filename, matrixdata, type]
+
+    local title, rowlbl, collbl, colnames, colabbrevs, rowdata;
+    if type === 'sar' or type === 'inter' then
+        [[title, rowlbl, collbl], colnames, colabbrevs, rowdata] = matrixdata;
+    elseif type === 'act' or type === 'pls' then
+        [title, colnames, ligdata] = matrixdata;
+    else
+        Warning [Unknown analysis data type.'];
+        return [];
+    endif
+
+    local f = fopenw filename;
+
+    local cname;
+    for cname in colnames loop
+        fwrite [f, ',{t:}', cname];          // first column name empty
+    endloop
+
+    fwrite [f, '\n'];
+
+    local row;
+    for row in rowdata loop
+        local rowname, rowabbrev, rowvals;
+        if type === 'sar' or type === 'inter' then
+            [rowname, rowabbrev, rowvals] = row;
+        elseif type === 'act' or type === 'pls' then
+            [rowname, rowvals] = row;
+        endif
+
+        fwrite [f, '{t:}', rowname];
+        local val;
+        for val in rowvals loop
+            fwrite [f, ',{n:f}', val];
+        endloop
+
+        fwrite [f, '\n'];
+    endloop
+
+    fclose f;
+
+    return;
 endfunction
 
 /****************************************************************************
@@ -1158,13 +1209,25 @@ global function qb_QBPWDSetupPanel []
 
         elseif trig === 'analsave' then
 
-                if second task_fork [statics:'share', 
-                        master:'parent'] === 'child' then
+            if second task_fork [statics:'share', 
+                    master:'parent'] === 'child' then
 
-//TODO:  Save analysis data in csv format
-
-                    exit [];
+                // Load and setup data
+                if isnull peek [pwddata, vals.analysis] then
+                    pwddata = poke [pwddata, vals.analysis, 
+                        GetAnalData [pwdfilename, vals.title,
+                        ANALKEYS (vals.analysis)]];
+                    if isnull peek [pwddata, vals.analysis] then
+                        Warning 'No analysis data to save.';
+                        exit [];
+                    endif
                 endif
+
+                local savefile = twrite ['{} {}.csv', vals.title, 
+                    ANALYSIS(vals.analysis)];
+                SaveMatrix [savefile, pwddata (vals.analysis)];
+                exit [];
+            endif
 
         elseif trig === 'loadact' then
             if second task_fork [master: 'parent',
