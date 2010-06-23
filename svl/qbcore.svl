@@ -1566,7 +1566,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
             task_prio 0;
 
             status = CheckCharge [wkey, status, vals.recchg,
-                vals.ligchg];
+                vals.ligchg, neL [vals.mode, 'Many-to-Many']];
             exit [];
         endif
 
@@ -1580,7 +1580,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
             task_prio 0;
 
             status = CheckCharge [wkey, status, vals.recchg,
-                vals.ligchg];
+                vals.ligchg, neL [vals.mode, 'Many-to-Many']];
             exit [];
         endif
 
@@ -2864,7 +2864,8 @@ global function qb_VerifyDivcon [wkey, status, vals]
     local msgkey = Message [0, 'Testing ...'];
 
     local ynmess = '';
-    status = CheckCharge [wkey, status, vals.recchg, vals.ligchg];
+    status = CheckCharge [wkey, status, vals.recchg, vals.ligchg,
+        neL [vals.mode, 'Many-to-Many']];
     local recchgok = neL [status.recchg, 3];
     local ligchgok = neL [status.ligchg, 3];
     local [recok, rm, ligok, lm] = TestComplex [1, 1, 1, 0, 0, status.appname,
