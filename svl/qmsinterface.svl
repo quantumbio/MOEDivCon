@@ -227,7 +227,7 @@ write ['Irecsz:  {}\n',  add recmol(3)(MOL_RES_NATOMS)];//DEBUG
         templist = cat [templist, flist [subdirname, 'MOE_*.row*']];
         templist = cat [templist, flist [subdirname, 'MOE_*.rst*']];
         templist = cat [templist, flist [subdirname, 'MOE_*.out']];
-        templist = cat [templist, flist [subdirname, 'divcon.log']];
+//        templist = cat [templist, flist [subdirname, 'divcon.log']];
         templist = cat [templist, flist [subdirname, 'mtkpp.log']];
         templist = cat [templist, flist [subdirname, 'divcon.hss']];
         templist = cat [templist, flist [subdirname, 'fort.8']];
