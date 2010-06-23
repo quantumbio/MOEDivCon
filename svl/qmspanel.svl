@@ -239,8 +239,17 @@ local function RunCalc [dbkey]
     coreopts.workdir = workdir;
     write ['Work Dir:  {}\n', workdir];
 
+    local start = clock [];//DEBUG
+
     local [results, errmess] = qb_QMScore [recset, ligand, coreopts, qmsopts,
         status.notforced];
+
+    local finish = clock [];//DEBUG
+    local secs = round (finish - start);
+    local hours = floor (secs / 3600);
+    secs = secs - (hours * 3600);
+    local minutes = floor (secs / 60);
+    secs = secs - (minutes * 60);
 
     if results === [] then
         if errmess === [] or errmess === '' then
@@ -263,7 +272,11 @@ local function RunCalc [dbkey]
         qb_SaveDivconStatus [dbkey, rowkey, sucmess];
     endif
 
-    Message [msgkey, 'QMScore is done.'];
+    local timemess = twrite ['QMScore is done.\nTotal clock time {}:{}:{}.', 
+        hours, minutes, secs];
+    write ['{}\n', timemess];
+    Message [msgkey, timemess];
+    sleep 3;
 
     return;
 endfunction
