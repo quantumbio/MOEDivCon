@@ -660,7 +660,7 @@ atombound = rep [1.050, num];
                     task_prio 0;
 
                     local ldkey, wascut;
-                    local dbpath = FilePrompt [title: 'Load Database', 
+                    local dbpath = first FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
                         if neL [ftype dbpath, 'file']

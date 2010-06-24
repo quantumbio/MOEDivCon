@@ -866,15 +866,15 @@ endfunction
  *  Save the matrix data in csv format.
  *
  ****************************************************************************/
-local function ReadMatrixData [filename, matrixdata, type]
+local function SaveMatrixData [filename, matrixdata, type]
 
     local title, rowlbl, collbl, colnames, colabbrevs, rowdata;
     if type === 'sar' or type === 'inter' then
         [[title, rowlbl, collbl], colnames, colabbrevs, rowdata] = matrixdata;
     elseif type === 'act' or type === 'pls' then
-        [title, colnames, ligdata] = matrixdata;
+        [title, [colnames, rowdata]] = matrixdata;
     else
-        Warning [Unknown analysis data type.'];
+        Warning ['Unknown analysis data type.'];
         return [];
     endif
 
@@ -1225,7 +1225,8 @@ global function qb_QBPWDSetupPanel []
 
                 local savefile = twrite ['{} {}.csv', vals.title, 
                     ANALYSIS(vals.analysis)];
-                SaveMatrix [savefile, pwddata (vals.analysis)];
+                SaveMatrixData [savefile, pwddata (vals.analysis), 
+                    ANALKEYS(vals.analysis)];
                 exit [];
             endif
 
@@ -1296,7 +1297,7 @@ global function qb_QBPWDSetupPanel []
                         vals.numtopres, vals.numcomps, vals.trainingset]];
                     SaveOptions [pwdfilename, pwdopts];
 
-/*
+//*
                     msgkey = Message [0, 'PWD Analysis is running ...'];
                     local errmess = qb_PWDAnalysis [pwdfilename];
                     Message [msgkey, 'PWD Analysis is done.'];
@@ -1305,9 +1306,9 @@ global function qb_QBPWDSetupPanel []
                     else
                         sleep 3;
                     endif
-*/
+//*/
 
-//DEBUG
+/* //DEBUG
     msgkey = Message [0, 'PWD Analysis is running ...'];
     local dbkey = db_Open [pwdfilename, 'read-write'];
     local plsdata = ReadMatrixData 'pls_table.csv';
@@ -1322,7 +1323,7 @@ global function qb_QBPWDSetupPanel []
     qb_SaveAnalysisData [dbkey, 'pwd', 'optlv', optlvdata];
     db_Close dbkey;
     Message [msgkey, 'PWD Analysis is done.'];
-//DEBUG
+*/ //DEBUG
 
                     WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
                     exit [];
@@ -1363,8 +1364,6 @@ global function qb_QBPWDSetupPanel []
                         WindowSetData [wkey, ldpwdopts];
                         WindowSetAttr [wkey, [analbox: [sensitive: 1],
                             panel: [sensitive: [1,1,1]]]];
-                    else
-                        pwdfilename = '';
                     endif
 
                     exit [];
