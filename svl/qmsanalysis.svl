@@ -28,6 +28,8 @@
 #set main 'qb_PWDAnalysis'
 
 function qb_GetEnvAnal;
+function qb_GetPoseFields;
+function qb_GetRecFields;
 function qb_SaveAnalysisData;
 
 const ENGERGIES =
@@ -39,10 +41,6 @@ global function qb_PWDAnalysis [qmsfilename]
 
     local plsdata = [], sardata = [], interdata = [], actdata = [], optLV = [];
     local errmess = "";
-
-    local scorepath = './divcon.h5';
-    scorepath = fbase scorepath;
-    scorepath = twrite ['{}.h5', scorepath];
 
     //  exe_open child process inherits parent's environment.
     local process_key = exe_open ['moedivconanalysis', '.', [], 1];
@@ -60,10 +58,17 @@ global function qb_PWDAnalysis [qmsfilename]
     local qmsdbkey = db_Open [qmsfilename, 'read-write'];
     local pwdopts = qb_GetEnvAnal qmsdbkey;
     local numpairs = db_nEntries qmsdbkey;
-    local activities = db_ReadColumn [qmsdbkey, pwdopts.expact_hdr]; 
+    local [recfld, rcf] = qb_GetRecFields [];
+    local [ligfld, lcf] = qb_GetPoseFields [];
+    local recmols = db_ReadColumn [qmsdbkey, recfld];
+    local ligmols = db_ReadColumn [qmsdbkey, pwdopts.expact_hdr]; 
+    local activities = db_ReadColumn [qmsdbkey, ligfld]; 
     local energies = ENGERGIES | [pwdopts.sf_e_ab, pwdopts.sf_e_abp,
         pwdopts.sf_e_abc, pwdopts.sf_e_r6, pwdopts.sf_e_r12,
         pwdopts.sf_e_ele];
+
+    local scorepath = fbase qmsfilename;
+    scorepath = twrite ['{}.h5', scorepath];
 
     //  Pass the target-ligand pairs, activities and options to 
     //  QuantumBio's Divcon PWD Analysis
@@ -84,8 +89,8 @@ global function qb_PWDAnalysis [qmsfilename]
 
     fwrite [stdin, '{n:}\n', numpairs];
     for idx = 1, numpairs, 1 loop
-        fwrite [stdin, '{c:}\n', twrite ['rec{}', idx]];
-        fwrite [stdin, '{c:}\n', twrite ['lig{}', idx]];
+        fwrite [stdin, '{c:}\n', recmols(idx)(1)(MOL_NAME)];
+        fwrite [stdin, '{c:}\n', ligmols(idx)(1)(MOL_NAME)];
         fwrite [stdin, '{n:}\n', activities[idx]];
     endloop
 
@@ -94,7 +99,6 @@ global function qb_PWDAnalysis [qmsfilename]
 write ['Handshake: {}\n', handshake];//DEBUG
 write ['Parameters exe_status:  {}\n', exe_status process_keys];//DEBUG
 
-    const NUMRESULTS = 4;
     local return_statement;
     local sleep_time = -1;
     local divconerrmess = "";
@@ -108,41 +112,68 @@ write ['Parameters exe_status:  {}\n', exe_status process_keys];//DEBUG
         write ['Divcon: {}\n', return_statement];//DEBUG
 
         if return_statement === "updateanalysis" then
-            local title, numtables, tabledata;
-/*
+            local title, numtables;
+
             [[title]] = fread [stdout, '{c:*}'];
+            if neL [title, pwdopts.title] then
+                db_Close qmsdbkey;
+                exe_kill  [process_key, 0];
+                exe_kill  process_key;
+                exe_close process_keys;
+                return swrite ['Unrecognized title:  {}\n', title];
+            endif
+
             [[optLV]] = fread [stdout, '{n:}'];
             [[numtables]] = fread [stdout, '{n:}'];
 
             for numtables loop
                 local tablename, numcols, numrows;
+                local name, colnames = [], rownames = [], rowdata = [];
                 [[tablename]] = fread [stdout, '{c:*}'];
-                if not anytrue (tablename == ['PLSTable', ActTable', 
+                if not anytrue (tablename == ['PLSTable', 'ActTable', 
                         'InterMap', 'SARMap']) then
-
+                    db_Close qmsdbkey;
                     exe_kill  [process_key, 0];
                     exe_kill  process_key;
                     exe_close process_keys;
-
+                    return swrite ['Unrecognized table name:  {}\n', tablename];
                 endif
 
-                results = cat [results, [[name, nameValue]]];
+                [[numcols]] = fread [stdout, '{n:}'];
+                [[numrows]] = fread [stdout, '{n:}'];
 
+                for numcols loop
+                    [[name]] = fread [stdout, '{c:*}'];
+                    colnames = append [colnames, name];
+                endloop
 
-                for NUMRESULTS loop
-                    [[parameter]] = fread [stdout, '{c:*}'];
-                    [[parameterValue]] = fread [stdout, '{n:}'];
-                    results = cat [results, [[parameter, parameterValue]]];
+                for numrows loop
+                    [[name]] = fread [stdout, '{c:*}'];
+                    rownames = append [rownames, name];
+                endloop
+
+                local ith;
+                for ith = 1, numrows, 1 loop
+                    local rowvals = [], val;
+                    for numcols loop
+                        [[val]] = fread [stdout, '{n:}'];
+                        rowvals = append [rowvals, val];
+                    endloop
+
+                    rowdata = append [rowdata, [rownames(ith), rowvals]];
                 endloop
 
                 if tablename === 'PLSTable' then
+                    plsdata = [colnames, rowdata];
                 elseif tablename === 'ActTable' then
+                    actdata = [colnames, rowdata];
                 elseif tablename === 'InterMap' then
+                    interdata = [colnames, rowdata];
                 elseif tablename === 'SARMap' then
-                else
+                    sardata = [colnames, rowdata];
                 endif
             endloop
-*/
+
             success = 1;
             fwrite [stdin, '{c:}\n', 'Ok'];
 

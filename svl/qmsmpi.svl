@@ -120,7 +120,7 @@ global function qb_QMScoreMPI [dbpath]
     local rowkey = 0, rowcnt = 0, numokay = 0, warnings = [];
     for rowkey in dbrowkeys loop
         local errmess = '', success = 0;
-        local recname, recchg;
+        local recchg;
         rowcnt = rowcnt + 1;
 
         coreopts.task = rowcnt;
@@ -130,12 +130,6 @@ global function qb_QMScoreMPI [dbpath]
             [recmol, recchg] = db_ReadFields [dbkey, rowkey, recflds];
         else
             recchg = coreopts.recchg;
-        endif
-
-        if coreopts.mode === 'One-to-Many' then
-            recname = twrite ['{}.{}', recmol(1)(MOL_NAME), rowcnt];
-        else
-            recname = recmol(1)(MOL_NAME);
         endif
 
         //  Run all error tests unless forced not to do so.
@@ -157,7 +151,7 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
 
             write ['Sending pose {} of {}\n', rowcnt, nrows];
             fwrite [stdin, '{n:}\n', rowcnt];
-            fwrite [stdin, '{c:}\n', recname];
+            fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
             fwrite [stdin, '{c:}\n', posemol(1)(MOL_NAME)];
             fwrite [stdin, '{n:}\n', recchg];
             fwrite [stdin, '{n:}\n', posechg];
