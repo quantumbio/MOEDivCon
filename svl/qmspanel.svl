@@ -432,7 +432,7 @@ global function qb_QMScoreSetupPanel []
                         statics:'share'] === 'child' then
                     task_prio 0;
 
-                    local dbpath = FilePrompt [title: 'Load Database', 
+                    local dbpath = first FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
                         if neL [ftype dbpath, 'file']
