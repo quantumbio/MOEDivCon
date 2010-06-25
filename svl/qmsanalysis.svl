@@ -28,6 +28,7 @@
 #set main 'qb_PWDAnalysis'
 
 function qb_GetEnvAnal;
+function qb_GetCoreEnv;
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_SaveAnalysisData;
@@ -56,12 +57,19 @@ global function qb_PWDAnalysis [qmsfilename]
 
     //  Get necessary data from Database
     local qmsdbkey = db_Open [qmsfilename, 'read-write'];
+    local [recmol, lm, s, coreopts, c] = qb_GetCoreEnv [qmsdbkey];
     local pwdopts = qb_GetEnvAnal qmsdbkey;
     local numpairs = db_nEntries qmsdbkey;
-    local [recfld, rcf] = qb_GetRecFields [];
+
+    local recmols = [];
+    if coreopts === 'Many-to-Many' then
+        local [recfld, rcf] = qb_GetRecFields [];
+        recmols = db_ReadColumn [qmsdbkey, recfld];
+    endif
+
     local [ligfld, lcf] = qb_GetPoseFields [];
-    local recmols = db_ReadColumn [qmsdbkey, recfld];
     local ligmols = db_ReadColumn [qmsdbkey, pwdopts.expact_hdr]; 
+
     local activities = db_ReadColumn [qmsdbkey, ligfld]; 
     local energies = ENGERGIES | [pwdopts.sf_e_ab, pwdopts.sf_e_abp,
         pwdopts.sf_e_abc, pwdopts.sf_e_r6, pwdopts.sf_e_r12,
@@ -89,7 +97,12 @@ global function qb_PWDAnalysis [qmsfilename]
 
     fwrite [stdin, '{n:}\n', numpairs];
     for idx = 1, numpairs, 1 loop
-        fwrite [stdin, '{c:}\n', recmols(idx)(1)(MOL_NAME)];
+        if coreopts === 'Many-to-Many' then
+            fwrite [stdin, '{c:}\n', recmols(idx)(1)(MOL_NAME)];
+        else
+            fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
+        endif
+
         fwrite [stdin, '{c:}\n', ligmols(idx)(1)(MOL_NAME)];
         fwrite [stdin, '{n:}\n', activities[idx]];
     endloop
