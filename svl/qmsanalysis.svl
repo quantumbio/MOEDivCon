@@ -68,9 +68,9 @@ global function qb_PWDAnalysis [qmsfilename]
     endif
 
     local [ligfld, lcf] = qb_GetPoseFields [];
-    local ligmols = db_ReadColumn [qmsdbkey, pwdopts.expact_hdr]; 
+    local ligmols = db_ReadColumn [qmsdbkey, ligfld]; 
 
-    local activities = db_ReadColumn [qmsdbkey, ligfld]; 
+    local activities = db_ReadColumn [qmsdbkey, pwdopts.expact_hdr]; 
     local energies = ENGERGIES | [pwdopts.sf_e_ab, pwdopts.sf_e_abp,
         pwdopts.sf_e_abc, pwdopts.sf_e_r6, pwdopts.sf_e_r12,
         pwdopts.sf_e_ele];
