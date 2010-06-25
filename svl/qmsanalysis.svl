@@ -128,12 +128,14 @@ write ['Parameters exe_status:  {}\n', exe_status process_keys];//DEBUG
             local title, numtables;
 
             [[title]] = fread [stdout, '{c:*}'];
+            title = token title;
             if neL [title, pwdopts.title] then
                 db_Close qmsdbkey;
                 exe_kill  [process_key, 0];
                 exe_kill  process_key;
                 exe_close process_keys;
-                return swrite ['Unrecognized title:  {}\n', title];
+                return swrite ['Unrecognized title:  {}\nShould be:  {}\n', 
+                    title, pwdopts.title];
             endif
 
             [[optLV]] = fread [stdout, '{n:}'];
@@ -143,6 +145,7 @@ write ['Parameters exe_status:  {}\n', exe_status process_keys];//DEBUG
                 local tablename, numcols, numrows;
                 local name, colnames = [], rownames = [], rowdata = [];
                 [[tablename]] = fread [stdout, '{c:*}'];
+                tablename = token tablename;
                 if not anytrue (tablename == ['PLSTable', 'ActTable', 
                         'InterMap', 'SARMap']) then
                     db_Close qmsdbkey;
