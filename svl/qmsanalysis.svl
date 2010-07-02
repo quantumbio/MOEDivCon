@@ -159,14 +159,14 @@ write ['Parameters exe_status:  {}\n', exe_status process_keys];//DEBUG
                 [[numrows]] = fread [stdout, '{n:}'];
 print 'Column Names';//DEBUG
                 for numcols loop
-                    [[name]] = fread [stdout, '{t:}'];
-                    colnames = append [colnames, name];
+                    [[name]] = fread [stdout, '{c:*}'];
+                    colnames = append [colnames, token name];
 print name;//DEBUG
                 endloop
 print 'Row Names\n';//DEBUG
                 for numrows loop
-                    [[name]] = fread [stdout, '{t:}'];
-                    rownames = append [rownames, name];
+                    [[name]] = fread [stdout, '{c:*}'];
+                    rownames = append [rownames, token name];
 print name;//DEBUG
                 endloop
 
