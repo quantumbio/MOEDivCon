@@ -1231,6 +1231,7 @@ global function qb_QBPWDSetupPanel []
             endif
 
         elseif trig === 'loadact' then
+
             if second task_fork [master: 'parent',
                     statics:'share'] === 'child' then
                 task_prio 0;
@@ -1239,7 +1240,7 @@ global function qb_QBPWDSetupPanel []
                         or neL [fext pwdfilename, 'mdb'] then
                     Warning 
                         twrite ['Cannot find the QMScore/PWD database:\n{}.',
-                        pwdfilename];
+                            pwdfilename];
                     exit [];
                 endif
 
@@ -1269,7 +1270,6 @@ global function qb_QBPWDSetupPanel []
 
             elseif vals.panel === 'Apply' then
 
-
                 if second task_fork [statics:'share', 
                         master:'parent'] === 'child' then
 
@@ -1297,7 +1297,6 @@ global function qb_QBPWDSetupPanel []
                         vals.numtopres, vals.numcomps, vals.trainingset]];
                     SaveOptions [pwdfilename, pwdopts];
 
-//*
                     msgkey = Message [0, 'PWD Analysis is running ...'];
                     local errmess = qb_PWDAnalysis [pwdfilename];
                     Message [msgkey, 'PWD Analysis is done.'];
@@ -1306,30 +1305,13 @@ global function qb_QBPWDSetupPanel []
                     else
                         sleep 3;
                     endif
-//*/
-
-/* //DEBUG
-    msgkey = Message [0, 'PWD Analysis is running ...'];
-    local dbkey = db_Open [pwdfilename, 'read-write'];
-    local plsdata = ReadMatrixData 'pls_table.csv';
-    qb_SaveAnalysisData [dbkey, 'pwd', 'pls', plsdata];
-    local actdata = ReadMatrixData 'act_table.csv';
-    qb_SaveAnalysisData [dbkey, 'pwd', 'act', actdata];
-    local sardata = ReadMatrixData 'sar_heatmap.csv';
-    qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
-    local interdata = ReadMatrixData 'inter_heatmap.csv';
-    qb_SaveAnalysisData [dbkey, 'pwd', 'inter', interdata];
-    local optlvdata = [4];
-    qb_SaveAnalysisData [dbkey, 'pwd', 'optlv', optlvdata];
-    db_Close dbkey;
-    Message [msgkey, 'PWD Analysis is done.'];
-*/ //DEBUG
 
                     WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
                     exit [];
                 endif
 
-            elseif vals.panel === 'Load' then 
+            elseif vals.panel === 'Load' then
+
                 if second task_fork [master: 'parent',
                         statics:'share'] === 'child' then
                     task_prio 0;
