@@ -29,6 +29,7 @@
 #set version '2010.02'
 
 function _Atoms;
+function pro_HydrogenBonds;
 
 //  Database Fields
 const LIG_FIELD = 'Ligand/Pose';
@@ -468,6 +469,7 @@ local function AtomOverlap [bigset, littleset]
     const PACKET = 100;
     const RADIUS = 1.5;
     const OVERLAP = 0.5;
+    const CLASH = 0.5;
 
     local subsets = split [bigset, PACKET];
 	local prox = prox_open [RADIUS, aPos littleset, RADIUS];
@@ -505,7 +507,7 @@ local function AtomOverlap [bigset, littleset]
 
 	prox_close prox;
 
-//  If intramolecular, remove reflexive duplicate pairs.
+    //  If intramolecular, remove reflexive duplicate pairs.
     if bigset === littleset then
         local ith, ok = rep [1, length badpairs];
         for ith = 1, length badpairs, 1 loop
@@ -521,6 +523,50 @@ local function AtomOverlap [bigset, littleset]
         badpairs = badpairs | ok;
     endif
 
+    //  Ignore HBonds pairs
+    local [donors, acceptors] = pro_HydrogenBonds uniq cat [bigset, littleset];
+    local bp, mkeep = [];
+    for bp in badpairs loop
+/*
+//DEBUG
+            local residues = oParent bp;
+            local rnames = rName residues;
+            local rnums = rNumber residues;
+            local ruids = rUID residues;
+            local anames = aName bp;
+            local indices = aNumber bp;
+
+            write ['{}: {} in {}: {} {} is {}A from {}: {} in {}: {} {}\n', 
+                    indices(1), anames(1), rnums(1), 
+                    rnames(1), ruids(1),  aDist bp, indices(2), 
+                    anames(2), rnums(2), rnames(2),
+                    ruids(2)];
+//DEBUG
+*/
+
+print uniq aElement donors;//DEBUG
+print uniq aElement acceptors;//DEBUG
+
+        if ltL [aDist bp, CLASH] then
+            mkeep = append [mkeep, 1];
+        else
+            local [latm, ratm] = bp;
+            local ldidx = first indicesof [latm, donors];
+            local rdidx = first indicesof [ratm, donors];
+            local laidx = [], raidx = [];
+            if isnull ldidx and isnull rdidx then
+                mkeep = append [mkeep, 1];
+print mkeep;
+            elseif not isnull ldidx then
+                mkeep = append [mkeep,
+    not anytrue eqE [ratm, acceptors [ldidx]]];
+            else
+                mkeep = append [mkeep, not anytrue eqE [latm, acceptors [rdidx]]];
+            endif
+        endif
+    endloop
+
+    badpairs = badpairs | mkeep;
     return badpairs;
 endfunction
 
