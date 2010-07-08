@@ -19,4 +19,6 @@ if [ -z "$QBENVSET" ]; then
     . $QBHOME/etc/qbenv.sh
 fi
 
+export R_HOME=$QBHOME/lib/R
+
 moedivconanalysis.bin $@ - 
