@@ -1137,7 +1137,7 @@ global function qb_QBPWDSetupPanel []
     if WindowShow ['QB-PWDPanel', 1] then return; endif
 
     pwdfilename = '';
-    pwddata = [[], [], []];
+    pwddata = [[], [], [], [], []];
 
     local msgkey;
     local appdflts = tag tr QBPWD_OPT_DEFAULTS;
@@ -1303,9 +1303,10 @@ global function qb_QBPWDSetupPanel []
                     if length errmess > 0 then
                         qb_CreateMessWin [errmess, 10, 160];
                     else
-                        sleep 3;
+                        sleep 2;
                     endif
 
+                    pwddata = [[], [], [], [], []];
                     WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
                     exit [];
                 endif
