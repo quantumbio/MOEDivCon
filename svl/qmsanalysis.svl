@@ -57,9 +57,12 @@ global function qb_PWDAnalysis [qmsfilename]
 
     //  Get necessary data from Database
     local qmsdbkey = db_Open [qmsfilename, 'read-write'];
-    local [recmol, lm, s, coreopts, c] = qb_GetCoreEnv [qmsdbkey];
+    local [recmol, ligmol, s, coreopts, c] = qb_GetCoreEnv [qmsdbkey];
     local pwdopts = qb_GetEnvAnal qmsdbkey;
     local numpairs = db_nEntries qmsdbkey;
+
+    //  NOTE:  Rscript can handle only one ligand residue
+
 
     local recmols = [];
     if coreopts === 'Many-to-Many' then

@@ -145,6 +145,20 @@ write ['Irecsz:  {}\n',  add recmol(3)(MOL_RES_NATOMS)];//DEBUG
     //  SplitReceptor ensures that there is only one chain per molecule
     //  in the receptor collection.
 
+//DEBUG
+write ['{c:}\n', scorepath];
+write ['{c:}\n', recmol(1)(MOL_NAME)];
+write ['{c:}\n', ligmol(1)(MOL_NAME)];
+write ['{c:}\n', select ['PWD', 'NOPWD', appopts.analpwd]];
+write ['{c:}\n', HAM_KEYS(coreopts.ham)];
+write ['{c:}\n', select ['NOSTANDARD', 'STANDARD',
+    coreopts.scaling === 1]];
+write ['{c:}\n', select ['FREQ', 'NOFREQ', appopts.freq]];
+write ['{c:}\n', LIG_KEYS(appopts.opt)];
+write ['{n:}\n', appopts.shift];
+write ['{n:}\n', coreopts.recchg];
+write ['{n:}\n', coreopts.ligchg];
+//DEBUG
     local success = 0;
     fwrite [stdin, '{c:}\n', scorepath];
     fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
