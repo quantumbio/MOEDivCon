@@ -2204,11 +2204,15 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     local handshake, resset, residue, atom, xyz, idx;
     xyz = tr aPos recatoms;
     fwrite [outpipe, '{n:}\n', length recressets];
+write ['Num receptors:  {n:}\n', length recressets];//DEBUG
     for resset in recressets loop
         fwrite [outpipe, '{n:}\n', length resset];
+write ['Num residues:  {n:}\n', length resset];//DEBUG
         for residue in resset loop
             fwrite [outpipe, '{c:} {n:} {n:}\n', 
                 rName residue, rUID residue, rAtomCount residue];
+write ['    {c:} {n:} {n:}\n', 
+    rName residue, rUID residue, rAtomCount residue];//DEBUG
             for atom in cat rAtoms residue loop
                 idx = aNumber atom;
                 fwrite [outpipe, '{c:} {c:} {c:}\n',
@@ -2227,11 +2231,15 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     //  collection, but we treat all collections similarly.
     xyz = tr aPos ligatoms;
     fwrite [outpipe, '{n:}\n', length ligressets];
+write ['Num ligs:  {n:}\n', length ligressets];//DEBUG
     for resset in ligressets loop
         fwrite [outpipe, '{n:}\n', length resset];
+write ['Num residues:  {n:}\n', length resset];//DEBUG
         for residue in resset loop
             fwrite [outpipe, '{c:} {n:} {n:}\n', 
                 rName residue, rUID residue, rAtomCount residue];
+write ['    {c:} {n:} {n:}\n', 
+    rName residue, rUID residue, rAtomCount residue];//DEBUG
             for atom in cat rAtoms residue loop
                 idx = aNumber atom - length recatoms;
                 fwrite [outpipe, '{c:} {c:} {c:}\n',
