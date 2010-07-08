@@ -110,7 +110,6 @@ global function qb_PWDAnalysis [qmsfilename]
     [[handshake]] = fread [stdout, '{n:}\n'];
 
 write ['Handshake: {}\n', handshake];//DEBUG
-write ['Parameters exe_status:  {}\n', exe_status process_keys];//DEBUG
 
     local return_statement;
     local sleep_time = -1;
@@ -157,17 +156,14 @@ write ['Parameters exe_status:  {}\n', exe_status process_keys];//DEBUG
 
                 [[numcols]] = fread [stdout, '{n:}'];
                 [[numrows]] = fread [stdout, '{n:}'];
-print 'Column Names';//DEBUG
                 for numcols loop
                     [[name]] = fread [stdout, '{c:*}'];
                     colnames = append [colnames, token name];
-print name;//DEBUG
                 endloop
-print 'Row Names\n';//DEBUG
+
                 for numrows loop
                     [[name]] = fread [stdout, '{c:*}'];
                     rownames = append [rownames, token name];
-print name;//DEBUG
                 endloop
 
                 local ith;
