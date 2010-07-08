@@ -85,10 +85,15 @@ global function qb_QMScoreMPI [dbpath]
     local nrows = db_nEntries dbkey;
 
     local currdir = getenv 'PWD';
+    local perpath = fpath coreopts.scoredb;
+    local pertail = fbase ftail coreopts.scoredb;
+    local perfile = twrite ['{}/{}.h5', perpath, pertail];
     local workdir = select [currdir, fabsname coreopts.workdir, 
         coreopts.cwd];
 
-    write ['Current Dir:  {}\n', currdir];
+
+
+    write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
     //  exe_open child process inherits parent's environment.
@@ -104,7 +109,7 @@ global function qb_QMScoreMPI [dbpath]
     local stderr = exe_stderr process_keys;
 
     //  Pass down the dirs, options and number of possible jobs.
-    fwrite [stdin, '{c:}\n', currdir];
+    fwrite [stdin, '{c:}\n', perfile];
     fwrite [stdin, '{c:}\n', workdir];
     fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', qmsopts.analpwd]];
     fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
