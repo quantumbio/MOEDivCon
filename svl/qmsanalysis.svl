@@ -113,7 +113,7 @@ write ['Handshake: {}\n', handshake];//DEBUG
 
     local return_statement;
     local sleep_time = -1;
-    local divconerrmess = "";
+    local rscripterrmess = "";
     while exe_status process_key loop
         if not MOE_BATCH then
             sleep sleep_time;
@@ -194,11 +194,11 @@ write ['Handshake: {}\n', handshake];//DEBUG
         elseif return_statement === "error" then
             [[return_statement]] = fread [stdout, '{c:*}'];
             if neL [return_statement, "Analysis done."] then
-                divconerrmess = cat [divconerrmess, return_statement];
+                rscripterrmess = cat [rscripterrmess, return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
             endif
             while neL [return_statement, "Analysis done."] loop
-                divconerrmess = cat [divconerrmess, "\n", return_statement];
+                rscripterrmess = cat [rscripterrmess, "\n", return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
             endloop;
             fwrite [stdin, '{c:}\n', 'Ok'];
@@ -219,31 +219,17 @@ write ['Results exe_status:  {}\n', exe_status process_keys];//DEBUG
     exe_kill  process_key;
     exe_close process_keys;
 
-    if success === 1 then
-        if not isnull plsdata then
-            qb_SaveAnalysisData [qmsdbkey, 'pwd', 'pls', plsdata];
-        endif
-
-        if not isnull sardata then
-            qb_SaveAnalysisData [qmsdbkey, 'pwd', 'sar', sardata];
-        endif
-
-        if not isnull interdata then
-            qb_SaveAnalysisData [qmsdbkey, 'pwd', 'inter', interdata];
-        endif
-
-        if not isnull actdata then
-            qb_SaveAnalysisData [qmsdbkey, 'pwd', 'act', actdata];
-        endif
-
-        if not isnull optLV then
-            qb_SaveAnalysisData [qmsdbkey, 'pwd', 'optlv', optLV];
-        endif
-    else
-        if isnull divconerrmess then divconerrmess = "Unknown error!"; endif
-    endif
-
+    //  Always save new data, even if null, to match saved parameters
+    qb_SaveAnalysisData [qmsdbkey, 'pwd', 'pls', plsdata];
+    qb_SaveAnalysisData [qmsdbkey, 'pwd', 'sar', sardata];
+    qb_SaveAnalysisData [qmsdbkey, 'pwd', 'inter', interdata];
+    qb_SaveAnalysisData [qmsdbkey, 'pwd', 'act', actdata];
+    qb_SaveAnalysisData [qmsdbkey, 'pwd', 'optlv', optLV];
     db_Close qmsdbkey;
+
+    if success === 0 and isnull rscripterrmess then
+        rscripterrmess = "Unknown error!";
+    endif
 
     return errmess;
 endfunction
