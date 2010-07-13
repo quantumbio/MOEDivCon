@@ -228,6 +228,7 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
             local sucmess = "Success";
             if not isnull  warnings (rowcnt)
                     and neL [warnings (rowcnt), '\n'] then
+print warnings(rowcnt);
                 sucmess = cat [sucmess, "-warnings!\n", string warnings (rowcnt)];
             else
                 sucmess = cat [sucmess, "\n"];
