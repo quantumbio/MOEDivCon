@@ -228,7 +228,8 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
 
             qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
             local sucmess = "Success";
-            if not isnull  warnings (rowcnt) then
+            if not isnull  warnings (rowcnt)
+                    and neL [warnings (rowcnt), '\n'] then
                 sucmess = cat [sucmess, "-warnings!\n", string warnings (rowcnt)];
             else
                 sucmess = cat [sucmess, "\n"];
@@ -258,7 +259,12 @@ print return_statement;//DEBUG
 
             fwrite [stdin, '{c:}\n', 'Ok'];
 
-            if isnull divconerrmess then divconerrmess = "Unknown error!"; endif
+            if isnull divconerrmess then
+                divconerrmess = "Error:  unknown error!";
+            else
+                divconerrmess = cat ["Error:  ", divconerrmess];
+            endif
+
             if not isnull warnings (rowcnt) then
                 divconerrmess = cat [divconerrmess, string warnings (rowcnt)];
             endif
