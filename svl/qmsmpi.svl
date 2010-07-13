@@ -244,13 +244,16 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
                 result_ith, numokay];
 
             [[return_statement]] = fread [stdout, '{c:*}'];
+print return_statement;//DEBUG
             if neL [return_statement, "Divcon done."] then
                 divconerrmess = cat [divconerrmess, return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
+print return_statement;//DEBUG
             endif
             while neL [return_statement, "Divcon done."] loop
                 divconerrmess = cat [divconerrmess, "\n", return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
+print return_statement;//DEBUG
             endloop;
 
             fwrite [stdin, '{c:}\n', 'Ok'];
