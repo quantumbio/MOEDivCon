@@ -85,13 +85,11 @@ global function qb_QMScoreMPI [dbpath]
     local nrows = db_nEntries dbkey;
 
     local currdir = getenv 'PWD';
-    local perpath = fpath coreopts.scoredb;
-    local pertail = fbase ftail coreopts.scoredb;
+    local perpath = fpath dbpath;
+    local pertail = fbase ftail dbpath;
     local perfile = twrite ['{}/{}.h5', perpath, pertail];
     local workdir = select [currdir, fabsname coreopts.workdir, 
         coreopts.cwd];
-
-
 
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
