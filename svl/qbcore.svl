@@ -2714,6 +2714,7 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap, hamcompat,
     local indices, residues, rnames, rnums, ruids, anames, ith; 
  
     local elements = aElement atoms;
+    local chgs = aFCharge atoms;
     local ions = aIon atoms;
 
     //  Look for explicit lone pairs (MOE parsing errors)
@@ -2778,13 +2779,14 @@ global function qb_TestDivcon [which, atoms, lonepair, overlap, hamcompat,
         endif
     endif
 
-    //  Look for missing/extra H
+    //  Look for missing/extra H and C+
     if missextraH then
         local hcount = aHCount atoms;
         local explicit = aExplicitHCount atoms;
-        [indices] = indicesof [1, (hcount <> explicit)
-            and not ((elements == 'N') and (ions == 1)
-            and (hcount - explicit == 1))];
+        [indices] = indicesof [1, ((hcount <> explicit)
+            and not ((elements == 'N') and ((ions == 1) or (chgs == 1))
+            and (hcount - explicit == 1)))
+            or ((elements == 'C') and ((ions == 1) or (chgs == 1)))];
         if length indices > 0 then
             residues = oParent atoms [indices];
             rnames = rName residues;
