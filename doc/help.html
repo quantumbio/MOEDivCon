@@ -62,6 +62,7 @@ QuantumBio Homepage
 <hr>
 
 <todo>Daren, update all images.  Add new ones.</todo>
+<todo>Daren, rewrite for mpi implementation.</todo>
 
 <h2><a name="ToC"></a>Table of Contents</h2>
 <ol id=tocl>
@@ -132,6 +133,7 @@ QuantumBio Homepage
         <li><a href="#qms-options-shift">Shift</a>
         <li><a href="#qms-options-opt">Ligand Optimization</a>
         <li><a href="#qms-options-freq">Frequency</a>
+        <li><a href="#qms-options-pwd">PWD</a>
       </ol>
       <li><a href="#qms-results">Results</a>
     </ol>
@@ -239,6 +241,8 @@ MOEDivCon SVL library under it.  For example:
 &gt; ln -s  ${QBHOME}/svl  ${HOME}/svl/qb_lib.svl<br>
 </pre>
 
+<todo>Daren, rewrite for mpi implementation.</todo>
+
 <p><a name="install-path"></a>
 Before you can run MOEDivCon Suite using MOE or moebatch, 
 you need to make sure that
@@ -331,6 +335,8 @@ to do with a large protein receptor for which the execution time may take
 several hours.
 <h3><a name="start-onetomany"></a>One-to-Many Mode</h3>
 <p>
+<todo>Daren, rewrite for mpi implementation.</todo>
+
 The real power of MOEDivCon Integration Suite
 is the ability to use moebatch to execute tasks in parallel on a cluster
 and collate the results in a MOE database.  In this case, start MOE and open
@@ -351,6 +357,7 @@ are okay (the
 <w>Status</w> field is empty).  Close the MOE Database Viewer and execute
 the following command from the directory where <inline>qmscore.mdb</inline>
 is located (assuming you have 4 processors on your workstation):
+<todo>Daren, rewrite for mpi implementation.</todo>
 <pre>
 &gt; moebatch -mpu 4 -exec "run ['qmsbatch.svl', ['qmscore.mdb']]" -exit
 </pre>
@@ -366,6 +373,7 @@ Database Viewer.  You should see results similar to these:
 data="images/qmscoredatabaseonetomany.png" type=image/png>
 QMScore Database
 </object>
+<todo>Daren, rewrite for mpi implementation.</todo>
 See the <a href="#core-parallel">Batch and Parallel Execution</a> section for
 more information on executing moebatch in parallel on a cluster.
 <h3><a name="start-manytomany"></a>Many-to-Many Mode</h3>
@@ -390,6 +398,7 @@ the receptors and ligands are okay (the
 <w>Status</w> field is empty).  Close the MOE Database Viewer and execute
 the following command from the directory where <inline>qmscore.mdb</inline>
 is located (assuming you have 4 processors on your workstation):
+<todo>Daren, rewrite for mpi implementation.</todo>
 <pre>
 &gt; moebatch -mpu 4 -exec "run ['qmsbatch.svl', ['qmscore.mdb']]" -exit
 </pre>
@@ -401,6 +410,7 @@ Database Viewer.  You should see results similar to these:
 data="images/qmscoredatabasemanytomany.png" type=image/png>
 QMScore Database
 </object>
+<todo>Daren, rewrite for mpi implementation.</todo>
 See the <a href="#core-parallel">Batch and Parallel Execution</a> section for
 more information on executing moebatch in parallel on a cluster.
 
@@ -457,8 +467,8 @@ AtomIndex: AtomName in ResidueIndex: ResidueName ResidueUID
 </pre>
 where the AtomIndex is MOE's index in the system, not the residue.  
 The ResidueIndex is MOE's index of the residue in the system, 
-and ResidueUID is ID field from
-the PDB file, say.  Below is an example error and warning tests report.
+and ResidueUID is original ID field from
+the pdb or mol2 file, say.  Below is an example error and warning tests report.
 <p>
 <object id="QMScoreErrorReport" title="QMScore Error and Warning Tests Report"
 data="images/qmscoreerrorreport.png" type=image/png>
@@ -526,6 +536,10 @@ The most common reasons for a missing H are truncated residues in proteins
 and misinterpreted bond orders in ligands.  The most common reason for an
 extra H in proteins are protonated carbonyl oxygens (C=O&rarr;C=OH).   Other
 problems are caused by incorrect charges, metal coordinations, etc.
+<p>
+This also tests for the presence of positively charged carbon (C<sup>+</sup>),
+often caused by incorrect bond orders in the guanidinium group in arginine and
+the imidazole ring in histidine.
 <p>
 This test can also generate false positives.  MOEDivCon already filters out
 the most common source of false positives:  terminal amines in proteins
@@ -636,10 +650,12 @@ directly written to disk and the previous value is lost.</warn>
 <p>
 You can load an existing MOEDivCon Score database into the MOEDivCon Score
 panel by pressing the <w>Load</w> button.  A file selection box will open
-allowing
-you to browse for the MOEDivCon Score database.  When you select a MOE database, it is checked to make
+allowing you to browse for the MOEDivCon Score database.  When you select 
+a MOE database, it is checked to make
 sure it is a MOEDivCon Score database.  The receptor/ligand complex stored in
-the database is then loaded into the MOE window, the MOEDivCon Score panel is
+the database is then loaded into the MOE window (if the mode of the database
+is <w>Many-to-Many</w>, then the first receptor and ligand are loaded),
+the MOEDivCon Score panel is
 updated with the settings stored in the database, and then the database itself
 is opened using the MOE Database Viewer.
 <p>
@@ -686,6 +702,7 @@ analysis steps are performed using MOE on your local workstation or laptop.
 The third step, execution, is best left to a computational cluster, whether 
 you are scoring one complex or hundreds.
 <p>
+<todo>Daren, rewrite for mpi implementation.</todo>
 Before getting into the details of executing moebatch on a cluster, we'll
 explain how to setup MOEDivCon QMScore to run a single job in batch mode or
 many jobs in parallel.  Analogous steps are performed to set up MOEDivCon
@@ -705,8 +722,9 @@ Next, open the QMScore panel and select your options, and then choose
 <w>Save</w> rather than <w>Run</w>.  MOEDivCon will store your receptor,
 ligand, and
 options in the QMScore database, and then open the MOE Database Viewer so you
-can verify the ligand/pose data.  See the
-<a href="#core-parallel-moebatch">Running Moebatch</a> section
+can verify the ligand/pose data.  
+<todo>Daren, rewrite for mpi implementation.</todo>
+See the <a href="#core-parallel-moebatch">Running Moebatch</a> section
 to learn how to execute the job.
 
 <h5><a name="core-parallel-mode-1toM"></a>One Receptor--Many Ligand Poses</h5>
@@ -742,8 +760,8 @@ options in the QMScore database, and it will copy the ligand/pose database into
 the QMScore database including any data fields (e.g., results from other scoring
 algorithms).  The MOE Database Viewer will then open the QMScore database so
 you can verify the ligand/pose data, especially the charge values and status.
-See the
-<a href="#core-parallel-moebatch">Running Moebatch</a>
+<todo>Daren, rewrite for mpi implementation.</todo>
+See the <a href="#core-parallel-moebatch">Running Moebatch</a>
 section to learn how to execute the job.
 <p>
 <h5><a name="core-parallel-mode-MtoM"></a>Many Receptors--Many Ligands</h5>
@@ -764,6 +782,7 @@ QMScore database, and it will copy the receptor and ligand databases, row
 by row, into the QMScore database including any data fields.  The MOE
 Database Viewer will then open the QMScore database so you can verify the
 receptor and ligand data, especially the charge values and status.
+<todo>Daren, rewrite for mpi implementation.</todo>
 See the <a href="#core-parallel-moebatch">Running Moebatch</a> section
 to learn how to execute the job.  See the
 <a href="#core-charge-manytomany">Charge</a>
@@ -776,6 +795,7 @@ the receptor data for those fields.</warn>
 
 <h4><a name="core-parallel-moebatch"></a>Running Moebatch</h4>
 <p>
+<todo>Daren, rewrite for mpi implementation.</todo>
 After you close the database, you can execute MOEDivCon QMScore in at least
 three different ways.  In the examples below, <inline>$USER_DATADB</inline>
 is the path to your QMScore database.  Analogous steps are performed to execute
@@ -853,6 +873,7 @@ Score panel.
 
 <h4><a name="core-options-outdb"></a>Output MOE Database</h4>
 <p>
+<todo>Daren, rewrite for mpi/hdf5 implementation.</todo>
 MOEDivCon uses a MOE database to store run parameters and to store
 Score results; and if appropriate, analysis results.  
 One advantage is that the database is self-contained:  all
@@ -894,6 +915,7 @@ to specifying <inline>'.'</inline> as the working directory.  If you use
 the <w>CWD</w> option when executing in moebatch parallel mode, each child task
 will create a subdirectory under the current working directory of the moebatch
 process.
+<todo>Daren, rewrite for hdf5 implementation.</todo>
 
 <h4><a name="core-options-ham"></a>Hamiltonian</h4>
 <p>
@@ -1072,6 +1094,11 @@ of the calculation.
 <p>
 Perform frequency calculation to determine ligand entropy in score
 function.  Warning: may increase CPU cost of the calculation.
+
+<h4><a name="qms-options-pwd"></a>PWD</h4>
+<p>
+Calculate the pairwise decomposition data needed for generating the Interaction
+Heat Map and for the PLS analysis to generate the SAR Heat Map.
 
 <h3><a name="qms-results"></a>Results</h3>
 <p>
@@ -1338,6 +1365,8 @@ in the <w>Number of sima</w> field, how standard deviations are used to
 determine the minimum and maximum values of the color scale.  Values smaller
 than the minimum are assigned the same color as the minimum and
 values greater than the maximum are assigned the same color as the maximum.
+Not that for the Interaction Heat Map, it is usually better to not select a
+cutoff.
 
 <h4><a name="heatmap-setup-numcolors"></a>Number of Colors</h4>
 <p>
@@ -1614,6 +1643,7 @@ The receptor and pose databases have different number of entries.
     I submitted a parallel PBS (SGE, etc.) QMScore batch script and it returned
     immediately without executing any jobs.
     </prob><p><sol>
+<todo>Daren, rewrite for mpi implementation.</todo>
     If the script requested more processors than the number of available MOE
     licenses, moebatch will fail. Sometimes an error message explaining
     the reason will make it back to the stderr, more often not.
