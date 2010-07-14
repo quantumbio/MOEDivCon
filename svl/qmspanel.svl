@@ -43,17 +43,17 @@ function qb_IsModeOneToOne;
 function qb_IsShowingAllPoses;
 function qb_ResetLigand;
 function qb_LoadCoreScoreDB;
-function qb_SaveDivconStatus;
+function qb_SaveDivConStatus;
 function qb_SetAppStatus;
 function qb_SetUpScoreDB;
 function qb_TagCoreVals;
 function qb_UpdateCorePanel;
-function qb_VerifyDivcon;
+function qb_VerifyDivCon;
 
 function qb_QMScore;
 function qb_QMScoreBatch;
 
-//  Data tags are in the order in which they are returned by Divcon.
+//  Data tags are in the order in which they are returned by DivCon.
 
 const QMS_DATA_TAGS =
     [
@@ -253,10 +253,10 @@ local function RunCalc [dbkey]
 
     if results === [] then
         if errmess === [] or errmess === '' then
-            qb_SaveDivconStatus [dbkey, rowkey, "Error:  Unknown error!\n"];
+            qb_SaveDivConStatus [dbkey, rowkey, "Error:  Unknown error!\n"];
             write ['QMScore Error:  Unknown error!\n'];
         else
-            qb_SaveDivconStatus [dbkey, rowkey, 
+            qb_SaveDivConStatus [dbkey, rowkey, 
                 swrite ['Error:  {}\n', errmess]];
             write ['QMScore Error:  {}\n', errmess];
         endif
@@ -269,7 +269,7 @@ local function RunCalc [dbkey]
             sucmess = cat [sucmess, "\n"];
         endif
 
-        qb_SaveDivconStatus [dbkey, rowkey, sucmess];
+        qb_SaveDivConStatus [dbkey, rowkey, sucmess];
     endif
 
     local timemess = twrite ['QMScore is done.\nTotal clock time {}:{}:{}.', 
@@ -341,7 +341,7 @@ global function RunOneToManyCalc [oldkey]
             if errmess === [] or errmess === '' then
                 errmess = "Unknown error!";
             endif
-            qb_SaveDivconStatus [dbkey, rowkey,
+            qb_SaveDivConStatus [dbkey, rowkey,
                 swrite ['Error:  {}\n', errmess]];
             write ['QMScore Error on pose {}:\n    {}\n', rowcnt, errmess];
             msgkey = Message [msgkey, 
@@ -356,7 +356,7 @@ global function RunOneToManyCalc [oldkey]
             else
                 sucmess = cat [sucmess, "\n"];
             endif
-            qb_SaveDivconStatus [dbkey, rowkey, sucmess];
+            qb_SaveDivConStatus [dbkey, rowkey, sucmess];
         endif
     endloop
 
@@ -472,7 +472,7 @@ global function qb_QMScoreSetupPanel []
 
                 if second task_fork [statics:'share'] === 'child' then
 
-                    status = qb_VerifyDivcon [wkey, status, vals];
+                    status = qb_VerifyDivCon [wkey, status, vals];
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
@@ -504,7 +504,7 @@ global function qb_QMScoreSetupPanel []
 
                 if second task_fork [statics:'share'] === 'child' then
 
-                    status = qb_VerifyDivcon [wkey, status, vals];
+                    status = qb_VerifyDivCon [wkey, status, vals];
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];

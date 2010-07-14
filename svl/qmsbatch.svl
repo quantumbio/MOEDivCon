@@ -32,7 +32,7 @@
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetQMSEnv;
-function qb_SaveDivconStatus;
+function qb_SaveDivConStatus;
 function qb_SaveQMScore;
 function qb_QMScore;
 
@@ -109,7 +109,7 @@ global function qb_QMScoreBatch [dbpath]
                 if errmess === [] or errmess === '' then
                     errmess = "Unknown error!";
                 endif
-                qb_SaveDivconStatus [dbkey, indkey(1),
+                qb_SaveDivConStatus [dbkey, indkey(1),
                     swrite ['Error:  {}\n', errmess]];
                 write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];
             else
@@ -120,14 +120,14 @@ global function qb_QMScoreBatch [dbpath]
                 else
                     sucmess = cat [sucmess, "\n"];
                 endif
-                qb_SaveDivconStatus [dbkey, indkey(1), sucmess];
+                qb_SaveDivConStatus [dbkey, indkey(1), sucmess];
             endif
 
         elseif code === 'error' then
             if errmess === [] or errmess === '' then
                 errmess = "Unknown error!";
             endif
-            qb_SaveDivconStatus [dbkey, indkey(1),
+            qb_SaveDivConStatus [dbkey, indkey(1),
                 swrite ['Error:  {}\n', errmess]];
 
             write ['QMScore Error on pose {}:\n    {}\n', seqno, errmess];

@@ -29,14 +29,14 @@
 #set version '2010.01'
 #set main    'qb_QMScoreMPI'
 
-function qb_CheckChgTestDivconMols;
+function qb_CheckChgTestDivConMols;
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetQMSEnv;
 function qb_GetWhich;
 function qb_HamSetsInit;
 function qb_PassBackbone;
-function qb_SaveDivconStatus;
+function qb_SaveDivConStatus;
 function qb_SaveQMScore;
 
 
@@ -137,7 +137,7 @@ global function qb_QMScoreMPI [dbpath]
 
         //  Run all error tests unless forced not to do so.
         local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
-            = qb_CheckChgTestDivconMols [recmol, recchg, posemol, posechg,
+            = qb_CheckChgTestDivConMols [recmol, recchg, posemol, posechg,
                 status.notforced, status.notforced, status.notforced,
                 coreopts.testH, coreopts.testMM, 'qms',
                 HAM_KEYS (coreopts.ham)];
@@ -147,7 +147,7 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
         if alltrue [recok, recchgok, ligok, ligchgok] then
             numokay = numokay + 1;
 
-            //  Pass the two backbones to QuantumBio's Divcon QMScore
+            //  Pass the two backbones to QuantumBio's DivCon QMScore
             //
             //  SplitCollection ensures that there is only one chain per 
             //  molecule in the receptor and ligand collections.
@@ -181,7 +181,7 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
                     qb_GetWhich [not recchgok, not ligchgok]]];
             endif
 
-            qb_SaveDivconStatus [dbkey, rowkey, 
+            qb_SaveDivConStatus [dbkey, rowkey, 
                 swrite ['Error:  {}\n', errmess]];
             write ['Skipping pose {} of {}\n', rowcnt, nrows];
             write ['QMScore Error:  {}\n', errmess];
@@ -203,7 +203,7 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
 
         [[return_statement]] = fread [stdout, '{c:*}'];
 
-        write ['Divcon: {}\n', return_statement];//DEBUG
+        write ['DivCon: {}\n', return_statement];//DEBUG
 
         if return_statement === "success" then
 
@@ -234,7 +234,7 @@ print warnings(rowcnt);
                 sucmess = cat [sucmess, "\n"];
             endif
 
-            qb_SaveDivconStatus [dbkey, dbrowkeys(rowcnt), sucmess];
+            qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), sucmess];
             result_ith = result_ith + 1;
 
         elseif return_statement === "error" then
@@ -245,12 +245,12 @@ print warnings(rowcnt);
 
             [[return_statement]] = fread [stdout, '{c:*}'];
 print return_statement;//DEBUG
-            if neL [return_statement, "Divcon done."] then
+            if neL [return_statement, "DivCon done."] then
                 divconerrmess = cat [divconerrmess, return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
 print return_statement;//DEBUG
             endif
-            while neL [return_statement, "Divcon done."] loop
+            while neL [return_statement, "DivCon done."] loop
                 divconerrmess = cat [divconerrmess, "\n", return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
 print return_statement;//DEBUG
@@ -268,7 +268,7 @@ print return_statement;//DEBUG
                 divconerrmess = cat [divconerrmess, string warnings (rowcnt)];
             endif
 
-            qb_SaveDivconStatus [dbkey, dbrowkeys(rowcnt), divconerrmess];
+            qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), divconerrmess];
             result_ith = result_ith + 1;
 
         else
@@ -281,7 +281,7 @@ print return_statement;//DEBUG
     errmess = "";
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
-        write ['MOEDivcon: {}\n', newerror];//DEBUG
+        write ['MOEDivCon: {}\n', newerror];//DEBUG
         errmess = cat [newerror, errmess];
         [[newerror]] = fread [stderr, '{c:*}'];
     endloop

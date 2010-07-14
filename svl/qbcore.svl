@@ -175,7 +175,7 @@ const CORE_PANEL =
             shortcut: ['/tmp', '.', '~', '~/tmp', '/scratch'],
             bubbleHelp:
                 'The name of the working directory for storing\n'
-                'QB Divcon intermediate calculations and logs.\n'
+                'QB DivCon intermediate calculations and logs.\n'
                 'The absolute path to the specified directory\n'
                 'will be stored and used at execution time.'
             ],
@@ -278,7 +278,7 @@ const CORE_PANEL =
                     font: 'mediumBold', text: 'Error:', 
                     bubbleHelp:
                         'These are tests for problems with the receptor(s)\n'
-                        'and ligand(s) that will cause Divcon to fail.'
+                        'and ligand(s) that will cause DivCon to fail.'
                     ],
                 Checkbox :
                     [
@@ -306,7 +306,7 @@ const CORE_PANEL =
                     font: 'mediumBold', text: 'Warning:',
                     bubbleHelp:
                         'These are tests for problems with the receptor(s)\n'
-                        'and ligand(s) that may or may not cause Divcon to\n'
+                        'and ligand(s) that may or may not cause DivCon to\n'
                         ' fail, but the results will probably be questionable.'
                     ],
                 Checkbox :
@@ -365,7 +365,7 @@ const CORE_PANEL =
                         'Problems with the total charge of receptor?\n'
                         '   White:   uncalculated or user-entered charge.\n'
                         '   Green:   charge calculated by MOE.\n'
-                        '   Red:      charge problematic for Divcon.'
+                        '   Red:      charge problematic for DivCon.'
                     ],
                 Text :
                     [
@@ -387,7 +387,7 @@ const CORE_PANEL =
                         '   White:   uncalculated or user-entered charge.\n'
                         '   Green:   charge calculated by MOE.\n'
                         '   Yellow:  MOE\'s charge was adjusted.\n'
-                        '   Red:      charge problematic for Divcon.'
+                        '   Red:      charge problematic for DivCon.'
 
                     ],
                 Text :
@@ -692,13 +692,13 @@ local function CheckComplexCharge [recchg, ligchg]
 
 endfunction
 
-function qb_CheckChgDivconMol;
+function qb_CheckChgDivConMol;
 function qb_GetEnvTag;
 function qb_GetStatusFlags;
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetWhich;
-function qb_SaveDivconStatus;
+function qb_SaveDivConStatus;
 
 /****************************************************************************
  *                          CheckChgDBMols
@@ -715,7 +715,7 @@ local function CheckChgDBMols [dbpath]
 
     local dblist = dbv_KeyList [];
     if isnull dblist or isnull indexof [dbkey, dblist] then
-        Warning 'The MOEDivcon database isn\'t open.';
+        Warning 'The MOEDivCon database isn\'t open.';
         return;
     endif
 
@@ -732,20 +732,20 @@ local function CheckChgDBMols [dbpath]
     while rowkey = db_NextEntry [dbkey, rowkey] loop
         local recok = 1, recchgok = 1, recmess = '';
         local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
-        local [ligok, ligchgok, ligmess] = qb_CheckChgDivconMol [ligmol,
+        local [ligok, ligchgok, ligmess] = qb_CheckChgDivConMol [ligmol,
             ligchg, 1];
         if coreopts.mode === 'Many-to-Many' then
             local [recmol, recchg] = db_ReadFields [dbkey, rowkey,
                 recflds];
-            [recok, recchgok, recmess] = qb_CheckChgDivconMol [recmol,
+            [recok, recchgok, recmess] = qb_CheckChgDivConMol [recmol,
                 recchg, 0];
         endif
 
         if alltrue [recok, recchgok, ligok, ligchgok] then
             local [oldstatus] = db_ReadFields [dbkey, rowkey, STATUS_FIELD];
             if not isnull findmatch ['*Problematic charge*', token oldstatus] then
-                qb_SaveDivconStatus [dbkey, rowkey,
-                    "Charges are compatible with Divcon.\n"];
+                qb_SaveDivConStatus [dbkey, rowkey,
+                    "Charges are compatible with DivCon.\n"];
             endif
         else
             local errmess = "";
@@ -768,7 +768,7 @@ local function CheckChgDBMols [dbpath]
                 endif
             endif
 
-            qb_SaveDivconStatus [dbkey, rowkey, errmess];
+            qb_SaveDivConStatus [dbkey, rowkey, errmess];
         endif
     endloop
 
@@ -802,7 +802,7 @@ endfunction
 
 function qb_GetEnvTag;
 function qb_InterMoleculeOverlap;
-function qb_TestDivcon;
+function qb_TestDivCon;
 function GetStatusMessage;
 function SingleMol;
 
@@ -864,7 +864,7 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
             chgok = ChargeOK [ligatms, charge];
         endif
 
-        local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms, 
+        local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatms, 
             lp, overlap, hamcompat, missH, MM, appname, hamname];
 
         local intermess = '';
@@ -885,7 +885,7 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
         rowdata = cat [chgdata, rowdata];
         local resultrowkey = db_Write [resultskey, 0, rowdata];
         if  length stsmess > 0 then
-            qb_SaveDivconStatus [resultskey, resultrowkey, stsmess];
+            qb_SaveDivConStatus [resultskey, resultrowkey, stsmess];
         endif
 
         oDestroy ligch;
@@ -956,7 +956,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         local recatms = cat oAtoms recchs;
         local recchg = CalcCharge [recatms];
         local recchgok = ChargeOK [recatms, recchg];
-        local [recok, recmess] = qb_TestDivcon ['receptor', recatms, 
+        local [recok, recmess] = qb_TestDivCon ['receptor', recatms, 
             lp, overlap, hamcompat, missH, MM, appname, hamname];
         stsmess = cat [GetStatusMessage ['Receptor', recchgok],
             string recmess];
@@ -998,7 +998,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
 
         posechg = CalcCharge [poseatms];
         local posechgok = ChargeOK [poseatms, posechg];
-        local [poseok, posemess] = qb_TestDivcon ['ligand', poseatms,
+        local [poseok, posemess] = qb_TestDivCon ['ligand', poseatms,
             lp, overlap, hamcompat, missH, MM, appname, hamname];
 
         local intermess = '';
@@ -1019,7 +1019,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         poserowdata = cat [posechgdata, poserowdata];
         db_Write [resultskey, resultrowkey, poserowdata];
         if not isnull stsmess then
-            qb_SaveDivconStatus [resultskey, resultrowkey, stsmess];
+            qb_SaveDivConStatus [resultskey, resultrowkey, stsmess];
         endif
         oDestroy posech;
         ith = ith + 1;
@@ -1209,9 +1209,9 @@ local function TestComplex [lonepairs, overlap, hamcompat, missextraH,
         return  [0, '', 0, errmess];
     endif
 
-    local [recok, recmess] = qb_TestDivcon ['receptor', recatoms, 
+    local [recok, recmess] = qb_TestDivCon ['receptor', recatoms, 
         lonepairs, overlap, hamcompat, missextraH, MMtype, appname, hamname];
-    local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatoms,
+    local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatoms,
         lonepairs, overlap, hamcompat, missextraH, MMtype, appname, hamname];
 
     local intermess = '';
@@ -1245,7 +1245,7 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
     local dbkey = db_Open [dbpath, 'read-write'];
     local dblist = dbv_KeyList [];
     if isnull dblist or isnull indexof [dbkey, dblist] then
-        Warning 'The MOEDivcon database isn\'t open.';
+        Warning 'The MOEDivCon database isn\'t open.';
         return;
     endif
 
@@ -1268,14 +1268,14 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
         local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
         local ligchns = mol_Create ligmol;
         local ligatms = cat oAtoms ligchns;
-        local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms,
+        local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatms,
             testLP, testOverlap, testHam, testH, testMM, appname, hamname];
         if coreopts.mode === 'Many-to-Many' then
             [recmols, recchg] = db_ReadFields [dbkey, rowkey, recflds];
             recchns = mol_Create recmols;
             recatms = cat oAtoms recchns;
 
-            [recok, recmess] = qb_TestDivcon ['receptor', recatms,
+            [recok, recmess] = qb_TestDivCon ['receptor', recatms,
                 testLP, testOverlap, testHam, testH, testMM, appname, hamname];
         endif
 
@@ -1297,10 +1297,10 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
         if recmess === '' and ligmess === '' then
             local [oldstatus] = db_ReadFields [dbkey, rowkey, STATUS_FIELD];
             if not isnull oldstatus then
-                qb_SaveDivconStatus [dbkey, rowkey, "No problems detected.\n"];
+                qb_SaveDivConStatus [dbkey, rowkey, "No problems detected.\n"];
             endif
         else
-            qb_SaveDivconStatus [dbkey, rowkey, 
+            qb_SaveDivConStatus [dbkey, rowkey, 
                 cat [string recmess, string ligmess]];
         endif
     endloop
@@ -1400,16 +1400,16 @@ global function qb_AtomsToMols []
 endfunction
 
 /****************************************************************************
- *                          qb_CheckChgDivconMol
+ *                          qb_CheckChgDivConMol
  *
  *  Determine whether the molecule and its total charge is problematic
- *  for Divcon.  Also checks if it is a single molecule when flagged.
+ *  for DivCon.  Also checks if it is a single molecule when flagged.
  *
  *  Assume that SystemPush [] and SystemPop [] have already been called,
  *  if necessary.
  *
  ****************************************************************************/
-global function qb_CheckChgDivconMol [mol, chg, single]
+global function qb_CheckChgDivConMol [mol, chg, single]
 
     local molok = 1, mess = '';
     local chn = mol_Create mol;
@@ -1430,23 +1430,23 @@ global function qb_CheckChgDivconMol [mol, chg, single]
 endfunction
 
 /****************************************************************************
- *                          qb_CheckChgTestDivconMols
+ *                          qb_CheckChgTestDivConMols
  *
  *  Determine whether the given molecules and their total charges are
- *  problematic for Divcon.  Return the receptor and ligand residues separated
- *  into individual molecules to be compatible with Divcon's backbone.
+ *  problematic for DivCon.  Return the receptor and ligand residues separated
+ *  into individual molecules to be compatible with DivCon's backbone.
  *
  *  Assume that SystemPush [] and SystemPop [] have already been called,
  *  if necessary.  Caller is responsible for destroying objects in newly
  *  created system.
  *
  ****************************************************************************/
-global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
+global function qb_CheckChgTestDivConMols [recmol, recchg, ligmol, ligchg,
         lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname]
 
     local mess = '';
     local recatms = cat oAtoms mol_Create recmol;
-    local [recok, recmess] = qb_TestDivcon ['receptor', recatms, 
+    local [recok, recmess] = qb_TestDivCon ['receptor', recatms, 
         lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname];
     mess = tok_cat [mess, recmess];
     local recchgok = ChargeOK [recatms, recchg];
@@ -1457,7 +1457,7 @@ global function qb_CheckChgTestDivconMols [recmol, recchg, ligmol, ligchg,
         mess = tok_cat [mess, 'Ligand must be a single molecule.'];
     endif
 
-    local [ligok, ligmess] = qb_TestDivcon ['ligand', ligatms,
+    local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatms,
         lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname];
     mess = tok_cat [mess, ligmess];
 
@@ -2326,12 +2326,12 @@ global function qb_SaveAnalysisData [dbkey, analysis, type, data]
 endfunction
 
 /****************************************************************************
- *                          qb_SaveDivconStatus
+ *                          qb_SaveDivConStatus
  *
  *  Save the error/status message for the given row.
  *
  ****************************************************************************/
-global function qb_SaveDivconStatus [dbkey, rowkey, message]
+global function qb_SaveDivConStatus [dbkey, rowkey, message]
 
     local sep = "-----------------------------------------------------------\n";
     local [status] = db_ReadFields [dbkey, rowkey, [STATUS_FIELD]];
@@ -2473,7 +2473,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
             local rowkey = db_Write [dbkey, 0, posedata];
 
             if not isnull stsmess then
-                qb_SaveDivconStatus [dbkey, rowkey, stsmess];
+                qb_SaveDivConStatus [dbkey, rowkey, stsmess];
             endif
         endif
 
@@ -2694,7 +2694,7 @@ global function qb_TagCoreVals [vals]
 endfunction
 
 /****************************************************************************
- *                          qb_TestDivcon
+ *                          qb_TestDivCon
  *
  *  Determine whether the molecule represented by the set of atoms has any
  *  problems by performing the flagged tests.
@@ -2707,7 +2707,7 @@ endfunction
  *  H counts:  ignore amines (MOE treats terminal amines as ammonium cations).
  *
  ****************************************************************************/
-global function qb_TestDivcon [which, atoms, lonepair, overlap, hamcompat,
+global function qb_TestDivCon [which, atoms, lonepair, overlap, hamcompat,
         missextraH, MMtype, appname, hamname]
 
     local warn = 0, error = 0, mess = '';
@@ -2900,16 +2900,16 @@ global function qb_UpdateCorePanel [wkey, status, coreopts]
 endfunction
 
 /****************************************************************************
- *                          qb_VerifyDivcon
+ *                          qb_VerifyDivCon
  *
  *  Verify with the user that the current charges and/or molecules should
- *  be used even if they are problematic for Divcon.
+ *  be used even if they are problematic for DivCon.
  *
  *  Assumption:  called from MOE gui, not moebatch.
  *
  *
  ****************************************************************************/
-global function qb_VerifyDivcon [wkey, status, vals]
+global function qb_VerifyDivCon [wkey, status, vals]
 
     if vals.mode === 'Many-to-Many' then
         status.verified = 1;

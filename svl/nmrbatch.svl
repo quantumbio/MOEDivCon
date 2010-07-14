@@ -33,7 +33,7 @@ function qb_GetAnalysisData;
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetNMRSEnv;
-function qb_SaveDivconStatus;
+function qb_SaveDivConStatus;
 function qb_SaveNMRScore;
 function qb_NMRScore;
 
@@ -113,7 +113,7 @@ global function qb_NMRScoreBatch [dbpath]
                 if errmess === [] or errmess === '' then
                     errmess = "Unknown error!";
                 endif
-                qb_SaveDivconStatus [dbkey, indkey(1),
+                qb_SaveDivConStatus [dbkey, indkey(1),
                     swrite ['Error:  {}\n', errmess]];
                 write ['NMRScore Error on pose {}:\n    {}\n', seqno, errmess];
             else
@@ -126,14 +126,14 @@ global function qb_NMRScoreBatch [dbpath]
                 else
                     sucmess = cat [sucmess, "\n"];
                 endif
-                qb_SaveDivconStatus [dbkey, indkey(1), sucmess];
+                qb_SaveDivConStatus [dbkey, indkey(1), sucmess];
             endif
 
         elseif code === 'error' then
             if errmess === [] or errmess === '' then
                 errmess = "Unknown error!";
             endif
-            qb_SaveDivconStatus [dbkey, indkey(1),
+            qb_SaveDivConStatus [dbkey, indkey(1),
                 swrite ['Error:  {}\n', errmess]];
 
             write ['NMRScore Error on pose {}:\n    {}\n', seqno, errmess];

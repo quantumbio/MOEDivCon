@@ -279,7 +279,7 @@ endfunction
 
 // ---------------------------- External interface ----------------------------
 
-global function scf_EngineDivcon param
+global function scf_EngineDivCon param
     if isnull param then
         return [
         wavefn:     1,
