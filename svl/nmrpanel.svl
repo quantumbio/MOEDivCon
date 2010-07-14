@@ -49,7 +49,7 @@ function qb_IsShowingAllPoses;
 function qb_LoadCoreScoreDB;
 function qb_ResetLigand;
 function qb_SaveAnalysisData;
-function qb_SaveDivconStatus;
+function qb_SaveDivConStatus;
 function qb_SetAppStatus;
 function qb_SetHamStatus;
 function qb_SetHamDefault;
@@ -60,7 +60,7 @@ function qb_SplitComplex;
 function qb_TagCoreVals;
 function qb_UpdateCharge;
 function qb_UpdateCorePanel;
-function qb_VerifyDivcon;
+function qb_VerifyDivCon;
 
 function qb_NMRScore;
 function qb_NMRScoreBatch;
@@ -325,10 +325,10 @@ local function RunCalc [dbkey]
 
     if results === [] then
         if errmess === [] or errmess === '' then
-            qb_SaveDivconStatus [dbkey, rowkey, "Error:  Unknown error!\n"];
+            qb_SaveDivConStatus [dbkey, rowkey, "Error:  Unknown error!\n"];
             write ['NMRScore Error:  Unknown error!\n'];
         else
-            qb_SaveDivconStatus [dbkey, rowkey, 
+            qb_SaveDivConStatus [dbkey, rowkey, 
                 swrite ['Error:  {}\n', errmess]];
             write ['NMRScore Error:  {}\n', errmess];
         endif
@@ -346,7 +346,7 @@ write ['S: {}\nV: {v}\n', score,  posevals];  //DEBUG
             sucmess = cat [sucmess, "\n"];
         endif
 
-        qb_SaveDivconStatus [dbkey, rowkey, sucmess];
+        qb_SaveDivConStatus [dbkey, rowkey, sucmess];
     endif
 
     Message [msgkey, 'NMRScore is done.'];
@@ -718,7 +718,7 @@ atombound = rep [1.050, num];
                     continue;
                 endif
 
-                status = qb_VerifyDivcon [wkey, status, vals];
+                status = qb_VerifyDivCon [wkey, status, vals];
                 if not status.verified then continue; endif
 
                 if second task_fork [statics:'share',
@@ -762,7 +762,7 @@ atombound = rep [1.050, num];
                     continue;
                 endif
 
-                status = qb_VerifyDivcon [wkey, status, vals];
+                status = qb_VerifyDivCon [wkey, status, vals];
                 if not status.verified then continue; endif
 
                 if second task_fork [statics:'share'] === 'child' then

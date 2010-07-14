@@ -82,7 +82,7 @@ global function qb_PWDAnalysis [qmsfilename]
     scorepath = twrite ['{}.h5', scorepath];
 
     //  Pass the target-ligand pairs, activities and options to 
-    //  QuantumBio's Divcon PWD Analysis
+    //  QuantumBio's DivCon PWD Analysis
     local handshake, success = 0;
     local idx;
     fwrite [stdin, '{c:}\n', 'pwd'];
@@ -124,7 +124,7 @@ write ['Handshake: {}\n', handshake];//DEBUG
 
         [[return_statement]] = fread [stdout, '{c:*}'];
 
-        write ['Divcon: {}\n', return_statement];//DEBUG
+        write ['DivCon: {}\n', return_statement];//DEBUG
 
         if return_statement === "updateanalysis" then
             local title, numtables;
@@ -211,7 +211,7 @@ write ['Handshake: {}\n', handshake];//DEBUG
     //  Look for error messages from stderr.
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
-        write ['MOEDivcon: {}\n', newerror];//DEBUG
+        write ['MOEDivCon: {}\n', newerror];//DEBUG
         errmess = cat [newerror, errmess];
         [[newerror]] = fread [stderr, '{c:*}'];
     endloop

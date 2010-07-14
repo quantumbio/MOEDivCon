@@ -27,7 +27,7 @@
 #set version '2010.01'
 #set main 'qb_NMRScore'
 
-function qb_CheckChgTestDivconMols;
+function qb_CheckChgTestDivConMols;
 function qb_GetElemIndices;
 function qb_GetWhich;
 function qb_HamSetsInit;
@@ -76,7 +76,7 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts, errortests,
     //  If there are any errors, return immediately.  Run all error tests.
     qb_HamSetsInit [];
     local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
-        = qb_CheckChgTestDivconMols [recmol, coreopts.recchg, ligmol,
+        = qb_CheckChgTestDivConMols [recmol, coreopts.recchg, ligmol,
             coreopts.ligchg, errortests, errortests, errortests,
             coreopts.testH, coreopts.testMM,
             'nmr', HAM_KEYS (coreopts.ham)];
@@ -165,7 +165,7 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts, errortests,
     local stdout = exe_stdout process_keys;
     local stderr = exe_stderr process_keys;
 
-    //  Pass the options and the two backbones to QuantumBio's Divcon NMRScore
+    //  Pass the options and the two backbones to QuantumBio's DivCon NMRScore
     //
     //  SplitReceptor ensures that there is only one chain per molecule
     //  in the receptor collection.
@@ -204,7 +204,7 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts, errortests,
 
         [[return_statement]] = fread [stdout, '{c:*}'];
 
-write ['Divcon: {}\n', return_statement];//DEBUG
+write ['DivCon: {}\n', return_statement];//DEBUG
 
         if return_statement === "updatescore" then
             local atomindices = [], atomvalues = [];
@@ -219,14 +219,14 @@ print [cspidx, cspval];//DEBUG
 
             if neL [length indices, length atomindices] then
                 errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
-                    '    Orig: {v}\n    Divcon: {v}\n', indices, atomindices],
+                    '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
                     errmess];
                 return [[], errmess];
             endif
 
             if not alltrue eqE [indices, atomindices] then
                 errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
-                    '    Orig: {v}\n    Divcon: {v}\n', indices, atomindices],
+                    '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
                     errmess];
                 return [[], errmess];
             endif
@@ -239,11 +239,11 @@ print [score];//DEBUG
 
         elseif return_statement === "QBException" then
             [[return_statement]] = fread [stdout, '{c:*}'];
-            if neL [return_statement, "Divcon done."] then
+            if neL [return_statement, "DivCon done."] then
                 divconerrmess = cat [divconerrmess, return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
             endif
-            while neL [return_statement, "Divcon done."] loop
+            while neL [return_statement, "DivCon done."] loop
                 divconerrmess = cat [divconerrmess, "\n", return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
             endloop;
@@ -254,7 +254,7 @@ print [score];//DEBUG
     //  Look for error messages from stderr.
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
-write ['MOEDivcon: {}\n', newerror];//DEBUG
+write ['MOEDivCon: {}\n', newerror];//DEBUG
         errmess = cat [newerror, errmess];
         [[newerror]] = fread [stderr, '{c:*}'];
     endloop

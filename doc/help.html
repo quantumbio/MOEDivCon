@@ -1,7 +1,7 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html>
 <head>
-<title>MOEDivcon Integration Suite Help</title>
+<title>MOEDivCon Integration Suite Help</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
 <meta http-equiv="content-style-type" content="text/css" />
 <style>
@@ -58,7 +58,7 @@ QuantumBio Homepage
   data="images/qb_logo.png" type=image/png title="QuantumBio Homepage">
 QuantumBio Homepage
 </object> </a>
-<h1>MOEDivcon Integration Suite</h1>
+<h1>MOEDivCon Integration Suite</h1>
 <hr>
 
 <todo>Daren, update all images.  Add new ones.</todo>
@@ -74,7 +74,7 @@ QuantumBio Homepage
     <li><a href="#start-onetomany">One-to-Many Mode</a>
     <li><a href="#start-manytomany">Many-to-Many Mode</a>
   </ol>
-  <li><a href='#core'>MOEDivcon Core</a>
+  <li><a href='#core'>MOEDivCon Core</a>
     <ol id=tocl>
       <li><a href="#core-intro">Introduction</a>
       <li><a href="#core-test">Molecule Tests</a>
@@ -107,7 +107,7 @@ QuantumBio Homepage
         <li><a href="#core-options-scaling">Scaling</a>
       </ol>
     </ol>
-  <li><a href="#nmr">MOEDivcon NMRScore</a>
+  <li><a href="#nmr">MOEDivCon NMRScore</a>
     <ol id=tocl>
       <li><a href="#nmr-intro">Introduction</a>
       <li><a href="#nmr-workflow">Workflow</a>
@@ -124,7 +124,7 @@ QuantumBio Homepage
       </ol>
       <li><a href="#nmr-results">Results</a>
     </ol>
-  <li><a href="#qms">MOEDivcon QMScore</a>
+  <li><a href="#qms">MOEDivCon QMScore</a>
     <ol id=tocl>
       <li><a href="#qms-intro">Introduction</a>
       <li><a href="#qms-options">Options</a>
@@ -135,7 +135,7 @@ QuantumBio Homepage
       </ol>
       <li><a href="#qms-results">Results</a>
     </ol>
-  <li><a href="#pwd">MOEDivcon QB-PWD Analysis</a>
+  <li><a href="#pwd">MOEDivCon QB-PWD Analysis</a>
     <ol id=tocl>
       <li><a href="#pwd-intro">Introduction</a>
       <li><a href="#pwd-workflow">Workflow</a>
@@ -152,7 +152,7 @@ QuantumBio Homepage
         <li><a href="#pwd-options-pls">PLS</a>
       </ol>
     </ol>
-  <li><a href="#heatmap">MOEDivcon Heat Map</a>
+  <li><a href="#heatmap">MOEDivCon Heat Map</a>
   <ol id=tocl>
     <li><a href="#heatmap-selection">Selection</a>
     <li><a href="#heatmap-saveprint">Save and Print</a>
@@ -176,7 +176,7 @@ QuantumBio Homepage
 
 <h2><a name="install"></a>Installation</h2>
 <p>
-The MOEDivcon Integration Suite is part of the QuantumBio Distribution,
+The MOEDivCon Integration Suite is part of the QuantumBio Distribution,
 which is packaged in a
 <inline>tar.gz</inline> file that uses the following naming convention
 <inline>quantumbio-&lt;platform&gt;-&lt;version&gt;.tar.gz</inline>.  Move
@@ -193,8 +193,8 @@ the <inline>/usr/local</inline> directory,
 refer to <inline>/usr/local/quantumbio-linux-5.0.0.1</inline>.
 
 <p><a name="install-menu"></a>
-The final steps of the installation set up your environment to run MOEDivcon.
-First, you need to copy the MOEDivcon menu file to your home directory.  If
+The final steps of the installation set up your environment to run MOEDivCon.
+First, you need to copy the MOEDivCon menu file to your home directory.  If
 you already have a custom MOE menu, you need to concatenate the files.
 For example, either
 <pre>
@@ -207,24 +207,24 @@ or
 
 <p><a name="install-svl"></a>
 In order for
-MOE to locate the MOEDivcon SVL library, you must create a link to the
+MOE to locate the MOEDivCon SVL library, you must create a link to the
 library in a place where MOE can find it.  If you already have a directory
-of SVL scripts, link the MOEDivcon SVL libarary as a subdirectory.
+of SVL scripts, link the MOEDivCon SVL libarary as a subdirectory.
 For example:
 <pre>
 &gt; ln -s  ${QBHOME}/svl  ${MOE_SVL_PATH}/qb_lib.svl
 </pre>
 Otherwise, create an SVL directory in your home directory and link the
-MOEDivcon SVL library under it.  For example:
+MOEDivCon SVL library under it.  For example:
 <pre>
 &gt; mkdir  ${HOME}/svl<br>
 &gt; ln -s  ${QBHOME}/svl  ${HOME}/svl/qb_lib.svl<br>
 </pre>
 
 <p><a name="install-path"></a>
-Before you can run MOEDivcon Suite using MOE or moebatch, 
+Before you can run MOEDivCon Suite using MOE or moebatch, 
 you need to make sure that
-the MOEDivcon executables are in your path and the MOEDivcon SVL library is in
+the MOEDivCon executables are in your path and the MOEDivCon SVL library is in
 your MOE run path.  For example, you should add to your .bashrc file:
 <pre>
 export  PATH=${QBHOME}/bin:${PATH}<br>
@@ -244,7 +244,7 @@ else<br>
 </pre>
 
 <p><a name="install-license"></a>
-Finally, MOEDivcon is distributed with an evaluation license that will
+Finally, MOEDivCon is distributed with an evaluation license that will
 eventually
 expire. Contact sales@quantumbioinc.com to purchase a license file.
 Once you have received a license file
@@ -261,10 +261,10 @@ To verify that the installation was successful, let's work through a few
 simple examples of QMScore.  If you run into any problems, 
 see the <a href="#trouble">Troubleshooting</a> section.
 <p>
-The workflow of MOEDivcon QMScore involves six steps:
+The workflow of MOEDivCon QMScore involves six steps:
 <ol>
   <li> Prepare the receptors and ligands/poses involved in the calculation.
-  <li> Closely examine all error and warning produced by the MOEDivcon tests
+  <li> Closely examine all error and warning produced by the MOEDivCon tests
        to ensure that the receptor(s) and ligand(s) are not problematic.
   <li> Verify the formal charges calculated by MOE.
   <li> Set up the run parameters to QMScore.
@@ -313,7 +313,7 @@ to do with a large protein receptor for which the execution time may take
 several hours.
 <h3><a name="start-onetomany"></a>One-to-Many Mode</h3>
 <p>
-The real power of MOEDivcon Integration Suite
+The real power of MOEDivCon Integration Suite
 is the ability to use moebatch to execute tasks in parallel on a cluster
 and collate the results in a MOE database.  In this case, start MOE and open
 <inline>${QBHOME}/examples/simplecomplex.moe</inline> and select the MOE menu
@@ -340,7 +340,7 @@ Or alternatively, close the MOE Database Viewer and click the <w>Run</w> button
 and the jobs will be executed sequentially in the current MOE session (not
 recommended for large proteins).
 <p>
-MOEDivcon will print out progress messages for one of the jobs.  When all
+MOEDivCon will print out progress messages for one of the jobs.  When all
 four jobs are completed, open <inline>qmscore.mdb</inline> in the MOE
 Database Viewer.  You should see results similar to these:
 <p>
@@ -352,7 +352,7 @@ See the <a href="#core-parallel">Batch and Parallel Execution</a> section for
 more information on executing moebatch in parallel on a cluster.
 <h3><a name="start-manytomany"></a>Many-to-Many Mode</h3>
 <p>
-In Many-to-Many Mode, MOEDivcon doesn't use the molecules in the MOE Window,
+In Many-to-Many Mode, MOEDivCon doesn't use the molecules in the MOE Window,
 so after starting MOE, selecting <w>QMScore</w> from the menu system,
 and selecting
 <w>Many-to-Many</w> mapping mode, and you can proceed directly to browsing
@@ -387,23 +387,23 @@ See the <a href="#core-parallel">Batch and Parallel Execution</a> section for
 more information on executing moebatch in parallel on a cluster.
 
 
-<h2><a name="core"></a>MOEDivcon Core</h2>
+<h2><a name="core"></a>MOEDivCon Core</h2>
 <h3><a name="core-intro"></a>Introduction</h3>
 <p>
-MOEDivcon Core encompasses the GUI form and functionality that is shared by all
-of the Score Calculation panels in the MOEDivcon Integration Suite.  It includes
+MOEDivCon Core encompasses the GUI form and functionality that is shared by all
+of the Score Calculation panels in the MOEDivCon Integration Suite.  It includes
 a set of molecular tests to capture common structural problems in the protein 
 receptor(s) and ligand(s) before they are sent to DivCon for evalutation.  It
 also includes a verification that the charges calculated by MOE are compatible
 with DivCon.  It includes basic functionality such as saving and loading
-MOEDivcon Score database, and options common to all scoring calculations.
+MOEDivCon Score database, and options common to all scoring calculations.
 Finally, it includes the support for setting up jobs to run in batch mode and
 the ability to execute jobs in parallel on either a workstation or computing
 cluster.
 
 <h3><a name="core-test"></a>Molecule Tests</h3>
 <p>
-MOEDivcon is able to perform several tests on the receptor(s) and ligand(s) to
+MOEDivCon is able to perform several tests on the receptor(s) and ligand(s) to
 determine if there are possible problems with the molecular structures.  The 
 "Error" tests check whether there are problems that will definitely cause DivCon
 to fail and the "Warning" tests check for other possible problems that may or
@@ -421,17 +421,17 @@ Window when you click <w>Run</w> or <w>Save</w> in <w>One-to-One</w> or
 <w>One-to-Many</w> mode.  If any problems  that will cause DivCon to fail are
 detected, you are asked whether you wish to continue.  The selected tests are
 also performed on any receptors and/or ligands/poses as they are copied into
-the MOEDivcon Score database in <w>One-to-Many</w> or <w>Many-to-Many</w> mode.  The
+the MOEDivCon Score database in <w>One-to-Many</w> or <w>Many-to-Many</w> mode.  The
 results of the tests are stored in the <w>Status</w> field of the 
-MOEDivcon Score database so that you may verify the test results.
+MOEDivCon Score database so that you may verify the test results.
 <p>
-The "Error" tests are always performed by MOEDivcon before passing the
+The "Error" tests are always performed by MOEDivCon before passing the
 receptor and ligand to DivCon for calculation.  If any of the "Error" tests
 fail, the calculation will be skipped.  The "Error" and selected "Warning"
-test results are stored in the <w>Status</w> field of the MOEDivcon Score 
+test results are stored in the <w>Status</w> field of the MOEDivCon Score 
 database.
 <p>
-For each atom that is detected to be problematic, MOEDivcon prints information
+For each atom that is detected to be problematic, MOEDivCon prints information
 that makes it easy to locate the atom using MOE's Atom Manager.  The 
 statement has the following format:
 <pre>
@@ -509,7 +509,7 @@ and misinterpreted bond orders in ligands.  The most common reason for an
 extra H in proteins are protonated carbonyl oxygens (C=O&rarr;C=OH).   Other
 problems are caused by incorrect charges, metal coordinations, etc.
 <p>
-This test can also generate false positives.  MOEDivcon already filters out
+This test can also generate false positives.  MOEDivCon already filters out
 the most common source of false positives:  terminal amines in proteins
 treated by MOE as ammonion cations. 
 <p>
@@ -544,7 +544,7 @@ and analogous characteristics. In the event that the charge is incorrectly
 determined, it is suggested that the user edit the structure using MOE's
 molecule Builder. Please see the MOE documentation for more information. 
 <p>
-When you open any of the MOEDivcon Score panels, MOE calculates the total
+When you open any of the MOEDivCon Score panels, MOE calculates the total
 charge of the
 receptor and ligand in the MOE window, and displays them in the
 <w>Charges</w> section.  You can press the <w>Calculate</w> button to
@@ -565,13 +565,13 @@ it has been calculated.  As with any other formal charge algorithm, MOE
 doesn't always get the total charge right.  You can edit the
 charges calculated by MOE if you think they are incorrect or they are marked
 as problematic for DivCon.  If you modify the charges in the 
-MOEDivcon Score panel,
-MOEDivcon will alert you if a charge you entered may cause problems with the
+MOEDivCon Score panel,
+MOEDivCon will alert you if a charge you entered may cause problems with the
 DivCon calculations when you press <w>Run</w> or <w>Save</w>.
 <p>
 <object id="QMScoreBadCharge" title="QMScore Charge Error"
 data="images/qmscorebadcharge.png" type=image/png>
-MOEDivcon Score Charge Error
+MOEDivCon Score Charge Error
 </object>
 
 <h4><a name="core-charge-onetomany"></a>One-to-Many</h4>
@@ -580,7 +580,7 @@ When in <w>One-to-Many</w> mode, you can choose
 to use the charge specified for the ligand as the charge for all the poses
 by selecting <w>All Poses</w>.  Otherwise, the charge is calculated for
 each pose as it is copied from the Ligand/Pose database to the
-MOEDivcon Score database.  In either case, when the MOEDivcon Score database
+MOEDivCon Score database.  In either case, when the MOEDivCon Score database
 is opened with
 the MOE Database Viewer for verification.  If a calculated charge is
 problematic for DivCon, it is noted in the <w>Status</w> column (double 
@@ -591,23 +591,23 @@ problematic charges are skipped.
 <p>
 When in <w>Many-to-Many</w> mode, the <w>Charges</w>
 section is disabled.  The charges for the receptors and ligands are calculated
-as they are copied from their respective databases into the MOEDivcon Score
+as they are copied from their respective databases into the MOEDivCon Score
 database.  Again, you can verify and edit the charges using the MOE Database
 Viewer.  DivCon calculations for molecules with problematic charges are skipped.
 
 <h4><a name="core-charge-editing"></a>Editing</h4>
 <p>
-You can edit the charges stored in the MOEDivcon Score database by double
+You can edit the charges stored in the MOEDivCon Score database by double
 clicking
 on the cell and edit the charge in the edit bar at the top of the window.
 Afterwards, you can press the <w>Check</w> button in the <w>Charges</w>
-section of the panel to ask MOEDivcon to recheck the charges in the 
-MOEDivcon Score
+section of the panel to ask MOEDivCon to recheck the charges in the 
+MOEDivCon Score
 database.  If a charge is still problematic, a warning message appears in
 the <w>Status</w> column.  Otherwise, an okay message is written.
 <p>
 Before passing the run parameters to DivCon
-during execution, MOEDivcon checks again whether the charges are
+during execution, MOEDivCon checks again whether the charges are
 going to be problematic.  If so, it skips the calculation and places a
 message in the <w>Status</w> column.
 <p>
@@ -616,39 +616,39 @@ directly written to disk and the previous value is lost.</warn>
 
 <h3><a name="core-load"></a>Load and Save</h3>
 <p>
-You can load an existing MOEDivcon Score database into the MOEDivcon Score
+You can load an existing MOEDivCon Score database into the MOEDivCon Score
 panel by pressing the <w>Load</w> button.  A file selection box will open
 allowing
-you to browse for the MOEDivcon Score database.  When you select a MOE database, it is checked to make
-sure it is a MOEDivcon Score database.  The receptor/ligand complex stored in
-the database is then loaded into the MOE window, the MOEDivcon Score panel is
+you to browse for the MOEDivCon Score database.  When you select a MOE database, it is checked to make
+sure it is a MOEDivCon Score database.  The receptor/ligand complex stored in
+the database is then loaded into the MOE window, the MOEDivCon Score panel is
 updated with the settings stored in the database, and then the database itself
 is opened using the MOE Database Viewer.
 <p>
- If you load an existing MOEDivcon Score database, change the options or edit
+ If you load an existing MOEDivCon Score database, change the options or edit
 the receptor or ligand using MOE's Builder, then press <w>Save</w>, the updated
 options, molecules and charges will be saved in the output database.
 <p>
-If you load an existing MOEDivcon Score database and only edit some of the
+If you load an existing MOEDivCon Score database and only edit some of the
 <w>Rec Chg</w> or <w>Lig Chg</w> fields, you shouldn't press the
-MOEDivcon Score <w>Save</w> button.  This would regenerate the original charges
+MOEDivCon Score <w>Save</w> button.  This would regenerate the original charges
 calculated from the molecules in the MOE Window, and/or those stored in the
-recepter and pose database specified in MOEDivcon Score panel.  When you edit
+recepter and pose database specified in MOEDivCon Score panel.  When you edit
 an entry in a MOE database, it is written directly to disk.  See the
 <a href="#core-charge-editing">Editing</a> charge section for more information.
 <p>
 <warn>Warning:  When you load a database, the current settings in the
-MOEDivcon Score panel and the molecules in the MOE Window are replaced
+MOEDivCon Score panel and the molecules in the MOE Window are replaced
 and may be lost if not saved beforehand.</warn>
 
 <h3><a name="core-clean"></a>Log Files and Postexecution Cleanup</h3>
 <p>
 <todo>Change to reflect use of HDF5.</todo>
-If a DivCon job runs successfully, MOEDivcon automatically deletes
+If a DivCon job runs successfully, MOEDivCon automatically deletes
 temporary files in the working directory.  This prevents DivCon from attempting
 to reuse files from an earlier run and avoids wasting disk space. However,
 if an error is reported the files are not deleted and the location of the
-DivCon log file is written to the <w>Status</w> column of the MOEDivcon Score
+DivCon log file is written to the <w>Status</w> column of the MOEDivCon Score
 database along with the error message.  The location has the format:
 <pre>
         hostname:/path/to/working/directory/divcon.log
@@ -662,15 +662,15 @@ temporary files post-mortem.
 <h3><a name="core-parallel"></a>Batch and Parallel Execution</h3>
 <p>
 As described in the <a href="#start">Getting Started</a> section, the workflow
-of MOEDivcon QMSore proceeds in six steps:  preparation, testing, verification,
+of MOEDivCon QMSore proceeds in six steps:  preparation, testing, verification,
 set up, execution, and analysis.  The prep, testing, verification, set up, and
 analysis steps are performed using MOE on your local workstation or laptop.
 The third step, execution, is best left to a computational cluster, whether 
 you are scoring one complex or hundreds.
 <p>
 Before getting into the details of executing moebatch on a cluster, we'll
-explain how to setup MOEDivcon QMScore to run a single job in batch mode or
-many jobs in parallel.  Analogous steps are performed to set up MOEDivcon
+explain how to setup MOEDivCon QMScore to run a single job in batch mode or
+many jobs in parallel.  Analogous steps are performed to set up MOEDivCon
 NMRScore batch jobs.
 
 <h4><a name="core-parallel-mode"></a>Mapping Mode</h4>
@@ -684,7 +684,7 @@ In <w>One-to-One</w> batch mode, the set up is the same as in the
 and ligand files into the MOE Window and perform any necessary preparatory,
 testing and verification steps.
 Next, open the QMScore panel and select your options, and then choose
-<w>Save</w> rather than <w>Run</w>.  MOEDivcon will store your receptor,
+<w>Save</w> rather than <w>Run</w>.  MOEDivCon will store your receptor,
 ligand, and
 options in the QMScore database, and then open the MOE Database Viewer so you
 can verify the ligand/pose data.  See the
@@ -693,10 +693,10 @@ to learn how to execute the job.
 
 <h5><a name="core-parallel-mode-1toM"></a>One Receptor--Many Ligand Poses</h5>
 <p>
-In <w>One-to-Many</w> parallel mode, MOEDivcon scores many ligand poses
+In <w>One-to-Many</w> parallel mode, MOEDivCon scores many ligand poses
 generated by your favorite docking program against the same receptor.  The set
 up is similar to <a href="#core-parallel-mode-1to1"><w>One-to-One</w></a> mode
-in that MOEDivcon expects the receptor/ligand complex to be in the MOE Window.
+in that MOEDivCon expects the receptor/ligand complex to be in the MOE Window.
 The difference is that you need to create a MOE database to store the ligand
 poses beforehand (see the MOE documentation if you are not familiar with
 this process).
@@ -717,9 +717,9 @@ You can also choose
 to use the charge specified for the ligand as the charge for all the poses
 by selecting <w>All Poses</w> in the Charge section.  
 See the <a href="#core-charge-onetomany">Charge</a>
-section to learn more details about how MOEDivcon handles charges.
+section to learn more details about how MOEDivCon handles charges.
 <p>
-When you choose <w>Save</w>,  MOEDivcon will store your receptor, ligand, and
+When you choose <w>Save</w>,  MOEDivCon will store your receptor, ligand, and
 options in the QMScore database, and it will copy the ligand/pose database into
 the QMScore database including any data fields (e.g., results from other scoring
 algorithms).  The MOE Database Viewer will then open the QMScore database so
@@ -730,8 +730,8 @@ section to learn how to execute the job.
 <p>
 <h5><a name="core-parallel-mode-MtoM"></a>Many Receptors--Many Ligands</h5>
 <p>
-In the <w>Many-to-Many</w> parallel mode, MOEDivcon scores many receptors,
-each against its own ligand.  In this case, MOEDivcon gathers the molecular
+In the <w>Many-to-Many</w> parallel mode, MOEDivCon scores many receptors,
+each against its own ligand.  In this case, MOEDivCon gathers the molecular
 information from the two databases you need to supply.  Additionally, it
 is up to the user to assure that the receptors and ligands are stored in the
 correct order in the MOE databases.
@@ -741,7 +741,7 @@ data="images/qmscoremanytomany.png" type=image/png>
 QMScore Many-to-Many Mode
 </object>
 <p>
-When you choose <w>Save</w>,  MOEDivcon will store your options in the
+When you choose <w>Save</w>,  MOEDivCon will store your options in the
 QMScore database, and it will copy the receptor and ligand databases, row
 by row, into the QMScore database including any data fields.  The MOE
 Database Viewer will then open the QMScore database so you can verify the
@@ -749,7 +749,7 @@ receptor and ligand data, especially the charge values and status.
 See the <a href="#core-parallel-moebatch">Running Moebatch</a> section
 to learn how to execute the job.  See the
 <a href="#core-charge-manytomany">Charge</a>
-section to learn more details about how MOEDivcon handles charges.
+section to learn more details about how MOEDivCon handles charges.
 <p>
 <warn>Warning:  If the receptor and pose databases have fields&ndash;other than
 the molecule field&ndash;with the same name, then the pose data will overwrite
@@ -758,10 +758,10 @@ the receptor data for those fields.</warn>
 
 <h4><a name="core-parallel-moebatch"></a>Running Moebatch</h4>
 <p>
-After you close the database, you can execute MOEDivcon QMScore in at least
+After you close the database, you can execute MOEDivCon QMScore in at least
 three different ways.  In the examples below, <inline>$USER_DATADB</inline>
 is the path to your QMScore database.  Analogous steps are performed to execute
-MOEDivcon NMRScore.
+MOEDivCon NMRScore.
 <p>
 You can run moebatch on your workstation from the command line:
 <pre>
@@ -830,15 +830,15 @@ use is limited by the number of MOE licenses you have been granted.
 
 <h3><a name="core-options"></a>Core Options</h3>
 <p>
-Here we include a more detailed description of the core options in the MOEDivcon
+Here we include a more detailed description of the core options in the MOEDivCon
 Score panel.
 
 <h4><a name="core-options-outdb"></a>Output MOE Database</h4>
 <p>
-MOEDivcon uses a MOE database to store run parameters and to store
+MOEDivCon uses a MOE database to store run parameters and to store
 Score results; and if appropriate, analysis results.  
 One advantage is that the database is self-contained:  all
-of the data and parameters needed to execute MOEDivcon Score jobs are stored
+of the data and parameters needed to execute MOEDivCon Score jobs are stored
 in the database.  The database can be moved to a working directory prior to
 execution time as long as the correct path is provided to the moebatch
 command (see the <a href="#core-parallel-moebatch">Running Moebatch</a>
@@ -851,13 +851,13 @@ data analysis tools designed to work with its database.
 
 The working directory is used for storing QuantumBio DivCon intermediate
 calculations and log files.  The path to the specified directory will
-be stored in the MOEDivcon Score database and resolved at execution time.
+be stored in the MOEDivCon Score database and resolved at execution time.
 If you are
-going to submit the MOEDivcon Score job on a cluster, you can specify
+going to submit the MOEDivCon Score job on a cluster, you can specify
 the absolute
 path to a scratch directory mounted on the cluster's file system.  Because of
 this possible scenerio, there is no check whether the directory actually
-exists.  If MOEDivcon Score job is executed using moebatch, a subdirectory
+exists.  If MOEDivCon Score job is executed using moebatch, a subdirectory
 under the
 working directory named <inline>qb_out<em>N</em></inline>
 will be created for each numbered task <inline><em>N</em></inline>.
@@ -880,7 +880,7 @@ process.
 <h4><a name="core-options-ham"></a>Hamiltonian</h4>
 <p>
 Several options are available in chosing the Hamiltonian algorithm to use
-with each MOEDivcon Score calculation, each with its own default:  PM3 has 
+with each MOEDivCon Score calculation, each with its own default:  PM3 has 
 proven to be the most reliable for QMScore and MNDO for NMRScore.
 
 <h4><a name="core-options-scaling"></a>Scaling</h4>
@@ -891,7 +891,7 @@ variety (e.g. O(n&sup3;) or worse) where n corresponds to the number of
 electrons in the system. The cross over point is at approximately 450 atoms.
 
 
-<h2><a name="nmr"></a>MOEDivcon NMRScore</h2>
+<h2><a name="nmr"></a>MOEDivCon NMRScore</h2>
 <p>
 
 <h3><a name="nmr-intro"></a>Introduction</h3>
@@ -987,7 +987,7 @@ an atom label in the panel, the atom is labeled in the MOE Window.
 
 <h3><a name="nmr-options"></a>Options</h3>
 <p>
-Here we include a more detailed description of the options in the MOEDivcon
+Here we include a more detailed description of the options in the MOEDivCon
 NMRScore panel.
 
 <h4><a name="nmr-options-opt"></a>Ligand Optimization</h4>
@@ -1006,7 +1006,7 @@ NMRScore.
 <p>
 <todo>Daren</todo>
 
-<h2><a name="qms"></a>MOEDivcon QMScore</h2>
+<h2><a name="qms"></a>MOEDivCon QMScore</h2>
 <p>
 
 <h3><a name="qms-intro"></a>Introduction</h3>
@@ -1025,7 +1025,7 @@ key peer-reviewed
 
 <h3><a name="qms-options"></a>Options</h3>
 <p>
-Here we include a more detailed description of the options in the MOEDivcon
+Here we include a more detailed description of the options in the MOEDivCon
 QMScore panel.
 
 <h4><a name="qms-options-shift"></a>Shift</h4>
@@ -1063,7 +1063,7 @@ description of each factor in formula.</todo>
   <li> E_solvMRM:  ...
 </ul>
 
-<h2><a name="pwd"></a>MOEDivcon QB-PWD Analysis</h2>
+<h2><a name="pwd"></a>MOEDivCon QB-PWD Analysis</h2>
 
 <h3><a name="pwd-intro"></a>Introduction</h3>
 <p>
@@ -1137,7 +1137,7 @@ directory.
 
 <h3><a name="pwd-options"></a>Options</h3>
 <p>
-Here we include a more detailed description of the options in the MOEDivcon
+Here we include a more detailed description of the options in the MOEDivCon
 QB-PWD panel.
 
 <h4><a name="pwd-options-title"></a>Title</h4>
@@ -1220,7 +1220,7 @@ molecules appear first when the receptor and pose MDB databases are created, or
 the entries in the databases can be rearranged after the database have been
 created (see the MOE documentation).
 
-<h2><a name="heatmap"></a>MOEDivcon Heat Map</h2>
+<h2><a name="heatmap"></a>MOEDivCon Heat Map</h2>
 <p>
 The <w>QB Heat Map</w> is used to implement the interaction energy map and the
 structure-activity relationship (SAR) map.  The interaction energy map is based
@@ -1335,7 +1335,7 @@ represented by the colors.
 <h2><a name="trouble"></a>Troubleshooting</h2>
 <todo>Are there more troubleshooting items to add?</todo>
 
-We list here potential problems using the MOEDivcon integration and possible
+We list here potential problems using the MOEDivCon integration and possible
 solutions.  If your problem is not listed here or the proposed solution
 doesn't help, please <a href="#contact">contact</a> support.
 <ui>
@@ -1352,7 +1352,7 @@ doesn't help, please <a href="#contact">contact</a> support.
 run: Environment variable not found.
     </pre>
     </prob><p><sol>
-    MOE's <inline>run</inline> function is unable to find the MOEDivcon SVL
+    MOE's <inline>run</inline> function is unable to find the MOEDivCon SVL
     scripts.  Make sure the <inline>MOE_SVL_RUNPATH</inline> is
     set up correctly (see the <a href="#install-path">installation</a>
     section).
@@ -1363,7 +1363,7 @@ run: Environment variable not found.
     qb_QMScore: fwrite: Broken pipe.
     </pre>
     </prob><p><sol>
-    MOE is unable to find the MOEDivcon executables.  Make sure the
+    MOE is unable to find the MOEDivCon executables.  Make sure the
     <inline>PATH</inline> is
     set up correctly (see the <a href="#install-path">installation</a>
     section).
@@ -1374,7 +1374,7 @@ run: Environment variable not found.
 Error:   LICENSE ERROR: Problem with license file. Error Code: 1003.
     </pre>
     </prob><p><sol>
-    MOEDivcon is distributed with an evaluation license which eventually
+    MOEDivCon is distributed with an evaluation license which eventually
     expires.  See the <a href="#install-license">installation</a>
     section for more information on purchasing and installing a license.
   </sol>
@@ -1386,10 +1386,10 @@ Error:   LICENSE ERROR: Problem with license file. Error Code: 1003.
     configuration file in the working directory takes precendence.
   </sol>
   <li><p><prob>
-    MOEDivcon doesn't always include the hostname in the location for the 
+    MOEDivCon doesn't always include the hostname in the location for the 
     log file written in the <w>Status</w> field of the QMScore database.
     </prob><p><sol>
-    Moebatch uses a ssh command to remotely execute MOEDivcon jobs, which
+    Moebatch uses a ssh command to remotely execute MOEDivCon jobs, which
     doesn't always set the <inline>HOSTNAME</inline> environment variable.
     To ensure that the hostname always appears, add the following line to your 
     .bashrc file:
@@ -1413,7 +1413,7 @@ No molecular complex loaded in MOE Window.
     </prob><p><sol>
     When using QMScore in 'One-to-One' or 'One-to-Many' mode, you need to first
     open the molecule files (.pdb, .moe, etc.) of the complex (or receptor and
-    ligand separately) into MOE.  MOEDivcon populates the QMScore database with
+    ligand separately) into MOE.  MOEDivCon populates the QMScore database with
     the molecular data in the MOE Window.
   </sol>
   <li><p><prob>
@@ -1445,7 +1445,7 @@ No ligand was recognized.  Use LigX to define it.
                      select <w>Color</w>&rarr;<w>Element</w>.
             </ol>
     </ol>
-    MOEDivcon should now be able to identify the ligand.
+    MOEDivCon should now be able to identify the ligand.
   </sol>
   <li><p><prob>
     I get the MOE message:
@@ -1466,9 +1466,9 @@ Ligand has to be a single molecule.
 Problematic molecule in receptor and/or ligand.  Continue anyway?
     </pre>
     </prob><p><sol>
-    MOEDivcon has detected that there is a problem with the structure
+    MOEDivCon has detected that there is a problem with the structure
     of either the receptor or ligand.  You should try to address the problem
-    before running or saving the QMScore database.  MOEDivcon will skip the
+    before running or saving the QMScore database.  MOEDivCon will skip the
     calculation of molecules with problematic structures.  You can learn
     what the problem is by clicking the <w>Perform</w> button in the
     <w>Molecule Tests</w> section with the "Error" tests selected.
@@ -1479,10 +1479,10 @@ Problematic molecule in receptor and/or ligand.  Continue anyway?
 Problematic charge for receptor and/or ligand.  Continue anyway?
     </pre>
     </prob><p><sol>
-    MOEDivcon has detected that there is a problem with the charge
+    MOEDivCon has detected that there is a problem with the charge
     of either the receptor or ligand.  The problematic molecule should be marked
     red in the <w>Charge</w> section.  You should try to address the problem
-    before running or saving the QMScore database.  MOEDivcon will skip the
+    before running or saving the QMScore database.  MOEDivCon will skip the
     calculation of molecules with problematic charges.
   </sol>
   <li><p><prob>
@@ -1535,7 +1535,7 @@ Error:  Problematic charge for receptor and/or ligand.
   <li><p><prob>
     I get the MOE message:
     <pre>
-The MOEDivcon database hasn't been created.
+The MOEDivCon database hasn't been created.
     </pre>
     </prob><p><sol>
     You are attempting to check the charges in the current QMScore database
@@ -1545,7 +1545,7 @@ The MOEDivcon database hasn't been created.
   <li><p><prob>
     I get the MOE message:
     <pre>
-The MOEDivcon database isn't open.
+The MOEDivCon database isn't open.
     </pre>
     You are attempting to check the charges in the current QMScore database
     that isn't open.  From the QMScore panel, ether save or load
@@ -1558,7 +1558,7 @@ The MOEDivcon database isn't open.
 The pose (or receptor) database has more than one molecule field.
     </pre>
     </prob><p><sol>
-    MOEDivcon cannot determine which is the correct molecule field for the
+    MOEDivCon cannot determine which is the correct molecule field for the
     poses (receptors) if there is more than one.  Copy the correct field into
     a new MOE database.
   </sol>
@@ -1594,12 +1594,12 @@ The receptor and pose databases have different number of entries.
     our support staff to resolve the issue.
   </sol>
   <li><p><prob>
-    How do I know when all jobs of a MOEDivcon batch run have completed, or
+    How do I know when all jobs of a MOEDivCon batch run have completed, or
     more importantly, are likely to converge.
     </prob><p><sol>
-    Presently, MOEDivcon has no mechanism to show the user the progress of a
+    Presently, MOEDivCon has no mechanism to show the user the progress of a
     calculation or whether it is converging.  This will be addressed in a future
-    release of MOEDivcon.
+    release of MOEDivCon.
   </sol>
 </ui>
 
