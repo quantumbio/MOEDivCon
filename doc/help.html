@@ -171,8 +171,26 @@ QuantumBio Homepage
 
 <h2><a name="intro"></a>Introduction</h2>
 <p>
-<todo> Lance, write intro to Integration Suite. </todo>
 
+<p>QuantumBio offers the DivCon Discovery Suite product line, providing solutions to achieve high accuracy, performance, and versatility for chemical characterization in drug discovery and development. The DivCon Discovery Suite is built on cutting-edge technology that utilizes precise quantum mechanical algorithms in a user-friendly format, providing the opportunity for faster results and reduced costs.</p>
+
+<p>QuantumBio offers the following lead optimization capabilities for your drug discovery investment:</p>
+
+<ul>
+<li>Use QM based Scoring Function to predict protein-ligand binding affinities on a routine basis.
+
+<li>Build computational expensive QM descriptors for QSAR & ADME/Tox Models.
+
+<li>Study protein-ligand complexes (even those containing metals).
+
+<li>Predict ligand-induced NMR (Nuclear Magnetic Resonance) Chemical Shift Perturbation on protein.
+
+<li>Study large biomolecules of 500 or 15,000 atoms with QM.
+
+<li>Understand the PairWise Energy Decomposition of protein-ligand complex interaction.
+
+<li>Leverage the accuracy and speed of divide & conquer linear-scaling QM.
+</ul>
 
 <h2><a name="install"></a>Installation</h2>
 <p>
@@ -896,7 +914,10 @@ electrons in the system. The cross over point is at approximately 450 atoms.
 
 <h3><a name="nmr-intro"></a>Introduction</h3>
 <p>
-<todo> Lance, write intro to NMRScore. </todo>
+
+<p>The patent pending NMRScore algorithm is a ligand binding mode scoring function based upon DivCon's NMR chemical shift perturbation prediction implementation. These CSP predictions are coupled with experimental CSP values and becuase CSP is exquisitely sensitive on the orientation of the ligand inside the binding pocket, NMRScore offers an accurate and straightforward approach to score different poses. </p>
+
+<p>It has been <a href="http://www.quantumbioinc.com/publications/show/A-Critical-Assessment-of-the-Performance-of-Protein-Ligand-Scoring-Functions-Based-on-NMR-Chemical-Shift-Perturbations" target="_blank">demonstrated</a> that the overall performance of NMRScore is superior to that of energy-based scoring functions associated with docking programs in ranking native-like structures and differentiating these poses from decoy poses. Therefore, by combining conventional docking programs with NMRScore results in an approach that can robustly determine the binding site structure for a protein-ligand complex without having to resort to an expensive, time-comsuming xray refinement.</p>
 
 <h3><a name="nmr-workflow"></a>Workflow</h3>
 <p>
@@ -965,8 +986,11 @@ radius from the ligand are preserved.  You always have the option of
 returning to original receptor by clicking on the <w>Original</w> button.
 
 <h3><a name="nmr-csp"></a>Chemical Shift Atoms</h3>
-<p>
-<todo> Lance, write explanation of CSP. </todo>
+
+<p>In the study of protein/ligand interactions, one of the most common experimental methods involves the determination of the chemical shift perturbation associated with ligand binding. In this experiment, the shifts associated with the ligand atoms (hydrogen and carbon) in both their bound and their unbound states are determined. This shifts provide insight into the parts of the ligand that are most affected by the binding site environment.</p>
+
+<p>Recent <a href="http://www.quantumbioinc.com/publications/show//Support/Publications/A-Fast-QM-MM-Quantum-Mechanical-Molecular-Mechanical-Approach-to-Calculate-Nuclear-Magnetic-Resonance-Chemical-Shifts-for-Macromolecules" target="_blank">advances</a> in linear scaling quantum mechanics have provided computational chemists with the means to predict these shifts on a routine basis.</p>
+
 <h4><a name="nmr-csp-type"></a>Atom Type</h4>
 <p>
 There are currently three choices of atom types for the ligand atoms to undergo
@@ -1001,6 +1025,10 @@ NMRScore.
 <todo> Lance, describe what the guess is.</todo>
 <p>
 <todo>How is it generated and how we are going to find it.</todo>
+
+
+<p>Lance: Good question! I'll have to talk to Roger and see where we stand with this. We do have a ticket to address this problem.</p>
+
 
 <h3><a name="nmr-results"></a>Results</h3>
 <p>
@@ -1121,7 +1149,8 @@ There are several post analysis datasets that you can select:
 </ul>
 
 More will become available in the near future.
-<h4><a name="pwd-analysis-view"></a>View</h4>
+
+<h4><a name="pwd-analysis-view"></a>View</h4>
 <p>
 Click on the <w>View</w> button to view the selected dataset.  If the
 Interaction or SAR dataset is selected, the surface of the protein pocket
