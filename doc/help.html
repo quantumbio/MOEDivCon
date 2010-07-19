@@ -1108,10 +1108,10 @@ Heat Map and for the PLS analysis to generate the SAR Heat Map.
 <h3><a name="qms-results"></a>Results</h3>
 
 <p>
-The QMScore method has been validated on numerious structures and systems both
-in academia and industry. The interested reader is invited to <a
+The <a
 href="http://www.quantumbioinc.com/publications?tag=qmscore"
-TARGET="_blank">access and read</a> the various papers on the subject. 
+TARGET="_blank">QMScore method</a> has been validated on numerious structures and systems both
+in academia and industry.
 </p>
 
 <p>
@@ -1137,8 +1137,32 @@ QMScore Thermodynamic Cycle
 <h2><a name="pwd"></a>MOEDivCon QB-PWD Analysis</h2>
 
 <h3><a name="pwd-intro"></a>Introduction</h3>
+
 <p>
-<todo> Lance, write the intro to QB-PWD analysis.</todo>
+The PairWise energy Decomposition (PWD) scheme for evaluating the electrostatic
+interaction energy uses the neglect of nonbonded differential overlap (NNDO)
+formalism applied to study protein-ligand interaction using the linear scaling
+QM methods implemented within the DivCon package. This scheme permits the
+calculation of the self-energy of the atom, core- electron interactions,
+electron-electron repulsion, and exchange between atoms from the molecular
+electron density.
+</p>
+<p>
+Simulations using PWD yield raw atom-by-atom pairwise values which can be
+difficult to interpret. Therefore, included with the tool is a receptor-based
+QSAR method, comparative binding energy analysis (COMBINE), which is able to
+process the data using statistical methods and provide a better picture of what
+is happening within the active site. This method coupled with the semi-empirical
+(SE) QM implementation within DivCon is referred to in the literature as
+SE-COMBINE.
+</p>
+<p>
+In addition to QM energy terms, molecular mechanics (MM) pairwise energy terms
+are also provided derived from the Lennard-Jones potential. These terms, broken
+into dispersive/attractive, repulsive, and electrostatics. When determining the
+best scoring function for a system (see below), sometimes the best function is
+one that combines the best of both QM and MM methods.
+</p>
 
 <p>
 <warn>The current implementation of QB-PWD analysis can only handle 
@@ -1221,18 +1245,21 @@ data in persistent storage.
 
 <h4><a name="pwd-options-scorefun"></a>Scoring Function</h4>
 <p>
-<todo> Lance, write the description to the Scoring function and give a short
-description of each energy term.</todo>
-
-<ul>QM:
-  <li> E_AB:  ...
-  <li> E_ABp:  ...
-  <li> E_ABc:  ...
+The SE-COMBINE-based scoring functions utilize a mixture of the SE-QM PWD methods of DivCon, and the MM PWD terms available from the Lennard-Jones potential along with electrostatics terms available from Coulomb's law. These physical terms are combined with the coefficients derived from the Partial Least Squares (PLS) to yield the overall scoring function.
+</p>
+<p>
+Note: when using the MOE interface, the MM terms provided are calculated using the currently selected MM force field within the MOE interface.
+</p>
+<ul>The terms of the QM and QM+MM scoring function(s) are broken down into the following QM elements:
+    <li> E_AB:  the exchange term contributes negatively to binding and is therefore a positive indicator of favorability.
+    <li> E_ABp:  the electron-electron repulsion term contributes positively to binding and is therefore a negative indicator of favorability.
+    <li> E_ABc:  the interactions between the core electrons.
 </ul>
-<ul>MM:
-  <li> E_R6:  ...
-  <li> E_R12: ...
-  <li> E_ELE:  ...
+
+<ul>The terms of the MM and QM+MM scoring function(s) are broken down into the following MM elements:
+    <li> E_R6:  The r^6 term corresponds to the dispersive/attractive term of the Lennard-Jones potential.
+    <li> E_R12: The r^12 term from the Lennard-Jones potential represents repulsion.
+    <li> E_ELE:  Molecular mechanics electrostatics are represented using Coulomb's law along with MM charges.
 </ul>
 
 <h4><a name="pwd-options-residues"></a>Residues</h4>
