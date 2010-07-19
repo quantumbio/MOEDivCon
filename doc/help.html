@@ -1044,12 +1044,17 @@ NMRScore.
 
 <h4><a name="nmr-options-guess"></a>Guess</h4>
 <p>
-<todo> Lance, describe what the guess is.</todo>
+<p> Perhaps the most useful methodology for speeding up DivCon is the use of the a
+guess <a href="http://en.wikipedia.org/wiki/Density_matrix"
+TARGET=_blank>density matrix<a/> derived from a previous QM characterization of
+the same or similar protein structure. Whenever a calculation is performed, the
+final density matrix of the simulation is saved to the HDF5 file. Without a
+guess density matrix a unit matrix is used, so the addition of a guess can make
+a signicant impact on the calculation. In addition to the density matrix, the
+current value of the shift value in eV is also saved. </p>
 <p>
-<todo>How is it generated and how we are going to find it.</todo>
+<todo>Roger, describe how is it generated and how we are going to find it.</todo>
 
-
-<p>Lance: Good question! I'll have to talk to Roger and see where we stand with this. We do have a ticket to address this problem.</p>
 
 
 <h3><a name="nmr-results"></a>Results</h3>
@@ -1101,21 +1106,32 @@ Calculate the pairwise decomposition data needed for generating the Interaction
 Heat Map and for the PLS analysis to generate the SAR Heat Map.
 
 <h3><a name="qms-results"></a>Results</h3>
-<p>
-<todo> Lance, describe how QMSCore is calculated and give a short
-description of each factor in formula.</todo>
 
-<ul>QMScore: ...
-  <li> dHf_g:  ...
-  <li> Solv_elec:  ...
-  <li> LJ_att:  ...
-  <li> S_solv:  ...
-  <li> S_vib:  ...
-  <li> E_eInt:  ...
-  <li> MRMScore:  ...
-  <li> E_stericMRM:  ...
-  <li> E_elecMRM:  ...
-  <li> E_solvMRM:  ...
+<p>
+The QMScore method has been validated on numerious structures and systems both
+in academia and industry. The interested reader is invited to <a
+href="http://www.quantumbioinc.com/publications?tag=qmscore"
+TARGET="_blank">access and read</a> the various papers on the subject. 
+</p>
+
+<p>
+<object id="ThermodynamicCycle" title="QMScore Thermodynamic Cycle"
+data="images/thermodynamiccyle.png" type=image/png>
+QMScore Thermodynamic Cycle
+</object>
+</p>
+
+<ul>
+    <li> dHf_g: Gas phase heat of formation. 
+    <li> Solv_elec: The electrostatic portion of the solvation free energy. 
+    <li> LJ_att:  Dispersion interactions from the attractive/dispersive part of the classical Lennard-Jones interaction potential.
+    <li> S_solv:  Solvent component of the entropic contribution to binding.
+    <li> S_vib:  Conformational component of the entropic contribution to binding.
+    <li> E_eInt:  Electronic Interaction Energy
+    <li> MRMScore:  Molecular Recognition Model score.
+    <li> E_stericMRM:  Steric component of the Molecular Recognition Model score.
+    <li> E_elecMRM:  Electrostatic component of the Molecular Recognition Model score.
+    <li> E_solvMRM:  Pairwise solvation component of the Molecular Recognition Model score.
 </ul>
 
 <h2><a name="pwd"></a>MOEDivCon QB-PWD Analysis</h2>
