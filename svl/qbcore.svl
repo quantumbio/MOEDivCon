@@ -2016,7 +2016,7 @@ global function qb_InitCorePanel [wkey, status, defaults]
 
     status.prevwd = defaults.workdir;
     WindowSetData [wkey, dropfirst defaults];
-    WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0],
+    WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1],
         allposes: [sensitive: 0],
         recbox: [sensitive: 0], recdb: [allowBlank: 1],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
@@ -2845,7 +2845,7 @@ endfunction
  *
  *                          qb_UpdateCorePanel
  *
- *  Initialize the core panel window.
+ *  Update the core panel window.
  *
  ****************************************************************************/
 global function qb_UpdateCorePanel [wkey, status, coreopts]

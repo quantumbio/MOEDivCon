@@ -482,8 +482,6 @@ local function CreateSurfaceMap [restokens]
     local dist = CalcDist [restokens, recatoms, ligatoms];
     dist = dist / 2;
 
-write ['Dist:  {}\n', dist];//DEBUG
-
     local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
     local gridopt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
         clipmode: 0];
@@ -953,11 +951,11 @@ endfunction
 local function ShowTable [data, postscript]
 
     local function writeNfield [nf]
-        return twrite ['{n:10.5f}', nf];
+        return twrite ['{n:15.5f}', nf];
     endfunction
 
     local function writeTfield [tf]
-        return twrite ['{t:10}', tf];
+        return twrite ['{t:15}', tf];
     endfunction
 
     local [title, [colNames, rowdata]] = data;
