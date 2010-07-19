@@ -1434,7 +1434,25 @@ The number of ticks to display on the color scale showing the values
 represented by the colors.
 
 <h2><a name="trouble"></a>Troubleshooting</h2>
-<todo>Are there more troubleshooting items to add?</todo>
+
+<todo>
+Are there more troubleshooting items to add?
+</todo>
+
+<p>
+<todo>Daren, we should probably find a place for this one. It looks like most of the trouble shooting here is for trouble shooting problems within the integration. We may want to make a separarate section for hints. Here is a hint:</todo>
+</p>
+<li> <p><prob>I observe "atomic fusion" upon completion of a MOE minimization.</prob></p>
+<p><sol>
+"Atomic fusion" or the movement of two atoms (usually
+protons) on top of each other has been observed when using the OPLS-AA force
+field within MOE. The problem is related to the fact that in OPLS-AA, polar
+hydrogens have zero van der Waals radii and that the default interior dielectric
+of the protein is 1. The problem can be addressed by turning on Born solvation
+at the start of the minimization. Unfortunately, there doesn't seem to be a way
+to fix the problem once it has already occured. Instead, you will need to go
+back to the original structure and re-optimize it.
+</sol></p>
 
 We list here potential problems using the MOEDivCon integration and possible
 solutions.  If your problem is not listed here or the proposed solution
