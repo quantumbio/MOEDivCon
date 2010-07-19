@@ -629,7 +629,7 @@ local function GetAnalData [dbpath, title, type]
     //  Create abbreviated names for heat map and check residues
     if type === 'sar' or type === 'inter' then
         local [resnames, ligdata] = data;
-        local resabbrevs = apt tok_drop [resnames, 3];
+        local resabbrevs = apt tok_keep [resnames, 3];
         local lignames = app first ligdata;
         local ligabbrevs = apt tok_keep [lignames, -3];
         local ligvals = app second ligdata;
