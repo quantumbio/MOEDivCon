@@ -30,6 +30,7 @@
 #set main    'qb_QMScoreMPI'
 
 function qb_CheckChgTestDivConMols;
+function qb_GetDivConStatus;
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetQMSEnv;
@@ -126,6 +127,13 @@ global function qb_QMScoreMPI [dbpath]
         local recchg;
         rowcnt = rowcnt + 1;
 
+        local oldstatus = qb_GetDivConStatus [dbkey, rowkey];
+        if  eqL ["Success", keep [oldstatus, 7]] then
+            write ['Skipping on success pose {} of {}\n', rowcnt, nrows];
+            fwrite [stdin, '{n:}\n', 0];            //  skipping
+            continue;
+        endif
+
         coreopts.task = rowcnt;
         local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
 
@@ -141,8 +149,6 @@ global function qb_QMScoreMPI [dbpath]
                 status.notforced, status.notforced, status.notforced,
                 coreopts.testH, coreopts.testMM, 'qms',
                 HAM_KEYS (coreopts.ham)];
-
-write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
 
         if alltrue [recok, recchgok, ligok, ligchgok] then
             numokay = numokay + 1;
@@ -227,8 +233,9 @@ write ['R {}, Rc {}, L {}, Lc {}\n', recok, recchgok, ligok, ligchgok];//DEBUG
             qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
             local sucmess = "Success";
             if not isnull  warnings (rowcnt)
+                    and neL [warnings (rowcnt), '']
                     and neL [warnings (rowcnt), '\n'] then
-write ['Warning: {}\n', warnings(rowcnt)];//DEBUG
+
                 sucmess = cat [sucmess, "-warnings!\n", string warnings (rowcnt)];
             else
                 sucmess = cat [sucmess, "\n"];
@@ -244,16 +251,13 @@ write ['Warning: {}\n', warnings(rowcnt)];//DEBUG
                 result_ith, numokay];
 
             [[return_statement]] = fread [stdout, '{c:*}'];
-print return_statement;//DEBUG
             if neL [return_statement, "DivCon done."] then
                 divconerrmess = cat [divconerrmess, return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
-print return_statement;//DEBUG
             endif
             while neL [return_statement, "DivCon done."] loop
                 divconerrmess = cat [divconerrmess, "\n", return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
-print return_statement;//DEBUG
             endloop;
 
             fwrite [stdin, '{c:}\n', 'Ok'];

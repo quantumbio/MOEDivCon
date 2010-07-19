@@ -93,7 +93,7 @@ const CORE_OPT_DEFAULTS =
     ['task',         0             ],
     ['mode',         'One-to-One'  ],
     ['allposes',     0             ],
-    ['cwd',          0             ],
+    ['cwd',          1             ],
     ['workdir',      '/tmp'        ],
     ['scoredb',      'qbscore.mdb' ],
     ['recdb',        ''            ],
@@ -523,50 +523,6 @@ local function AtomOverlap [bigset, littleset]
         badpairs = badpairs | ok;
     endif
 
-    //  Ignore HBonds pairs
-    local [donors, acceptors] = pro_HydrogenBonds uniq cat [bigset, littleset];
-    local bp, mkeep = [];
-    for bp in badpairs loop
-/*
-//DEBUG
-            local residues = oParent bp;
-            local rnames = rName residues;
-            local rnums = rNumber residues;
-            local ruids = rUID residues;
-            local anames = aName bp;
-            local indices = aNumber bp;
-
-            write ['{}: {} in {}: {} {} is {}A from {}: {} in {}: {} {}\n', 
-                    indices(1), anames(1), rnums(1), 
-                    rnames(1), ruids(1),  aDist bp, indices(2), 
-                    anames(2), rnums(2), rnames(2),
-                    ruids(2)];
-//DEBUG
-*/
-
-print uniq aElement donors;//DEBUG
-print uniq aElement acceptors;//DEBUG
-
-        if ltL [aDist bp, CLASH] then
-            mkeep = append [mkeep, 1];
-        else
-            local [latm, ratm] = bp;
-            local ldidx = first indicesof [latm, donors];
-            local rdidx = first indicesof [ratm, donors];
-            local laidx = [], raidx = [];
-            if isnull ldidx and isnull rdidx then
-                mkeep = append [mkeep, 1];
-print mkeep;
-            elseif not isnull ldidx then
-                mkeep = append [mkeep,
-    not anytrue eqE [ratm, acceptors [ldidx]]];
-            else
-                mkeep = append [mkeep, not anytrue eqE [latm, acceptors [rdidx]]];
-            endif
-        endif
-    endloop
-
-    badpairs = badpairs | mkeep;
     return badpairs;
 endfunction
 
@@ -1841,6 +1797,19 @@ global function qb_GetDefaultsStatus []
 endfunction
 
 /****************************************************************************
+ *                          qb_GetDivConStatus
+ *
+ *  Save the error/status message for the given row.
+ *
+ ****************************************************************************/
+global function qb_GetDivConStatus [dbkey, rowkey]
+
+    local [status] = db_ReadFields [dbkey, rowkey, [STATUS_FIELD]];
+
+    return status;
+endfunction
+
+/****************************************************************************
  *                          qb_GetElemIndices
  *
  *  For the given molecule, get the indices of the H, C, or all atoms.
@@ -2204,15 +2173,11 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     local handshake, resset, residue, atom, xyz, idx;
     xyz = tr aPos recatoms;
     fwrite [outpipe, '{n:}\n', length recressets];
-write ['Num receptors:  {n:}\n', length recressets];//DEBUG
     for resset in recressets loop
         fwrite [outpipe, '{n:}\n', length resset];
-write ['Num residues:  {n:}\n', length resset];//DEBUG
         for residue in resset loop
             fwrite [outpipe, '{c:} {n:} {n:}\n', 
                 rName residue, rUID residue, rAtomCount residue];
-write ['    {c:} {n:} {n:}\n', 
-    rName residue, rUID residue, rAtomCount residue];//DEBUG
             for atom in cat rAtoms residue loop
                 idx = aNumber atom;
                 fwrite [outpipe, '{c:} {c:} {c:}\n',
@@ -2231,15 +2196,11 @@ write ['    {c:} {n:} {n:}\n',
     //  collection, but we treat all collections similarly.
     xyz = tr aPos ligatoms;
     fwrite [outpipe, '{n:}\n', length ligressets];
-write ['Num ligs:  {n:}\n', length ligressets];//DEBUG
     for resset in ligressets loop
         fwrite [outpipe, '{n:}\n', length resset];
-write ['Num residues:  {n:}\n', length resset];//DEBUG
         for residue in resset loop
             fwrite [outpipe, '{c:} {n:} {n:}\n', 
                 rName residue, rUID residue, rAtomCount residue];
-write ['    {c:} {n:} {n:}\n', 
-    rName residue, rUID residue, rAtomCount residue];//DEBUG
             for atom in cat rAtoms residue loop
                 idx = aNumber atom - length recatoms;
                 fwrite [outpipe, '{c:} {c:} {c:}\n',
