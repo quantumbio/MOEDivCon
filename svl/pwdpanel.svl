@@ -563,10 +563,13 @@ local function FindResidue [restok]
 
     if MOE_BATCH then return [0, []]; endif
 
+    local rnidx = indexof ["1234567890", string restok];
+    rnidx = rnidx | rnidx <> 0;
+    rnidx = (min rnidx) - 1;
     local residx = 0, resatms = []; 
     local residues = Residues [];
     local resnames = rName residues;
-    local rname = tok_keep [restok, 3];
+    local rname = tok_keep [restok, rnidx];
     if rname === 'CYS' then
         rname = ['CYS', 'CYX'];
     elseif rname === 'HIS' then
@@ -575,7 +578,7 @@ local function FindResidue [restok]
 
     local indices = cat indicesof [rname, resnames];
     if length indices > 0 then
-        local rnum = atoi tok_drop [restok, 3];
+        local rnum = atoi tok_drop [restok, rnidx];
         local idx_i = indexof [rnum, rUID residues [indices]];
         if idx_i > 0 then
             residx = indices (idx_i);
@@ -720,8 +723,12 @@ local function MatchResidue [restok, restokset]
 
     local residx = indexof [restok, restokset];
     if residx === 0 then
-        local rname = tok_keep [restok, 3];
-        local rnum = atoi tok_drop [restok, 3];
+        local rnidx = indexof ["1234567890", string restok];
+        rnidx = rnidx | rnidx <> 0;
+        rnidx = (min rnidx) - 1;
+
+        local rname = tok_keep [restok, rnidx];
+        local rnum = atoi tok_drop [restok, rnidx];
         if rname === 'CYX' then
             restok = twrite ['{}{}', 'CYS', rnum];
         elseif rname === 'HID' or rname === 'HIE' or rname === 'HIP' then
