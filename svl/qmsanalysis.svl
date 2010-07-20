@@ -100,7 +100,7 @@ global function qb_PWDAnalysis [qmsfilename]
 
     fwrite [stdin, '{n:}\n', numpairs];
     for idx = 1, numpairs, 1 loop
-        if coreopts === 'Many-to-Many' then
+        if coreopts.mode === 'Many-to-Many' then
             fwrite [stdin, '{c:}\n', recmols(idx)(1)(MOL_NAME)];
         else
             fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
