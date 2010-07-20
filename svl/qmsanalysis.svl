@@ -65,7 +65,7 @@ global function qb_PWDAnalysis [qmsfilename]
 
 
     local recmols = [];
-    if coreopts === 'Many-to-Many' then
+    if coreopts.mode === 'Many-to-Many' then
         local [recfld, rcf] = qb_GetRecFields [];
         recmols = db_ReadColumn [qmsdbkey, recfld];
     endif
