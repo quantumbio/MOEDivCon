@@ -918,7 +918,7 @@ endfunction
 /****************************************************************************
  *                          SaveOptions
  *
- *  Save the analysis data in the QMScore database.
+ *  Save the analysis options in the QMScore database.
  *
  *  Note:  it is assumed that this function is called from a child process
  *  and will exit on an error.
@@ -939,7 +939,6 @@ local function SaveOptions [dbpath, options]
     db_Close dbkey;
 
 endfunction
-
 
 /****************************************************************************
  *                          ShowTable
