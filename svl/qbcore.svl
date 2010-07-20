@@ -1306,7 +1306,7 @@ local function UpdateMode [wkey, vals, status]
         WindowSetAttr [wkey, [allposes: [sensitive: 0],
             recbox: [sensitive: 0], recdb: [allowBlank: 1], 
             posebox: [sensitive: 0], posedb: [allowBlank: 1], 
-            panel:[sensitive: [1,1,1,1]], calcchg: [sensitive: 1],
+            panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
             chgbox: [sensitive: 1], recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
         vals = qb_ResetLigand [wkey, vals];
@@ -1315,7 +1315,7 @@ local function UpdateMode [wkey, vals, status]
         WindowSetAttr [wkey, [allposes: [sensitive: 1],
             recbox: [sensitive: 0], recdb: [allowBlank: 1],
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
-            panel:[sensitive: [1,1,1,1]], calcchg: [sensitive: 1],
+            panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
             chgbox: [sensitive: 1], recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0], poseschg: [sensitive: 1]]];
         SetChargeStatus [wkey, status];
@@ -1323,7 +1323,7 @@ local function UpdateMode [wkey, vals, status]
         WindowSetAttr [wkey, [allposes: [sensitive: 0],
             recbox: [sensitive: 1], recdb: [allowBlank: 0],
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
-            panel:[sensitive: [0,1,1,1]], calcchg: [sensitive: 0],
+            panel:[sensitive: [0,1,1,1,1]], calcchg: [sensitive: 0],
             chgbox: [sensitive: 0], recchg: [allowBlank: 1],
             ligchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
         ClearChargeStatus [wkey];
@@ -2314,6 +2314,33 @@ global function qb_SaveEnvAnal [dbkey, analopts]
 endfunction
 
 /****************************************************************************
+ *                          qb_SaveOptions
+ *
+ *  Save the core and application options in the score database.
+ *
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
+ *
+ ****************************************************************************/
+global function qb_SaveOptions [coreopts, appopts]
+
+    if MOE_BATCH then return []; endif
+
+    if neL [ftype coreopts.scoredb, 'file']
+            or neL [fext coreopts.scoredb, 'mdb'] then
+        Warning twrite ['{}\n is not a MOEDivCon Score database.',
+            coreopts.scoredb];
+        exit [];
+    endif
+
+    local dbkey = db_Open [coreopts.scoredb, 'read-write'];
+    db_SetEnv [dbkey, COREOPTS, twrite ['{v}', coreopts]];
+    db_SetEnv [dbkey, APPOPTS, twrite ['{v}', appopts]];
+    db_Close dbkey;
+
+endfunction
+
+/****************************************************************************
  *                          qb_SetAppStatus
  *
  *  Change the application in the GUI status.
@@ -2638,7 +2665,7 @@ endfunction
  ****************************************************************************/
 global function qb_TagCoreVals [vals]
 
-    vals.scoredb = fabsname vals.scoredb;
+    vals.scoredb = vals.scoredb;
     vals.recdb = select ['', fabsname vals.recdb, vals.recdb === ''];
     vals.posedb = select ['', fabsname vals.posedb, vals.posedb === ''];
 
