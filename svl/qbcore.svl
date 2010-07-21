@@ -1513,7 +1513,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
 
             if vals.mode === 'Many-to-Many' then
                 Message [msgkey, 'Running tests ... done.'];
-                sleep 5;
+                sleep 3;
                 exit [];
             else
                 if [recok and ligok and recmess === '' and ligmess === ''] then
@@ -1524,7 +1524,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
                         exit [];
                     else
                         Message [msgkey, 'Running tests ... done.'];
-                        sleep 5;
+                        sleep 3;
                         exit [];
                     endif
                 else
@@ -1568,7 +1568,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
             task_prio 0;
 
             status = CheckCharge [wkey, status, vals.recchg,
-                vals.ligchg, neL [vals.mode, 'Many-to-Many']];
+                vals.ligchg, 1];
             exit [];
         endif
 
@@ -1582,7 +1582,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
             task_prio 0;
 
             status = CheckCharge [wkey, status, vals.recchg,
-                vals.ligchg, neL [vals.mode, 'Many-to-Many']];
+                vals.ligchg, 1];
             exit [];
         endif
 
@@ -2087,7 +2087,6 @@ global function qb_LoadCoreScoreDB [dbpath, type]
     endif
 
     local [rec, lig, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
-
 
     if coreopts.mode === 'Many-to-Many' then
         local recchg, ligchg;
@@ -2879,7 +2878,7 @@ global function qb_UpdateCorePanel [wkey, status, coreopts]
 
     WindowSetData [wkey, dropfirst coreopts];
     status = CheckCharge [wkey, status, coreopts.recchg, coreopts.ligchg,
-        neL [coreopts.mode, 'Many-to-Many']];
+        1];  // Now that MtoM complexes are loaded, always update charge
     UpdateMode [wkey, coreopts, status];
     status.prevwd = UpdateCWD [wkey, coreopts.cwd, coreopts.workdir, 
         coreopts.workdir];

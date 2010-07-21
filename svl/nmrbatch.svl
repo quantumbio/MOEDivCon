@@ -33,6 +33,7 @@ function qb_GetAnalysisData;
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetNMRSEnv;
+function qb_IsModeManyToMany;
 function qb_SaveDivConStatus;
 function qb_SaveNMRScore;
 function qb_NMRScore;
@@ -84,7 +85,7 @@ global function qb_NMRScoreBatch [dbpath]
             coreopts.task = rowcnt;
             local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
 
-            if coreopts.mode === 'Many-to-Many' then
+            if qb_IsModeManyToMany coreopts then
                 [recmols, recchg] = db_ReadFields [dbkey, rowkey, recflds];
             else
                 recchg = coreopts.recchg;
