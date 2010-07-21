@@ -31,6 +31,7 @@ function qb_GetEnvAnal;
 function qb_GetCoreEnv;
 function qb_GetPoseFields;
 function qb_GetRecFields;
+function qb_IsModeManyToMany;
 function qb_SaveAnalysisData;
 
 const ENGERGIES =
@@ -61,17 +62,32 @@ global function qb_PWDAnalysis [qmsfilename]
     local pwdopts = qb_GetEnvAnal qmsdbkey;
     local numpairs = db_nEntries qmsdbkey;
 
-    //  NOTE:  Rscript can handle only one ligand residue
-
-
     local recmols = [];
-    if coreopts.mode === 'Many-to-Many' then
+    if qb_IsModeManyToMany coreopts then
         local [recfld, rcf] = qb_GetRecFields [];
         recmols = db_ReadColumn [qmsdbkey, recfld];
     endif
 
     local [ligfld, lcf] = qb_GetPoseFields [];
     local ligmols = db_ReadColumn [qmsdbkey, ligfld]; 
+
+    //  NOTE:  Rscript can handle only one ligand residue - TEST!
+    local lm;
+    for lm in ligmols loop
+        if length lm(2)(MOL_CHAIN_NAME) > 1 then
+            db_Close qmsdbkey;
+            exe_kill  [process_key, 0];
+            exe_kill  process_key;
+            exe_close process_keys;
+            return "Ligands/poses can have only one chain.";
+        elseif lm(2)(MOL_CHAIN_NRES)(1) > 1 then
+            db_Close qmsdbkey;
+            exe_kill  [process_key, 0];
+            exe_kill  process_key;
+            exe_close process_keys;
+            return "Ligands/poses can have only one residue.";
+        endif
+    endloop
 
     local activities = db_ReadColumn [qmsdbkey, pwdopts.expact_hdr]; 
     local energies = ENGERGIES | [pwdopts.sf_e_ab, pwdopts.sf_e_abp,
@@ -100,7 +116,7 @@ global function qb_PWDAnalysis [qmsfilename]
 
     fwrite [stdin, '{n:}\n', numpairs];
     for idx = 1, numpairs, 1 loop
-        if coreopts.mode === 'Many-to-Many' then
+        if qb_IsModeManyToMany coreopts then
             fwrite [stdin, '{c:}\n', recmols(idx)(1)(MOL_NAME)];
         else
             fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];

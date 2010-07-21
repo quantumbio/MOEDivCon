@@ -36,6 +36,7 @@ function qb_GetRecFields;
 function qb_GetQMSEnv;
 function qb_GetWhich;
 function qb_HamSetsInit;
+function qb_IsModeManyToMany;
 function qb_PassBackbone;
 function qb_SaveDivConStatus;
 function qb_SaveQMScore;
@@ -137,7 +138,7 @@ global function qb_QMScoreMPI [dbpath]
         coreopts.task = rowcnt;
         local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
 
-        if coreopts.mode === 'Many-to-Many' then
+        if qb_IsModeManyToMany coreopts then
             [recmol, recchg] = db_ReadFields [dbkey, rowkey, recflds];
         else
             recchg = coreopts.recchg;
