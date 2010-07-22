@@ -231,6 +231,11 @@ local function RunCalc [dbkey]
     local rowkey = first db_Entries [dbkey];
     local [recset, ligand, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
 
+    local dbpath = fabsname db_Filename dbkey;
+    local perpath = fpath dbpath;
+    local pertail = fbase ftail dbpath;
+    local perfile = twrite ['{}/{}.h5', perpath, pertail];
+
     local workdir;
     if coreopts.cwd === 1 then
         workdir = getenv 'PWD';
@@ -239,12 +244,13 @@ local function RunCalc [dbkey]
     endif
 
     coreopts.workdir = workdir;
+    write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
     local start = clock [];//DEBUG
 
-    local [results, errmess] = qb_QMScore [recset, ligand, coreopts, qmsopts,
-        status.notforced];
+    local [results, errmess] = qb_QMScore [recset, ligand, perfile, 
+        coreopts, qmsopts, status.notforced];
 
     local finish = clock [];//DEBUG
     local secs = round (finish - start);
@@ -313,6 +319,12 @@ global function RunOneToManyCalc [oldkey]
     local [recmols, l, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
 
     local msgkey = 0;
+
+    local dbpath = fabsname db_Filename dbkey;
+    local perpath = fpath dbpath;
+    local pertail = fbase ftail dbpath;
+    local perfile = twrite ['{}/{}.h5', perpath, pertail];
+
     local workdir;
     if coreopts.cwd === 1 then
         workdir = getenv 'PWD';
@@ -321,6 +333,7 @@ global function RunOneToManyCalc [oldkey]
     endif
 
     coreopts.workdir = workdir;
+    write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
     //  For each ligand pose in the database, calculate QM score.
@@ -336,8 +349,8 @@ global function RunOneToManyCalc [oldkey]
         coreopts.task = rowcnt;
         local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
         coreopts.ligchg = posechg;
-        local [results, errmess] = qb_QMScore [recmols, posemol, coreopts,
-            qmsopts, status.notforced];
+        local [results, errmess] = qb_QMScore [recmols, posemol, perfile,
+            coreopts, qmsopts, status.notforced];
 
         if results === [] then
             if errmess === [] or errmess === '' then
@@ -476,6 +489,7 @@ global function qb_QMScoreSetupPanel []
 
                 if second task_fork [statics:'share'] === 'child' then
 
+                    task_settitle [-1, 'MOEDivCon QMScore Run'];
                     status = qb_VerifyDivCon [wkey, status, vals];
                     if not status.verified then exit []; endif
 

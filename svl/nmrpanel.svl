@@ -559,7 +559,7 @@ atombound = rep [1.050, num];
                 ViewSave 1;
                 orignuc = aNucleusLook ligatoms;
                 origbnd = aBondLook ligatoms;
-                if posemols === [] and qb_IsModeOneToMany vals then
+                if posemols === [] and qb_IsModeOneToMany [vals] then
                     [posemols, errmess] = qb_GetPoses vals;
                     if posemols === [] then
                         Warning errmess;

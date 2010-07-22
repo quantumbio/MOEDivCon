@@ -138,7 +138,7 @@ global function qb_QMScoreMPI [dbpath]
         coreopts.task = rowcnt;
         local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
 
-        if qb_IsModeManyToMany coreopts then
+        if qb_IsModeManyToMany [coreopts] then
             [recmol, recchg] = db_ReadFields [dbkey, rowkey, recflds];
         else
             recchg = coreopts.recchg;
