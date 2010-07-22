@@ -63,7 +63,7 @@ global function qb_PWDAnalysis [qmsfilename]
     local numpairs = db_nEntries qmsdbkey;
 
     local recmols = [];
-    if qb_IsModeManyToMany coreopts then
+    if qb_IsModeManyToMany [coreopts] then
         local [recfld, rcf] = qb_GetRecFields [];
         recmols = db_ReadColumn [qmsdbkey, recfld];
     endif
@@ -116,7 +116,7 @@ global function qb_PWDAnalysis [qmsfilename]
 
     fwrite [stdin, '{n:}\n', numpairs];
     for idx = 1, numpairs, 1 loop
-        if qb_IsModeManyToMany coreopts then
+        if qb_IsModeManyToMany [coreopts] then
             fwrite [stdin, '{c:}\n', recmols(idx)(1)(MOL_NAME)];
         else
             fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
