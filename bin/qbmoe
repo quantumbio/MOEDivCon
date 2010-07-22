@@ -38,6 +38,6 @@ else
     MOE_SVL_LOAD="${QBHOME}/svl:$MOE_SVL_LOAD"; export MOE_SVL_LOAD
 fi
 
-$MOEBIN $@ -
+$MOEBIN $@
 
 exit $?
