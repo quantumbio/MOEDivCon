@@ -94,7 +94,7 @@ const CORE_OPT_DEFAULTS =
     ['mode',         'One-to-One'  ],
     ['allposes',     0             ],
     ['cwd',          1             ],
-    ['workdir',      '/tmp'        ],
+    ['workdir',      ''            ],
     ['scoredb',      'qbscore.mdb' ],
     ['recdb',        ''            ],
     ['posedb',       ''            ],

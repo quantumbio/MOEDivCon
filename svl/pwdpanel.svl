@@ -488,31 +488,32 @@ local function CreateSurfaceMap [restokens]
 
     G_surface =
         [
-        title   : 'QB Heat Map',
-        class   : CLASS,
-        colorby : 'Constant',
-        colconst: 0xFFFFFF,            // White
-        surfdim : 3,
-        trans_f : 96,
-        trans_b : 96,
-        rec     : recatoms,
-        recpos  : aPos recatoms,
-        lig     : ligatoms,
-        ligpos  : aPos ligatoms,
-        ligidx  : 0,
-        ligmols : [],
-        origvw  : 7,
-        orignuk : '',
-        origbnd : '',
-        restok  : '',
-        resatms : [],
-        dist    : dist,
-        rad     : vdwR,
-        eps     : vdwE,
-        gridopt : gridopt,
-		fix     : 0,
-        gvtx    : [],
-        gobj    : []
+        title    : 'QB Heat Map',
+        class    : CLASS,
+        colorby  : 'Constant',
+        colconst : 0xFFFFFF,            // White
+        surfdim  : 3,
+        trans_f  : 96,
+        trans_b  : 96,
+        rec      : recatoms,
+        recpos   : aPos recatoms,
+        lig      : ligatoms,
+        ligpos   : aPos ligatoms,
+        ligidx   : 0,
+        ligmols  : [],
+        lignames : [],
+        origvw   : 7,
+        orignuk  : '',
+        origbnd  : '',
+        restok   : '',
+        resatms  : [],
+        dist     : dist,
+        rad      : vdwR,
+        eps      : vdwE,
+        gridopt  : gridopt,
+		fix      : 0,
+        gvtx     : [],
+        gobj     : []
         ];
 
     G_surface.gvtx = msurf_MolecularSurface [G_surface.recpos, 
@@ -703,15 +704,18 @@ local function LoadLigs [pwdfilename]
     local dbkey = db_Open [pwdfilename, 'read'];
 
     local ligmols = [];
+    local lignames = [];
     local rowkey = 0;
     local ligflds = qb_GetPoseFields [dbkey];
 
     while rowkey = db_NextEntry [dbkey, rowkey] loop
         local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
         ligmols = append [ligmols, ligmol];
+        lignames = append [lignames, ligmol(1)(MOL_NAME)];
     endloop
 
     G_surface.ligmols = ligmols;
+    G_surface.lignames = lignames;
     db_Close dbkey;
 
 endfunction
@@ -991,7 +995,9 @@ endfunction
  *  Replace the ligand in the MOE window with the given ligand.
  *
  ****************************************************************************/
-local function UpdateComplex [lignum]
+local function UpdateComplex [ligtok]
+
+    local lignum = indexof [ligtok, G_surface.lignames];
 
     if G_surface.ligidx === lignum then return; endif
     if length G_surface.lig === 0 then return; endif
@@ -1098,7 +1104,7 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
     endif
 
     ClearSurfaceMap G_surface.title;
-    UpdateComplex selrow;
+    UpdateComplex ligtok;
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
         mincut, maxcut, colors];
 
@@ -1209,7 +1215,7 @@ global function qb_QBPWDSetupPanel []
                 endif
 
                 //  Make sure first ligand is in MOE Window
-                UpdateComplex INITLIG;
+                UpdateComplex G_surface.lignames (INITLIG);
                 qb_HeatMapSetupPanel [pwddata (vals.analysis),
                     SIGNIFRES, 'qb_QBPWDSelectHandler', INITLIG, 1,
                     'qb_QBPWDCloseHandler'];

@@ -1,7 +1,7 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html>
 <head>
-<title>MOEDivCon Integration Suite Help</title>
+<title>MOEDivCon Integration Help</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
 <meta http-equiv="content-style-type" content="text/css" />
 <style>
@@ -95,7 +95,7 @@ QuantumBio Homepage
       </ol>
       <li><a href="#core-load">Load and Save</a>
       <li><a href="#core-clean">Log Files and Postexecution Cleanup</a>
-      <li><a href="#core-parallel">Batch and Parallel Execution</a>
+      <li><a href="#core-parallel">Parallel Execution</a>
       <ol  id=tocl>
         <li><a href="#core-parallel-mode">Parallel Mapping Mode</a>
         <li><a href="#core-parallel-moebatch">Running Moebatch</a>
@@ -141,6 +141,7 @@ QuantumBio Homepage
     <ol id=tocl>
       <li><a href="#pwd-intro">Introduction</a>
       <li><a href="#pwd-workflow">Workflow</a>
+      <li><a href="#pwd-align">Protein Alignment</a>
       <li><a href="#pwd-analysis">Analysis</a>
       <ol id=tocl>
         <li><a href="#pwd-analysis-view">View</a>
@@ -171,33 +172,34 @@ QuantumBio Homepage
   <li><a href="#trouble">Troubleshooting</a>
   <li><a href="#contact">Support Contact Information</a></ol>
 
-<h2><a name="intro"></a>Introduction</h2>
+<h2><a name="intro"></a>Introduction</h2>
 <p>
-
-<p>QuantumBio offers the DivCon Discovery Suite product line, providing solutions to achieve high accuracy, performance, and versatility for chemical characterization in drug discovery and development. The DivCon Discovery Suite is built on cutting-edge technology that utilizes precise quantum mechanical algorithms in a user-friendly format, providing the opportunity for faster results and reduced costs.</p>
-
-<p>QuantumBio offers the following lead optimization capabilities for your drug discovery investment:</p>
-
+QuantumBio offers the DivCon Discovery Suite product line, providing
+solutions to achieve high accuracy, performance, and versatility for chemical
+characterization in drug discovery and development. The DivCon Discovery Suite
+is built on cutting-edge technology that utilizes precise quantum mechanical
+algorithms in a user-friendly format, providing the opportunity for faster
+results and reduced costs.
+<p>
+QuantumBio offers the following lead optimization capabilities for your drug
+discovery investment:
 <ul>
-<li>Use QM based Scoring Function to predict protein-ligand binding affinities on a routine basis.
-
-<li>Build computational expensive QM descriptors for QSAR & ADME/Tox Models.
-
-<li>Study protein-ligand complexes (even those containing metals).
-
-<li>Predict ligand-induced NMR (Nuclear Magnetic Resonance) Chemical Shift Perturbation on protein.
-
-<li>Study large biomolecules of 500 or 15,000 atoms with QM.
-
-<li>Understand the PairWise Energy Decomposition of protein-ligand complex interaction.
-
-<li>Leverage the accuracy and speed of divide & conquer linear-scaling QM.
+<li> Use QM based Scoring Function to predict protein-ligand binding affinities
+     on a routine basis.
+<li> Build computational expensive QM descriptors for QSAR & ADME/Tox Models.
+<li> Study protein-ligand complexes (even those containing metals).
+<li> Predict ligand-induced NMR (Nuclear Magnetic Resonance) Chemical Shift
+     Perturbation on protein.
+<li> Study large biomolecules of 500 or 15,000 atoms with QM.
+<li> Understand the PairWise Energy Decomposition of protein-ligand complex
+     interaction.
+<li> Leverage the accuracy and speed of divide & conquer linear-scaling QM.
 </ul>
 
 <h2><a name="install"></a>Installation</h2>
 <p>
-The MOEDivCon Integration Suite is part of the QuantumBio Distribution,
-which is packaged in a
+The MOEDivCon Integration is part of the QuantumBio Discovery Suite 
+Distribution, which is packaged in a
 <inline>tar.gz</inline> file that uses the following naming convention
 <inline>quantumbio-&lt;platform&gt;-&lt;version&gt;.tar.gz</inline>.  Move
 the file where you wish to install the QuantumBio software (e.g.,
@@ -240,8 +242,6 @@ MOEDivCon SVL library under it.  For example:
 &gt; mkdir  ${HOME}/svl<br>
 &gt; ln -s  ${QBHOME}/svl  ${HOME}/svl/qb_lib.svl<br>
 </pre>
-
-<todo>Daren, rewrite for mpi implementation.</todo>
 
 <p><a name="install-path"></a>
 Before you can run MOEDivCon Suite using MOE or moebatch, 
@@ -313,14 +313,16 @@ data="images/qmscoredefault.png" type=image/png>
 QMScore Panel
 </object>
 <p>
-Ensure that the <w>Working Dir</w> is
+Unselect <w>CWD</w> and ensure that the <w>Working Dir</w> is
 <inline>/tmp</inline> (files for storing intermediate calculations and logs
  will be written here).  Press the <w>Run</w> button.  If all goes
 well, QMScore will execute using the receptor and ligand complex shown in
 the MOE Window.  After several seconds, the MOE database Viewer should open
 the QMScore database showing the results.  
 
-<todo>Change to reflect use of HDF5.</todo>Note that the DivCon temporary
+Note that DivCon creates an <inline>HDF5</inline> file with the same name 
+(extension <inline>.h5</inline>) and in the same directory as the QMScore 
+database, but the temporary
 files in <inline>/tmp</inline> are deleted when DivCon returns successfully.
 
 <p>
@@ -335,10 +337,9 @@ to do with a large protein receptor for which the execution time may take
 several hours.
 <h3><a name="start-onetomany"></a>One-to-Many Mode</h3>
 <p>
-<todo>Daren, rewrite for mpi implementation.</todo>
-
 The real power of MOEDivCon Integration Suite
-is the ability to use moebatch to execute tasks in parallel on a cluster
+is the ability to use moebatch and MPI to execute tasks in parallel on a 
+cluster
 and collate the results in a MOE database.  In this case, start MOE and open
 <inline>${QBHOME}/examples/simplecomplex.moe</inline> and select the MOE menu
 <w>Compute</w>&rarr;<w>Simulations</w>&rarr;<w>QuantumBio</w>&rarr;<w>QMScore</w>.
@@ -353,19 +354,11 @@ QMScore One-to-Many Options
 </object>
 <p>
 Press <w>Save</w> and verify that the charges and other data for the poses
-are okay (the
-<w>Status</w> field is empty).  Close the MOE Database Viewer and execute
-the following command from the directory where <inline>qmscore.mdb</inline>
-is located (assuming you have 4 processors on your workstation):
-<todo>Daren, rewrite for mpi implementation.</todo>
-<pre>
-&gt; moebatch -mpu 4 -exec "run ['qmsbatch.svl', ['qmscore.mdb']]" -exit
-</pre>
-Or alternatively, close the MOE Database Viewer and click the <w>Run</w> button
-and the jobs will be executed sequentially in the current MOE session (not
+are okay (the <w>Status</w> field is empty).  Close the MOE Database Viewer
+and click the <w>Run</w> button.
+The jobs will be executed sequentially in the current MOE session (not
 recommended for large proteins).
-<p>
-MOEDivCon will print out progress messages for one of the jobs.  When all
+MOEDivCon will print out progress messages.  When all
 four jobs are completed, open <inline>qmscore.mdb</inline> in the MOE
 Database Viewer.  You should see results similar to these:
 <p>
@@ -373,8 +366,8 @@ Database Viewer.  You should see results similar to these:
 data="images/qmscoredatabaseonetomany.png" type=image/png>
 QMScore Database
 </object>
-<todo>Daren, rewrite for mpi implementation.</todo>
-See the <a href="#core-parallel">Batch and Parallel Execution</a> section for
+
+See the <a href="#core-parallel">Parallel Execution</a> section for
 more information on executing moebatch in parallel on a cluster.
 <h3><a name="start-manytomany"></a>Many-to-Many Mode</h3>
 <p>
@@ -411,7 +404,7 @@ data="images/qmscoredatabasemanytomany.png" type=image/png>
 QMScore Database
 </object>
 <todo>Daren, rewrite for mpi implementation.</todo>
-See the <a href="#core-parallel">Batch and Parallel Execution</a> section for
+See the <a href="#core-parallel">Parallel Execution</a> section for
 more information on executing moebatch in parallel on a cluster.
 
 
@@ -693,7 +686,7 @@ logs if you need more information about why the error occurred.  It also makes
 it easier for you to find the working directory in order to delete the
 temporary files post-mortem.
 
-<h3><a name="core-parallel"></a>Batch and Parallel Execution</h3>
+<h3><a name="core-parallel"></a>Parallel Execution</h3>
 <p>
 As described in the <a href="#start">Getting Started</a> section, the workflow
 of MOEDivCon QMSore proceeds in six steps:  preparation, testing, verification,
@@ -795,76 +788,45 @@ the receptor data for those fields.</warn>
 
 <h4><a name="core-parallel-moebatch"></a>Running Moebatch</h4>
 <p>
-<todo>Daren, rewrite for mpi implementation.</todo>
-After you close the database, you can execute MOEDivCon QMScore in at least
-three different ways.  In the examples below, <inline>$USER_DATADB</inline>
-is the path to your QMScore database.  Analogous steps are performed to execute
-MOEDivCon NMRScore.
-<p>
-You can run moebatch on your workstation from the command line:
-<pre>
-&gt; moebatch -mpu N -exec "run ['qmsbatch.svl', ['$USER_DATADB']]" -exit
-</pre>
-where <inline>N</inline> is the number of local processors to use.
-<p>
-You can run moebatch on a LAN:
-<pre>
-moebatch -mpu moedivcon_machinefile -exec "run ['qmsbatch.svl', ['$USER_DATADB']]" -exit
-</pre>
-where <inline>moedivcon_machinefile</inline> is the MOE machine file, which
-has the following format:
-<pre>
-localhost ssh hostname01 'moebatch -mpu -'
-localhost ssh hostname01 'moebatch -mpu -'
-localhost ssh hostname02 'moebatch -mpu -'
-localhost ssh hostname02 'moebatch -mpu -'
-localhost ssh hostname03 'moebatch -mpu -'
-localhost ssh hostname03 'moebatch -mpu -'
-$eof
-</pre>
-The first hostname must be the host from where you launch the
-<inline>moebatch -mpu moedivcon_machinefile</inline> command.
-You may repeat a hostname in the MOE machine file if you wish to use more
-than one processor on that compute node.  In the above example, two processors
-are used on the three compute nodes.  The MOE maching file must end with
-<inline>$eof</inline>.  The number of processors should not exceed the number
-of available MOE licenses.  See the MOE/smp documentation
-for more details on the machine file.
-<p>
-You can
-also execute moebatch by submitting the job to a cluster queue.  Example
+After you close the database, you can execute MOEDivCon QMScore by submitting
+a script to a cluster queue (analogous steps are performed to execute MOEDivCon
+NMRScore.).  Example
 scripts for PBS and SGE are located in <inline>${QBHOME}/scripts</inline>.
 For example, below is the script for submitting a parallel job to PBS
-using bash (<inline>${QBHOME}/scripts/moedivconbatch_bash.pbs</inline>):
+using bash (<inline>${QBHOME}/scripts/moedivconmpi_bash.pbs</inline>):
 <pre>
 #!/bin/bash
 #PBS -S /bin/bash
-#  Warning:  the number of processors (nodes * ppn) should not exceed the
-#  number of available MOE licenses.
-#PBS -l nodes=6:ppn=2
+#PBS -l nodes=8:ppn=4
+#PBS -l mem=2000mb
 #PBS -j oe
 
 hostname
 date
 cat $PBS_NODEFILE
-cd $PBS_O_WORKDIR
-
-# Generate the MOE machine file from the PBS list of processors.
-rm -f moedivcon_machinefile
-for mach in $( cat $PBS_NODEFILE ); do
-   echo "localhost ssh $mach 'moebatch -mpu -'" >> moedivcon_machinefile
-done
-echo "\$eof" >> moedivcon_machinefile
 
 # Change the path and name for the MOE database.
+cd $PBS_O_WORKDIR
 USER_DATADB="$PWD/qmscore.mdb"
 
-moebatch -mpu moedivcon_machinefile -exec "run ['qmsbatch.svl', ['$USER_DATADB']]" -exit
+moebatch -mpu 1 -exec "run ['qmsmpi.svl', ['$USER_DATADB']]" -exit
 </pre>
-The script requests the number of proccessors to use in the batch job and
-uses the list of nodes in the <inline>PBS_NODEFILE</inline> to automatically
-generate the MOE machine file.  Note that the number of processors you can
-use is limited by the number of MOE licenses you have been granted.
+<inline>$USER_DATADB</inline> is the path to your QMScore database.  
+The script requests the number of proccessors to use in the parallel job and
+generates the list of nodes in the <inline>PBS_NODEFILE</inline> that is used
+by MPI.  Note that only one MOE license for moebatch is required.
+<p>
+In addition to storing the scores in the QMScore MOE database, the QMScore
+application creates an <inline>HDF5</inline> file in the same location and with
+the same name as the QMScore database (<inline>.h5</inline> extension).  This
+file contains additional data (for instance, PWD) that the application uses for
+post-execution analysis.
+<p>
+Each worker process creates a single log file in the working directory for
+all of the jobs it executes.
+Each worker process creates a separate <inline>HDF5</inline> file in the 
+working directory for each job that it executes.  These files are automatically
+deleted after a successful execution.
 
 <h3><a name="core-options"></a>Core Options</h3>
 <p>
@@ -873,7 +835,6 @@ Score panel.
 
 <h4><a name="core-options-outdb"></a>Output MOE Database</h4>
 <p>
-<todo>Daren, rewrite for mpi/hdf5 implementation.</todo>
 MOEDivCon uses a MOE database to store run parameters and to store
 Score results; and if appropriate, analysis results.  
 One advantage is that the database is self-contained:  all
@@ -882,12 +843,15 @@ in the database.  The database can be moved to a working directory prior to
 execution time as long as the correct path is provided to the moebatch
 command (see the <a href="#core-parallel-moebatch">Running Moebatch</a>
 section for more information).  Another advantage is the suite of MOE
-data analysis tools designed to work with its database.
+data analysis tools designed to work with MOE database.
+<p>
+MOEDivCon also creates an <inline>HDF5</inline> file in the same location and
+with the same name as the MOE database (<inline>.h5</inline> extension).  This
+file contains additional data (for instance, PWD) that the application uses for
+post-execution analysis.
 
 <h4><a name="core-options-workdir"></a>Working Directory</h4>
 <p>
-<todo>Change to reflect use of HDF5.</todo>
-
 The working directory is used for storing QuantumBio DivCon intermediate
 calculations and log files.  The path to the specified directory will
 be stored in the MOEDivCon Score database and resolved at execution time.
@@ -896,10 +860,9 @@ going to submit the MOEDivCon Score job on a cluster, you can specify
 the absolute
 path to a scratch directory mounted on the cluster's file system.  Because of
 this possible scenerio, there is no check whether the directory actually
-exists.  If MOEDivCon Score job is executed using moebatch, a subdirectory
-under the
-working directory named <inline>qb_out<em>N</em></inline>
-will be created for each numbered task <inline><em>N</em></inline>.
+exists.  If MOEDivCon Score job is executed in parallel, a subdirectory
+under the working directory named <inline>logs</inline> in which
+will be created a separate log file for each worker process.
 <p>
 An alternative to specifying a working directory is to use the <w>CWD</w>
 option.
@@ -911,11 +874,7 @@ QMScore CWD Option
 <p>
 In this case the current working directory will be set using the run time
 environment variable <inline>$PWD</inline>.  This is effectively equivalent
-to specifying <inline>'.'</inline> as the working directory.  If you use
-the <w>CWD</w> option when executing in moebatch parallel mode, each child task
-will create a subdirectory under the current working directory of the moebatch
-process.
-<todo>Daren, rewrite for hdf5 implementation.</todo>
+to specifying <inline>'.'</inline> as the working directory.
 
 <h4><a name="core-options-ham"></a>Hamiltonian</h4>
 <p>
@@ -937,9 +896,23 @@ electrons in the system. The cross over point is at approximately 450 atoms.
 <h3><a name="nmr-intro"></a>Introduction</h3>
 <p>
 
-<p>The patent pending NMRScore algorithm is a ligand binding mode scoring function based upon DivCon's NMR chemical shift perturbation prediction implementation. These CSP predictions are coupled with experimental CSP values and becuase CSP is exquisitely sensitive on the orientation of the ligand inside the binding pocket, NMRScore offers an accurate and straightforward approach to score different poses. </p>
+<p>
+The patent pending NMRScore algorithm is a ligand binding mode scoring
+function based upon DivCon's NMR chemical shift perturbation prediction
+implementation. These CSP predictions are coupled with experimental CSP
+values and becuase CSP is exquisitely sensitive on the orientation of the
+ligand inside the binding pocket, NMRScore offers an accurate and
+straightforward approach to score different poses.
 
-<p>It has been <a href="http://www.quantumbioinc.com/publications/show/A-Critical-Assessment-of-the-Performance-of-Protein-Ligand-Scoring-Functions-Based-on-NMR-Chemical-Shift-Perturbations" target="_blank">demonstrated</a> that the overall performance of NMRScore is superior to that of energy-based scoring functions associated with docking programs in ranking native-like structures and differentiating these poses from decoy poses. Therefore, by combining conventional docking programs with NMRScore results in an approach that can robustly determine the binding site structure for a protein-ligand complex without having to resort to an expensive, time-comsuming xray refinement.</p>
+<p>It has been 
+<a href="http://www.quantumbioinc.com/publications/show/A-Critical-Assessment-of-the-Performance-of-Protein-Ligand-Scoring-Functions-Based-on-NMR-Chemical-Shift-Perturbations" target="_blank">demonstrated</a>
+that the overall performance of NMRScore is superior to that of energy-based
+scoring functions associated with docking programs in ranking native-like
+structures and differentiating these poses from decoy poses. Therefore, by
+combining conventional docking programs with NMRScore results in an approach
+that can robustly determine the binding site structure for a protein-ligand
+complex without having to resort to an expensive, time-comsuming xray
+refinement.
 
 <h3><a name="nmr-workflow"></a>Workflow</h3>
 <p>
@@ -1008,10 +981,18 @@ radius from the ligand are preserved.  You always have the option of
 returning to original receptor by clicking on the <w>Original</w> button.
 
 <h3><a name="nmr-csp"></a>Chemical Shift Atoms</h3>
-
-<p>In the study of protein/ligand interactions, one of the most common experimental methods involves the determination of the chemical shift perturbation associated with ligand binding. In this experiment, the shifts associated with the ligand atoms (hydrogen and carbon) in both their bound and their unbound states are determined. This shifts provide insight into the parts of the ligand that are most affected by the binding site environment.</p>
-
-<p>Recent <a href="http://www.quantumbioinc.com/publications/show//Support/Publications/A-Fast-QM-MM-Quantum-Mechanical-Molecular-Mechanical-Approach-to-Calculate-Nuclear-Magnetic-Resonance-Chemical-Shifts-for-Macromolecules" target="_blank">advances</a> in linear scaling quantum mechanics have provided computational chemists with the means to predict these shifts on a routine basis.</p>
+<p>
+In the study of protein/ligand interactions, one of the most common experimental
+methods involves the determination of the chemical shift perturbation associated
+with ligand binding. In this experiment, the shifts associated with the ligand
+atoms (hydrogen and carbon) in both their bound and their unbound states are
+determined. This shifts provide insight into the parts of the ligand that are
+most affected by the binding site environment.
+<p>
+Recent 
+<a href="http://www.quantumbioinc.com/publications/show//Support/Publications/A-Fast-QM-MM-Quantum-Mechanical-Molecular-Mechanical-Approach-to-Calculate-Nuclear-Magnetic-Resonance-Chemical-Shifts-for-Macromolecules" target="_blank">advances</a>
+in linear scaling quantum mechanics have provided computational chemists with
+the means to predict these shifts on a routine basis.
 
 <h4><a name="nmr-csp-type"></a>Atom Type</h4>
 <p>
@@ -1044,18 +1025,16 @@ NMRScore.
 
 <h4><a name="nmr-options-guess"></a>Guess</h4>
 <p>
-<p> Perhaps the most useful methodology for speeding up DivCon is the use of the a
+Perhaps the most useful methodology for speeding up DivCon is the use of the a
 guess <a href="http://en.wikipedia.org/wiki/Density_matrix"
 TARGET=_blank>density matrix<a/> derived from a previous QM characterization of
 the same or similar protein structure. Whenever a calculation is performed, the
 final density matrix of the simulation is saved to the HDF5 file. Without a
 guess density matrix a unit matrix is used, so the addition of a guess can make
-a signicant impact on the calculation. In addition to the density matrix, the
-current value of the shift value in eV is also saved. </p>
+a signifcant impact on the calculation. In addition to the density matrix, the
+current value of the shift value in eV is also saved.
 <p>
-<todo>Roger, describe how is it generated and how we are going to find it.</todo>
-
-
+<warn>Note:  not yet implemented.</warn>
 
 <h3><a name="nmr-results"></a>Results</h3>
 <p>
@@ -1104,34 +1083,35 @@ function.  Warning: may increase CPU cost of the calculation.
 <p>
 Calculate the pairwise decomposition data needed for generating the Interaction
 Heat Map and for the PLS analysis to generate the SAR Heat Map.
+<p>
+<warn>The QB-PWD analysis requires that the proteins have the same residue
+numbers (see <a href="#pwd-align">Protein Alignment</a>).</warn>
 
 <h3><a name="qms-results"></a>Results</h3>
 
 <p>
 The <a
 href="http://www.quantumbioinc.com/publications?tag=qmscore"
-TARGET="_blank">QMScore method</a> has been validated on numerious structures and systems both
-in academia and industry.
-</p>
-
-<p>
+TARGET="_blank">QMScore method</a>
+has been validated on numerious structures and systems both
+in academia and industry.<p>
 <object id="ThermodynamicCycle" title="QMScore Thermodynamic Cycle"
 data="images/thermodynamiccyle.png" type=image/png>
 QMScore Thermodynamic Cycle
-</object>
-</p>
-
-<ul>
+</object><ul>
     <li> dHf_g: Gas phase heat of formation. 
     <li> Solv_elec: The electrostatic portion of the solvation free energy. 
-    <li> LJ_att:  Dispersion interactions from the attractive/dispersive part of the classical Lennard-Jones interaction potential.
+    <li> LJ_att:  Dispersion interactions from the attractive/dispersive part
+         of the classical Lennard-Jones interaction potential.
     <li> S_solv:  Solvent component of the entropic contribution to binding.
     <li> S_vib:  Conformational component of the entropic contribution to binding.
     <li> E_eInt:  Electronic Interaction Energy
     <li> MRMScore:  Molecular Recognition Model score.
     <li> E_stericMRM:  Steric component of the Molecular Recognition Model score.
-    <li> E_elecMRM:  Electrostatic component of the Molecular Recognition Model score.
-    <li> E_solvMRM:  Pairwise solvation component of the Molecular Recognition Model score.
+    <li> E_elecMRM:  Electrostatic component of the Molecular Recognition Model
+         score.
+    <li> E_solvMRM:  Pairwise solvation component of the Molecular Recognition
+         Model score.
 </ul>
 
 <h2><a name="pwd"></a>MOEDivCon QB-PWD Analysis</h2>
@@ -1146,7 +1126,6 @@ QM methods implemented within the DivCon package. This scheme permits the
 calculation of the self-energy of the atom, core- electron interactions,
 electron-electron repulsion, and exchange between atoms from the molecular
 electron density.
-</p>
 <p>
 Simulations using PWD yield raw atom-by-atom pairwise values which can be
 difficult to interpret. Therefore, included with the tool is a receptor-based
@@ -1155,15 +1134,12 @@ process the data using statistical methods and provide a better picture of what
 is happening within the active site. This method coupled with the semi-empirical
 (SE) QM implementation within DivCon is referred to in the literature as
 SE-COMBINE.
-</p>
 <p>
 In addition to QM energy terms, molecular mechanics (MM) pairwise energy terms
 are also provided derived from the Lennard-Jones potential. These terms, broken
 into dispersive/attractive, repulsive, and electrostatics. When determining the
 best scoring function for a system (see below), sometimes the best function is
 one that combines the best of both QM and MM methods.
-</p>
-
 <p>
 <warn>The current implementation of QB-PWD analysis can only handle 
 cases where the ligand consists of a single "residue" (that is, all
@@ -1191,6 +1167,9 @@ The workflow of QB-PWD Analysis is captured in the following steps:
       csv-formatted file.
 </ol>
 
+<h3><a name="pwd-align"></a>Protein Alignment</h3>
+<p>
+<todo></todo>
 <h3><a name="pwd-analysis"></a>Analysis</h3>
 <p>
 There are several post analysis datasets that you can select:
@@ -1245,14 +1224,20 @@ data in persistent storage.
 
 <h4><a name="pwd-options-scorefun"></a>Scoring Function</h4>
 <p>
-The SE-COMBINE-based scoring functions utilize a mixture of the SE-QM PWD methods of DivCon, and the MM PWD terms available from the Lennard-Jones potential along with electrostatics terms available from Coulomb's law. These physical terms are combined with the coefficients derived from the Partial Least Squares (PLS) to yield the overall scoring function.
-</p>
+The SE-COMBINE-based scoring functions utilize a mixture of the SE-QM PWD
+methods of DivCon, and the MM PWD terms available from the Lennard-Jones
+potential along with electrostatics terms available from Coulomb's law. These
+physical terms are combined with the coefficients derived from the Partial
+Least Squares (PLS) to yield the overall scoring function.
 <p>
-Note: when using the MOE interface, the MM terms provided are calculated using the currently selected MM force field within the MOE interface.
-</p>
-<ul>The terms of the QM and QM+MM scoring function(s) are broken down into the following QM elements:
-    <li> E_AB:  the exchange term contributes negatively to binding and is therefore a positive indicator of favorability.
-    <li> E_ABp:  the electron-electron repulsion term contributes positively to binding and is therefore a negative indicator of favorability.
+Note: when using the MOE interface, the MM terms provided are calculated using 
+he currently selected MM force field within the MOE interface.
+<ul>The terms of the QM and QM+MM scoring function(s) are broken down into the
+    following QM elements:
+    <li> E_AB:  the exchange term contributes negatively to binding and is 
+         therefore a positive indicator of favorability.
+    <li> E_ABp:  the electron-electron repulsion term contributes positively
+         to binding and is therefore a negative indicator of favorability.
     <li> E_ABc:  the interactions between the core electrons.
 </ul>
 
@@ -1441,8 +1426,9 @@ Are there more troubleshooting items to add?
 
 <p>
 <todo>Daren, move this to where you think might fit. Here is the hint:</todo>
-</p>
-<li> <p><prob>I observe "atomic fusion" upon completion of a MOE minimization.</prob></p>
+
+<li> <p><prob>I observe "atomic fusion" upon completion of a MOE
+minimization.</prob>
 <p><sol>
 "Atomic fusion" or the movement of two atoms (usually
 protons) on top of each other has been observed when using the OPLS-AA force
@@ -1452,7 +1438,7 @@ of the protein is 1. The problem can be addressed by turning on Born solvation
 at the start of the minimization. Unfortunately, there doesn't seem to be a way
 to fix the problem once it has already occured. Instead, you will need to go
 back to the original structure and re-optimize it.
-</sol></p>
+</sol>
 
 We list here potential problems using the MOEDivCon integration and possible
 solutions.  If your problem is not listed here or the proposed solution
@@ -1576,7 +1562,7 @@ Ligand has to be a single molecule.
     receptor may comprise many chains, solvents, etc.  The ligand has to
     a single molecule.  If your problem involves multiple ligands within the
     same complex, we recommend you isolate each ligand for independent
-    analysis.  Or <a href=#contact>contact</a> our scientific support group
+    analysis.  Or <a href="#contact">contact</a> our scientific support group
     to resolve this issue in a future release.
   </sol>
   <li><p><prob>
@@ -1616,7 +1602,7 @@ Warning:  Problematic receptor and/or ligand.
     </prob><p><sol>
     You should get error or warning messages about a problematic molecules when 
     creating or saving a QMScore database (see the 
-    <a href="#test">Molecule Tests</a> section for more information).
+    <a href="#core-test">Molecule Tests</a> section for more information).
     You can right-click on the problematic molecule in the MOE Database Viewer,
     select <w>Send to MOE</w> from the popup menu, cleanup the molecule with
     MOE's suite of tools, then save it back in the database by right-clicking
@@ -1649,7 +1635,7 @@ Error:  Problematic charge for receptor and/or ligand.
     modified molecule files.
     <p>
     Or you can simply edit the charge in the MOE database (see the
-    <a href="#charge-editing">charge</a> section).
+    <a href="#core-charge-editing">charge</a> section).
   </sol>
   <li><p><prob>
     I get the MOE message:
@@ -1710,7 +1696,7 @@ The receptor and pose databases have different number of entries.
     the reason will make it back to the stderr, more often not.
     </sol>
     <p><sol>
-    There may be configuration problems.  Please <a href=#contact>contact</a>
+    There may be configuration problems.  Please <a href="#contact">contact</a>
     our support staff to resolve the issue.
   </sol>
   <li><p><prob>

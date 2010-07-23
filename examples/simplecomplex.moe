@@ -1,9 +1,9 @@
 #moe 2001.01
 #system 8 tag t value *
-ViewOrientationY i* 3 0 1 0 ViewOrientationZ i* 3 0 0 1 ViewLookAt r* 3
--5.3596616 -11.1845856 -13.8962879 ViewScale r 30.4609337
-ViewDepthCueFront r 0.45 ViewDepthCueStrength r 0.75 ViewZFront i 0
-ViewZWidth i 1
+ViewOrientationY r* 3 -0.342402 0.8842955 0.3174625 ViewOrientationZ r*
+3 0.8391109 0.4398169 -0.3200845 ViewLookAt r* 3 -5.4873857 -11.1845856
+-14.3227167 ViewScale r 25.1763325 ViewDepthCueFront r 0.45
+ViewDepthCueStrength r 0.75 ViewZFront i 0 ViewZWidth i 1
 #molecule 3 tag t value *
 atoms i 73 residues i 4 chains i 2
 #bond 64 a i b i o i=1
@@ -93,8 +93,6 @@ CB C sp3 -7.7713109 -13.0443969 -14.8257678 8 HB H sp3 -7.7331431
 5 7 9 13 17 21 23 26 29 32 39 43 45 48 51 54
 #attr 15 ID i aBackbone i=1
 1 3 4 5 17 18 19 21 39 40 41 43 54 55 56
-#attr 16 ID i aColorBy t=rgb
-5 7 9 13 17 21 23 26 29 32 39 43 45 48 51 54
 #attr 17 ID i aNucleusLook t=small-sphere
 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73
 #attr 17 ID i aBondLook t=cylinder
