@@ -1164,6 +1164,7 @@ global function qb_QBPWDSetupPanel []
     WindowSetData [wkey, appdflts];
     WindowSetAttr [wkey, [analbox: [sensitive: 0], selbox: [sensitive: 0],
         panel: [sensitive: [0,1,1]]]];
+
     WindowShow [wkey, 1];
 
     loop
@@ -1363,6 +1364,7 @@ global function qb_QBPWDSetupPanel []
                         WindowSetData [wkey, ldpwdopts];
                         WindowSetAttr [wkey, [analbox: [sensitive: 1],
                             panel: [sensitive: [1,1,1]]]];
+WindowSetAttr [wkey, [sf_e_r12: [sensitive: 0], sf_e_ele: [sensitive: 0]]];//DEBUG
                     endif
 
                     exit [];
