@@ -41,15 +41,19 @@ function qb_GetEnvApp;
 function qb_GetEnvTag;
 function qb_GetElemIndices;
 function qb_GetLigandAtoms;
+function qb_GetNMRSEnv;
+function qb_GetPoseFields;
 function qb_GetPoses;
 function qb_GetWhich;
 function qb_InitCorePanel;
 function qb_IsModeOneToMany;
+function qb_IsModeOneToOne;
 function qb_IsShowingAllPoses;
 function qb_LoadCoreScoreDB;
 function qb_ResetLigand;
 function qb_SaveAnalysisData;
 function qb_SaveDivConStatus;
+function qb_SaveNMRScore;
 function qb_SetAppStatus;
 function qb_SetHamStatus;
 function qb_SetHamDefault;
@@ -291,8 +295,6 @@ local function LoadDB [dbpath]
         indices, names, free, bound];
 endfunction
 
-function qb_GetNMRSEnv;
-function qb_SaveNMRScore;
 
 /****************************************************************************
  *                          RunCalc
@@ -311,6 +313,11 @@ local function RunCalc [dbkey]
     local [indices, names, free, bound] = qb_GetAnalysisData [dbkey,
         'nmr', 'exp'];
 
+    local dbpath = fabsname db_Filename dbkey;
+    local perpath = fpath dbpath;
+    local pertail = fbase ftail dbpath;
+    local perfile = twrite ['{}/{}.h5', perpath, pertail];
+
     local workdir;
     if coreopts.cwd === 1 then
         workdir = getenv 'PWD';
@@ -319,10 +326,11 @@ local function RunCalc [dbkey]
     endif
 
     coreopts.workdir = workdir;
+    write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
-    local [results, errmess] = qb_NMRScore [recset, ligand, coreopts, nmrsopts,
-        status.notforced, indices, free, bound];
+    local [results, errmess] = qb_NMRScore [recset, ligand, perfile,
+        coreopts, nmrsopts, status.notforced, indices, free, bound];
 
     if results === [] then
         if errmess === [] or errmess === '' then
@@ -353,6 +361,96 @@ write ['S: {}\nV: {v}\n', score,  posevals];  //DEBUG
     Message [msgkey, 'NMRScore is done.'];
 
     return;
+endfunction
+
+/****************************************************************************
+ *                          RunOneToManyCalc
+ *
+ *  Execute NMRScore for each row of the scoring database.
+ *
+ *  WARNING:  breaking into core
+ *
+ ****************************************************************************/
+local function RunOneToManyCalc [oldkey]
+
+    if MOE_BATCH then return; endif
+
+    if oldkey === 0 then
+        Warning 'The NMRScore database hasn\'t been created.';
+        return;
+    endif
+
+    local dblist = dbv_KeyList [];
+    if not isnull dblist and not isnull indexof [oldkey, dblist] then
+        Warning 'The NMRScore database is still open.';
+        return;
+    endif
+
+    //  Extract molecules and run options from the database environment
+    local dbkey = db_Open [oldkey, 'read-write'];
+    local [recmols, l, status, coreopts, nmrsopts, c] = qb_GetNMRSEnv [dbkey];
+    local [indices, names, free, bound] = qb_GetAnalysisData [dbkey,
+        'nmr', 'exp'];
+
+    local dbpath = fabsname db_Filename dbkey;
+    local perpath = fpath dbpath;
+    local pertail = fbase ftail dbpath;
+    local perfile = twrite ['{}/{}.h5', perpath, pertail];
+
+    local workdir;
+    if coreopts.cwd === 1 then
+        workdir = getenv 'PWD';
+    else
+        workdir = fabsname coreopts.workdir;
+    endif
+
+    coreopts.workdir = workdir;
+    write ['Persistent File:  {}\n', perfile];
+    write ['Work Dir:  {}\n', workdir];
+
+    //  For each ligand pose in the database, calculate NMR score.
+    local msgkey = 0;
+    local nrows = db_nEntries dbkey;
+    local rowkey = 0, rowcnt = 0;
+    local poseflds = qb_GetPoseFields [dbkey];
+
+    while rowkey = db_NextEntry [dbkey, rowkey] loop
+        rowcnt = rowcnt + 1;
+        msgkey = Message [msgkey, twrite ['Scoring pose {} of {}\n', rowcnt,
+            nrows]];
+
+        coreopts.task = rowcnt;
+        local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
+        coreopts.ligchg = posechg;
+        local [results, errmess] = qb_NMRScore [recmols, posemol, perfile,
+            coreopts, nmrsopts, status.notforced, indices, free, bound];
+
+        if results === [] then
+            if errmess === [] or errmess === '' then
+                errmess = "Unknown error!";
+            endif
+            qb_SaveDivConStatus [dbkey, rowkey,
+                swrite ['Error:  {}\n', errmess]];
+            write ['NMRScore Error on pose {}:\n    {}\n', rowcnt, errmess];
+            msgkey = Message [msgkey, 
+                twrite ['NMRScore Error on pose {}:\n    {}\n', rowcnt,
+                    errmess]];
+            sleep 3;
+        else
+            local [score, posevals] = results;
+            qb_SaveNMRScore [dbkey, rowkey, score, tag [names, posevals]];
+            local sucmess = "Success";
+            if not isnull errmess then
+                sucmess = cat [sucmess, "-warnings!\n", errmess];
+            else
+                sucmess = cat [sucmess, "\n"];
+            endif
+            qb_SaveDivConStatus [dbkey, rowkey, sucmess];
+        endif
+    endloop
+
+    db_Close dbkey;
+
 endfunction
 
 /****************************************************************************
@@ -488,8 +586,8 @@ global function qb_NMRScoreSetupPanel []
     static cutrecmol;
     static origrecmol;
     static origligmol;
-    static orignuc;
-    static origbnd;
+    static orignucs;
+    static origbnds;
     static recatoms;
     static ligatoms;
     static posemols;
@@ -511,8 +609,8 @@ global function qb_NMRScoreSetupPanel []
 
     origrecmol = mol_Extract recatoms;
     origligmol = mol_Extract ligatoms;
-    orignuc = '';
-    origbnd = '';
+    orignucs = [];
+    origbnds = [];
     cutrecmol = [];
     posemols = [];
     poseatoms = [];
@@ -558,10 +656,17 @@ atombound = rep [1.050, num];
                 task_prio 0;
 
                 ViewSave 1;
-                orignuc = aNucleusLook ligatoms;
-                origbnd = aBondLook ligatoms;
+
+                [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
+                if recatoms === [] or ligatoms === [] then
+                    Warning errmess;
+                    return;
+                endif
+
+                orignucs = aNucleusLook ligatoms;
+                origbnds = aBondLook ligatoms;
                 if posemols === [] and qb_IsModeOneToMany [vals] then
-                    [posemols, errmess] = qb_GetPoses vals;
+                    [posemols, errmess] = qb_GetPoses [vals];
                     if posemols === [] then
                         Warning errmess;
                         exit [];
@@ -606,8 +711,8 @@ atombound = rep [1.050, num];
 
                 WindowSetAttr [wkey, [showcut: [sensitive: 1],
                     original: [sensitive: 0]]];
-                aSetNucleusLook [ligatoms, orignuc];
-                aSetBondLook [ligatoms, origbnd];
+                aSetNucleusLook [ligatoms, orignucs];
+                aSetBondLook [ligatoms, origbnds];
                 ViewLoad 1;
                 View [];
                 exit [];
@@ -745,7 +850,13 @@ atombound = rep [1.050, num];
                         cat [NMR_NUM_FIELDS, atomnames], 'nmrscore', 0];
                     qb_SaveAnalysisData [dbkey, 'nmr', 'exp',
                         [indices, atomnames, atomfree, atombound]];
-                    RunCalc [dbkey, indices, atomnames];
+
+                    if qb_IsModeOneToOne [coreopts] then
+                        RunCalc [dbkey];
+                    elseif qb_IsModeOneToMany [coreopts] then
+                        RunOneToManyCalc [dbkey];
+                    endif
+
                     dbv_Open db_Filename dbkey;
                     db_Close dbkey;
                     exit [];

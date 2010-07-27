@@ -299,7 +299,7 @@ function qb_GetPoseFields;
  *  WARNING:  breaking into core
  *
  ****************************************************************************/
-global function RunOneToManyCalc [oldkey]
+local function RunOneToManyCalc [oldkey]
 
     if MOE_BATCH then return; endif
 
