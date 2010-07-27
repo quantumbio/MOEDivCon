@@ -65,8 +65,8 @@ const CSP_KEYS =
     'ALL'
     ];
 
-global function qb_NMRScore [recmol, ligmol, coreopts, appopts, errortests,
-        indices, free, bound]
+global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts, 
+        errortests, indices, free, bound]
 
     local osys, nsys, errmess = "";
     if not MOE_BATCH then
@@ -149,10 +149,6 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts, errortests,
         return [[], errmess];
     endif
  
-    local scorepath = coreopts.scoredb;
-    scorepath = fbase scorepath;
-    scorepath = twrite ['{}.h5', scorepath];
-
     //  exe_open child process inherits parent's environment.
     local process_key = exe_open ['moedivconnmr', subdirname, [], 1];
     local process_keys = [process_key];
@@ -172,7 +168,7 @@ global function qb_NMRScore [recmol, ligmol, coreopts, appopts, errortests,
 
     local idx, success = 0;
 
-    fwrite [stdin, '{c:}\n', scorepath];
+    fwrite [stdin, '{c:}\n', perfile];
     fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
     fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
     fwrite [stdin, '{c:}\n', DIVCON_HAM_KEYS(coreopts.ham)];
