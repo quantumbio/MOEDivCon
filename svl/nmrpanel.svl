@@ -628,16 +628,12 @@ global function qb_NMRScoreSetupPanel []
     local appdflts = tag tr NMRSCORE_OPT_DEFAULTS;
 
     indices = qb_GetElemIndices [origligmol, appdflts.csp];
+    atomfree = rep [0, length indices];
+    atombound = rep [0, length indices];
 
     local coreopts = [], nmrsopts = [], browsetasks = [], dbkey = 0;
     local curatoms = [], curidx = [];
     local indextoks = [];
-
-//DEBUG
-local num = length indices;
-atomfree = rep [1.025, num];
-atombound = rep [1.050, num];
-//DEBUG
 
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
@@ -702,8 +698,6 @@ atombound = rep [1.050, num];
                 mol_Create origrecmol;
                 ligatoms = cat cAtoms mol_Create origligmol;
                 oSetCollection ['QB_LIGAND', ligatoms];
-//DEBUG                aSetNucleusLook [ligatoms, 'small-sphere'];//DEBUG
-//DEBUG                aSetBondLook [ligatoms, 'cylinder'];//DEBUG
                 poseatoms = [];
 
                qb_ShowLigPoses [vals];
@@ -720,6 +714,8 @@ atombound = rep [1.050, num];
 
         elseif droplast trig === 'csp' then
             indices = qb_GetElemIndices [origligmol, vals.csp];
+            atomfree = rep [0, length indices];
+            atombound = rep [0, length indices];
 
         elseif trig === 'experimental' then
 
