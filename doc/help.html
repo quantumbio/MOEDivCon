@@ -60,10 +60,6 @@ QuantumBio Homepage
 </object> </a>
 <h1>MOEDivCon Integration Suite</h1>
 <hr>
-
-<todo>Daren, update all images.  Add new ones.</todo>
-<todo>Daren, rewrite for mpi implementation.</todo>
-
 <h2><a name="ToC"></a>Table of Contents</h2>
 <ol id=tocl>
   <li><a href="#ToC">Table of Contents</a>
@@ -93,12 +89,12 @@ QuantumBio Homepage
         <li><a href="#core-charge-manytomany">Many-to-Many Mode</a>
         <li><a href="#core-charge-editing">Editing</a>
       </ol>
-      <li><a href="#core-load">Load and Save</a>
+      <li><a href="#core-load">Load, Create, and Update</a>
       <li><a href="#core-clean">Log Files and Postexecution Cleanup</a>
       <li><a href="#core-parallel">Parallel Execution</a>
       <ol  id=tocl>
         <li><a href="#core-parallel-mode">Parallel Mapping Mode</a>
-        <li><a href="#core-parallel-moebatch">Running Moebatch</a>
+        <li><a href="#core-parallel-moebatch">Running Moebatch/MPI</a>
       </ol>
       <li><a href="#core-options">Options</a>
       <ol id=tocl>
@@ -123,7 +119,7 @@ QuantumBio Homepage
         <li><a href="#nmr-options-opt">Ligand Optimization</a>
         <li><a href="#nmr-options-guess">Guess</a>
       </ol>
-      <li><a href="#nmr-results">Results</a>
+<!--      <li><a href="#nmr-results">Results</a>  -->
     </ol>
   <li><a href="#qms">MOEDivCon QMScore</a>
     <ol id=tocl>
@@ -301,7 +297,7 @@ First, start MOE and open
 select the MOE menu
 <w>Compute</w>&rarr;<w>Simulations</w>&rarr;<w>QuantumBio</w>&rarr;<w>QMScore</w>.
 <p>
-<object id="MOEwithMenu" title="Moe Window with QuantumBio Menu" width=1000
+<object id="MOEwithMenu" title="Moe Window with QuantumBio Menu" width=956
 data="images/mainwithmenu.png" type=image/png>
 Moe Window with QuantumBio Menu
 </object>
@@ -326,7 +322,7 @@ database, but the temporary
 files in <inline>/tmp</inline> are deleted when DivCon returns successfully.
 
 <p>
-<object id="QMScoreDatabase" title="QMScore Database" width=1000 
+<object id="QMScoreDatabase" title="QMScore Database" width=956 
 data="images/qmscoredatabase.png" type=image/png>
 QMScore Database
 </object>
@@ -337,9 +333,8 @@ to do with a large protein receptor for which the execution time may take
 several hours.
 <h3><a name="start-onetomany"></a>One-to-Many Mode</h3>
 <p>
-The real power of MOEDivCon Integration Suite
-is the ability to use moebatch and MPI to execute tasks in parallel on a 
-cluster
+The real power of the MOEDivCon Integration is the ability to use moebatch
+and MPI to execute tasks in parallel on a cluster
 and collate the results in a MOE database.  In this case, start MOE and open
 <inline>${QBHOME}/examples/simplecomplex.moe</inline> and select the MOE menu
 <w>Compute</w>&rarr;<w>Simulations</w>&rarr;<w>QuantumBio</w>&rarr;<w>QMScore</w>.
@@ -353,7 +348,7 @@ data="images/qmscoreoptionsonetomany.png" type=image/png>
 QMScore One-to-Many Options
 </object>
 <p>
-Press <w>Save</w> and verify that the charges and other data for the poses
+Press <w>Create</w> and verify that the charges and other data for the poses
 are okay (the <w>Status</w> field is empty).  Close the MOE Database Viewer
 and click the <w>Run</w> button.
 The jobs will be executed sequentially in the current MOE session (not
@@ -362,7 +357,7 @@ MOEDivCon will print out progress messages.  When all
 four jobs are completed, open <inline>qmscore.mdb</inline> in the MOE
 Database Viewer.  You should see results similar to these:
 <p>
-<object id="QMScoreDatabaseOneToMany" title="QMScore One-to-Many Database" width=1000 
+<object id="QMScoreDatabaseOneToMany" title="QMScore One-to-Many Database" width=956 
 data="images/qmscoredatabaseonetomany.png" type=image/png>
 QMScore Database
 </object>
@@ -386,26 +381,27 @@ QMScore One-to-Many Options
 <p>
 Note that the <w>Charges</w> section is inactivated; the charges are
 calculated as the receptors and ligands are copied to the QMScore database.
-Press <w>Save</w> and verify that the charges and other data for both 
+Press <w>Create</w> and verify that the charges and other data for both 
 the receptors and ligands are okay (the
-<w>Status</w> field is empty).  Close the MOE Database Viewer and execute
-the following command from the directory where <inline>qmscore.mdb</inline>
-is located (assuming you have 4 processors on your workstation):
-<todo>Daren, rewrite for mpi implementation.</todo>
+<w>Status</w> field is empty).  Close the MOE Database Viewer, copy
+<inline>moedivconmpi_bash.pbs</inline> from
+ <inline>${QBHOME}/scripts/</inline> to the directory 
+where <inline>qmscore.mdb</inline>
+is located, change the number of processors (if necessary) 
+and submit it to your PBS queue:
 <pre>
-&gt; moebatch -mpu 4 -exec "run ['qmsbatch.svl', ['qmscore.mdb']]" -exit
+&gt; qsub moedivconmpi_bash.pbs
 </pre>
-The execution will take longer since there are twelve jobs to run.  When all
+Analagous steps are followed for other cluster management systems.  When all
 twelve jobs are completed, open <inline>qmscore.mdb</inline> in the MOE
 Database Viewer.  You should see results similar to these:
 <p>
-<object id="QMScoreDatabaseManyToMany" title="QMScore Many-to-Many Database" width=1000 
+<object id="QMScoreDatabaseManyToMany" title="QMScore Many-to-Many Database" width=956 
 data="images/qmscoredatabasemanytomany.png" type=image/png>
 QMScore Database
 </object>
-<todo>Daren, rewrite for mpi implementation.</todo>
 See the <a href="#core-parallel">Parallel Execution</a> section for
-more information on executing moebatch in parallel on a cluster.
+more information on executing jobs in parallel on a cluster.
 
 
 <h2><a name="core"></a>MOEDivCon Core</h2>
@@ -438,7 +434,7 @@ You should turn off the tests only if you are sure the receptor(s) and ligand(s)
 have been cleaned up and are correctly parsed by MOE.
 <p>
 The "Error" tests are always performed on the receptor and ligand in the MOE
-Window when you click <w>Run</w> or <w>Save</w> in <w>One-to-One</w> or
+Window when you click <w>Run</w> or <w>Create</w> in <w>One-to-One</w> or
 <w>One-to-Many</w> mode.  If any problems  that will cause DivCon to fail are
 detected, you are asked whether you wish to continue.  The selected tests are
 also performed on any receptors and/or ligands/poses as they are copied into
@@ -461,10 +457,11 @@ AtomIndex: AtomName in ResidueIndex: ResidueName ResidueUID
 where the AtomIndex is MOE's index in the system, not the residue.  
 The ResidueIndex is MOE's index of the residue in the system, 
 and ResidueUID is original ID field from
-the pdb or mol2 file, say.  Below is an example error and warning tests report.
+the pdb or mol2 file, say.  Below is an example error and warning tests report
+(for 1KZK from the Astex Set).
 <p>
 <object id="QMScoreErrorReport" title="QMScore Error and Warning Tests Report"
-data="images/qmscoreerrorreport.png" type=image/png>
+data="images/qmscoreerrorreport2.png" type=image/png>
 QMScore Error and Warning Tests Report
 </object>
 <p>
@@ -592,7 +589,7 @@ charges calculated by MOE if you think they are incorrect or they are marked
 as problematic for DivCon.  If you modify the charges in the 
 MOEDivCon Score panel,
 MOEDivCon will alert you if a charge you entered may cause problems with the
-DivCon calculations when you press <w>Run</w> or <w>Save</w>.
+DivCon calculations when you press <w>Run</w> or <w>Create</w>.
 <p>
 <object id="QMScoreBadCharge" title="QMScore Charge Error"
 data="images/qmscorebadcharge.png" type=image/png>
@@ -639,7 +636,7 @@ message in the <w>Status</w> column.
 <warn>Warning:  When you edit a cell in a MOE database, the new value is
 directly written to disk and the previous value is lost.</warn>
 
-<h3><a name="core-load"></a>Load and Save</h3>
+<h3><a name="core-load"></a>Load, Create, and Update</h3>
 <p>
 You can load an existing MOEDivCon Score database into the MOEDivCon Score
 panel by pressing the <w>Load</w> button.  A file selection box will open
@@ -652,13 +649,19 @@ the MOEDivCon Score panel is
 updated with the settings stored in the database, and then the database itself
 is opened using the MOE Database Viewer.
 <p>
- If you load an existing MOEDivCon Score database, change the options or edit
-the receptor or ligand using MOE's Builder, then press <w>Save</w>, the updated
-options, molecules and charges will be saved in the output database.
+If you load an existing MOEDivCon Score database and change the options and/or
+charges in the panel, you can then press <w>Update</w> to save the new options
+and/or charges in the output database.  If you also edit the receptor or ligand
+in the MOE Window using MOE's Builder, then press <w>Create</w>, and the 
+updated options, molecules and charges will be saved in the output database.
 <p>
 If you load an existing MOEDivCon Score database and only edit some of the
-<w>Rec Chg</w> or <w>Lig Chg</w> fields, you shouldn't press the
-MOEDivCon Score <w>Save</w> button.  This would regenerate the original charges
+<w>Rec Chg</w> or <w>Lig Chg</w> fields, or edit the <w>Receptor</w> or 
+<w>Ligand/Pose</w> field directly using <w>Get from MOE</w> 
+and <w>Send to MOE</w> options from the <w>Molecule</w> popup menu, then
+you shouldn't press the MOEDivCon Score <w>Create</w> button.  This would 
+regenerate the original molecules
+and charges
 calculated from the molecules in the MOE Window, and/or those stored in the
 recepter and pose database specified in MOEDivCon Score panel.  When you edit
 an entry in a MOE database, it is written directly to disk.  See the
@@ -670,9 +673,9 @@ and may be lost if not saved beforehand.</warn>
 
 <h3><a name="core-clean"></a>Log Files and Postexecution Cleanup</h3>
 <p>
-<todo>Change to reflect use of HDF5.</todo>
 If a DivCon job runs successfully, MOEDivCon automatically deletes
-temporary files in the working directory.  This prevents DivCon from attempting
+temporary HDF5 (.h5 extension) files in the working directory.  
+This prevents DivCon from attempting
 to reuse files from an earlier run and avoids wasting disk space. However,
 if an error is reported the files are not deleted and the location of the
 DivCon log file is written to the <w>Status</w> column of the MOEDivCon Score
@@ -695,11 +698,9 @@ analysis steps are performed using MOE on your local workstation or laptop.
 The third step, execution, is best left to a computational cluster, whether 
 you are scoring one complex or hundreds.
 <p>
-<todo>Daren, rewrite for mpi implementation.</todo>
 Before getting into the details of executing moebatch on a cluster, we'll
-explain how to setup MOEDivCon QMScore to run a single job in batch mode or
-many jobs in parallel.  Analogous steps are performed to set up MOEDivCon
-NMRScore batch jobs.
+explain how to setup MOEDivCon QMScore to run many jobs in parallel.  
+Analogous steps are performed to set up MOEDivCon NMRScore jobs.
 
 <h4><a name="core-parallel-mode"></a>Mapping Mode</h4>
 <p>
@@ -712,12 +713,11 @@ In <w>One-to-One</w> batch mode, the set up is the same as in the
 and ligand files into the MOE Window and perform any necessary preparatory,
 testing and verification steps.
 Next, open the QMScore panel and select your options, and then choose
-<w>Save</w> rather than <w>Run</w>.  MOEDivCon will store your receptor,
+<w>Create</w> rather than <w>Run</w>.  MOEDivCon will store your receptor,
 ligand, and
 options in the QMScore database, and then open the MOE Database Viewer so you
 can verify the ligand/pose data.  
-<todo>Daren, rewrite for mpi implementation.</todo>
-See the <a href="#core-parallel-moebatch">Running Moebatch</a> section
+See the <a href="#core-parallel-moebatch">Running Moebatch/MPI</a> section
 to learn how to execute the job.
 
 <h5><a name="core-parallel-mode-1toM"></a>One Receptor--Many Ligand Poses</h5>
@@ -748,13 +748,12 @@ by selecting <w>All Poses</w> in the Charge section.
 See the <a href="#core-charge-onetomany">Charge</a>
 section to learn more details about how MOEDivCon handles charges.
 <p>
-When you choose <w>Save</w>,  MOEDivCon will store your receptor, ligand, and
+When you choose <w>Create</w>,  MOEDivCon will store your receptor, ligand, and
 options in the QMScore database, and it will copy the ligand/pose database into
 the QMScore database including any data fields (e.g., results from other scoring
 algorithms).  The MOE Database Viewer will then open the QMScore database so
 you can verify the ligand/pose data, especially the charge values and status.
-<todo>Daren, rewrite for mpi implementation.</todo>
-See the <a href="#core-parallel-moebatch">Running Moebatch</a>
+See the <a href="#core-parallel-moebatch">Running Moebatch/MPI</a>
 section to learn how to execute the job.
 <p>
 <h5><a name="core-parallel-mode-MtoM"></a>Many Receptors--Many Ligands</h5>
@@ -770,13 +769,12 @@ data="images/qmscoremanytomany.png" type=image/png>
 QMScore Many-to-Many Mode
 </object>
 <p>
-When you choose <w>Save</w>,  MOEDivCon will store your options in the
+When you choose <w>Create</w>,  MOEDivCon will store your options in the
 QMScore database, and it will copy the receptor and ligand databases, row
 by row, into the QMScore database including any data fields.  The MOE
 Database Viewer will then open the QMScore database so you can verify the
 receptor and ligand data, especially the charge values and status.
-<todo>Daren, rewrite for mpi implementation.</todo>
-See the <a href="#core-parallel-moebatch">Running Moebatch</a> section
+See the <a href="#core-parallel-moebatch">Running Moebatch/MPI</a> section
 to learn how to execute the job.  See the
 <a href="#core-charge-manytomany">Charge</a>
 section to learn more details about how MOEDivCon handles charges.
@@ -786,7 +784,7 @@ the molecule field&ndash;with the same name, then the pose data will overwrite
 the receptor data for those fields.</warn>
 
 
-<h4><a name="core-parallel-moebatch"></a>Running Moebatch</h4>
+<h4><a name="core-parallel-moebatch"></a>Running Moebatch/MPI</h4>
 <p>
 After you close the database, you can execute MOEDivCon QMScore by submitting
 a script to a cluster queue (analogous steps are performed to execute MOEDivCon
@@ -812,7 +810,8 @@ USER_DATADB="$PWD/qmscore.mdb"
 moebatch -mpu 1 -exec "run ['qmsmpi.svl', ['$USER_DATADB']]" -exit
 </pre>
 <inline>$USER_DATADB</inline> is the path to your QMScore database.  
-The script requests the number of proccessors to use in the parallel job and
+The script requests the number of proccessors to use in the parallel job (in
+this case 32) and
 generates the list of nodes in the <inline>PBS_NODEFILE</inline> that is used
 by MPI.  Note that only one MOE license for moebatch is required.
 <p>
@@ -822,8 +821,8 @@ the same name as the QMScore database (<inline>.h5</inline> extension).  This
 file contains additional data (for instance, PWD) that the application uses for
 post-execution analysis.
 <p>
-Each worker process creates a single log file in the working directory for
-all of the jobs it executes.
+Each worker process creates a single log file in the <inline>log</inline>
+subdirectory of the working directory for all of the jobs it executes.
 Each worker process creates a separate <inline>HDF5</inline> file in the 
 working directory for each job that it executes.  These files are automatically
 deleted after a successful execution.
@@ -832,6 +831,11 @@ deleted after a successful execution.
 <p>
 Here we include a more detailed description of the core options in the MOEDivCon
 Score panel.
+<p>
+<object id="QBMOEDivConCore" title="QB MOEDivCon Core"
+data="images/qb_core.png" type=image/png>
+QB MOEDivCon Core
+</object>
 
 <h4><a name="core-options-outdb"></a>Output MOE Database</h4>
 <p>
@@ -841,9 +845,14 @@ One advantage is that the database is self-contained:  all
 of the data and parameters needed to execute MOEDivCon Score jobs are stored
 in the database.  The database can be moved to a working directory prior to
 execution time as long as the correct path is provided to the moebatch
-command (see the <a href="#core-parallel-moebatch">Running Moebatch</a>
+command (see the <a href="#core-parallel-moebatch">Running Moebatch/MPI</a>
 section for more information).  Another advantage is the suite of MOE
 data analysis tools designed to work with MOE database.
+<p>
+<object id="QMScoreOutputDB" title="QMScore Output DataBase"
+data="images/qmscoreoutputdb.png" type=image/png>
+Output DataBase
+</object>
 <p>
 MOEDivCon also creates an <inline>HDF5</inline> file in the same location and
 with the same name as the MOE database (<inline>.h5</inline> extension).  This
@@ -919,6 +928,12 @@ refinement.
 The NMRScore workflow is somewhat complicated by convergence issues due to the
 sensitivity of the parameters of the Hamiltonians available for NMR 
 calculations.
+<p>
+<object id="NMRScoreDefaults" title="NMRScore Panel"
+data="images/nmrscoredefaults.png" type=image/png>
+NMRScore Panel
+</object>
+<p>
 <ol>
   <li>Prepare the receptor and poses for the NMRScore calculation.
   <li>Load the poses into a MOE database.
@@ -929,7 +944,7 @@ calculations.
       <w>Compute</w>&rarr;<w>Simulations</w>&rarr;<w>QuantumBio</w>&rarr;<w>NMRScore</w>.
   <li>Enter the database name, working directory and select the
       <w>One-to-Many</w> mode.  Browse for the pose database.
-  <li>Click <w>Save</w> to save the NMRScore database.
+  <li>Click <w>Create</w> to save the NMRScore database.
   <li>While the NMRScore database is still open in the MOE Database Viewer,
       click on <w>Perform</w> in the <w>Molecular Tests</w> section of the
       NMRScore panel.  If there are any errors or warnings, 
@@ -942,7 +957,7 @@ calculations.
       the molecules are properly protonated.  If not, go to <b>step 1</b>.
       Otherwise,  enter the correct charge in the charge text boxes (select
       <w>All Poses</w> if appropriate).  Close the MOE Database Viewer and
-      click <w>Save</w> to save the NMRScore database.  Recheck the charges by
+      click <w>Update</w> to save the NMRScore database.  Recheck the charges by
       clicking <w>Check</w> again.  If problematic charges are reported in
       the <w>Status</w> field of the NMRScore database, you can edit the
       database.
@@ -958,7 +973,7 @@ calculations.
       click <w>Save</w> to save the NMRScore database.  At this point, you
       may wish to make a backup copy of the database.
   <li>Run the NMRScore jobs using moebatch (see the 
-      <a href="#core-parallel-moebatch">Running Moebatch</a> section).
+      <a href="#core-parallel-moebatch">Running Moebatch/MPI</a> section).
   <li>After the jobs have completed, open the NMRScore database.  Verify that
       all the calculations converged ("Success" in the <w>Status</w> field).
       If not, close the MOE Database Viewer,
@@ -1036,9 +1051,10 @@ current value of the shift value in eV is also saved.
 <p>
 <warn>Note:  not yet implemented.</warn>
 
+<!--
 <h3><a name="nmr-results"></a>Results</h3>
 <p>
-<todo>Daren</todo>
+-->
 
 <h2><a name="qms"></a>MOEDivCon QMScore</h2>
 <p>
@@ -1061,6 +1077,12 @@ key peer-reviewed
 <p>
 Here we include a more detailed description of the options in the MOEDivCon
 QMScore panel.
+<p>
+<object id="QMScoreDefaultDialog" title="QMScore Panel"
+data="images/qmscoredefault.png" type=image/png>
+QMScore Panel
+</object>
+<p>
 
 <h4><a name="qms-options-shift"></a>Shift</h4>
 <p>
@@ -1147,10 +1169,15 @@ the atoms have the same residue name and number).</warn>
 
 <h3><a name="pwd-workflow"></a>Workflow</h3>
 <p>
+<object id="PWDDefaults" title="PWD Panel"
+data="images/pwddefaults.png" type=image/png>
+PWD Panel
+</object>
+<p>
 The workflow of QB-PWD Analysis is captured in the following steps:
 <ol>
   <li>Execute a batch run of QMScore with PWD selected on a set of receptor(s) 
-      and poses.
+      and poses.  The receptors must be aligned (see next section).
   <li>Open the QB-PWD panel:  
       <w>Compute</w>&rarr;<w>Simulations</w>&rarr;<w>QuantumBio</w>&rarr;<w>QB-PWD</w>.
   <li>Click on <w>Load</w> to open the QMScore MDB database containing the 
@@ -1169,7 +1196,43 @@ The workflow of QB-PWD Analysis is captured in the following steps:
 
 <h3><a name="pwd-align"></a>Protein Alignment</h3>
 <p>
-<todo></todo>
+<object id="PWDProteinAlign" title="PWD Protein Align" width=956 
+data="images/pwdproteinalign.png" type=image/png>
+PWD Protein Align
+</object>
+<p>
+In order to perform QB-PWD analysis on more than one protein, the residue
+names and numbers must match;  that is, the proteins must be aligned.  You
+are welcome to use your favorite tool, but we supply a script 
+<inline>qbalign.svl</inline> in the MOEDivCon svl directory that performs
+the task. The script reads in the protein of the receptor collections in 
+the source directory, aligns them, renumbers the UIDs, and then 
+stores the new receptor collections in the destination directory.  
+Two assumptions are made:
+<ul>
+  <li>  The protein in the receptor collection is a single chain.
+  <li>  The protein chain is the first chain in the receptor collection.
+</ul>
+
+There are two methods to execute the SVL script.  The first uses moebatch from a
+shell command line in the parent directory of the source and destination
+subdirectories.  The extension identifies the molecule file
+type (supported extensions are pdb, moe, mol2, mdl_mol and macmod).
+<pre>
+&gt; moebatch -exec "run ['qbalign.svl', ['srcdir', 'destdir', 'ext']]" -exit
+</pre>
+An example:
+<pre>
+&gt; moebatch -exec "run ['qbalign.svl', ['recs', 'alignrecs', 'pdb']]" -exit
+</pre>
+The other method is to call the function from MOE's SVL command line (assuming
+that moe was started in the parent directory of the source and destination
+subdirectories.
+<pre>
+svl&gt; qb_Align ['srcdir', 'destdir', 'ext']
+</pre>
+Finally, create a MOE database containing the aligned proteins.
+
 <h3><a name="pwd-analysis"></a>Analysis</h3>
 <p>
 There are several post analysis datasets that you can select:
@@ -1241,10 +1304,14 @@ he currently selected MM force field within the MOE interface.
     <li> E_ABc:  the interactions between the core electrons.
 </ul>
 
-<ul>The terms of the MM and QM+MM scoring function(s) are broken down into the following MM elements:
-    <li> E_R6:  The r^6 term corresponds to the dispersive/attractive term of the Lennard-Jones potential.
-    <li> E_R12: The r^12 term from the Lennard-Jones potential represents repulsion.
-    <li> E_ELE:  Molecular mechanics electrostatics are represented using Coulomb's law along with MM charges.
+<ul>The terms of the MM and QM+MM scoring function(s) are broken down into the 
+    following MM elements:
+    <li> E_R6:  The r^6 term corresponds to the dispersive/attractive term of
+         the Lennard-Jones potential.
+    <li> E_R12: The r^12 term from the Lennard-Jones potential represents
+         repulsion.
+    <li> E_ELE:  Molecular mechanics electrostatics are represented using
+         Coulomb's law along with MM charges.
 </ul>
 
 <h4><a name="pwd-options-residues"></a>Residues</h4>
@@ -1332,7 +1399,7 @@ corresponding residues along the molecular surface are colored
 according to their interaction values in the heap map.  An example of such a
 surface (ligand 6 of the heat map is selected) is shown below.
 <p>
-<object id="QBPWDSurfacePoly" title="QBPWD Surface Poly" width=1000
+<object id="QBPWDSurfacePoly" title="QBPWD Surface Poly" width=956
 data="images/surfacepoly.png" type=image/png>
 QBPWD Surface Poly
 </object>
@@ -1419,26 +1486,6 @@ The number of ticks to display on the color scale showing the values
 represented by the colors.
 
 <h2><a name="trouble"></a>Troubleshooting</h2>
-
-<todo>
-Are there more troubleshooting items to add?
-</todo>
-
-<p>
-<todo>Daren, move this to where you think might fit. Here is the hint:</todo>
-
-<li> <p><prob>I observe "atomic fusion" upon completion of a MOE
-minimization.</prob>
-<p><sol>
-"Atomic fusion" or the movement of two atoms (usually
-protons) on top of each other has been observed when using the OPLS-AA force
-field within MOE. The problem is related to the fact that in OPLS-AA, polar
-hydrogens have zero van der Waals radii and that the default interior dielectric
-of the protein is 1. The problem can be addressed by turning on Born solvation
-at the start of the minimization. Unfortunately, there doesn't seem to be a way
-to fix the problem once it has already occured. Instead, you will need to go
-back to the original structure and re-optimize it.
-</sol>
 
 We list here potential problems using the MOEDivCon integration and possible
 solutions.  If your problem is not listed here or the proposed solution
@@ -1637,6 +1684,19 @@ Error:  Problematic charge for receptor and/or ligand.
     Or you can simply edit the charge in the MOE database (see the
     <a href="#core-charge-editing">charge</a> section).
   </sol>
+<li> <p><prob>
+    I observe "atomic fusion" upon completion of a MOE minimization.</prob>
+<p><sol>
+    "Atomic fusion" or the movement of two atoms (usually
+    protons) on top of each other has been observed when using the OPLS-AA force
+    field within MOE. The problem is related to the fact that in OPLS-AA, polar
+    hydrogens have zero van der Waals radii and that the default interior
+    dielectric of the protein is 1. The problem can be addressed by turning on
+    Born solvation at the start of the minimization. Unfortunately, there 
+    doesn't seem to be a way to fix the problem once it has already occured. 
+    Instead, you will need to go back to the original structure and re-optimize
+    it.
+</sol>
   <li><p><prob>
     I get the MOE message:
     <pre>
@@ -1690,12 +1750,6 @@ The receptor and pose databases have different number of entries.
     I submitted a parallel PBS (SGE, etc.) QMScore batch script and it returned
     immediately without executing any jobs.
     </prob><p><sol>
-<todo>Daren, rewrite for mpi implementation.</todo>
-    If the script requested more processors than the number of available MOE
-    licenses, moebatch will fail. Sometimes an error message explaining
-    the reason will make it back to the stderr, more often not.
-    </sol>
-    <p><sol>
     There may be configuration problems.  Please <a href="#contact">contact</a>
     our support staff to resolve the issue.
   </sol>
