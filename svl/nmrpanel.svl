@@ -103,11 +103,12 @@ const HEADER =
     name: 'panel', 
     title: 'NMRScore',
     windowName: 'NMRScorePanel',
-    text: ['Run', 'Save', 'Load', 'Close'],
-    onTrigger: ['validate', 'validate', 'return', 'return'],
+    text: ['Run', 'Create', 'Update', 'Load', 'Close'],
+    onTrigger: ['validate', 'validate', 'return', 'return', 'return'],
     bubbleHelp: ['Execute NMRScore from MOE Window.',
-        'Save run parameters in database\n'
-        'for later execution on cluster.', 
+        'Create a score database with receptor(s), ligand(s)\n'
+        'and run parameters for later execution on cluster.', 
+        'Update only the run parameters in database.', 
         'Load run parameters from a NMRScore database.', 
         '']
     ];

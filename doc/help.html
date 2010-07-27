@@ -126,8 +126,8 @@ QuantumBio Homepage
       <li><a href="#qms-intro">Introduction</a>
       <li><a href="#qms-options">Options</a>
       <ol id=tocl>
-        <li><a href="#qms-options-shift">Shift</a>
         <li><a href="#qms-options-opt">Ligand Optimization</a>
+        <li><a href="#qms-options-shift">Shift</a>
         <li><a href="#qms-options-freq">Frequency</a>
         <li><a href="#qms-options-pwd">PWD</a>
       </ol>
@@ -461,7 +461,7 @@ the pdb or mol2 file, say.  Below is an example error and warning tests report
 (for 1KZK from the Astex Set).
 <p>
 <object id="QMScoreErrorReport" title="QMScore Error and Warning Tests Report"
-data="images/qmscoreerrorreport2.png" type=image/png>
+data="images/qmscoreerrorreport.png" type=image/png>
 QMScore Error and Warning Tests Report
 </object>
 <p>
@@ -1078,15 +1078,11 @@ key peer-reviewed
 Here we include a more detailed description of the options in the MOEDivCon
 QMScore panel.
 <p>
-<object id="QMScoreDefaultDialog" title="QMScore Panel"
-data="images/qmscoredefault.png" type=image/png>
-QMScore Panel
+<object id="QMScoreOptions" title="QMScore Options"
+data="images/qmscoreoptions.png" type=image/png>
+QMScore Options
 </object>
 <p>
-
-<h4><a name="qms-options-shift"></a>Shift</h4>
-<p>
-User-defined initial dynamic level shift parameter in eV.
 
 <h4><a name="qms-options-opt"></a>Ligand Optimization</h4>
 <p>
@@ -1095,6 +1091,10 @@ This optimization may occur either while the ligand is docked within
 the target or while the ligand is separate from the target.
 Warning: this optional step will significantly increase the CPU cost
 of the calculation.
+
+<h4><a name="qms-options-shift"></a>Shift</h4>
+<p>
+User-defined initial dynamic level shift parameter in eV.
 
 <h4><a name="qms-options-freq"></a>Frequency</h4>
 <p>
@@ -1135,6 +1135,12 @@ QMScore Thermodynamic Cycle
     <li> E_solvMRM:  Pairwise solvation component of the Molecular Recognition
          Model score.
 </ul>
+<p>
+<object id="AstexQMScoreResults" title="QMScore for Astex" width=956
+data="images/astexmdb.png" type=image/png>
+QMScore for Astex
+</object>
+<p>
 
 <h2><a name="pwd"></a>MOEDivCon QB-PWD Analysis</h2>
 
@@ -1374,35 +1380,51 @@ created (see the MOE documentation).
 <h2><a name="heatmap"></a>MOEDivCon Heat Map</h2>
 <p>
 The <w>QB Heat Map</w> is used to implement the interaction energy map and the
-structure-activity relationship (SAR) map.  The interaction energy map is based
+structure-activity relationship (SAR) map.  The <w>QB Heat Map</w> is 
+interactive.  When first invoked, a Connolly molecular
+surface of the pocket is generated.  Then, depending on the user selection, the
+corresponding residues along the molecular surface are colored 
+according to their interaction values in the heap map.
+<p>
+The interaction energy map is based
 on the absolute <em>E</em><sub>AB</sub> terms from PWD, which  makes it
 easy to identify the residues that have the largest absolute effect on ligand
-binding.  The SAR map consists of the most important residue-ligand interaction
+binding.  Below is an example interaction heat map and associated surface for
+ligand 4.
+<p>
+<object id="QBHeatMapInterPoly" title="QB Heat Map Interaction"
+data="images/qbheatmapinterastexpoly.png" type=image/png>
+QB Heat Map Interaction
+</object>
+<p>
+
+<object id="SurfaceInterPoly" title="Surface Interaction" width=956
+data="images/surfaceinterastexlig4poly.png" type=image/png>
+Surface Interaction
+</object>
+<p>
+
+The SAR map consists of the most important residue-ligand interaction
 terms derived from the PLS analysis of all the interaction terms (attractive
 and repulsive), which highlights residues that are most critical to discriminating
 between more and less potent ligands (see the PWD section for more details).
-Below is an example SAR map.
+Below is an example SAR heat map and associated surface for ligand 6.
 <p>
-<object id="QBPWDHeatMapPoly" title="QBPWD Heat Map Poly"
-data="images/qbheatmappoly.png" type=image/png>
-QBPWD Heat Map Poly
+<object id="QBHeatMapInterMono" title="QB Heat Map SAR"
+data="images/qbheatmapsarastexmono.png" type=image/png>
+QB Heat Map SAR
+</object>
+<p>
+<object id="SurfaceSARMono" title="Surface SAR" width=956
+data="images/surfacesarastexlig6mono.png" type=image/png>
+Surface SAR
 </object>
 <p>
 Note that ligand and residue names are abbreviated so that they fit into the
 heat map.  If you hover the mouse over the abreviated names, a bubble appears
 with the full name.  If you hover over a color-coded cell, the full corresponding 
-ligand and residue names as well as the interaction value appears in the bubble.
-<p>
-The <w>QB Heat Map</w> is interactive.  When first invoked, a Connolly molecular
-surface of the pocket is generated.  Then, depending on the user selection, the
-corresponding residues along the molecular surface are colored 
-according to their interaction values in the heap map.  An example of such a
-surface (ligand 6 of the heat map is selected) is shown below.
-<p>
-<object id="QBPWDSurfacePoly" title="QBPWD Surface Poly" width=956
-data="images/surfacepoly.png" type=image/png>
-QBPWD Surface Poly
-</object>
+ligand and residue names as well as the interaction or SAR value appears in 
+the bubble.
 <p>
 
 <h3><a name="heatmap-selection"></a>Selection</h3>
@@ -1424,8 +1446,8 @@ to save the image.  Note that the default background is transparent.  If you
 wish a white background, select the color white under the <w>Background</w>
 option in the bottom right corner.  An example is shown below.
 <p>
-<object id="QMPWDHeatMapSave" title="QBPWD Heat Map Save"
-data="images/qbheatmapoutputpoly.png" type=image/png>
+<object id="QBHeatMapSave" title="QB Heat Map Save"
+data="images/qbheatmapsave.png" type=image/png>
 QBPWD Heat Map Save
 </object>
 <p>
@@ -1442,12 +1464,13 @@ the molecular surface is recolored.  When all ligands have been shown, the
 
 <h3><a name="heatmap-setup"></a>Configuration</h3>
 <p>
-The <w>QB-PWD</w> panel contains several options you can use to
-set up the <w>QB Heat Map</w> as shown below.
+The <w>QB Heat Map</w> panel contains several options you can use to
+configure the overall look of the heat map.  After changing the options,
+click the <w>Apply</w> button to redraw the heat map and surface.
 <p>
-<object id="QBPWDAnalysis" title="QBPWD Anaysis"
-data="images/qbpwdanalysis.png" type=image/png>
-QBPWD Anaysis
+<object id="QBHeatmapConfig" title="QB Heatmap Config"
+data="images/qbheatmapconfig.png" type=image/png>
+QB Heatmap Config
 </object>
 <p>
 
@@ -1470,15 +1493,10 @@ The number of different colors used to generate the color scale for the heat map
 <h4><a name="heatmap-setup-mono"></a>Monochromatic</h4>
 <p>
 If <w>Monochromatic</w> is selected, a single color (red for positive,
-blue for negative) is used to generate the color scale.  Otherwise,
-a rainbow spectrum of colors is used (as was seen above).  The same heat map
-with the monochromatic option is shown below.
-<p>
-<object id="QMPWDHeatMapMono" title="QBPWD Heat Map Mono"
-data="images/qbheatmapmono.png" type=image/png>
-QBPWD Heat Map Poly
-</object>
-<p>
+blue for negative) is used to generate the color scale as was seen in the
+SAR heat map above. Otherwise,
+a rainbow spectrum of colors is used as was seen in the Interaction heat map
+above.
 
 <h4><a name="heatmap-setup-numticks"></a>Number of Ticks</h4>
 <p>
