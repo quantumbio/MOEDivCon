@@ -632,13 +632,22 @@ local function GetAnalData [dbpath, title, type]
         if i > 0 then return tok_keep [t, i - 1]; else return t; endif
    endfunction
 
+    local function where [r]
+        local rnidx = indexof ["1234567890", string r];
+        rnidx = rnidx | rnidx <> 0;
+        return  (min rnidx) - 1;
+    endfunction
+
     //  Create abbreviated names for heat map and check residues
     if type === 'sar' or type === 'inter' then
         local [resnames, ligdata] = data;
-        local resabbrevs = apt tok_keep [resnames, 3];
+        local idx = app where resnames;
+        local resabbrevs = apt tok_drop [resnames, idx];
+        resabbrevs = apt tok_keep [resabbrevs, -3];
         local lignames = app first ligdata;
         local newlignames = app trim lignames;
         local ligabbrevs = apt tok_drop [newlignames, 3];
+        ligabbrevs = apt tok_keep [ligabbrevs, -3];
         local ligvals = app second ligdata;
         data = [[fulltitle, 'Ligands', 'Residues'], resnames, resabbrevs,
             tr [lignames, ligabbrevs, ligvals]];
