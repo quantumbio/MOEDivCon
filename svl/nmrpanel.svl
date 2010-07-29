@@ -30,6 +30,7 @@
 #set main    'qb_NMRScoreSetupPanel'
 
 function qb_AtomsToMols;
+function qb_CoreEnable;
 function qb_CoreHandler;
 function qb_CutReceptor;
 function qb_GetAnalysisData;
@@ -601,11 +602,12 @@ global function qb_NMRScoreSetupPanel []
     if MOE_BATCH then return; endif
     if WindowShow ['NMRScorePanel', 1] then return; endif
 
-    local errmess;
+    local errmess = '';
     [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
     if recatoms === [] or ligatoms === [] then
         Warning errmess;
-        return;
+
+//        return;
     endif
 
     origrecmol = mol_Extract recatoms;
@@ -639,10 +641,21 @@ global function qb_NMRScoreSetupPanel []
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
     WindowSetData [wkey, appdflts];
-    WindowSetAttr [wkey, [
-        radius: [sensitive: 1],
-        showcut: [sensitive: 1], original: [sensitive: 0],
-        guess: [sensitive: 1], opt: [sensitive:1]]];
+
+    if errmess === '' then
+        WindowSetAttr [wkey, [
+            radius: [sensitive: 1],
+            showcut: [sensitive: 1], original: [sensitive: 0],
+            guess: [sensitive: 1], opt: [sensitive:1]]];
+    else
+        qb_CoreEnable [wkey, 0];
+        WindowSetAttr [wkey, [
+            radius: [sensitive: 0],
+            showcut: [sensitive: 0], original: [sensitive: 0],
+            csp: [sensitive: 0], experimental: [sensitive:0],
+            guess: [sensitive: 0], opt: [sensitive:0],
+            panel:[sensitive:[0,0,0,1,1]]]];
+    endif
     WindowShow [wkey, 1];
 
     loop
@@ -782,15 +795,15 @@ global function qb_NMRScoreSetupPanel []
                             mol_Create cutrecmol;
                             ligatoms = cat oAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
-//DEBUG                            aSetNucleusLook [ligatoms, 'small-sphere'];//DEBUG
-//DEBUG                            aSetBondLook [ligatoms, 'cylinder'];//DEBUG
+                            aSetNucleusLook [ligatoms, 'small-sphere'];
+                            aSetBondLook [ligatoms, 'cylinder'];
                         else
                             wascut = 0;
                             mol_Create origrecmol;
                             ligatoms = cat cAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
-//DEBUG                            aSetNucleusLook [ligatoms, 'small-sphere'];//DEBUG
-//DEBUG                            aSetBondLook [ligatoms, 'cylinder'];//DEBUG
+                            aSetNucleusLook [ligatoms, 'small-sphere'];
+                            aSetBondLook [ligatoms, 'cylinder'];
                         endif
 
                         poseatoms = [];
@@ -799,14 +812,21 @@ global function qb_NMRScoreSetupPanel []
 
                         dbv_Open db_Filename ldkey;
                         db_Close ldkey;
-                        status = qb_UpdateCorePanel [wkey, status, coreopts];
-                        WindowSetAttr [wkey,
-                            [showcut: [sensitive: not wascut],
-                            original: [sensitive: wascut]]];
 
+                        qb_CoreEnable [wkey, 1];
+                        WindowSetAttr [wkey, [
+                            radius: [sensitive: 1],
+                            showcut: [sensitive: not wascut], 
+                            original: [sensitive: wascut],
+                            csp: [sensitive: 1], experimental: [sensitive:1],
+                            guess: [sensitive: 1], opt: [sensitive:1],
+                            panel:[sensitive:[1,1,1,1,1]]]];
+
+                        status = qb_UpdateCorePanel [wkey, status, coreopts];
                         WindowSetData [wkey, nmrsopts];
                         View [];
                     endif
+
 
                 exit [];
                 endif

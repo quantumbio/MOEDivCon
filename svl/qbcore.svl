@@ -151,7 +151,7 @@ const CORE_PANEL =
     [
     Hbox :
         [
-        extendH: 1,
+        name: 'dbbox', extendH: 1,
         FSBText :
             [
             name: 'scoredb', len: 40, extendH: 1, title: 'Output DB:',
@@ -167,7 +167,7 @@ const CORE_PANEL =
 
     Hbox :
         [
-        extendH: 1,
+        name: 'wdbox', extendH: 1,
         Text :
             [
             name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
@@ -196,6 +196,7 @@ const CORE_PANEL =
 
     Hbox :
         [
+        name: 'modebox',
         Radio :
             [
             name: 'mode', text: RUN_MODES, columns: 3, minWidth: 12, 
@@ -253,6 +254,7 @@ const CORE_PANEL =
 
     Hbox :
         [
+        name: 'testbox',
         Vbox :
             [
             extendH: 1, title: 'Molecule Tests:',
@@ -330,7 +332,7 @@ const CORE_PANEL =
 
     Hbox :
         [
-        extendH: 1, title: 'Charges:',
+        name: 'chargebox', extendH: 1, title: 'Charges:',
         Vbox :
             [
             Button :
@@ -413,7 +415,7 @@ const CORE_PANEL =
 
     Hbox :
         [
-        extendH: 1,
+        name: 'calcbox', extendH: 1,
         Option :
             [
             name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
@@ -1299,6 +1301,8 @@ function qb_ResetLigand;
  *
  *  Update the window based on new mode value.
  *
+ *  NOTE:  this also updates the panel's buttons.
+ *
  ****************************************************************************/
 local function UpdateMode [wkey, vals, status]
 
@@ -1440,6 +1444,23 @@ global function qb_CheckChgTestDivConMols [recmol, recchg, ligmol, ligchg,
     return [recressets, recok, recchgok, ligressets, ligok, ligchgok, mess];
 
 endfunction
+
+/****************************************************************************
+ *                          qb_CoreEnable
+ *
+ *  Enable/disable the core panel functionality.
+ *
+ ****************************************************************************/
+global function qb_CoreEnable [wkey, which]
+
+    WindowSetAttr [wkey, [dbbox: [sensitive: which],
+            wdbox: [sensitive: which], modebox: [sensitive: which], 
+            recbox: [sensitive: which], posebox: [sensitive: which], 
+            chargebox: [sensitive: which], testbox: [sensitive: which],
+            calcbox: [sensitive: which]]];
+
+endfunction
+
 
 function qb_CreateMessWin;
 function qb_ShowLigPoses;
