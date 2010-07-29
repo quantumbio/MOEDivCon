@@ -126,7 +126,7 @@ global function qb_NMRScoreMPI [dbpath]
 
     //  Pass down the dirs, options and number of possible jobs.
     fwrite [stdin, '{c:}\n', perfile];
-    fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
+    fwrite [stdin, '{c:}\n',  DIVCON_HAM_KEYS(coreopts.ham)];
     fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
         coreopts.scaling === 1]];
     fwrite [stdin, '{c:}\n', GEOM_KEYS(nmrsopts.opt)];
@@ -240,7 +240,6 @@ global function qb_NMRScoreMPI [dbpath]
             write ['Getting results for pose {} ({} of {})\n', rowcnt, 
                 result_ith, numokay];
             local [[numvals]] = fread [stdout, '{n:}'];
-
             for numvals loop
                 local [[cspidx]] = fread [stdout, '{n:}'];
                 local [[cspval]] = fread [stdout, '{n:}'];
