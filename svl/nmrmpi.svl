@@ -22,65 +22,81 @@
  // END COPYRIGHT
 #endif
 
-//    qmsmpi.svl    Executes QMScore calculations in parallel
+//    nmrmpi.svl    Executes NMRScore calculations in parallel
 
-#set title   'QuantumBio QMScore MPI'
+#set title   'QuantumBio NMRScore MPI'
 #set class   'QuantumBio'
 #set version '2010.01'
-#set main    'qb_QMScoreMPI'
+#set main    'qb_NMRScoreMPI'
 
+function qb_GetAnalysisData;
 function qb_CheckChgTestDivConMols;
 function qb_GetDivConStatus;
+function qb_GetElemIndices;
 function qb_GetPoseFields;
 function qb_GetRecFields;
-function qb_GetQMSEnv;
+function qb_GetNMRSEnv;
 function qb_GetWhich;
 function qb_HamSetsInit;
 function qb_IsModeManyToMany;
 function qb_PassBackbone;
+function qb_RMSD;
 function qb_SaveDivConStatus;
-function qb_SaveQMScore;
+function qb_SaveNMRScore;
 
 
 /*  NOTE:  If you change the key lists here, you need to update the
- *         option lists and default indices in qbcore.svl and qmspanel.svl.
+ *         option lists and default indices in qbcore.svl and nmrpanel.svl.
            The unused Hamilitonians were masked when the core was created.
  */
 
 const HAM_KEYS =
     [
     'am1',
-    'mndo',
-    'mndod',
-    'pddgpm3',
-    'pm3',
-    'pm6'
+    'mndo'
     ];
 
-const LIG_KEYS =
+const DIVCON_HAM_KEYS =
+    [
+    'am1_nmr',
+    'mndo_nmr'
+    ];
+
+const GEOM_KEYS =
     [
     'NOOPT',
-    'LIGOPT',
-    'COMPLEXOPT'
+    'HONLYOPT',
+    'HETEROOPT',
+    'ALLOPT'
+    ];
+const CSP_KEYS =
+    [
+    'H_ONLY',
+    'C_ONLY',
+    'ALL'
     ];
 
 
 /****************************************************************************
- *                          qb_QMScoreMPI
+ *                          qb_NMRScoreMPI
  *
  *  Pass all of the jobs in the database down to moedivconmpi, then collect
  *  all of the results.
  *
  *
 ****************************************************************************/
-global function qb_QMScoreMPI [dbpath]
+global function qb_NMRScoreMPI [dbpath]
 
     if not MOE_BATCH then return; endif
 
     //  Extract molecules and run options from the database environment
     qb_HamSetsInit [];
     local dbkey = db_Open [dbpath, 'read-write'];
-    local [recmol, ligmol, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
+    local [recmol, ligmol, status, coreopts, nmrsopts, c]
+        = qb_GetNMRSEnv [dbkey];
+    local [indices, names, free, bound] = qb_GetAnalysisData [dbkey,
+        'nmr', 'exp'];
+
     local poseflds = qb_GetPoseFields [dbkey];
     local recflds = qb_GetRecFields [dbkey];
     local dbrowkeys = db_Entries dbkey;
@@ -97,7 +113,7 @@ global function qb_QMScoreMPI [dbpath]
     write ['Work Dir:  {}\n', workdir];
 
     //  exe_open child process inherits parent's environment.
-    local process_key = exe_open ['moedivconmpi', workdir, [], 1];
+    local process_key = exe_open ['moedivconnmrmpi', workdir, [], 1];
     local process_keys = [process_key];
     local exestatus = exe_status process_keys;
 
@@ -110,21 +126,19 @@ global function qb_QMScoreMPI [dbpath]
 
     //  Pass down the dirs, options and number of possible jobs.
     fwrite [stdin, '{c:}\n', perfile];
-    fwrite [stdin, '{c:}\n', workdir];
-    fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', qmsopts.analpwd]];
     fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
     fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
         coreopts.scaling === 1]];
-    fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', qmsopts.freq]];
-    fwrite [stdin, '{c:}\n', LIG_KEYS(qmsopts.opt)];
-    fwrite [stdin, '{n:}\n', qmsopts.shift];
+    fwrite [stdin, '{c:}\n', GEOM_KEYS(nmrsopts.opt)];
+    fwrite [stdin, '{c:}\n', select ['GUESS', 'NOGUESS', nmrsopts.guess]];
+    fwrite [stdin, '{c:}\n', CSP_KEYS(nmrsopts.csp)];
     fwrite [stdin, '{n:}\n', nrows];
 
     //  For each receptor/pose in the database, check tests, then send down
     //  to moedivconmpi
     local rowkey = 0, rowcnt = 0, numokay = 0, warnings = [];
     for rowkey in dbrowkeys loop
-        local errmess = '', success = 0;
+        local errmess = '';
         local recchg;
         rowcnt = rowcnt + 1;
 
@@ -148,13 +162,16 @@ global function qb_QMScoreMPI [dbpath]
         local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
             = qb_CheckChgTestDivConMols [recmol, recchg, posemol, posechg,
                 status.notforced, status.notforced, status.notforced,
-                coreopts.testH, coreopts.testMM, 'qms',
+                coreopts.testH, coreopts.testMM, 'nmr',
                 HAM_KEYS (coreopts.ham)];
 
-        if alltrue [recok, recchgok, ligok, ligchgok] then
+        local poseidxs = qb_GetElemIndices [ligmol, nmrsopts.csp];
+        local idxok =  alltrue eqE [indices, poseidxs];
+
+        if alltrue [recok, recchgok, ligok, ligchgok, idxok] then
             numokay = numokay + 1;
 
-            //  Pass the two backbones to QuantumBio's DivCon QMScore
+            //  Pass the two backbones to QuantumBio's DivCon NMRScore
             //
             //  SplitCollection ensures that there is only one chain per 
             //  molecule in the receptor and ligand collections.
@@ -188,10 +205,16 @@ global function qb_QMScoreMPI [dbpath]
                     qb_GetWhich [not recchgok, not ligchgok]]];
             endif
 
+            if not idxok then
+                errmess = cat [errmess, 
+                    swrite ['Skipping!  Atom indices are inconsistent:\n'
+                    '    Orig: {v}\n    Pose: {v}\n', indices, poseidxs]];
+            endif
+
             qb_SaveDivConStatus [dbkey, rowkey, 
                 swrite ['Error:  {}\n', errmess]];
             write ['Skipping pose {} of {}\n', rowcnt, nrows];
-            write ['QMScore Error:  {}\n', errmess];
+            write ['NMRScore Error:  {}\n', errmess];
 
             fwrite [stdin, '{n:}\n', 0];            //  skipping
         endif
@@ -202,7 +225,6 @@ global function qb_QMScoreMPI [dbpath]
 
 
     //  Collect and store results
-    const NUMRESULTS = 11;
     local result_ith = 1;
     while exe_status process_key and result_ith <= numokay loop
         local results = [], return_statement = [];
@@ -213,37 +235,64 @@ global function qb_QMScoreMPI [dbpath]
         write ['DivCon: {}\n', return_statement];//DEBUG
 
         if return_statement === "success" then
-
+            local atomindices = [], atomvalues = [];
             [[rowcnt]] = fread [stdout, '{n:}'];
             write ['Getting results for pose {} ({} of {})\n', rowcnt, 
                 result_ith, numokay];
+            local [[numvals]] = fread [stdout, '{n:}'];
 
-            local name, nameValue;
-            local parameter, parameterValue;
-            [[name]] = fread [stdout, '{c:*}'];
-            [[nameValue]] = fread [stdout, '{c:*}'];
-            results = cat [results, [[name, nameValue]]];
-            for NUMRESULTS loop
-                [[parameter]] = fread [stdout, '{c:*}'];
-                [[parameterValue]] = fread [stdout, '{n:}'];
-                results = cat [results, [[parameter, parameterValue]]];
+            for numvals loop
+                local [[cspidx]] = fread [stdout, '{n:}'];
+                local [[cspval]] = fread [stdout, '{n:}'];
+print [cspidx, cspval];//DEBUG
+                atomindices = append [atomindices, cspidx];
+                atomvalues = append [atomvalues, cspval];
             endloop
 
-            fwrite [stdin, '{c:}\n', 'Ok'];
+            if neL [length indices, length atomindices] then
+                errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
+                    '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
+                    errmess];
+                if not isnull warnings (rowcnt) then
+                    errmess = cat [errmess, string warnings (rowcnt)];
+                endif
 
-            qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
-            local sucmess = "Success";
-            if not isnull  warnings (rowcnt)
-                    and neL [warnings (rowcnt), '']
-                    and neL [warnings (rowcnt), '\n'] then
+                qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), errmess];
 
-                sucmess = cat [sucmess, "-warnings!\n", string warnings (rowcnt)];
+            elseif not alltrue eqE [indices, atomindices] then
+                errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
+                    '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
+                    errmess];
+                if not isnull warnings (rowcnt) then
+                    errmess = cat [errmess, string warnings (rowcnt)];
+                endif
+
+                qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), errmess];
+
             else
-                sucmess = cat [sucmess, "\n"];
-            endif
+                local score = qb_RMSD [atomvalues, free - bound];
+print [score];//DEBUG
+                results = [score, atomvalues];
 
-            qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), sucmess];
-            result_ith = result_ith + 1;
+                fwrite [stdin, '{c:}\n', 'Ok'];
+
+                qb_SaveNMRScore [dbkey, dbrowkeys(rowcnt), score, 
+                    tag [names, atomvalues]];
+                local sucmess = "Success";
+                if not isnull  warnings (rowcnt)
+                        and neL [warnings (rowcnt), '']
+                        and neL [warnings (rowcnt), '\n'] then
+
+                    sucmess = cat [sucmess, "-warnings!\n", 
+                        string warnings (rowcnt)];
+                else
+                    sucmess = cat [sucmess, "\n"];
+                endif
+
+                qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), sucmess];
+
+            endif
+           result_ith = result_ith + 1;
 
         elseif return_statement === "error" then
 

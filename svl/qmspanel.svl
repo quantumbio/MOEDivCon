@@ -549,7 +549,7 @@ global function qb_QMScoreSetupPanel []
 
                     qb_SaveOptions [coreopts, qmsopts];
 
-                    Message [0, 'MOEDivCon Score update is done.'];
+                    Message [0, 'MOEDivCon QMScore update is done.'];
                     sleep 2;
                     exit [];
                 endif

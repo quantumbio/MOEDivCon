@@ -54,6 +54,7 @@ function qb_ResetLigand;
 function qb_SaveAnalysisData;
 function qb_SaveDivConStatus;
 function qb_SaveNMRScore;
+function qb_SaveOptions;
 function qb_SetAppStatus;
 function qb_SetHamStatus;
 function qb_SetHamDefault;
@@ -860,7 +861,7 @@ global function qb_NMRScoreSetupPanel []
                     break;
                 endif
 
-            elseif vals.panel === 'Save' then
+            elseif vals.panel === 'Create' then
                 if qb_IsShowingAllPoses [vals] then
                     vals = qb_ResetLigand [wkey, vals];
                 endif
@@ -900,6 +901,23 @@ global function qb_NMRScoreSetupPanel []
                     db_Close dbkey;
                     exit [];
                 endif
+
+            elseif vals.panel === 'Update' then
+
+                if second task_fork [statics:'share'] === 'child' then
+
+                    coreopts = qb_TagCoreVals [vals];
+                    nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,
+                        [vals.csp, vals.guess, vals.opt,
+                        vals.radius]];
+
+                    qb_SaveOptions [coreopts, nmrsopts];
+
+                    Message [0, 'MOEDivCon NMRScore update is done.'];
+                    sleep 2;
+                    exit [];
+                endif
+
             endif
         else
            [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
