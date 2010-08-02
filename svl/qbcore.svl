@@ -1200,10 +1200,47 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
 
     if MOE_BATCH then return; endif
 
+    local dbtype;
+    if appname === 'qms' then
+        dbtype = 'QMScore';
+    elseif appname === 'nmr' then
+        dbtype = 'NMRScore';
+    else
+        dbtype = 'Unkown';
+    endif
+
+    if neL [fext dbpath, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', dbpath];
+        exit [];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        Warning twrite ['Unable to find the {} database:\n'
+            '    {}\nCreate it or Load it first.', dbtype, dbpath];
+        exit [];
+    endif
+
     local dbkey = db_Open [dbpath, 'read-write'];
+
+    if appname === 'qms' then
+        if neL [db_GetEnv [dbkey, DBTYPE], QMSCORE] then
+            Warning twrite ['{}\n is not a QMScore database.', dbpath];
+            exit [];
+        endif
+    elseif appname === 'nmr' then
+        if neL [db_GetEnv [dbkey, DBTYPE], NMRSCORE] then
+            Warning twrite ['{}\n is not a NMRScore database.', dbpath];
+            exit [];
+        endif
+    else
+        Warning twrite ['{}\n is not a MOEDivCon database.', dbpath];
+        exit [];
+    endif
+
     local dblist = dbv_KeyList [];
     if isnull dblist or isnull indexof [dbkey, dblist] then
-        Warning 'The MOEDivCon database isn\'t open.';
+        Warning twrite ['The {} database isn\'t open.\n'
+            'Create it or Load it first.', dbtype];
         return;
     endif
 

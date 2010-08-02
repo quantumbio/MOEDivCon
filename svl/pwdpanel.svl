@@ -480,7 +480,7 @@ local function CreateSurfaceMap [restokens]
     endif
 
     local dist = CalcDist [restokens, recatoms, ligatoms];
-    dist = dist / 2;
+//    dist = dist / 2;
 
     local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
     local gridopt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
@@ -774,7 +774,8 @@ local function NearestAtomColor [pos, rad, acolor, spos]
     const NAC_BUCKET_SIZE = 4.0;
     const NAC_MAX_POINTS  = 100000;
 
-    const ALPHA = 2.5;
+    const ALPHA = 0.0;  //  Do not attenuate color on map
+//    const ALPHA = 2.5;
     local maxrad = max [1, max rad];
     local argb = bitand [0xFF, bitshr [[acolor],[16,8,0]]];
     local r = rep [0, l_length spos], g = r, b = r;
