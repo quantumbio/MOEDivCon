@@ -1216,7 +1216,7 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
 
     if neL [ftype dbpath, 'file'] then
         Warning twrite ['Unable to find the {} database:\n'
-            '    {}\nCreate it or Load it first.', dbtype, dbpath];
+            '    {}\nCreate it first.', dbtype, dbpath];
         exit [];
     endif
 
