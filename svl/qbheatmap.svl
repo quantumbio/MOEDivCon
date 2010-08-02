@@ -1193,10 +1193,24 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
     optdflts.mapradio = initsel;
     selrow = initsel; selcol = 0;
 
-    //  Currently, only 30 columns and 40 rows are allowed.
+    //  Currently, only MAX_COLS columns and MAX_ROWS rows are allowed.
+    local warning = '';
+    local [titles, colnames, colabbrevs, rowdata] = data;
+    if length colnames > MAX_COLS then
+        warning = tok_cat [warning, 'Heat Map:  truncating column data.\n'];
+    endif
+
+    if length rowdata > MAX_ROWS then
+        warning = tok_cat [warning, 'Heat Map:  truncating row data.\n'];
+    endif
+
+    if tok_length warning > 0 then
+        Warning warning;
+    endif
+
     data = TruncateCols [data];
     data = TruncateRows [data];
-    local [titles, colnames, colabbrevs, rowdata] = data;
+    [titles, colnames, colabbrevs, rowdata] = data;
     local numcols = length colnames;
     numsignifcols = select [numcols, numsignifcols, numcols < numsignifcols];
     local numrows = length rowdata;
