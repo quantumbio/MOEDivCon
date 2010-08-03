@@ -1350,7 +1350,9 @@ local function UpdateMode [wkey, vals, status]
             panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
             chgbox: [sensitive: 1], recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
-        vals = qb_ResetLigand [wkey, vals];
+            local las;
+            [vals, las] = qb_ResetLigand [vals];
+            WindowSetData [wkey, [allposes: vals.allposes]];
         SetChargeStatus [wkey, status];
     elseif vals.mode === 'One-to-Many' then
         WindowSetAttr [wkey, [allposes: [sensitive: 1],
@@ -1510,7 +1512,7 @@ function qb_UpdateCharge;
  *  Handle the triggers of the core panel.
  *
  ****************************************************************************/
-global function qb_CoreHandler [wkey, trig, status, vals, btasks]
+global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
 
     local btid;
     if trig === 'cwd' then
@@ -1523,126 +1525,91 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
     elseif trig === 'allposes' then
         if neL [vals.mode, 'One-to-Many'] then
             WindowSetData [wkey, [allposes: 0]];
-            return [status, btasks];
+            return [status, ligatoms, btasks];
         endif
 
-        if second task_fork [statics:'share',
-                master: 'parent'] === 'child' then
-            task_prio 0;
-
-            if not qb_ShowLigPoses [vals] then
-                WindowSetData [wkey, [allposes: 0]];
-            endif
-
-            exit [];
-        endif
+        [vals, ligatoms] = qb_ShowLigPoses [vals, ligatoms];
+        WindowSetData [wkey, [allposes: vals.allposes]];
 
     elseif trig === 'performtests' then
         if allfalse [vals.testLP, vals.testOverlap, vals.testHam, vals.testH,
                 vals.testMM] then
             Warning 'No tests selected.';
-            return;
+            return [status, ligatoms, btasks];
         endif
 
         if vals.allposes then
-            vals = qb_ResetLigand [wkey, vals];
+            [vals, ligatoms] = qb_ResetLigand [vals];
+            WindowSetData [wkey, [allposes: vals.allposes]];
         endif
 
+        local recok = 1, recmess = '', ligok = 1, ligmess = '';
+        local msgkey = Message [0, 'Running tests ...'];
 
-        if second task_fork [master: 'parent',
-                statics:'share'] === 'child' then
-            task_prio 0;
+        if neL [vals.mode, 'Many-to-Many'] then
+            [recok, recmess, ligok, ligmess] = TestComplex [
+                vals.testLP, vals.testOverlap, vals.testHam,
+                vals.testH, vals.testMM, status.appname,
+                (HAM_KEYS | status.allowham)(vals.ham)];
+        endif
 
-            local recok = 1, recmess = '', ligok = 1, ligmess = '';
-            local msgkey = Message [0, 'Running tests ...'];
+        if neL [vals.mode, 'One-to-One'] then
+            TestDBMols [vals.scoredb, vals.testLP, vals.testOverlap,
+                vals.testHam, vals.testH, vals.testMM, status.appname,
+                (HAM_KEYS | status.allowham)(vals.ham)];
+        endif
 
-            if neL [vals.mode, 'Many-to-Many'] then
-                [recok, recmess, ligok, ligmess] = TestComplex [
-                    vals.testLP, vals.testOverlap, vals.testHam,
-                    vals.testH, vals.testMM, status.appname,
-                    (HAM_KEYS | status.allowham)(vals.ham)];
-            endif
-
-            if neL [vals.mode, 'One-to-One'] then
-                TestDBMols [vals.scoredb, vals.testLP, vals.testOverlap,
-                    vals.testHam, vals.testH, vals.testMM, status.appname,
-                    (HAM_KEYS | status.allowham)(vals.ham)];
-            endif
-
-            if vals.mode === 'Many-to-Many' then
-                Message [msgkey, 'Running tests ... done.'];
-                sleep 3;
-                exit [];
-            else
-                if [recok and ligok and recmess === '' and ligmess === ''] then
-                    if vals.mode === 'One-to-One' then
-                        qb_CreateMessWin [
-                            "No problems detected for complex in MOE Window.",
-                            1, 40];
-                        exit [];
-                    else
-                        Message [msgkey, 'Running tests ... done.'];
-                        sleep 3;
-                        exit [];
-                    endif
+        if vals.mode === 'Many-to-Many' then
+            Message [msgkey, 'Running tests ... done.'];
+            sleep 3;
+            return [status, ligatoms, btasks];
+        else
+            if [recok and ligok and recmess === '' and ligmess === ''] then
+                if vals.mode === 'One-to-One' then
+                    qb_CreateMessWin [
+                        "No problems detected for complex in MOE Window.",
+                        1, 40];
+                    return [status, ligatoms, btasks];
                 else
-                    qb_CreateMessWin [string tok_cat [recmess, ligmess]];
-                    exit [];
+                    Message [msgkey, 'Running tests ... done.'];
+                    sleep 3;
+                    return [status, ligatoms, btasks];
                 endif
+            else
+                qb_CreateMessWin [string tok_cat [recmess, ligmess]];
+                return [status, ligatoms, btasks];
             endif
-
-            exit [];
         endif
 
     elseif trig === 'calcchg' then
         if vals.allposes then
-            vals = qb_ResetLigand [wkey, vals];
+            [vals, ligatoms] = qb_ResetLigand [vals];
+            WindowSetData [wkey, [allposes: vals.allposes]];
         endif
 
-        if second task_fork [master: 'parent',
-                statics:'share'] === 'child' then
-            task_prio 0;
-
-            status = qb_UpdateCharge [wkey, vals, status, 1];
-            exit [];
-        endif
+       status = qb_UpdateCharge [wkey, vals, status, 1];
 
     elseif trig === 'ckdbchg' then
-        if second task_fork [master: 'parent',
-                statics:'share'] === 'child' then
-            task_prio 0;
 
-            CheckChgDBMols [vals.scoredb];
-            exit [];
-        endif
+        CheckChgDBMols [vals.scoredb];
 
     elseif trig === 'recchg' then
         if vals.allposes then
-            vals = qb_ResetLigand [wkey, vals];
+            [vals, ligatoms] = qb_ResetLigand [vals];
+            WindowSetData [wkey, [allposes: vals.allposes]];
         endif
 
-        if second task_fork [master: 'parent', 
-                statics:'share'] === 'child' then
-            task_prio 0;
-
-            status = CheckCharge [wkey, status, vals.recchg,
-                vals.ligchg, 1];
-            exit [];
-        endif
+        status = CheckCharge [wkey, status, vals.recchg,
+            vals.ligchg, 1];
 
     elseif trig === 'ligchg' then
         if vals.allposes then
-            vals = qb_ResetLigand [wkey, vals];
+            [vals, ligatoms] = qb_ResetLigand [vals];
+            WindowSetData [wkey, [allposes: vals.allposes]];
         endif
 
-        if second task_fork [master: 'parent',
-                statics:'share'] === 'child' then
-            task_prio 0;
-
-            status = CheckCharge [wkey, status, vals.recchg,
-                vals.ligchg, 1];
-            exit [];
-        endif
+        status = CheckCharge [wkey, status, vals.recchg,
+            vals.ligchg, 1];
 
     elseif trig === 'browse_scoredb' then
         btid = run ['fbrowse.svl', [trig, wkey, 'Select QMScore DB File', 
@@ -1660,7 +1627,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, btasks]
         if btid then btasks = append [btasks, btid]; endif
     endif
 
-    return [status, btasks];
+    return [status, ligatoms, btasks];
 endfunction
 
 /****************************************************************************
@@ -2280,13 +2247,13 @@ endfunction
  *  Remove the poses and restore the original ligand.
  *
  ****************************************************************************/
-global function qb_ResetLigand [wkey, vals]
+global function qb_ResetLigand [vals]
 
-    WindowSetData [wkey, [allposes: 0]];
+    local ligatoms;
     vals = tagpoke [vals, 'allposes', 0];
-    qb_ShowLigPoses [vals];
+    [vals, ligatoms] = qb_ShowLigPoses [vals, []];
 
-    return vals;
+    return [vals, ligatoms];
 endfunction
 
 /****************************************************************************
@@ -2587,34 +2554,29 @@ endfunction
  *  Show either the ligand or all poses in the MOE Window.
  *
  ****************************************************************************/
-global function qb_ShowLigPoses [vals]
+global function qb_ShowLigPoses [vals, ligatoms]
 
-    static ligmol, ligatoms, posemols, poseatoms, posedb;
+    static ligmol, posemols, poseatoms, posedb;
 
-    local errmess;
     //  If first entry, set up ligmol
     if ligmol === [] and posemols === [] then
-        [ligatoms, errmess] = qb_GetLigandAtoms [];
-        if ligatoms === [] then
-            Warning errmess;
-            return 0;
-        endif
-
         ligmol = mol_Extract ligatoms;
         posedb = '';
     endif
 
     if vals.allposes then
-        if ligatoms === [] then
-            return 1;
+        if  not isnull poseatoms then
+            return [vals, []];
         endif
 
         if (neL [posedb, vals.posedb] or posemols === [])
                 and vals.mode === 'One-to-Many' then
+            local errmess;
             [posemols, errmess] = qb_GetPoses [vals];
             if posemols === [] then
                 Warning errmess;
-                return 0;
+                vals = tagpoke [vals, 'allposes', 0];
+                return [vals, ligatoms];
             endif
         endif
 
@@ -2625,9 +2587,10 @@ global function qb_ShowLigPoses [vals]
         oSetCollection ['QB_LIGAND', poseatoms];
         aSetNucleusLook [poseatoms, 'small-sphere'];
         aSetBondLook [poseatoms, 'cylinder'];
+        return [vals, []];
     else
         if poseatoms === [] then
-            return 1;
+            return [vals, ligatoms];
         endif
 
         oDestroy uniq oChains poseatoms;
@@ -2637,9 +2600,8 @@ global function qb_ShowLigPoses [vals]
         oSetCollection ['QB_LIGAND', ligatoms];
         aSetNucleusLook [ligatoms, 'small-sphere'];
         aSetBondLook [ligatoms, 'cylinder'];
+        return [vals, ligatoms];
     endif
-
-    return 1;
 endfunction
 
 /****************************************************************************
