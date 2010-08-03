@@ -420,6 +420,8 @@ endfunction
 global function qb_QMScoreSetupPanel []
 
     static status;                     //  Shared with child tasks.
+    static origligmol;
+    static ligatoms;
 
     if MOE_BATCH then return; endif
     if WindowShow ['QMScorePanel', 1] then return; endif
