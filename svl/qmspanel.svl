@@ -460,17 +460,16 @@ global function qb_QMScoreSetupPanel []
                             exit [];
                         endif
 
-                        local [ldkey, ldrec, ldlig, ldsts, ldcoreopts,
+                        local [ldkey, ldrec, origligmol, ldsts, ldcoreopts,
                             ldqmropts] = LoadDB [dbpath];
 
     	                Close [force:1];
-                        if neL [ldrec, []] and neL [ldlig, []] then
-                            local ldligmol = mol_Create ldlig;
-                            local ldligatoms = cat oAtoms ldligmol;
-                            oSetCollection ['QB_LIGAND', ldligatoms];
-                            aSetNucleusLook [ldligatoms, 'small-sphere'];
-                            aSetBondLook [ldligatoms, 'cylinder'];
+                        if neL [ldrec, []] and neL [origligmol, []] then
                             mol_Create ldrec;
+                            local ligatoms = cat oAtoms mol_Create origligmol;
+                            oSetCollection ['QB_LIGAND', ligatoms];
+                            aSetNucleusLook [ligatoms, 'small-sphere'];
+                            aSetBondLook [ligatoms, 'cylinder'];
         	                View [];
                         endif
 
@@ -486,12 +485,14 @@ global function qb_QMScoreSetupPanel []
             elseif vals.panel === 'Run' then
 
                 if qb_IsShowingAllPoses [vals] then
-                    vals = qb_ResetLigand [wkey, vals];
+                    [vals, ligatoms] = qb_ResetLigand [vals];
+                    WindowSetData [wkey, [allposes: vals.allposes]];
                 endif
 
                 if second task_fork [statics:'share'] === 'child' then
 
                     task_settitle [-1, 'MOEDivCon QMScore Run'];
+
                     status = qb_VerifyDivCon [wkey, status, vals];
                     if not status.verified then exit []; endif
 
@@ -519,7 +520,8 @@ global function qb_QMScoreSetupPanel []
             elseif vals.panel === 'Create' then
 
                 if qb_IsShowingAllPoses [vals] then
-                    vals = qb_ResetLigand [wkey, vals];
+                    [vals, ligatoms] = qb_ResetLigand [vals];
+                    WindowSetData [wkey, [allposes: vals.allposes]];
                 endif
 
                 if second task_fork [statics:'share'] === 'child' then

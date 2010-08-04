@@ -601,12 +601,24 @@ local function GetAnalData [dbpath, title, type]
 
     if MOE_BATCH then return []; endif
 
-    if neL [ftype dbpath, 'file'] or neL [fext dbpath, 'mdb'] then
-        Warning twrite ['{}\n is not a QMScore/PWD database.', dbpath];
+    if neL [fext dbpath, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', dbpath];
+        exit [];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        Warning twrite ['Unable to find the {} database:\n'
+            '    {}\nCreate it first.', dbtype, dbpath];
         exit [];
     endif
 
     local dbkey = db_Open [dbpath, 'read'];
+
+    if neL [db_GetEnv [dbkey, DBTYPE], QMSCORE] then
+        Warning twrite ['{}\n is not a QMScore database.', dbpath];
+        exit [];
+    endif
+
     local data = qb_GetAnalysisData [dbkey, 'pwd', type];
     db_Close dbkey;
 
@@ -705,8 +717,14 @@ local function LoadLigs [pwdfilename]
 
     if MOE_BATCH then return []; endif
 
-    if neL [ftype pwdfilename, 'file'] or neL [fext pwdfilename, 'mdb'] then
-        Warning twrite['{}\nis not a QMScore/PWD database.', pwdfilename];
+    if neL [fext pwdfilename, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', pwdfilename];
+        exit [];
+    endif
+
+    if neL [ftype pwdfilename, 'file'] then
+        Warning twrite ['Unable to find the {} database:\n'
+            '    {}\nCreate it first.', pwdfilename];
         exit [];
     endif
 
@@ -947,13 +965,18 @@ local function SaveOptions [dbpath, options]
 
     if MOE_BATCH then return []; endif
 
-    if neL [ftype dbpath, 'file'] or neL [fext dbpath, 'mdb'] then
-        Warning twrite ['{}\n is not a QMScore/PWD database.', dbpath];
+    if neL [fext dbpath, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', dbpath];
+        exit [];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        Warning twrite ['Unable to find the {} database:\n'
+            '    {}\nCreate it first.', dbtype, dbpath];
         exit [];
     endif
 
     local dbkey = db_Open [dbpath, 'read-write'];
-
     local data = qb_SaveEnvAnal [dbkey, options];
     db_Close dbkey;
 

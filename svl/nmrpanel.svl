@@ -964,15 +964,10 @@ global function qb_NMRScoreSetupPanel []
 
             endif
         else
-            if second task_fork [statics:'share'] === 'child' then
-                task_prio 0;
-
 print ['before ', aName ligatoms];//DEBUG
-                [status, ligatoms, browsetasks] = qb_CoreHandler [wkey, trig, 
-                status, vals, ligatoms, browsetasks];
+            [status, ligatoms, browsetasks] = qb_CoreHandler [wkey, trig, 
+            status, vals, ligatoms, browsetasks];
 print ['after  ', aName ligatoms];//DEBUG
-                exit [];
-            endif
         endif
     endloop
 
