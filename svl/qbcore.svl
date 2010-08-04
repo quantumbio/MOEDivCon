@@ -669,6 +669,17 @@ function qb_SaveDivConStatus;
  ****************************************************************************/
 local function CheckChgDBMols [dbpath]
 
+    if neL [fext dbpath, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', dbpath];
+        exit [];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        Warning twrite ['Unable to find the {} database:\n'
+            '    {}\nCreate it first.', dbtype, dbpath];
+        exit [];
+    endif
+
     local dbkey = db_Open [dbpath, 'read-write'];
 
     local dblist = dbv_KeyList [];
@@ -1511,10 +1522,14 @@ function qb_UpdateCharge;
  *
  *  Handle the triggers of the core panel.
  *
+ *  Note:  Because of the All Poses option, the caller must keep track of
+ *  the current keys for the ligand atoms in the MOE System. 
+ *
  ****************************************************************************/
 global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
 
     local btid;
+
     if trig === 'cwd' then
         status.prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir,
             status.prevwd];
@@ -1543,42 +1558,44 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
             WindowSetData [wkey, [allposes: vals.allposes]];
         endif
 
-        local recok = 1, recmess = '', ligok = 1, ligmess = '';
-        local msgkey = Message [0, 'Running tests ...'];
+        if second task_fork [statics:'share'] === 'child' then
+            local recok = 1, recmess = '', ligok = 1, ligmess = '';
+            local msgkey = Message [0, 'Running tests ...'];
 
-        if neL [vals.mode, 'Many-to-Many'] then
-            [recok, recmess, ligok, ligmess] = TestComplex [
-                vals.testLP, vals.testOverlap, vals.testHam,
-                vals.testH, vals.testMM, status.appname,
-                (HAM_KEYS | status.allowham)(vals.ham)];
-        endif
+            if neL [vals.mode, 'Many-to-Many'] then
+                [recok, recmess, ligok, ligmess] = TestComplex [
+                    vals.testLP, vals.testOverlap, vals.testHam,
+                    vals.testH, vals.testMM, status.appname,
+                    (HAM_KEYS | status.allowham)(vals.ham)];
+            endif
 
-        if neL [vals.mode, 'One-to-One'] then
-            TestDBMols [vals.scoredb, vals.testLP, vals.testOverlap,
-                vals.testHam, vals.testH, vals.testMM, status.appname,
-                (HAM_KEYS | status.allowham)(vals.ham)];
-        endif
+            if neL [vals.mode, 'One-to-One'] then
+                TestDBMols [vals.scoredb, vals.testLP, vals.testOverlap,
+                    vals.testHam, vals.testH, vals.testMM, status.appname,
+                    (HAM_KEYS | status.allowham)(vals.ham)];
+            endif
 
-        if vals.mode === 'Many-to-Many' then
-            Message [msgkey, 'Running tests ... done.'];
-            sleep 3;
-            return [status, ligatoms, btasks];
-        else
-            if [recok and ligok and recmess === '' and ligmess === ''] then
-                if vals.mode === 'One-to-One' then
-                    qb_CreateMessWin [
-                        "No problems detected for complex in MOE Window.",
-                        1, 40];
-                    return [status, ligatoms, btasks];
+            if vals.mode === 'Many-to-Many' then
+                Message [msgkey, 'Running tests ... done.'];
+                sleep 2;
+            else
+                if [recok and ligok and recmess === '' and ligmess === ''] then
+                    if vals.mode === 'One-to-One' then
+                        qb_CreateMessWin [
+                            "No problems detected for complex in MOE Window.",
+                            1, 40];
+                        return [status, ligatoms, btasks];
+                    else
+                        Message [msgkey, 'Running tests ... done.'];
+                        sleep 3;
+                        return [status, ligatoms, btasks];
+                    endif
                 else
-                    Message [msgkey, 'Running tests ... done.'];
-                    sleep 3;
+                    qb_CreateMessWin [string tok_cat [recmess, ligmess]];
                     return [status, ligatoms, btasks];
                 endif
-            else
-                qb_CreateMessWin [string tok_cat [recmess, ligmess]];
-                return [status, ligatoms, btasks];
             endif
+            exit [];
         endif
 
     elseif trig === 'calcchg' then
@@ -1591,7 +1608,10 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
 
     elseif trig === 'ckdbchg' then
 
-        CheckChgDBMols [vals.scoredb];
+        if second task_fork [statics:'share'] === 'child' then
+            CheckChgDBMols [vals.scoredb];
+            exit [];
+        endif
 
     elseif trig === 'recchg' then
         if vals.allposes then
@@ -2096,6 +2116,17 @@ endfunction
  ****************************************************************************/
 global function qb_LoadCoreScoreDB [dbpath, type]
 
+    if neL [fext dbpath, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', dbpath];
+        exit [];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        Warning twrite ['Unable to find the {} database:\n'
+            '    {}\nCreate it first.', dbtype, dbpath];
+        exit [];
+    endif
+
     local dbkey = db_Open [dbpath, 'read-write'];
     local dbtype = db_GetEnv [dbkey, DBTYPE];
 
@@ -2350,10 +2381,13 @@ global function qb_SaveOptions [coreopts, appopts]
 
     if MOE_BATCH then return []; endif
 
-    if neL [ftype coreopts.scoredb, 'file']
-            or neL [fext coreopts.scoredb, 'mdb'] then
-        Warning twrite ['{}\n is not a MOEDivCon Score database.',
-            coreopts.scoredb];
+    if neL [fext coreopts., 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', dbpath];
+        exit [];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        Warning twrite ['Unable to find the database\n     ', dbpath];
         exit [];
     endif
 
