@@ -29,6 +29,7 @@
 #set version '2010.02'
 #set main    'qb_NMRScoreSetupPanel'
 
+function qb_AllPosesEnable;
 function qb_AtomsToMols;
 function qb_CoreEnable;
 function qb_CoreHandler;
@@ -346,9 +347,6 @@ local function RunCalc [dbkey]
         endif
     else
         local [score, posevals] = results;
-
-write ['S: {}\nV: {v}\n', score,  posevals];  //DEBUG
-
         qb_SaveNMRScore [dbkey, rowkey, score, tag [names, posevals]];
 
         local sucmess = "Success";
@@ -376,7 +374,7 @@ endfunction
  ****************************************************************************/
 local function RunOneToManyCalc [oldkey]
 
-    if MOE_BATCH then return; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
     if oldkey === 0 then
         Warning 'The NMRScore database hasn\'t been created.';
@@ -463,7 +461,7 @@ endfunction
  ****************************************************************************/
 local function SetupExpDataPanel [ligatoms, indices, atomfree, atombound]
 
-    if MOE_BATCH then return; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
     if WindowShow ['NMRExperimentalData', 1] then return; endif
 
     local atomnames = get [aName ligatoms, indices];
@@ -582,11 +580,6 @@ endfunction
  *  It is assumed that the user will not modify the receptor or ligand
  *  poses while the NMRScore panel is open.
  *
- *  NOTE:  QBCore's allposes "events" are captured here and the corresponding
- *  functionality is duplicated here.  A poor design, but a necessary
- *  compromise so that all keys to System atoms are located in one place
- *  and consistently deleted and created.
- *
  ****************************************************************************/
 global function qb_NMRScoreSetupPanel []
 
@@ -604,7 +597,7 @@ global function qb_NMRScoreSetupPanel []
     static atomfree;
     static atombound;
 
-    if MOE_BATCH then return; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
     if WindowShow ['NMRScorePanel', 1] then return; endif
 
     cutrecmol = [];
@@ -643,6 +636,9 @@ global function qb_NMRScoreSetupPanel []
         origrecmol = mol_Extract recatoms;
         origligmol = mol_Extract ligatoms;
         indices = qb_GetElemIndices [origligmol, nmrdflts.csp];
+        atomnames = get [aName ligatoms, indices];
+        indextoks = totok indices;
+        atomnames = tok_cat [indextoks, '-', atomnames];
         curcsp = nmrdflts.csp;
 //        atomfree = rep [0, length indices];//DEBUG
 //        atombound = rep [0, length indices];//DEBUG
@@ -672,11 +668,8 @@ global function qb_NMRScoreSetupPanel []
         local [vals, trig] = WindowWait wkey;
         if trig === 'showcut' then
 
-            if not qb_IsModeOneToMany [vals] then continue; endif
-
             if qb_IsShowingAllPoses [vals] then
-                [vals, ligatoms] = qb_ResetLigand [vals];
-                WindowSetData [wkey, [allposes: vals.allposes]];
+                [vals, ligatoms] = qb_ResetLigand [wkey, vals];
             endif
 
             if second task_fork [statics:'share',
@@ -684,30 +677,29 @@ global function qb_NMRScoreSetupPanel []
                 task_prio 0;
 
                 ViewSave 1;
-/*
-                [ligatoms, errmess] = qb_GetLigandAtoms [];
-                if ligatoms === [] then
-                    Warning errmess;
-                    return;
-                endif
-*/
                 orignucs = aNucleusLook ligatoms;
                 origbnds = aBondLook ligatoms;
-                if posemols === [] then
-                    [posemols, errmess] = qb_GetPoses [vals];
+
+                if qb_IsModeOneToMany [vals] then 
                     if posemols === [] then
-                        Warning errmess;
-                        exit [];
+                        [posemols, errmess] = qb_GetPoses [vals];
+                        if posemols === [] then
+                            Warning errmess;
+                            exit [];
+                        endif
                     endif
+
+                    [recatoms, errmess] = qb_CutReceptor [posemols, vals.radius];
+                else
+                    [recatoms, errmess] = qb_CutReceptor [[], vals.radius];
                 endif
 
-                [cutrecmol, errmess]
-                    = qb_CutReceptor [posemols, vals.radius];
-                if cutrecmol === [] then
+                if recatoms === [] then
                     Warning errmess;
                     exit [];
                 endif
 
+                cutrecmol = mol_Extract recatoms;
                 status = qb_UpdateCharge [wkey, vals, status, 1];
 
                 WindowSetAttr [wkey, [showcut: [sensitive: 0],
@@ -717,6 +709,11 @@ global function qb_NMRScoreSetupPanel []
             endif
 
         elseif trig === 'original' then
+
+            if qb_IsShowingAllPoses [vals] then
+                [vals, ligatoms] = qb_ResetLigand [wkey, vals];
+            endif
+
             if second task_fork [statics:'share',
                     master: 'parent'] === 'child' then
                 task_prio 0;
@@ -726,14 +723,9 @@ global function qb_NMRScoreSetupPanel []
                     exit [];
                 endif
 
-                Close [force:1];
-                mol_Create origrecmol;
-                ligatoms = cat cAtoms mol_Create origligmol;
-                oSetCollection ['QB_LIGAND', ligatoms];
-
-               [vals, ligatoms] = qb_ShowLigPoses [vals, ligatoms];
-                status = qb_UpdateCharge [wkey, vals, status, 1];//DEBUG
-
+                oDestroy uniq oChains recatoms;
+                recatoms = cat cAtoms mol_Create origrecmol;
+                status = qb_UpdateCharge [wkey, vals, status, 1];
                 WindowSetAttr [wkey, [showcut: [sensitive: 1],
                     original: [sensitive: 0]]];
                 aSetNucleusLook [ligatoms, orignucs];
@@ -743,10 +735,12 @@ global function qb_NMRScoreSetupPanel []
                 exit [];
             endif
 
-        elseif droplast trig === 'csp' then
+        elseif trig === 'csp' then
             if neL [curcsp, vals.csp] then
                 indices = qb_GetElemIndices [origligmol, vals.csp];
-                atomnames = [];
+                atomnames = get [aName ligatoms, indices];
+                indextoks = totok indices;
+                atomnames = tok_cat [indextoks, '-', atomnames];
                 atomfree = [];
                 atombound = [];
                 curcsp = vals.csp;
@@ -757,19 +751,14 @@ global function qb_NMRScoreSetupPanel []
             if WindowShow ['NMRExperimentalData', 1] then continue; endif
 
             if qb_IsShowingAllPoses [vals] then
-                [vals, ligatoms] = qb_ResetLigand [vals];
-                WindowSetData [wkey, [allposes: vals.allposes]];
+                [vals, ligatoms] = qb_ResetLigand [wkey, vals];
             endif
 
             if second task_fork [statics:'share',
                     master: 'parent'] === 'child' then
-/*
-                [ligatoms, errmess] = qb_GetLigandAtoms [];
-                if ligatoms === [] then
-                    Warning errmess;
-                    exit [];
-                endif
-*/
+
+                qb_AllPosesEnable [wkey, 0];
+                WindowSetAttr [wkey, [csp: [sensitive: 0]]];
                 ViewSave 2;
                 local lignucs = aNucleusLook ligatoms;
                 local ligbnds = aBondLook ligatoms;
@@ -779,10 +768,11 @@ global function qb_NMRScoreSetupPanel []
                 View ligatoms;
                 [atomfree, atombound] = SetupExpDataPanel [ligatoms, indices,
                     atomfree, atombound];
-
                 aSetNucleusLook [ligatoms, lignucs];
                 aSetBondLook [ligatoms, ligbnds];
                 ViewLoad 2;
+                qb_AllPosesEnable [wkey, qb_IsModeOneToMany [vals]];
+                WindowSetAttr [wkey, [csp: [sensitive: 1]]];
                 exit [];
             endif
 
@@ -812,14 +802,14 @@ global function qb_NMRScoreSetupPanel []
                         Close [force:1];
                         if neL [cutrecmol, []] then
                             wascut = 1;
-                            mol_Create cutrecmol;
+                            recatoms = cat cAtoms mol_Create cutrecmol;
                             ligatoms = cat oAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
                             aSetNucleusLook [ligatoms, 'small-sphere'];
                             aSetBondLook [ligatoms, 'cylinder'];
                         else
                             wascut = 0;
-                            mol_Create origrecmol;
+                            recatoms = cat cAtoms mol_Create origrecmol;
                             ligatoms = cat cAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
                             aSetNucleusLook [ligatoms, 'small-sphere'];
@@ -853,8 +843,7 @@ global function qb_NMRScoreSetupPanel []
 
             elseif vals.panel === 'Run' then
                 if qb_IsShowingAllPoses [vals] then
-                    [vals, ligatoms] = qb_ResetLigand [vals];
-                    WindowSetData [wkey, [allposes: vals.allposes]];
+                    [vals, ligatoms] = qb_ResetLigand [wkey, vals];
                 endif
 
                 if isnull atomfree or isnull atombound then
@@ -862,27 +851,19 @@ global function qb_NMRScoreSetupPanel []
                     continue;
                 endif
 
-                status = qb_VerifyDivCon [wkey, status, vals];
-                if not status.verified then continue; endif
-
                 if second task_fork [statics:'share',
                         prio:3, idle:0] === 'child' then
+
+                    task_settitle [-1, 'MOEDivCon NMRScore Run'];
+
+                    status = qb_VerifyDivCon [wkey, status, vals];
+                    if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
                     nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,
                         [vals.csp, vals.guess, vals.opt,
                         vals.radius]];
-/*
-                    //  Make sure atom names are unique for DB fields.
-                    [ligatoms, errmess] = qb_GetLigandAtoms [];
-                    if ligatoms === [] then
-                        Warning errmess;
-                        exit [];
-                    endif
-*/
-                    atomnames = get [aName ligatoms, indices];
-                    indextoks = totok indices;
-                    atomnames = tok_cat [indextoks, '-', atomnames];
+
                     dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         [origrecmol, origligmol],
                         cat [NMR_NUM_FIELDS, atomnames], 'nmrscore', 0];
@@ -904,8 +885,7 @@ global function qb_NMRScoreSetupPanel []
 
             elseif vals.panel === 'Create' then
                 if qb_IsShowingAllPoses [vals] then
-                    [vals, ligatoms] = qb_ResetLigand [vals];
-                    WindowSetData [wkey, [allposes: vals.allposes]];
+                    [vals, ligatoms] = qb_ResetLigand [wkey, vals];
                 endif
 
                 if isnull atomfree or isnull atombound then
@@ -923,17 +903,7 @@ global function qb_NMRScoreSetupPanel []
                     nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,
                         [vals.csp, vals.guess, vals.opt,
                         vals.radius]];
-/*
-                    //  Make sure atom names are unique for DB fields.
-                    [ligatoms, errmess] = qb_GetLigandAtoms [];
-                    if ligatoms === [] then
-                        Warning errmess;
-                        exit [];
-                    endif
-*/
-                    atomnames = get [aName ligatoms, indices];
-                    indextoks = totok indices;
-                    atomnames = tok_cat [indextoks, '-', atomnames];
+
                     dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         [origrecmol, origligmol],
                         cat [NMR_NUM_FIELDS, atomnames], 'nmrscore', 1];
@@ -964,10 +934,8 @@ global function qb_NMRScoreSetupPanel []
 
             endif
         else
-print ['before ', aName ligatoms];//DEBUG
             [status, ligatoms, browsetasks] = qb_CoreHandler [wkey, trig, 
             status, vals, ligatoms, browsetasks];
-print ['after  ', aName ligatoms];//DEBUG
         endif
     endloop
 

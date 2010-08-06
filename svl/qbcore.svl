@@ -670,14 +670,14 @@ function qb_SaveDivConStatus;
 local function CheckChgDBMols [dbpath]
 
     if neL [fext dbpath, 'mdb'] then
-        Warning twrite ['{}\n is not a MOE database.', dbpath];
-        exit [];
+        Warning twrite ['{}\nis not a MOE database.', dbpath];
+        return;
     endif
 
     if neL [ftype dbpath, 'file'] then
-        Warning twrite ['Unable to find the {} database:\n'
-            '    {}\nCreate it first.', dbtype, dbpath];
-        exit [];
+        Warning twrite ['Unable to find the database:\n'
+            '    {}\nCreate it first.', dbpath];
+        return;
     endif
 
     local dbkey = db_Open [dbpath, 'read-write'];
@@ -1209,7 +1209,7 @@ endfunction
 local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
         testMM, appname, hamname]
 
-    if MOE_BATCH then return; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
     local dbtype;
     if appname === 'qms' then
@@ -1221,14 +1221,14 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
     endif
 
     if neL [fext dbpath, 'mdb'] then
-        Warning twrite ['{}\n is not a MOE database.', dbpath];
-        exit [];
+        Warning twrite ['{}\nis not a MOE database.', dbpath];
+        return;
     endif
 
     if neL [ftype dbpath, 'file'] then
         Warning twrite ['Unable to find the {} database:\n'
             '    {}\nCreate it first.', dbtype, dbpath];
-        exit [];
+        return;
     endif
 
     local dbkey = db_Open [dbpath, 'read-write'];
@@ -1236,16 +1236,16 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
     if appname === 'qms' then
         if neL [db_GetEnv [dbkey, DBTYPE], QMSCORE] then
             Warning twrite ['{}\n is not a QMScore database.', dbpath];
-            exit [];
+            return;
         endif
     elseif appname === 'nmr' then
         if neL [db_GetEnv [dbkey, DBTYPE], NMRSCORE] then
             Warning twrite ['{}\n is not a NMRScore database.', dbpath];
-            exit [];
+            return;
         endif
     else
         Warning twrite ['{}\n is not a MOEDivCon database.', dbpath];
-        exit [];
+        return;
     endif
 
     local dblist = dbv_KeyList [];
@@ -1362,8 +1362,7 @@ local function UpdateMode [wkey, vals, status]
             chgbox: [sensitive: 1], recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
             local las;
-            [vals, las] = qb_ResetLigand [vals];
-            WindowSetData [wkey, [allposes: vals.allposes]];
+            [vals, las] = qb_ResetLigand [wkey, vals];
         SetChargeStatus [wkey, status];
     elseif vals.mode === 'One-to-Many' then
         WindowSetAttr [wkey, [allposes: [sensitive: 1],
@@ -1386,6 +1385,18 @@ local function UpdateMode [wkey, vals, status]
 endfunction
 
 //************************  Global Functions  *******************************
+
+/****************************************************************************
+ *                          qb_AllPosesEnable
+ *
+ *  Enable/disable the all poses functionality.
+ *
+ ****************************************************************************/
+global function qb_AllPosesEnable [wkey, which]
+
+    WindowSetAttr [wkey, [allposes: [sensitive: which]]];
+
+endfunction
 
 /****************************************************************************
  *                          qb_AtomsToMols
@@ -1511,7 +1522,6 @@ global function qb_CoreEnable [wkey, which]
 
 endfunction
 
-
 function qb_CreateMessWin;
 function qb_ShowLigPoses;
 function qb_UpdateCharge;
@@ -1554,54 +1564,63 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
         endif
 
         if vals.allposes then
-            [vals, ligatoms] = qb_ResetLigand [vals];
-            WindowSetData [wkey, [allposes: vals.allposes]];
+            [vals, ligatoms] = qb_ResetLigand [wkey, vals];
         endif
 
-        if second task_fork [statics:'share'] === 'child' then
-            local recok = 1, recmess = '', ligok = 1, ligmess = '';
-            local msgkey = Message [0, 'Running tests ...'];
 
-            if neL [vals.mode, 'Many-to-Many'] then
-                [recok, recmess, ligok, ligmess] = TestComplex [
-                    vals.testLP, vals.testOverlap, vals.testHam,
-                    vals.testH, vals.testMM, status.appname,
-                    (HAM_KEYS | status.allowham)(vals.ham)];
-            endif
+        local recok = 1, recmess = '', ligok = 1, ligmess = '';
+        local msgkey = Message [0, 
+            'Running tests on complex in MOE Window ...'];
 
-            if neL [vals.mode, 'One-to-One'] then
+        if neL [vals.mode, 'Many-to-Many'] then
+            [recok, recmess, ligok, ligmess] = TestComplex [
+                vals.testLP, vals.testOverlap, vals.testHam,
+                vals.testH, vals.testMM, status.appname,
+                (HAM_KEYS | status.allowham)(vals.ham)];
+        endif
+
+        if neL [vals.mode, 'One-to-One'] then
+            if second task_fork [statics:'share'] === 'child' then
+                local msgkey2 = Message [0, 
+                    'Running tests on MOEDivCon database ...'];
                 TestDBMols [vals.scoredb, vals.testLP, vals.testOverlap,
                     vals.testHam, vals.testH, vals.testMM, status.appname,
                     (HAM_KEYS | status.allowham)(vals.ham)];
+                msgkey2 = Message [msgkey2, 
+                    'Running tests on MOEDivCon database ... done.'];
+                    sleep 2;
+                exit [];
             endif
+        endif
 
-            if vals.mode === 'Many-to-Many' then
-                Message [msgkey, 'Running tests ... done.'];
-                sleep 2;
-            else
-                if [recok and ligok and recmess === '' and ligmess === ''] then
-                    if vals.mode === 'One-to-One' then
-                        qb_CreateMessWin [
-                            "No problems detected for complex in MOE Window.",
-                            1, 40];
-                        return [status, ligatoms, btasks];
-                    else
-                        Message [msgkey, 'Running tests ... done.'];
-                        sleep 3;
-                        return [status, ligatoms, btasks];
-                    endif
+        if vals.mode === 'Many-to-Many' then
+            Message [msgkey, 
+                'Running tests on complex in MOE Window ... skipping.'];
+            sleep 2;
+            Message [msgkey, []];
+        else
+            if [recok and ligok and recmess === '' and ligmess === ''] then
+                if vals.mode === 'One-to-One' then
+                    qb_CreateMessWin [
+                        "No problems detected for complex in MOE Window.",
+                        1, 40];
+                    return [status, ligatoms, btasks];
                 else
-                    qb_CreateMessWin [string tok_cat [recmess, ligmess]];
+                    Message [msgkey, 
+                        'Running tests on complex in MOE Window ... done.'];
+                    sleep 2;
+                    Message [msgkey, []];
                     return [status, ligatoms, btasks];
                 endif
+            else
+                qb_CreateMessWin [string tok_cat [recmess, ligmess]];
+                return [status, ligatoms, btasks];
             endif
-            exit [];
         endif
 
     elseif trig === 'calcchg' then
         if vals.allposes then
-            [vals, ligatoms] = qb_ResetLigand [vals];
-            WindowSetData [wkey, [allposes: vals.allposes]];
+            [vals, ligatoms] = qb_ResetLigand [wkey, vals];
         endif
 
        status = qb_UpdateCharge [wkey, vals, status, 1];
@@ -1609,14 +1628,18 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
     elseif trig === 'ckdbchg' then
 
         if second task_fork [statics:'share'] === 'child' then
+            local msgkey3 = Message [0, 
+                'Checking charges in MOEDivCon database ...'];
             CheckChgDBMols [vals.scoredb];
+            msgkey3 = Message [msgkey3, 
+                'Checking charges in MOEDivCon database ... done.'];
+            sleep 2;
             exit [];
         endif
 
     elseif trig === 'recchg' then
         if vals.allposes then
-            [vals, ligatoms] = qb_ResetLigand [vals];
-            WindowSetData [wkey, [allposes: vals.allposes]];
+            [vals, ligatoms] = qb_ResetLigand [wkey, vals];
         endif
 
         status = CheckCharge [wkey, status, vals.recchg,
@@ -1624,8 +1647,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
 
     elseif trig === 'ligchg' then
         if vals.allposes then
-            [vals, ligatoms] = qb_ResetLigand [vals];
-            WindowSetData [wkey, [allposes: vals.allposes]];
+            [vals, ligatoms] = qb_ResetLigand [wkey, vals];
         endif
 
         status = CheckCharge [wkey, status, vals.recchg,
@@ -1684,16 +1706,16 @@ endfunction
  *  Given a vector of poses and radius, find all receptor atoms of the current
  *  complex in the MOE Window that are within the radius distance from each
  *  pose, expand those atoms out to their respective residues, and return
- *  the "molecules" formed by those atoms.  If poses is empty, cut around
+ *  the cut receptor atoms.  If poses is empty, cut around
  *  the ligand in the MOE Window.
  *
  ****************************************************************************/
 global function qb_CutReceptor [poses, radius]
 
-    if MOE_BATCH then return [[], [], 'No MOE Window!']; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
     if radius <= 0.0 then
-        return [[], [], 'Radius must be greater than zero.'];
+        return [[], 'Radius must be greater than zero.'];
     endif
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
@@ -1722,7 +1744,7 @@ global function qb_CutReceptor [poses, radius]
     endloop
 
     if length cutset === 0 then
-        return [[], [], twrite ['No receptor atoms within radius {n:.1f}\n'
+        return [[], twrite ['No receptor atoms within radius {n:.1f}\n'
             'of the ligand pose atoms.', radius]];
     endif
 
@@ -1743,9 +1765,7 @@ global function qb_CutReceptor [poses, radius]
 
     [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
 
-    local recmol = mol_Extract recatoms;
-
-    return [recmol, ''];
+    return [recatoms, ''];
 endfunction
 
 /****************************************************************************
@@ -1949,11 +1969,11 @@ global function qb_GetPoses [vals]
 
     if vals.posedb === '' then return [[], 'No pose file.']; endif
 
-    if neL [ftype vals.posedb, 'file'] then return [[],
-        twrite ['{}\n is not a file.', vals.posedb]]; endif
-
     if neL [fext vals.posedb, 'mdb'] then return [[],
-        twrite ['{}\n is not a pose database.', vals.posedb]]; endif
+        twrite ['{}\nis not a pose database.', vals.posedb]]; endif
+
+    if neL [ftype vals.posedb, 'file'] then return [[],
+        twrite ['{}\ndoes not exist.', vals.posedb]]; endif
 
     local posekey = db_Open [vals.posedb, 'read'];
     local mess = '';
@@ -2116,15 +2136,24 @@ endfunction
  ****************************************************************************/
 global function qb_LoadCoreScoreDB [dbpath, type]
 
+    local typename;
+    if type === 'qmscore' then
+        typename = 'QMScore';
+    elseif type === 'nmrscore' then
+        typename = 'NMRScore';
+    else
+        typename = 'Unkown';
+    endif
+
     if neL [fext dbpath, 'mdb'] then
-        Warning twrite ['{}\n is not a MOE database.', dbpath];
-        exit [];
+        return [0, [], [], [], [], [], 
+            twrite ['{}\nis not a MOE database.', dbpath]];
     endif
 
     if neL [ftype dbpath, 'file'] then
-        Warning twrite ['Unable to find the {} database:\n'
-            '    {}\nCreate it first.', dbtype, dbpath];
-        exit [];
+        return [0, [], [], [], [], [], 
+            twrite ['Unable to find the {} database:\n    {}', 
+                typename, dbpath]];
     endif
 
     local dbkey = db_Open [dbpath, 'read-write'];
@@ -2278,10 +2307,11 @@ endfunction
  *  Remove the poses and restore the original ligand.
  *
  ****************************************************************************/
-global function qb_ResetLigand [vals]
+global function qb_ResetLigand [wkey, vals]
 
     local ligatoms;
-    vals = tagpoke [vals, 'allposes', 0];
+    vals.allposes = 0;
+    WindowSetData [wkey, [allposes: 0]];
     [vals, ligatoms] = qb_ShowLigPoses [vals, []];
 
     return [vals, ligatoms];
@@ -2379,15 +2409,16 @@ endfunction
  ****************************************************************************/
 global function qb_SaveOptions [coreopts, appopts]
 
-    if MOE_BATCH then return []; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
-    if neL [fext coreopts., 'mdb'] then
-        Warning twrite ['{}\n is not a MOE database.', dbpath];
+    if neL [fext coreopts.scoredb, 'mdb'] then
+        Warning twrite ['{}\nis not a MOE database.', coreopts.scoredb];
         exit [];
     endif
 
-    if neL [ftype dbpath, 'file'] then
-        Warning twrite ['Unable to find the database\n     ', dbpath];
+    if neL [ftype coreopts.scoredb, 'file'] then
+        Warning twrite ['Unable to find the database:\n    {}', 
+            coreopts.scoredb];
         exit [];
     endif
 
@@ -2534,6 +2565,17 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
     endif
 
     if neL [coreopts.mode, 'One-to-One'] then
+        if neL [fext coreopts.posedb, 'mdb'] then
+            Warning twrite ['{}\nis not a MOE database.', coreopts.posedb];
+            exit [];
+        endif
+
+        if neL [ftype coreopts.posedb, 'file'] then
+            Warning twrite ['Unable to find the database:\n    {}', 
+                coreopts.posedb];
+            exit [];
+        endif
+
         local posekey = db_Open [coreopts.posedb, 'read'];
         if dbkey === posekey then
             Warning twrite ['{} and {}\n are the same database.', 
@@ -2554,6 +2596,16 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
                 exit [];
             endif
         else
+            if neL [fext coreopts.recdb, 'mdb'] then
+                Warning twrite ['{}\nis not a MOE database.', coreopts.recdb];
+                exit [];
+            endif
+
+            if neL [ftype coreopts.recdb, 'file'] then
+                Warning twrite ['Unable to find the database:\n    {}', 
+                    coreopts.recdb];
+                exit [];
+            endif
             local reckey = db_Open [coreopts.recdb, 'read'];
             if dbkey === reckey then
                 Warning twrite ['{} and {}\n are the same database.', 
@@ -2623,12 +2675,16 @@ global function qb_ShowLigPoses [vals, ligatoms]
         aSetBondLook [poseatoms, 'cylinder'];
         return [vals, []];
     else
-        if poseatoms === [] then
+        if poseatoms === [] and not isnull ligatoms then
             return [vals, ligatoms];
         endif
 
         oDestroy uniq oChains poseatoms;
         poseatoms = [];
+
+        if not isnull ligatoms then
+            oDestroy uniq oChains ligatoms;
+        endif
 
         ligatoms = cat oAtoms mol_Create ligmol;
         oSetCollection ['QB_LIGAND', ligatoms];
@@ -2700,7 +2756,7 @@ global function qb_StandardDeviation [nums]
 
     local n = length nums;
     if n === 0 then
-        return 0;
+        return [0.0, 0.0];
     endif
     local avg = (add nums) / n;
     local sigma = sqrt ((add (sqr (nums - avg))) / n);
@@ -2895,7 +2951,7 @@ endfunction
  ****************************************************************************/
 global function qb_UpdateCharge [wkey, vals, status, warn]
 
-    if MOE_BATCH then return status; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
     local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
     if (recchg === [] or recok === []

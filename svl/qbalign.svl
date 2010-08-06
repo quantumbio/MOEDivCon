@@ -48,7 +48,7 @@
 function cAlignmentPositions;
 function pro_Align;
 
-local function readrecs [srcdir, ext]
+local function readReceptors [srcdir, ext]
     local patt = twrite ['*.{}', ext];
     local filelist = flist [srcdir, patt];
     local filename, chains;
@@ -70,7 +70,7 @@ local function readrecs [srcdir, ext]
     endloop
 endfunction
 
-local function saverecs [srcdir, destdir, ext, newuids]
+local function saveReceptors [srcdir, destdir, ext, newuids]
     local patt = twrite ['*.{}', ext];
     local filelist = flist [srcdir, patt];
     local filename, idx = 1;
@@ -110,11 +110,14 @@ local function saverecs [srcdir, destdir, ext, newuids]
 endfunction
 
 global function qb_Align [src, dest, ext]
-    readrecs [src, ext];
+    local osys, nsys;
+    if not MOE_BATCH then [osys, nsys] = SystemPush []; endif
+    readReceptors [src, ext];
     write ['Aligning {} proteins ...', nChains []];
     pro_Align [Chains [], [superpose:0]];
     local newuids = cAlignmentPositions Chains [];
     Close [force:1];
     write [' done.\n'];
-    saverecs [src, dest, ext, newuids];
+    saveReceptors [src, dest, ext, newuids];
+    if not MOE_BATCH then SystemPop [osys, nsys]; endif
 endfunction

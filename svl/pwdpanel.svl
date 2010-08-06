@@ -386,7 +386,7 @@ function FindResidue;
  ****************************************************************************/
 local function CheckResidues [restoks]
 
-    if MOE_BATCH then return restoks; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
     local res, missing = [];
     for res in restoks loop
@@ -560,7 +560,7 @@ endfunction
  ****************************************************************************/
 local function FindResidue [restok]
 
-    if MOE_BATCH then return [0, []]; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
     local rnidx = indexof ["1234567890", string restok];
     rnidx = rnidx | rnidx <> 0;
@@ -599,7 +599,7 @@ endfunction
  ****************************************************************************/
 local function GetAnalData [dbpath, title, type]
 
-    if MOE_BATCH then return []; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
     if neL [fext dbpath, 'mdb'] then
         Warning twrite ['{}\n is not a MOE database.', dbpath];
@@ -607,18 +607,12 @@ local function GetAnalData [dbpath, title, type]
     endif
 
     if neL [ftype dbpath, 'file'] then
-        Warning twrite ['Unable to find the {} database:\n'
-            '    {}\nCreate it first.', dbtype, dbpath];
+        Warning twrite ['Unable to find the QMScore/PWD database:\n'
+            '    {}', dbpath];
         exit [];
     endif
 
     local dbkey = db_Open [dbpath, 'read'];
-
-    if neL [db_GetEnv [dbkey, DBTYPE], QMSCORE] then
-        Warning twrite ['{}\n is not a QMScore database.', dbpath];
-        exit [];
-    endif
-
     local data = qb_GetAnalysisData [dbkey, 'pwd', type];
     db_Close dbkey;
 
@@ -708,14 +702,13 @@ endfunction
  *
  *  Load the ligands from the PWD database.
  *
- *
  *  Note:  it is assumed that this function is called from a child process
  *  and will exit on an error.
  *
 ****************************************************************************/
 local function LoadLigs [pwdfilename]
 
-    if MOE_BATCH then return []; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
     if neL [fext pwdfilename, 'mdb'] then
         Warning twrite ['{}\n is not a MOE database.', pwdfilename];
@@ -723,8 +716,8 @@ local function LoadLigs [pwdfilename]
     endif
 
     if neL [ftype pwdfilename, 'file'] then
-        Warning twrite ['Unable to find the {} database:\n'
-            '    {}\nCreate it first.', pwdfilename];
+        Warning twrite ['Unable to find the QMScore/PWD database:\n'
+            '    {}', pwdfilename];
         exit [];
     endif
 
@@ -850,10 +843,29 @@ endfunction
  *  and store it in the given QMScore database in the ExpAct field.  It is
  *  assumed that the orderings are consistent.
  *
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
+ *
  ****************************************************************************/
 local function ReadExpActData [expactfn, qmsdbfn, header]
 
 write ['Act file:  {}\n', expactfn];//DEBUG
+
+    if neL [fext qmsdbfn, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', qmsdbfn];
+        exit [];
+    endif
+
+    if neL [ftype qmsdbfn, 'file'] then
+        Warning twrite ['Unable to find the QMScore/PWD database:\n    {}',
+            qmsdbfn];
+        exit [];
+    endif
+
+    if neL [ftype expactfn, 'file'] then
+        Warning twrite ['Unable to find the file\n    {}', expactfn];
+        exit [];
+    endif
 
     local qdbkey = db_Open [qmsdbfn, 'read-write'];
     local eaf = fopenr expactfn;
@@ -957,23 +969,20 @@ endfunction
  *
  *  Save the analysis options in the QMScore database.
  *
- *  Note:  it is assumed that this function is called from a child process
- *  and will exit on an error.
- *
  ****************************************************************************/
 local function SaveOptions [dbpath, options]
 
-    if MOE_BATCH then return []; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
     if neL [fext dbpath, 'mdb'] then
         Warning twrite ['{}\n is not a MOE database.', dbpath];
-        exit [];
+        return;
     endif
 
     if neL [ftype dbpath, 'file'] then
-        Warning twrite ['Unable to find the {} database:\n'
-            '    {}\nCreate it first.', dbtype, dbpath];
-        exit [];
+        Warning twrite ['Unable to find the QMScore/PWD database:\n'
+            '    {}', dbpath];
+        return;
     endif
 
     local dbkey = db_Open [dbpath, 'read-write'];
@@ -1181,7 +1190,7 @@ global function qb_QBPWDSetupPanel []
     static pwdfilename;                     //  Shared with child tasks.
     static pwddata;
 
-    if MOE_BATCH then return; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
     if WindowShow ['QB-PWDPanel', 1] then return; endif
 
     pwdfilename = '';
