@@ -301,7 +301,7 @@ function qb_GetPoseFields;
  ****************************************************************************/
 local function RunOneToManyCalc [oldkey]
 
-    if MOE_BATCH then return; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
     if oldkey === 0 then
         Warning 'The QMScore database hasn\'t been created.';
@@ -420,10 +420,10 @@ endfunction
 global function qb_QMScoreSetupPanel []
 
     static status;                     //  Shared with child tasks.
-    static origligmol;
+    static origligmol;                 //  Probably not necessary for QMScore
     static ligatoms;
 
-    if MOE_BATCH then return; endif
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
     if WindowShow ['QMScorePanel', 1] then return; endif
 
     local coreopts = [], qmsopts = [], browsetasks = [], dbkey = 0;
@@ -442,7 +442,6 @@ global function qb_QMScoreSetupPanel []
         local [vals, trig] = WindowWait wkey;
         if trig === 'panel' then
             if vals.panel === 'Close' then 
-
                 break;
 
             elseif vals.panel === 'Load' then 
@@ -460,13 +459,14 @@ global function qb_QMScoreSetupPanel []
                             exit [];
                         endif
 
-                        local [ldkey, ldrec, origligmol, ldsts, ldcoreopts,
-                            ldqmropts] = LoadDB [dbpath];
+                        local [ldkey, ldrec, ldlig, ldsts, ldcoreopts,
+                            ldqmsopts] = LoadDB [dbpath];
 
     	                Close [force:1];
-                        if neL [ldrec, []] and neL [origligmol, []] then
+                        if neL [ldrec, []] and neL [ldlig, []] then
+							origligmol = ldlig;
                             mol_Create ldrec;
-                            local ligatoms = cat oAtoms mol_Create origligmol;
+                            ligatoms = cat oAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
                             aSetNucleusLook [ligatoms, 'small-sphere'];
                             aSetBondLook [ligatoms, 'cylinder'];
@@ -476,7 +476,7 @@ global function qb_QMScoreSetupPanel []
                         dbv_Open db_Filename ldkey;
                         db_Close ldkey;
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
-                        WindowSetData [wkey, ldqmropts];
+                        WindowSetData [wkey, ldqmsopts];
                     endif
 
                     exit [];
@@ -485,8 +485,7 @@ global function qb_QMScoreSetupPanel []
             elseif vals.panel === 'Run' then
 
                 if qb_IsShowingAllPoses [vals] then
-                    [vals, ligatoms] = qb_ResetLigand [vals];
-                    WindowSetData [wkey, [allposes: vals.allposes]];
+                    [vals, ligatoms] = qb_ResetLigand [wkey, vals];
                 endif
 
                 if second task_fork [statics:'share'] === 'child' then
@@ -520,8 +519,7 @@ global function qb_QMScoreSetupPanel []
             elseif vals.panel === 'Create' then
 
                 if qb_IsShowingAllPoses [vals] then
-                    [vals, ligatoms] = qb_ResetLigand [vals];
-                    WindowSetData [wkey, [allposes: vals.allposes]];
+                    [vals, ligatoms] = qb_ResetLigand [wkey, vals];
                 endif
 
                 if second task_fork [statics:'share'] === 'child' then
@@ -560,8 +558,8 @@ global function qb_QMScoreSetupPanel []
             endif
 
         else
-           [status, browsetasks] = qb_CoreHandler [wkey, trig, status, vals,
-               browsetasks];
+           [status, ligatoms, browsetasks] = qb_CoreHandler [wkey, trig, 
+                status, vals, browsetasks];
         endif
     endloop
 

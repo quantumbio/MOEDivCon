@@ -64,7 +64,6 @@ const LIG_KEYS =
     'COMPLEXOPT'
     ];
 
-
 /****************************************************************************
  *                          qb_QMScoreMPI
  *
@@ -75,10 +74,17 @@ const LIG_KEYS =
 ****************************************************************************/
 global function qb_QMScoreMPI [dbpath]
 
-    if not MOE_BATCH then return; endif
+    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
 
     //  Extract molecules and run options from the database environment
-    qb_HamSetsInit [];
+    if neL [fext dbpath, 'mdb'] then
+        exit twrite ['{}\nis not a MOE database.', dbpath];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        exit twrite ['Unable to find the database:\n    {}', dbpath];
+    endif
+
     local dbkey = db_Open [dbpath, 'read-write'];
     local [recmol, ligmol, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
     local poseflds = qb_GetPoseFields [dbkey];
@@ -121,6 +127,7 @@ global function qb_QMScoreMPI [dbpath]
 
     //  For each receptor/pose in the database, check tests, then send down
     //  to moedivconmpi
+    qb_HamSetsInit [];
     local rowkey = 0, rowcnt = 0, numokay = 0, warnings = [];
     for rowkey in dbrowkeys loop
         local errmess = '', success = 0;

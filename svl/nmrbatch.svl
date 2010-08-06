@@ -22,6 +22,7 @@
  // END COPYRIGHT
 #endif
 
+//    nmrbatch.svl    Obsolete code,  DO NOT USE!
 //    nmrbatch.svl    Executes NMRScore calculations in batch mode
 
 #set title   'QuantumBio NMRScore Batch'
