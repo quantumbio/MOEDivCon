@@ -262,32 +262,45 @@ global function qb_QMScoreMPI [dbpath, jobid]
         elseif return_statement === "error" then
 
             [[rowcnt]] = fread [stdout, '{n:}'];
-            write ['Getting error message for pose {} ({} of {})\n', rowcnt, 
-                result_ith, numokay];
+            if rowcnt < 1 or rowcnt > length dbrowkeys then
+                write ['Getting chairman error message:\n'];
 
-            [[return_statement]] = fread [stdout, '{c:*}'];
-            if neL [return_statement, "DivCon done."] then
-                divconerrmess = cat [divconerrmess, return_statement];
-                [[return_statement]] = fread [stdout, '{c:*}'];
-            endif
-            while neL [return_statement, "DivCon done."] loop
-                divconerrmess = cat [divconerrmess, "\n", return_statement];
-                [[return_statement]] = fread [stdout, '{c:*}'];
-            endloop;
+                while neL [return_statement, "DivCon done."] loop
+                    [[return_statement]] = fread [stdout, '{c:*}'];
+                    write ['    {}\n', return_statement];
+                endloop;
 
-            fwrite [stdin, '{c:}\n', 'Ok'];
-
-            if isnull divconerrmess then
-                divconerrmess = "Error:  unknown error!";
+                fwrite [stdin, '{c:}\n', 'Ok'];
             else
-                divconerrmess = cat ["Error:  ", divconerrmess];
+                write ['Getting error message for pose {} ({} of {})\n', rowcnt, 
+                    result_ith, numokay];
+
+                [[return_statement]] = fread [stdout, '{c:*}'];
+                if neL [return_statement, "DivCon done."] then
+                    divconerrmess = cat [divconerrmess, return_statement];
+                    [[return_statement]] = fread [stdout, '{c:*}'];
+                endif
+                while neL [return_statement, "DivCon done."] loop
+                    divconerrmess = cat [divconerrmess, "\n", return_statement];
+                    [[return_statement]] = fread [stdout, '{c:*}'];
+                endloop;
+
+                fwrite [stdin, '{c:}\n', 'Ok'];
+
+                if isnull divconerrmess then
+                    divconerrmess = "Error:  unknown error!";
+                else
+                    divconerrmess = cat ["Error:  ", divconerrmess];
+                endif
+
+                if not isnull warnings (rowcnt) then
+                    divconerrmess = cat [divconerrmess, 
+                        string warnings (rowcnt)];
+                endif
+
+                qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), divconerrmess];
             endif
 
-            if not isnull warnings (rowcnt) then
-                divconerrmess = cat [divconerrmess, string warnings (rowcnt)];
-            endif
-
-            qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), divconerrmess];
             result_ith = result_ith + 1;
 
         else
