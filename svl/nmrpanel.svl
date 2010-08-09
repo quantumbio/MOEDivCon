@@ -640,8 +640,8 @@ global function qb_NMRScoreSetupPanel []
         indextoks = totok indices;
         atomnames = tok_cat [indextoks, '-', atomnames];
         curcsp = nmrdflts.csp;
-//        atomfree = rep [0, length indices];//DEBUG
-//        atombound = rep [0, length indices];//DEBUG
+        atomfree = rep [0, length indices];//DEBUG
+        atombound = rep [0, length indices];//DEBUG
 
         WindowSetAttr [wkey, [
             radius: [sensitive: 1],

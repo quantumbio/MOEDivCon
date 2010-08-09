@@ -72,7 +72,7 @@ const LIG_KEYS =
  *
  *
 ****************************************************************************/
-global function qb_QMScoreMPI [dbpath]
+global function qb_QMScoreMPI [dbpath, jobid]
 
     if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
 
@@ -98,6 +98,14 @@ global function qb_QMScoreMPI [dbpath]
     local perfile = twrite ['{}/{}.h5', perpath, pertail];
     local workdir = select [currdir, fabsname coreopts.workdir, 
         coreopts.cwd];
+
+    if not isnull jobid then
+        workdir = twrite ['{}/{}', workdir, jobid];
+        local okay = _fmkdir workdir;
+        if okay === -1 then
+            exit twrite ['Unable to create subdirectory:  {}\n',  workdir];
+        endif
+    endif
 
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
