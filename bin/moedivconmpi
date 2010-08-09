@@ -15,8 +15,13 @@ if [ ! "$QBHOME" ]; then
     export QBHOME
 fi
 
+echo "What is QBENVSET? " $QBENVSET
 if [ -z "$QBENVSET" ]; then
+echo "in if for QBENVSET? " $QBENVSET
     . $QBHOME/etc/qbenv.sh
 fi
+
+export MKL_NUM_THREADS=1
+export MKL_DYNAMIC=false
 
 mpirun -x QBHOME -x PATH -x LD_LIBRARY_PATH -x MKL_NUM_THREADS -x MKL_DYNAMIC -machinefile $PBS_NODEFILE moedivconmpi.bin $@ - 
