@@ -84,7 +84,7 @@ const CSP_KEYS =
  *  all of the results.
  *
 ****************************************************************************/
-global function qb_NMRScoreMPI [dbpath]
+global function qb_NMRScoreMPI [dbpath, jobid]
 
     if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
 
@@ -115,6 +115,14 @@ global function qb_NMRScoreMPI [dbpath]
     local perfile = twrite ['{}/{}.h5', perpath, pertail];
     local workdir = select [currdir, fabsname coreopts.workdir, 
         coreopts.cwd];
+
+    if not isnull jobid then
+        workdir = twrite ['{}/{}', workdir, jobid];
+        local okay = _fmkdir workdir;
+        if okay === -1 then
+            exit twrite ['Unable to create subdirectory:  {}\n',  workdir];
+        endif
+    endif
 
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
@@ -304,32 +312,44 @@ print [score];//DEBUG
         elseif return_statement === "error" then
 
             [[rowcnt]] = fread [stdout, '{n:}'];
-            write ['Getting error message for pose {} ({} of {})\n', rowcnt, 
-                result_ith, numokay];
+            if rowcnt < 1 or rowcnt > length dbrowkeys then
+                write ['Getting chairman error message:\n'];
 
-            [[return_statement]] = fread [stdout, '{c:*}'];
-            if neL [return_statement, "DivCon done."] then
-                divconerrmess = cat [divconerrmess, return_statement];
-                [[return_statement]] = fread [stdout, '{c:*}'];
-            endif
-            while neL [return_statement, "DivCon done."] loop
-                divconerrmess = cat [divconerrmess, "\n", return_statement];
-                [[return_statement]] = fread [stdout, '{c:*}'];
-            endloop;
+                while neL [return_statement, "DivCon done."] loop
+                    [[return_statement]] = fread [stdout, '{c:*}'];
+                    write ['    {}\n', return_statement];
+                endloop;
 
-            fwrite [stdin, '{c:}\n', 'Ok'];
-
-            if isnull divconerrmess then
-                divconerrmess = "Error:  unknown error!";
+                fwrite [stdin, '{c:}\n', 'Ok'];
             else
-                divconerrmess = cat ["Error:  ", divconerrmess];
+                write ['Getting error message for pose {} ({} of {})\n', rowcnt, 
+                    result_ith, numokay];
+
+                [[return_statement]] = fread [stdout, '{c:*}'];
+                if neL [return_statement, "DivCon done."] then
+                    divconerrmess = cat [divconerrmess, return_statement];
+                    [[return_statement]] = fread [stdout, '{c:*}'];
+                endif
+                while neL [return_statement, "DivCon done."] loop
+                    divconerrmess = cat [divconerrmess, "\n", return_statement];
+                    [[return_statement]] = fread [stdout, '{c:*}'];
+                endloop;
+
+                fwrite [stdin, '{c:}\n', 'Ok'];
+
+                if isnull divconerrmess then
+                    divconerrmess = "Error:  unknown error!";
+                else
+                    divconerrmess = cat ["Error:  ", divconerrmess];
+                endif
+
+                if not isnull warnings (rowcnt) then
+                    divconerrmess = cat [divconerrmess, string warnings (rowcnt)];
+                endif
+
+                qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), divconerrmess];
             endif
 
-            if not isnull warnings (rowcnt) then
-                divconerrmess = cat [divconerrmess, string warnings (rowcnt)];
-            endif
-
-            qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), divconerrmess];
             result_ith = result_ith + 1;
 
         else
