@@ -21,15 +21,31 @@ echo "in if for QBENVSET? " $QBENVSET
     . $QBHOME/etc/qbenv.sh
 fi
     
-# below we will set to hard-coded machine file. This could be done on the qbenv.sh file.
-if [ -e "qbmachinefile.txt" ] ; then
-    QBMACHINEFILE="-machinefile qbmachinefile.txt" ; export QBMACHINEFILE
-elif [ ! -z "${PBS_NODEFILE}" ]; then
-# NOTE!! We should use mpirun technologies as per ticket #553 instead of doing it this way.
-    QBMACHINEFILE="-machinefile ${PBS_NODEFILE}" ; export QBMACHINEFILE
-else
-# note: we need an empty QBMACHINEFILE variable for the mpirun below so we don't need to maintain two calls.
-    QBMACHINEFILE="" ; export QBMACHINEFILE  
+# below we will set to hard-coded machine file if the user does not provide a machine file on the comand line.
+QB_MACHINEFILE_SET=0
+for word do
+    if [ "$word" = "-machinefile" ]; then
+        QB_MACHINEFILE_SET=1
+    elif [ $QB_MACHINEFILE_SET -eq 1 ]; then
+        QBMACHINEFILE="-machinefile $word"
+        QB_MACHINEFILE_SET=2
+    fi
+done
+
+if [ $QB_MACHINEFILE_SET -eq 0 ]; then
+
+    if [ -e "qbmachinefile.txt" ] ; then
+        QBMACHINEFILE="-machinefile qbmachinefile.txt"
+    elif [ ! -z "${PBS_NODEFILE}" ]; then
+    # NOTE!! We should use mpirun technologies as per ticket #553 instead of doing it this way.
+        QBMACHINEFILE="-machinefile ${PBS_NODEFILE}"
+    else
+    # note: we need an empty QBMACHINEFILE variable for the mpirun below so we don't need to maintain two calls.
+        QBMACHINEFILE=""
+    fi
+
 fi
+
+echo "NOTE: Using ${QBMACHINEFILE}"
 
 mpirun -x QBHOME -x PATH -x LD_LIBRARY_PATH -x MKL_NUM_THREADS -x MKL_DYNAMIC ${QBMACHINEFILE} moedivconmpi.bin $@ - 
