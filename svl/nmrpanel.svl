@@ -924,8 +924,8 @@ global function qb_NMRScoreSetupPanel []
                         vals.radius]];
 
                     qb_SaveOptions [coreopts, nmrsopts];
-                    qb_SaveAnalysisData [dbkey, 'nmr', 'exp',
-                        [indices, atomnames, atomfree, atombound]];
+                    qb_SaveAnalysisData [coreopts.scoredb, 'nmr', 'exp',
+                        [indices, atomnames, atomfree, atombound]];//DEBUG-core
 
                     Message [0, 'MOEDivCon NMRScore update is done.'];
                     sleep 2;
