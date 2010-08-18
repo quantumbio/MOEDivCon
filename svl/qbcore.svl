@@ -1601,9 +1601,12 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
         else
             if [recok and ligok and recmess === '' and ligmess === ''] then
                 if vals.mode === 'One-to-One' then
+                    Message [msgkey, 
+                        'Running tests on complex in MOE Window ... done.'];
                     qb_CreateMessWin [
                         "No problems detected for complex in MOE Window.",
                         1, 40];
+                    Message [msgkey, []];
                     return [status, ligatoms, btasks];
                 else
                     Message [msgkey, 
@@ -1613,7 +1616,10 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
                     return [status, ligatoms, btasks];
                 endif
             else
+                Message [msgkey, 
+                    'Running tests on complex in MOE Window ... done.'];
                 qb_CreateMessWin [string tok_cat [recmess, ligmess]];
+                Message [msgkey, []];
                 return [status, ligatoms, btasks];
             endif
         endif
