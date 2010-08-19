@@ -362,8 +362,15 @@ print [score];//DEBUG
     errmess = "";
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
-        write ['MOEDivCon: {}\n', newerror];//DEBUG
-        errmess = cat [newerror, errmess];
+        // Hack!  Skip openmpi ignored error messages //DEBUG
+        local errstrs = wordsplit [newerror, "()"];
+        local errtoks = app token errstrs;
+        local idx = indexof ['ignored', errtoks];
+        if idx === 0 then
+            write ['MOEDivCon: {}\n', newerror];//DEBUG
+            errmess = cat [newerror, errmess];
+        endif
+
         [[newerror]] = fread [stderr, '{c:*}'];
     endloop
 
