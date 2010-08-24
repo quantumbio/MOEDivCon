@@ -1266,8 +1266,8 @@ global function qb_QBPWDSetupPanel []
 
         elseif trig === 'analsave' then
 
-            if second task_fork [statics:'share', 
-                    master:'parent'] === 'child' then
+            if second task_fork [statics:'share'] === 'child' then
+                task_prio 0;
 
                 // Load and setup data
                 if isnull peek [pwddata, vals.analysis] then
@@ -1313,6 +1313,8 @@ global function qb_QBPWDSetupPanel []
         elseif trig === 'panel' then
 
             if vals.panel === 'Close' then
+                task_prio 0;
+
 	            if tok_length pwdfilename > 0 then
                     pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
                         vals.title,
@@ -1329,6 +1331,8 @@ global function qb_QBPWDSetupPanel []
 
                 if second task_fork [statics:'share', 
                         master:'parent'] === 'child' then
+                    task_prio 3;
+                    task_settitle [-1, 'MOEDivCon PWD Analysis'];
 
                     if neL [ftype pwdfilename, 'file']
                             or neL [fext pwdfilename, 'mdb'] then

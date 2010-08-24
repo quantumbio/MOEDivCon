@@ -851,12 +851,17 @@ global function qb_NMRScoreSetupPanel []
                     continue;
                 endif
 
-                if second task_fork [statics:'share',
-                        prio:3, idle:0] === 'child' then
+                if not eqE [length indices, length atomfree, length atombound]
+                then
+                    Warning 'There are missing experimental values.';
+                    continue;
+                endif
 
+                if second task_fork [statics:'share'] === 'child' then
+                    task_prio 3;
                     task_settitle [-1, 'MOEDivCon NMRScore Run'];
 
-                    status = qb_VerifyDivCon [wkey, status, vals];
+                    status = qb_VerifyDivCon [0, status, vals];
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
@@ -866,7 +871,8 @@ global function qb_NMRScoreSetupPanel []
 
                     dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         [origrecmol, origligmol],
-                        cat [NMR_NUM_FIELDS, atomnames], 'nmrscore', 0];
+                        cat [NMR_NUM_FIELDS, atomnames], 'nmrscore',
+                        status.notforced];
                     qb_SaveAnalysisData [dbkey, 'nmr', 'exp',
                         [indices, atomnames, atomfree, atombound]];
 
@@ -906,7 +912,8 @@ global function qb_NMRScoreSetupPanel []
 
                     dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
                         [origrecmol, origligmol],
-                        cat [NMR_NUM_FIELDS, atomnames], 'nmrscore', 1];
+                        cat [NMR_NUM_FIELDS, atomnames], 'nmrscore',
+                        status.notforced];
                     qb_SaveAnalysisData [dbkey, 'nmr', 'exp',
                         [indices, atomnames, atomfree, atombound]];
                     dbv_Open db_Filename dbkey;
@@ -917,6 +924,7 @@ global function qb_NMRScoreSetupPanel []
             elseif vals.panel === 'Update' then
 
                 if second task_fork [statics:'share'] === 'child' then
+                    task_prio 0;
 
                     coreopts = qb_TagCoreVals [vals];
                     nmrsopts = tag [first tr NMRSCORE_OPT_DEFAULTS,

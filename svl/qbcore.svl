@@ -600,7 +600,10 @@ local function CheckCharge [wkey, status, recchg, ligchg, warn]
             Warning errmess;
         endif
 
-        SetChargeStatus [wkey, status];
+        if wkey > 0 then
+            SetChargeStatus [wkey, status];
+        endif
+
         return status;
     endif
 
@@ -625,7 +628,10 @@ local function CheckCharge [wkey, status, recchg, ligchg, warn]
         status.ligchg = 3;
     endif
 
-    SetChargeStatus [wkey, status];
+    if wkey > 0 then
+        SetChargeStatus [wkey, status];
+    endif
+
     return status;
 endfunction
 
@@ -712,7 +718,8 @@ local function CheckChgDBMols [dbpath]
 
         if alltrue [recok, recchgok, ligok, ligchgok] then
             local [oldstatus] = db_ReadFields [dbkey, rowkey, STATUS_FIELD];
-            if not isnull findmatch ['*Problematic charge*', token oldstatus] then
+            if not isnull findmatch ['*Problematic charge*', token oldstatus]
+            then
                 qb_SaveDivConStatus [dbkey, rowkey,
                     "Charges are compatible with DivCon.\n"];
             endif
