@@ -489,10 +489,10 @@ global function qb_QMScoreSetupPanel []
                 endif
 
                 if second task_fork [statics:'share'] === 'child' then
-
+                    task_prio 3;
                     task_settitle [-1, 'MOEDivCon QMScore Run'];
 
-                    status = qb_VerifyDivCon [wkey, status, vals];
+                    status = qb_VerifyDivCon [0, status, vals];
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
@@ -501,7 +501,7 @@ global function qb_QMScoreSetupPanel []
                         vals.analpwd]];
 
                     dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
-                        [], QMS_NUM_FIELDS, 'qmscore', 0];
+                        [], QMS_NUM_FIELDS, 'qmscore', status.notforced];
 
                     if qb_IsModeOneToOne [coreopts] then
                         RunCalc [dbkey];
@@ -523,6 +523,7 @@ global function qb_QMScoreSetupPanel []
                 endif
 
                 if second task_fork [statics:'share'] === 'child' then
+                    task_prio 0;
 
                     status = qb_VerifyDivCon [wkey, status, vals];
                     if not status.verified then exit []; endif
@@ -543,6 +544,7 @@ global function qb_QMScoreSetupPanel []
             elseif vals.panel === 'Update' then
 
                 if second task_fork [statics:'share'] === 'child' then
+                    task_prio 0;
 
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [

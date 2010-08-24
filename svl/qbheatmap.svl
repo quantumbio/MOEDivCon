@@ -492,13 +492,29 @@ endfunction
  *  NOTE:  calling function should call gr_destroy on key after using it.
  *
  ****************************************************************************/
-local function DrawMap [data, numrows, numcols, mincut, maxcut, colors, ticks]
+local function DrawMap [data, numrows, numcols, abbrrow, abbrcol,
+        mincut, maxcut, colors, ticks]
+
+    const LETWD = 3;
+    const ROWPAD = 4;
+    const COLPAD = 10;
 
     local [titles, colnames, colabbrevs, rowdata] = data;
 
-    local colnmlen = (max app tok_length colnames) * 8 + 4;
-    local rownmlen = (max app tok_length app first rowdata) * 8 + 4;
+    local colnmlen, rownmlen;
+    if abbrcol then
+        colnmlen = (max app tok_length colabbrevs) * LETWD + COLPAD;
+    else
+        colnmlen = (max app tok_length colnames) * LETWD + COLPAD;
+    endif
 
+    if abbrrow then
+      rownmlen = (max app tok_length app second rowdata) * LETWD + COLPAD;
+    else
+      rownmlen = (max app tok_length app first rowdata) * LETWD + COLPAD;
+    endif
+
+print [rownmlen, colnmlen];//DEBUG
     local box_w = numcols * CELL_WD;
     local box_h = numrows * CELL_HT;
     local box_x = ROWCOLTITLE_H + rownmlen;
@@ -520,8 +536,13 @@ local function DrawMap [data, numrows, numcols, mincut, maxcut, colors, ticks]
         local [rowname, rowabbrev, rowvals] = rowdata (row_i);
         local c_y = box_y + (numrows - row_i) * CELL_HT;
 
-        gr_text [key, [0, [ROWCOLTITLE_H + CELL_WD/2 , c_y + CELL_HT/2],
-            rowname, 'sys-b', icolor'black', 8, [position: 'middlecenter']]];
+        if abbrrow then
+            gr_text [key, [0, [ROWCOLTITLE_H + CELL_WD/2 , c_y + CELL_HT/2],
+                rowabbrev, 'sys-b', icolor'black', 8, [position: 'middleright']]];
+        else
+            gr_text [key, [0, [ROWCOLTITLE_H + CELL_WD/2 , c_y + CELL_HT/2],
+                rowname, 'sys-b', icolor'black', 8, [position: 'middleright']]];
+        endif
 
         for col_i = 1, numcols, 1 loop
             local cidx, value = rowvals (col_i);
@@ -547,8 +568,14 @@ local function DrawMap [data, numrows, numcols, mincut, maxcut, colors, ticks]
     for col_i = 1, numcols, 1 loop
         local colkey = gr_create [size: [4 * colnmlen, 4 * CELL_WD],
             units: 'pt'];
-        gr_text [colkey, [0, [4 * 2, 2 * CELL_WD], colnames (col_i), 'sys-b', 
-            icolor'black', 4 * 8, [position: 'middleleft']]];
+        if abbrcol then
+            gr_text [colkey, [0, [4 * 2, 2 * CELL_WD], colabbrevs (col_i),
+                'sys-b', icolor'black', 4 * 8, [position: 'middleleft']]];
+        else
+            gr_text [colkey, [0, [4 * 2, 2 * CELL_WD], colnames (col_i),
+                'sys-b', icolor'black', 4 * 8, [position: 'middleleft']]];
+        endif
+
         img = gr_render_pixmap [bg, colkey];
         gr_destroy colkey;
         gr_pixmap [key, [0, [box_x + (col_i - 1) * CELL_WD, box_y],
@@ -1282,13 +1309,13 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                 break;
 
             elseif vals.panel === 'Save' then
-                local simgkey = DrawMap [data, numrows, numcols, mincut, 
+                local simgkey = DrawMap [data, numrows, numcols, 0, 0, mincut, 
                     maxcut, colors, vals.nticks];
                 gr_export simgkey;
                 gr_destroy simgkey;
 
             elseif vals.panel === 'Print' then
-                local pimgkey = DrawMap [data, numrows, numcols, mincut, 
+                local pimgkey = DrawMap [data, numrows, numcols, 0, 0, mincut, 
                     maxcut, colors, vals.nticks];
                 gr_print pimgkey;
                 gr_destroy pimgkey;
