@@ -342,7 +342,6 @@ local function CalculateCuts [data, numsigma, cols, num]
         local step = dist / num;
         mincut = (ceil (mincut / step) - 0.5) * step;
         maxcut = mincut + dist;
-
     else
         return [[], [], twrite ['Cannot generate minimum and maximum cuts\n'
             'with number of sigmas {}, signifcant columns {}, and number {}\n',
@@ -383,7 +382,6 @@ local function CalculateMinMax [data, num]
         local step = dist / num;
         mincut = (ceil (mincut / step) - 0.5) * step;
         maxcut = mincut + dist;
-
     else
         return [[], [], twrite ['Cannot generate minimum and maximum cuts\n'
             'with number {}\n', num]];
@@ -495,26 +493,24 @@ endfunction
 local function DrawMap [data, numrows, numcols, abbrrow, abbrcol,
         mincut, maxcut, colors, ticks]
 
-    const LETWD = 3;
-    const ROWPAD = 4;
-    const COLPAD = 10;
+    const LETWD = 5;		//  trial-and-error guess!
+    const LETPAD = 2;
 
     local [titles, colnames, colabbrevs, rowdata] = data;
 
     local colnmlen, rownmlen;
     if abbrcol then
-        colnmlen = (max app tok_length colabbrevs) * LETWD + COLPAD;
+        colnmlen = (max app tok_length colabbrevs) * LETWD + 3 * LETPAD;
     else
-        colnmlen = (max app tok_length colnames) * LETWD + COLPAD;
+        colnmlen = (max app tok_length colnames) * LETWD + 3 * LETPAD;
     endif
 
     if abbrrow then
-      rownmlen = (max app tok_length app second rowdata) * LETWD + COLPAD;
+      rownmlen = (max app tok_length app second rowdata) * LETWD + LETPAD;
     else
-      rownmlen = (max app tok_length app first rowdata) * LETWD + COLPAD;
+      rownmlen = (max app tok_length app first rowdata) * LETWD + LETPAD;
     endif
 
-print [rownmlen, colnmlen];//DEBUG
     local box_w = numcols * CELL_WD;
     local box_h = numrows * CELL_HT;
     local box_x = ROWCOLTITLE_H + rownmlen;
@@ -537,11 +533,13 @@ print [rownmlen, colnmlen];//DEBUG
         local c_y = box_y + (numrows - row_i) * CELL_HT;
 
         if abbrrow then
-            gr_text [key, [0, [ROWCOLTITLE_H + CELL_WD/2 , c_y + CELL_HT/2],
-                rowabbrev, 'sys-b', icolor'black', 8, [position: 'middleright']]];
+            gr_text [key, [0, [ROWCOLTITLE_H + rownmlen - LETPAD,
+                c_y + CELL_HT/2], rowabbrev, 'sys-b', icolor'black', 8, 
+                [position: 'middleright']]];
         else
-            gr_text [key, [0, [ROWCOLTITLE_H + CELL_WD/2 , c_y + CELL_HT/2],
-                rowname, 'sys-b', icolor'black', 8, [position: 'middleright']]];
+            gr_text [key, [0, [ROWCOLTITLE_H + rownmlen - LETPAD,
+                c_y + CELL_HT/2], rowname, 'sys-b', icolor'black', 8,
+                [position: 'middleright']]];
         endif
 
         for col_i = 1, numcols, 1 loop
@@ -578,7 +576,7 @@ print [rownmlen, colnmlen];//DEBUG
 
         img = gr_render_pixmap [bg, colkey];
         gr_destroy colkey;
-        gr_pixmap [key, [0, [box_x + (col_i - 1) * CELL_WD, box_y],
+        gr_pixmap [key, [0, [box_x + (col_i - 1) * CELL_WD, box_y - LETPAD],
             [CELL_WD, colnmlen], app reverse tr img]];
     endloop
 
@@ -677,7 +675,8 @@ local function GetColors [mincut, maxcut, num]
     elseif maxcut === 0 and mincut < 0 and num > 0 then
         colors = GetNegColors [mincut, num - 1];
     elseif mincut < 0 and maxcut > 0 and num > 0 then
-        local mid = max [1, floor ((num - 1) * (mincut / (mincut - maxcut)))];
+        local pct = mincut / (mincut - maxcut);
+        local mid = max [1, floor (num * pct)];
         colors = GetNegColors [mincut, mid];
         colors = cat [colors, dropfirst  GetPosColors [maxcut, num - mid - 1]];
     else
@@ -860,7 +859,8 @@ local function GetMonoColors [mincut, maxcut, num]
     elseif maxcut === 0 and mincut < 0 and num > 0 then
         colors = GetMonoNegColors [mincut, num - 1];
     elseif mincut < 0 and maxcut > 0 and num > 0 then
-        local mid = max [1, floor ((num - 1) * (mincut / (mincut - maxcut)))];
+        local pct = mincut / (mincut - maxcut);
+        local mid = max [1, floor (num * pct)];
         colors = GetMonoNegColors [mincut, mid];
         colors = cat [colors, dropfirst  GetMonoPosColors [maxcut,
             num - mid - 1]];
@@ -1207,6 +1207,8 @@ endfunction
  *    help : boolean : if true, show in the bubble help for each button
  *          the full row label, full column label and cell value.
  *
+ *  ToDo:  add controls for using abbreviated or full row/cal label names.
+ *
  ****************************************************************************/
 global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
         help, closefun]
@@ -1309,13 +1311,13 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                 break;
 
             elseif vals.panel === 'Save' then
-                local simgkey = DrawMap [data, numrows, numcols, 0, 0, mincut, 
+                local simgkey = DrawMap [data, numrows, numcols, 1, 0, mincut, 
                     maxcut, colors, vals.nticks];
                 gr_export simgkey;
                 gr_destroy simgkey;
 
             elseif vals.panel === 'Print' then
-                local pimgkey = DrawMap [data, numrows, numcols, 0, 0, mincut, 
+                local pimgkey = DrawMap [data, numrows, numcols, 1, 0, mincut, 
                     maxcut, colors, vals.nticks];
                 gr_print pimgkey;
                 gr_destroy pimgkey;

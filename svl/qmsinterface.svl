@@ -222,17 +222,9 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
     exe_kill  process_key;
     exe_close process_keys;
 
-
     //  Clean up working directory.
     if success === 1 then
-        local templist = flist [subdirname, 'MOE_*.dmx*'];
-        templist = cat [templist, flist [subdirname, 'MOE_*.row*']];
-        templist = cat [templist, flist [subdirname, 'MOE_*.rst*']];
-        templist = cat [templist, flist [subdirname, 'MOE_*.out']];
-        templist = cat [templist, flist [subdirname, 'divcon.log']];
-        templist = cat [templist, flist [subdirname, 'mtkpp.log']];
-        templist = cat [templist, flist [subdirname, 'divcon.hss']];
-        templist = cat [templist, flist [subdirname, 'fort.8']];
+        local templist = flist [subdirname, 'divcon.log'];
         if delsubdir then
             templist = cat [templist, subdirname];
         endif
