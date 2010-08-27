@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -S /bin/bash
-#PBS -l nodes=8:ppn=4
+#PBS -l nodes=2:ppn=7
 #PBS -l mem=2000mb
 #PBS -j oe
 
@@ -9,7 +9,6 @@ date
 cat $PBS_NODEFILE
 
 # Change the path and name for the MOE database.
-cd $PBS_O_WORKDIR
-USER_DATADB="$PWD/qmscore.mdb"
+USER_DATADB="$PBS_O_WORKDIR/nmrscore.mdb"
 
-moebatch -mpu 1 -exec "run ['qmsmpi.svl', ['$USER_DATADB']]" -exit
+moebatch -exec "run ['nmrmpi.svl', ['$USER_DATADB', '$PBS_JOBID']]" -exit

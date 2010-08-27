@@ -89,6 +89,7 @@ QuantumBio Homepage
         <li><a href="#core-charge-manytomany">Many-to-Many Mode</a>
         <li><a href="#core-charge-editing">Editing</a>
       </ol>
+      <li><a href="#core-editmol">Editing Molecules</a>
       <li><a href="#core-load">Load, Create, and Update</a>
       <li><a href="#core-clean">Log Files and Postexecution Cleanup</a>
       <li><a href="#core-parallel">Parallel Execution</a>
@@ -636,6 +637,34 @@ message in the <w>Status</w> column.
 <warn>Warning:  When you edit a cell in a MOE database, the new value is
 directly written to disk and the previous value is lost.</warn>
 
+<h3><a name="core-editmol"></a>Editing Molecules</h3>
+<p>
+If you do encounter a problematic molecule, you may wish to edit it to fix the
+problem.  This is not a detailed description of how to use MOE's tools for
+editing and optimizing molecules, but a few additional pointers relevant 
+for the MOEDivCon Integration Suit.
+<p>
+<ul>
+  <li>Close all MOEDivCon panels before editing molecules.
+  <li>If you open an existing MOEDivCon Score database and edit some of the
+    <w>Receptor</w> or <w>Ligand/Pose</w> fields directly using
+    <w>Get from MOE</w> and <w>Send to MOE</w> options from the 
+    <w>Molecule</w> popup menu, then you need to rename the receptors and
+    ligands including the MOEDivCon specific tags:  "rec#" and "lig#" (or
+    "rec#=<em>&lt;name&gt;</em>" and "lig#=<em>&lt;name&gt;</em>" 
+    if the molecules also have a user supplied name). To do so, right click
+    on the appropriate molecule cell and select <w>Set Name</w> from the popup
+    menu.
+  <li>It is suggested that you also save any edited molecules in their
+    original file format (mol2, pdb, etc.), so that, if necessary, the
+    receptor and/or ligand/pose databases can be regenerated with the
+    correct structures.
+  <li>If you modify a MOEDivcon Score database after it has been submitted
+    for parallel execution on a computing cluster to correct problematic
+    molecules, you can resubmit it to the cluster queue and the jobs marked
+    successful in the database will be skipped.
+</ul>
+
 <h3><a name="core-load"></a>Load, Create, and Update</h3>
 <p>
 You can load an existing MOEDivCon Score database into the MOEDivCon Score
@@ -674,9 +703,7 @@ and may be lost if not saved beforehand.</warn>
 <h3><a name="core-clean"></a>Log Files and Postexecution Cleanup</h3>
 <p>
 If a DivCon job runs successfully, MOEDivCon automatically deletes
-temporary HDF5 (.h5 extension) files in the working directory.  
-This prevents DivCon from attempting
-to reuse files from an earlier run and avoids wasting disk space. However,
+temporary HDF5 (.h5 extension) files in the working directory.  However,
 if an error is reported the files are not deleted and the location of the
 DivCon log file is written to the <w>Status</w> column of the MOEDivCon Score
 database along with the error message.  The location has the format:

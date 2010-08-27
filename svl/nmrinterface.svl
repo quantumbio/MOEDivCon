@@ -135,7 +135,19 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
     endif
 
     local poseidxs = qb_GetElemIndices [ligmol, appopts.csp];
+    if neL [length indices, length poseidxs] then
+        errmess = cat [swrite ['Skipping!  Atom indices are inconsistent:\n'
+            '    Orig: {v}\n    Pose: {v}\n', indices, poseidxs], errmess];
 
+        oDestroy uniq cat oChains cat recressets;
+        oDestroy uniq cat oChains cat ligressets;
+        if not MOE_BATCH then
+            SystemPop [osys, nsys];
+        endif
+
+        return [[], errmess];
+    endif
+ 
     if not alltrue eqE [indices, poseidxs] then
         errmess = cat [swrite ['Skipping!  Atom indices are inconsistent:\n'
             '    Orig: {v}\n    Pose: {v}\n', indices, poseidxs], errmess];
@@ -268,14 +280,7 @@ print [score];//DEBUG
 
     //  Clean up working directory.
     if success === 1 then
-        local templist = flist [subdirname, 'MOE_*.dmx*'];
-        templist = cat [templist, flist [subdirname, 'MOE_*.row*']];
-        templist = cat [templist, flist [subdirname, 'MOE_*.rst*']];
-        templist = cat [templist, flist [subdirname, 'MOE_*.out']];
-        templist = cat [templist, flist [subdirname, 'divcon.log']];
-        templist = cat [templist, flist [subdirname, 'mtkpp.log']];
-        templist = cat [templist, flist [subdirname, 'divcon.hss']];
-        templist = cat [templist, flist [subdirname, 'fort.8']];
+        local templist = flist [subdirname, 'divcon.log'];
         if delsubdir then
             templist = cat [templist, subdirname];
         endif
