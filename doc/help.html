@@ -373,6 +373,8 @@ and selecting
 <w>Many-to-Many</w> mapping mode, and you can proceed directly to browsing
 for the receptor database (<inline>${QBHOME}/examples/simplerecs.mdb</inline>) 
 and ligand database (<inline>${QBHOME}/examples/simpleligands.mdb</inline>).
+Also change the working directory to <inline>~</inline> or some other network
+mounted directory accessable by all of the nodes on your computing cluster.
 Your settings should look like:
 <p>
 <object id="QMScoreOptionsManyToMany" title="QMScore Many-to-Many Options"
@@ -385,13 +387,13 @@ calculated as the receptors and ligands are copied to the QMScore database.
 Press <w>Create</w> and verify that the charges and other data for both 
 the receptors and ligands are okay (the
 <w>Status</w> field is empty).  Close the MOE Database Viewer, copy
-<inline>moedivconmpi_bash.pbs</inline> from
+<inline>mmoedivcon_qmsmpi_bash.pbs</inline> from
  <inline>${QBHOME}/scripts/</inline> to the directory 
 where <inline>qmscore.mdb</inline>
 is located, change the number of processors (if necessary) 
 and submit it to your PBS queue:
 <pre>
-&gt; qsub moedivconmpi_bash.pbs
+&gt; qsub moedivcon_qmsmpi_bash.pbs
 </pre>
 Analagous steps are followed for other cluster management systems.  When all
 twelve jobs are completed, open <inline>qmscore.mdb</inline> in the MOE
@@ -478,15 +480,14 @@ problems parsing a PDB file, in particular the Atom Name field.
 <h4><a name="core-test-overlap"></a>Atom Overlap</h4>
 <p>
 This is an "Error" test.
-Not unexpectedly, DivCon has serious convergence problems if there are atoms
-that are overlapping (&lt; 0.5 &#197;).  This test checks for intramolecular
+Not unexpectedly, DivCon has serious convergence problems if there are unbonded
+atoms with overlapping orbitals.  This test checks for intramolecular
 atom overlap; that is, whether any two atoms in the ligand are too close to 
 each other, or any two atoms in the receptor collection, which may include 
 solvents, cofactors, etc.  This test detects structural problems that may be
 difficult to see with a 3D molecular viewer.  This test also checks for
 intermolecular atom overlap; that is between receptor and ligand atoms.  At
-the moment, the test uses a simple heuristic that will be improved over time
-to account for H-bonds, for example.
+the moment, the test uses a simple heuristic that will be improved with time.
 
 <h4><a name="core-test-hamcompat"></a>Hamiltonian Compatibility</h4>
 <p>
@@ -640,9 +641,9 @@ directly written to disk and the previous value is lost.</warn>
 <h3><a name="core-editmol"></a>Editing Molecules</h3>
 <p>
 If you do encounter a problematic molecule, you may wish to edit it to fix the
-problem.  This is not a detailed description of how to use MOE's tools for
-editing and optimizing molecules, but a few additional pointers relevant 
-for the MOEDivCon Integration Suit.
+problem.  See the MOE documentation for a detailed description of how to use 
+MOE's tools for editing and optimizing molecules, but here's a few additional
+pointers relevant for the MOEDivCon Integration Suit.
 <p>
 <ul>
   <li>Close all MOEDivCon panels before editing molecules.
@@ -651,7 +652,7 @@ for the MOEDivCon Integration Suit.
     <w>Get from MOE</w> and <w>Send to MOE</w> options from the 
     <w>Molecule</w> popup menu, then you need to rename the receptors and
     ligands including the MOEDivCon specific tags:  "rec#" and "lig#" (or
-    "rec#=<em>&lt;name&gt;</em>" and "lig#=<em>&lt;name&gt;</em>" 
+    "rec#=<em>&lt;name&gt;</em>" and "lig#=<em>&lt;name&gt;</em>"
     if the molecules also have a user supplied name). To do so, right click
     on the appropriate molecule cell and select <w>Set Name</w> from the popup
     menu.
@@ -694,7 +695,8 @@ and charges
 calculated from the molecules in the MOE Window, and/or those stored in the
 recepter and pose database specified in MOEDivCon Score panel.  When you edit
 an entry in a MOE database, it is written directly to disk.  See the
-<a href="#core-charge-editing">Editing</a> charge section for more information.
+<a href="#core-editmol">editing molecule</a> and
+<a href="#core-charge-editing">editing charge</a> sections for more information.
 <p>
 <warn>Warning:  When you load a database, the current settings in the
 MOEDivCon Score panel and the molecules in the MOE Window are replaced
@@ -728,6 +730,11 @@ you are scoring one complex or hundreds.
 Before getting into the details of executing moebatch on a cluster, we'll
 explain how to setup MOEDivCon QMScore to run many jobs in parallel.  
 Analogous steps are performed to set up MOEDivCon NMRScore jobs.
+<p>
+Note:  the current working directory must be mounted on all computing cluster
+nodes, unless all processors used for the parallel run are on the same node.
+For instance, <inline>/tmp</inline> is locally mounted on each node and should
+not be used for the current working directory of a parallel run.
 
 <h4><a name="core-parallel-mode"></a>Mapping Mode</h4>
 <p>
@@ -818,11 +825,11 @@ a script to a cluster queue (analogous steps are performed to execute MOEDivCon
 NMRScore.).  Example
 scripts for PBS and SGE are located in <inline>${QBHOME}/scripts</inline>.
 For example, below is the script for submitting a parallel job to PBS
-using bash (<inline>${QBHOME}/scripts/moedivconmpi_bash.pbs</inline>):
+using bash (<inline>${QBHOME}/scripts/moedivcon_qmsmpi_bash.pbs</inline>):
 <pre>
 #!/bin/bash
 #PBS -S /bin/bash
-#PBS -l nodes=8:ppn=4
+#PBS -l nodes=2:ppn=7
 #PBS -l mem=2000mb
 #PBS -j oe
 
@@ -831,28 +838,59 @@ date
 cat $PBS_NODEFILE
 
 # Change the path and name for the MOE database.
-cd $PBS_O_WORKDIR
-USER_DATADB="$PWD/qmscore.mdb"
+USER_DATADB="$PBS_O_WORKDIR/qmscore.mdb"
 
-moebatch -mpu 1 -exec "run ['qmsmpi.svl', ['$USER_DATADB']]" -exit
+moebatch -exec "run ['qmsmpi.svl', ['$USER_DATADB', '$PBS_JOBID']]" -exit
 </pre>
-<inline>$USER_DATADB</inline> is the path to your QMScore database.  
-The script requests the number of proccessors to use in the parallel job (in
-this case 32) and
-generates the list of nodes in the <inline>PBS_NODEFILE</inline> that is used
-by MPI.  Note that only one MOE license for moebatch is required.
+The MPI implementation of MOEDivCon require one process for moebatch and a 
+separate processor for each worker that performs QMScore computations.
+The above script requests 14 (2 * 7) proccessors to use in the parallel job,
+so thirteen would be available to process the receptor/pose complexes in the 
+QMScore database.  PBS generates the list of nodes in the 
+<inline>PBS_NODEFILE</inline> that is used by MPI.  Note that only one MOE 
+license for moebatch is required.
 <p>
-In addition to storing the scores in the QMScore MOE database, the QMScore
-application creates an <inline>HDF5</inline> file in the same location and with
-the same name as the QMScore database (<inline>.h5</inline> extension).  This
-file contains additional data (for instance, PWD) that the application uses for
-post-execution analysis.
+The first argument to <inline>qmsmpi.svl</inline>, 
+<inline>$USER_DATADB</inline>, is the path to your QMScore database. The second
+argument, which is optional, is the name of the subdirectory to use to store
+temporary files in the working directory; in this case, 
+<inline>$PBS_JOBID</inline>.  A unique subdirectory name ensures that
+different parallel jobs don't mix temporary files.
 <p>
 Each worker process creates a single log file in the <inline>log</inline>
 subdirectory of the working directory for all of the jobs it executes.
 Each worker process creates a separate <inline>HDF5</inline> file in the 
 working directory for each job that it executes.  These files are automatically
 deleted after a successful execution.
+<p>
+In addition to storing the scores in the QMScore MOE database, the QMScore
+application creates an <inline>HDF5</inline> file in the same location and with
+the same name as the QMScore database (<inline>.h5</inline> extension).  This
+file contains additional data (for instance, PWD) that the application uses for
+post-execution analysis.  Note that if you resubmit a QMScore database, those
+rows that have "Success" in the <w>Status</w> field are skipped.
+<p>
+An alternate setup, especially for users who prefer to use the <w>CWD</w>
+option for the working directory would be:
+
+<pre>
+#!/bin/bash
+#PBS -S /bin/bash
+#PBS -l nodes=2:ppn=7
+#PBS -l mem=2000mb
+#PBS -j oe
+
+hostname
+date
+cat $PBS_NODEFILE
+
+mkdir $PBS_JOBID; cd $PBS_JOBID
+
+# Change the path and name for the MOE database.
+USER_DATADB="qmscore.mdb"
+
+moebatch -exec "run ['qmsmpi.svl', ['$USER_DATADB']]" -exit
+</pre>
 
 <h3><a name="core-options"></a>Core Options</h3>
 <p>
@@ -891,13 +929,14 @@ post-execution analysis.
 The working directory is used for storing QuantumBio DivCon intermediate
 calculations and log files.  The path to the specified directory will
 be stored in the MOEDivCon Score database and resolved at execution time.
-If you are
-going to submit the MOEDivCon Score job on a cluster, you can specify
-the absolute
-path to a scratch directory mounted on the cluster's file system.  Because of
-this possible scenerio, there is no check whether the directory actually
-exists.  If MOEDivCon Score job is executed in parallel, a subdirectory
-under the working directory named <inline>logs</inline> in which
+If you are going to submit the MOEDivCon Score job on a cluster, you can 
+specify the absolute path to a scratch directory mounted on the cluster's 
+file system.  Each node involved in the parallel execution must have access
+to the working directory.  If passed as a second argument to 
+<inline>qmsmpi.svl</inline> in a cluster script, a subdirectory is created in
+the working directory and MOEDivCon executes in it.
+Also if MOEDivCon Score job is executed in parallel, 
+a subdirectory under the working directory named <inline>logs</inline> in which
 will be created a separate log file for each worker process.
 <p>
 An alternative to specifying a working directory is to use the <w>CWD</w>
@@ -1045,6 +1084,10 @@ chemical shift evaluation:
   <li>C only:  only the carbon atoms in the ligand are scored.
   <li>all atoms: all atoms in the ligand are scored.
 </ul>
+<p>
+<warn>Warning:  changing the CSP atom type deletes any experimental values 
+entered previously.
+</warn>
 
 <h4><a name="nmr-csp-exp"></a>Experimental Data</h4>
 <p>
@@ -1359,6 +1402,11 @@ the poses and have mostly zero values for the energy terms in the scoring
 function.  The inclusion of these residues in the analysis can distort the
 PLS calculations.  Any residues with more than the given percentage of zero
 energy values are pruned.  The default is set at 95 percent zero values.
+<p>
+Because of space limitations, the Heat Map truncates residues if there are
+more than thirty of them, possibly losing important information.  If you
+lower the threshhold for zero values (75%, say), more residues with lots of
+zero values (and thus little interest) will be pruned during the analysis.
 
 <h5><a name="pwd-options-residues-pSD"></a>Pruning:  Minimum SD</h5>
 <p>
@@ -1657,6 +1705,17 @@ Ligand has to be a single molecule.
     analysis.  Or <a href="#contact">contact</a> our scientific support group
     to resolve this issue in a future release.
   </sol>
+    <p><sol>
+    If you have edited the ligand (added or deleted atoms), the collection
+    used to identify the ligand is invalid.  To fix the problem, you need to
+    <ol>
+        <li> From the SVL command line, execute
+<pre>
+svl>  oSetCollection ['QB_LIGAND', []]
+</pre>
+        <li> Use LigX to choose the ligand (see above).
+    </ol>
+  </sol>
   <li><p><prob>
     I get the MOE message:
     <pre>
@@ -1729,19 +1788,6 @@ Error:  Problematic charge for receptor and/or ligand.
     Or you can simply edit the charge in the MOE database (see the
     <a href="#core-charge-editing">charge</a> section).
   </sol>
-<li> <p><prob>
-    I observe "atomic fusion" upon completion of a MOE minimization.</prob>
-<p><sol>
-    "Atomic fusion" or the movement of two atoms (usually
-    protons) on top of each other has been observed when using the OPLS-AA force
-    field within MOE. The problem is related to the fact that in OPLS-AA, polar
-    hydrogens have zero van der Waals radii and that the default interior
-    dielectric of the protein is 1. The problem can be addressed by turning on
-    Born solvation at the start of the minimization. Unfortunately, there 
-    doesn't seem to be a way to fix the problem once it has already occured. 
-    Instead, you will need to go back to the original structure and re-optimize
-    it.
-</sol>
   <li><p><prob>
     I get the MOE message:
     <pre>
@@ -1806,6 +1852,19 @@ The receptor and pose databases have different number of entries.
     calculation or whether it is converging.  This will be addressed in a future
     release of MOEDivCon.
   </sol>
+    <li> <p><prob>
+    I observe "atomic fusion" upon completion of a MOE minimization.
+    </prob><p><sol>
+    "Atomic fusion" or the movement of two atoms (usually
+    protons) on top of each other has been observed when using the OPLS-AA force
+    field within MOE. The problem is related to the fact that in OPLS-AA, polar
+    hydrogens have zero van der Waals radii and that the default interior
+    dielectric of the protein is 1. The problem can be addressed by turning on
+    Born solvation at the start of the minimization. Unfortunately, there 
+    doesn't seem to be a way to fix the problem once it has already occured. 
+    Instead, you will need to go back to the original structure and re-optimize
+    it.
+    </sol>
 </ui>
 
 <h2><a name="contact"></a>Support Contact Information</h2>
