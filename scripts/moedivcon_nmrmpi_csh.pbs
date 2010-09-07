@@ -1,5 +1,5 @@
-#!/bin/bash
-#PBS -S /bin/bash
+#!/bin/csh
+#PBS -S /bin/csh
 #PBS -l nodes=2:ppn=7
 #PBS -l pmem=1gb
 #PBS -j oe

@@ -264,10 +264,13 @@ print [cspidx, cspval];//DEBUG
                 atomvalues = append [atomvalues, cspval];
             endloop
 
+write ['Indices: {v}\nDivcon indices: {v}\nValues: {v}\nFree: {v}\nBound: {v}\n', 
+indices, atomindices, atomvalues, free, bound];//DEBUG
             if neL [length indices, length atomindices] then
                 errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
                     '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
                     errmess];
+                write errmess;//DEBUG
                 if not isnull warnings (rowcnt) then
                     errmess = cat [errmess, string warnings (rowcnt)];
                 endif
@@ -278,6 +281,7 @@ print [cspidx, cspval];//DEBUG
                 errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
                     '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
                     errmess];
+                write errmess;//DEBUG
                 if not isnull warnings (rowcnt) then
                     errmess = cat [errmess, string warnings (rowcnt)];
                 endif
