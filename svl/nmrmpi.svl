@@ -154,7 +154,7 @@ global function qb_NMRScoreMPI [dbpath, jobid]
     qb_HamSetsInit [];
     local rowkey = 0, rowcnt = 0, numokay = 0, warnings = [];
     for rowkey in dbrowkeys loop
-        local errmess = '';
+        local errmess = "";
         local recchg;
         rowcnt = rowcnt + 1;
 
@@ -264,8 +264,11 @@ print [cspidx, cspval];//DEBUG
                 atomvalues = append [atomvalues, cspval];
             endloop
 
-write ['Indices: {v}\nDivcon indices: {v}\nValues: {v}\nFree: {v}\nBound: {v}\n', 
-indices, atomindices, atomvalues, free, bound];//DEBUG
+            //  DivCon doesn't always retain index order //DEBUG
+            local sidx = x_sort atomindices;
+            atomindices = atomindices [sidx];
+            atomvalues = atomvalues [sidx];
+
             if neL [length indices, length atomindices] then
                 errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
                     '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
