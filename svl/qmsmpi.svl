@@ -138,7 +138,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
     qb_HamSetsInit [];
     local rowkey = 0, rowcnt = 0, numokay = 0, warnings = [];
     for rowkey in dbrowkeys loop
-        local errmess = '', success = 0;
+        local errmess = "", success = 0;
         local recchg;
         rowcnt = rowcnt + 1;
 
