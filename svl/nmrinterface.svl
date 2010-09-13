@@ -224,6 +224,13 @@ print [cspidx, cspval];//DEBUG
                 atomindices = append [atomindices, cspidx];
                 atomvalues = append [atomvalues, cspval];
             endloop
+print atomindices;//DEBUG
+            local sidx = x_sort atomindices;
+print sidx;//DEBUG
+            atomindices = atomindices [sidx];
+print atomindices;//DEBUG
+            atomvalues = atomvalues [sidx];
+print atomvalues;//DEBUG
 
             if neL [length indices, length atomindices] then
                 errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'

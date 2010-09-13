@@ -1560,7 +1560,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
             return [status, ligatoms, btasks];
         endif
 
-        [vals, ligatoms] = qb_ShowLigPoses [vals, ligatoms];
+        [vals, ligatoms] = qb_ShowLigPoses [vals, ligatoms, 0];
         WindowSetData [wkey, [allposes: vals.allposes]];
 
     elseif trig === 'performtests' then
@@ -1902,7 +1902,8 @@ global function qb_GetElemIndices [mol, which]
     elseif which === 2 then
         atomindices = cat indicesof ['C', mol(4)(MOL_ATOM_EL)];
     else
-        atomindices = igen add mol(3)(MOL_RES_NATOMS);
+//        atomindices = igen add mol(3)(MOL_RES_NATOMS);
+        atomindices = igen mol_aCount mol;
     endif
 
     return atomindices;
@@ -2325,7 +2326,7 @@ global function qb_ResetLigand [wkey, vals]
     local ligatoms;
     vals.allposes = 0;
     WindowSetData [wkey, [allposes: 0]];
-    [vals, ligatoms] = qb_ShowLigPoses [vals, []];
+    [vals, ligatoms] = qb_ShowLigPoses [vals, [], 0];
 
     return [vals, ligatoms];
 endfunction
@@ -2653,12 +2654,12 @@ endfunction
  *  Show either the ligand or all poses in the MOE Window.
  *
  ****************************************************************************/
-global function qb_ShowLigPoses [vals, ligatoms]
+global function qb_ShowLigPoses [vals, ligatoms, reset]
 
     static ligmol, posemols, poseatoms, posedb;
 
     //  If first entry, set up ligmol
-    if ligmol === [] and posemols === [] then
+    if (ligmol === [] and posemols === []) or reset then
         ligmol = mol_Extract ligatoms;
         posedb = '';
     endif
