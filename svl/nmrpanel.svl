@@ -160,7 +160,11 @@ const PANEL =
             type: 'int', minWidth: 11, onTrigger: 'return',
             bubbleHelp:
                 'The set of atoms on which to perform\n'
-                'chemical shift perturbation.'
+                'chemical shift perturbation.  Note:  the\n'
+                'atoms are selected immediately after changing\n'
+                'this option.  Warning:  any experimental values\n'
+                'entered are deleted immediately after changing\n'
+                'this option.'
             ],
         Separator : 
             [
@@ -723,11 +727,13 @@ global function qb_NMRScoreSetupPanel []
                     exit [];
                 endif
 
+                cutrecmol = [];
                 oDestroy uniq oChains recatoms;
                 recatoms = cat cAtoms mol_Create origrecmol;
                 status = qb_UpdateCharge [wkey, vals, status, 1];
                 WindowSetAttr [wkey, [showcut: [sensitive: 1],
                     original: [sensitive: 0]]];
+write ['Ligs okay?  {t:}\n', select ['Yes.', 'No!', alltrue oValid ligatoms]];//DEBUG
                 aSetNucleusLook [ligatoms, orignucs];
                 aSetBondLook [ligatoms, origbnds];
                 ViewLoad 1;
@@ -795,18 +801,25 @@ global function qb_NMRScoreSetupPanel []
                             exit [];
                         endif
 
-                        [ldkey, cutrecmol, origligmol, status, coreopts,
+                        local ldligmol;
+                        [ldkey, cutrecmol, ldligmol, status, coreopts,
                             nmrsopts, [origrecmol, origligmol], indices,
                             atomnames, atomfree, atombound] = LoadDB [dbpath];
 
+                        if mol_aCount origrecmol === mol_aCount cutrecmol then
+                            cutrecmol = [];
+                        endif
+
                         Close [force:1];
-                        if neL [cutrecmol, []] then
+                        if not isnull cutrecmol then
                             wascut = 1;
                             recatoms = cat cAtoms mol_Create cutrecmol;
-                            ligatoms = cat oAtoms mol_Create origligmol;
+                            ligatoms = cat cAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
                             aSetNucleusLook [ligatoms, 'small-sphere'];
                             aSetBondLook [ligatoms, 'cylinder'];
+                            orignucs = aNucleusLook ligatoms;
+                            origbnds = aBondLook ligatoms;
                         else
                             wascut = 0;
                             recatoms = cat cAtoms mol_Create origrecmol;
@@ -814,11 +827,13 @@ global function qb_NMRScoreSetupPanel []
                             oSetCollection ['QB_LIGAND', ligatoms];
                             aSetNucleusLook [ligatoms, 'small-sphere'];
                             aSetBondLook [ligatoms, 'cylinder'];
+                            orignucs = aNucleusLook ligatoms;
+                            origbnds = aBondLook ligatoms;
                         endif
 
                         posemols = [];
                         [coreopts, ligatoms] = qb_ShowLigPoses [coreopts, 
-                            ligatoms];
+                            ligatoms, 1];
 
                         dbv_Open db_Filename ldkey;
                         db_Close ldkey;

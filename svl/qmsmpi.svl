@@ -169,10 +169,6 @@ global function qb_QMScoreMPI [dbpath, jobid]
             numokay = numokay + 1;
 
             //  Pass the two backbones to QuantumBio's DivCon QMScore
-            //
-            //  SplitCollection ensures that there is only one chain per 
-            //  molecule in the receptor and ligand collections.
-
             write ['Sending pose {} of {}\n', rowcnt, nrows];
             fwrite [stdin, '{n:}\n', rowcnt];
             fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
