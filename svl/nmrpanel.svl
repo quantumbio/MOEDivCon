@@ -30,7 +30,6 @@
 #set main    'qb_NMRScoreSetupPanel'
 
 function qb_AllPosesEnable;
-function qb_AtomsToMols;
 function qb_CoreEnable;
 function qb_CoreHandler;
 function qb_CutReceptor;
@@ -40,7 +39,6 @@ function qb_GetCorePanel;
 function qb_GetDefaultsCore;
 function qb_GetDefaultsStatus;
 function qb_GetEnvApp;
-function qb_GetEnvTag;
 function qb_GetElemIndices;
 function qb_GetLigandAtoms;
 function qb_GetNMRSEnv;
@@ -70,7 +68,6 @@ function qb_UpdateCorePanel;
 function qb_VerifyDivCon;
 
 function qb_NMRScore;
-function qb_NMRScoreBatch;
 
 const NMR_NUM_FIELDS =
     [
@@ -287,7 +284,7 @@ const EXP_TEXTCELL =
  ****************************************************************************/
 local function LoadDB [dbpath]
 
-    local [dbkey, recset, ligand, status, coreopts, complex, mess] = 
+    local [dbkey, receptor, ligand, status, coreopts, complex, mess] = 
         qb_LoadCoreScoreDB [dbpath, 'nmrscore'];
     if dbkey === 0 then
         Warning mess;
@@ -299,7 +296,7 @@ local function LoadDB [dbpath]
     local [indices, names, free, bound] = qb_GetAnalysisData [dbkey,
         'nmr', 'exp'];
 
-    return [dbkey, recset, ligand, status, coreopts, nrmsopts, complex,
+    return [dbkey, receptor, ligand, status, coreopts, nrmsopts, complex,
         indices, names, free, bound];
 endfunction
 
@@ -316,7 +313,7 @@ local function RunCalc [dbkey]
     sleep -1;    // Allow parent to close input window.
 
     local rowkey = first db_Entries [dbkey];
-    local [recset, ligand, status, coreopts, nmrsopts, c]
+    local [receptor, ligand, status, coreopts, nmrsopts, c]
         = qb_GetNMRSEnv [dbkey];
     local [indices, names, free, bound] = qb_GetAnalysisData [dbkey,
         'nmr', 'exp'];
@@ -337,7 +334,7 @@ local function RunCalc [dbkey]
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
-    local [results, errmess] = qb_NMRScore [recset, ligand, perfile,
+    local [results, errmess] = qb_NMRScore [receptor, ligand, perfile,
         coreopts, nmrsopts, status.notforced, indices, free, bound];
 
     if results === [] then
@@ -557,11 +554,11 @@ endfunction
  ****************************************************************************/
 global function qb_GetNMRSEnv [dbkey]
 
-    local [recset, ligand, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
+    local [receptor, ligand, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
     local nmrsopts = qb_GetEnvApp [dbkey];
     nmrsopts = tagcat [nmrsopts, tag tr NMRSCORE_OPT_DEFAULTS];
 
-    return [recset, ligand, status, coreopts, nmrsopts, complex];
+    return [receptor, ligand, status, coreopts, nmrsopts, complex];
 endfunction
 
 /****************************************************************************
@@ -619,7 +616,7 @@ global function qb_NMRScoreSetupPanel []
 
     status = qb_GetDefaultsStatus [];
     status = qb_SetAppStatus [status, 'nmr'];
-    status = qb_SetModeStatus [status, [1,1,0]];
+    status = qb_SetModeStatus [status, [0,1,1,0]];
     status = qb_SetHamStatus [status, [1,1,0,0,0,0]];
     local coredflts = qb_GetDefaultsCore [];
     coredflts = qb_SetHamDefault [coredflts, 2];

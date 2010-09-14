@@ -200,7 +200,7 @@ const PANEL =
  ****************************************************************************/
 local function LoadDB [dbpath]
 
-    local [dbkey, recset, ligand, status, coreopts, c, mess] = 
+    local [dbkey, receptor, ligand, status, coreopts, c, mess] = 
         qb_LoadCoreScoreDB [dbpath, 'qmscore'];
     if dbkey === 0 and status === [] and coreopts === [] then
         Warning mess;
@@ -210,7 +210,7 @@ local function LoadDB [dbpath]
     local qmsopts = qb_GetEnvApp [dbkey];
     qmsopts = tagcat [qmsopts, tag tr QMSCORE_OPT_DEFAULTS];
 
-    return [dbkey, recset, ligand, status, coreopts, qmsopts];
+    return [dbkey, receptor, ligand, status, coreopts, qmsopts];
 endfunction
 
 function qb_GetQMSEnv;
@@ -229,7 +229,7 @@ local function RunCalc [dbkey]
     sleep -1;    // Allow parent to close input window.
 
     local rowkey = first db_Entries [dbkey];
-    local [recset, ligand, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
+    local [receptor, ligand, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
 
     local dbpath = fabsname db_Filename dbkey;
     local perpath = fpath dbpath;
@@ -249,7 +249,7 @@ local function RunCalc [dbkey]
 
     local start = clock [];//DEBUG
 
-    local [results, errmess] = qb_QMScore [recset, ligand, perfile, 
+    local [results, errmess] = qb_QMScore [receptor, ligand, perfile, 
         coreopts, qmsopts, status.notforced];
 
     local finish = clock [];//DEBUG
@@ -390,11 +390,11 @@ endfunction
  ****************************************************************************/
 global function qb_GetQMSEnv [dbkey]
 
-    local [recset, ligand, status, coreopts, c] = qb_GetCoreEnv [dbkey];
+    local [receptor, ligand, status, coreopts, c] = qb_GetCoreEnv [dbkey];
     local qmsopts = qb_GetEnvApp [dbkey];
     qmsopts = tagcat [qmsopts, tag tr QMSCORE_OPT_DEFAULTS];
 
-    return [recset, ligand, status, coreopts, qmsopts];
+    return [receptor, ligand, status, coreopts, qmsopts];
 endfunction
 
 /****************************************************************************

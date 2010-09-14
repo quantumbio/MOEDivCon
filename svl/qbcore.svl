@@ -52,6 +52,7 @@ const ANALOPTS = 'analysisoptions';
 const DBTYPE = 'qb_dbtype';
 const QMSCORE = 'qb_qmscoredb';
 const NMRSCORE = 'qb_nmrscoredb';
+const NMRPERTURB = 'qb_nmrperturbdb';
 
 const ANALYSIS = 'qb_analysistype';
 const ANALPWD = 'qb_pwd';
@@ -75,7 +76,7 @@ const CHG_COLOR =
 const STATUS_DEFAULTS =
     [
     ['appname',      ''            ],
-    ['allowmode',    [1,1,1]       ],
+    ['allowmode',    [0,1,1,1]     ],
     ['allowham',     [1,1,1,1,1,1] ],
     ['prevwd',       ''            ],
     ['calcchg',      0             ],
@@ -116,6 +117,7 @@ const CORE_OPT_DEFAULTS =
 
 const RUN_MODES =
     [
+    'SinglePoint',
     'One-to-One',
     'One-to-Many',
     'Many-to-Many'
@@ -199,14 +201,15 @@ const CORE_PANEL =
         name: 'modebox',
         Radio :
             [
-            name: 'mode', text: RUN_MODES, columns: 3, minWidth: 12, 
+            name: 'mode', text: RUN_MODES, columns: 4, minWidth: 12, 
             extendH: 1, onTrigger: 'return', title: 'Mapping Mode:',
             type: 'char',
             bubbleHelp:
                 'The mapping mode of receptors to ligand/poses:\n'
-                '  One ligand docked into one receptor.\n'
-                '  Many ligand poses docked into the same receptor.\n'
-                '  Many ligand poses, each docked into its own receptor.'
+                '  SinglePoint:  The receptor only.\n'
+                '  One-to-One:  One ligand docked into one receptor.\n'
+                '  One-to-Many:  Many ligand poses docked into the same receptor.\n'
+                '  Many-to-Many:  Many ligand poses, each docked into its own receptor.'
             ],
         Separator : 
             [
@@ -359,6 +362,7 @@ const CORE_PANEL =
             name: 'chgbox',
             Hbox :
                 [
+                name: 'recchgbox',
                 extendH: 1,
                 Label :
                     [
@@ -380,6 +384,7 @@ const CORE_PANEL =
                 ],
             Hbox :
                 [
+                name: 'ligchgbox',
                 extendH: 1,
                 Label :
                     [
@@ -1361,12 +1366,22 @@ function qb_ResetLigand;
  ****************************************************************************/
 local function UpdateMode [wkey, vals, status]
 
-    if vals.mode === 'One-to-One' then
+    if vals.mode === 'SinglePoint' then
         WindowSetAttr [wkey, [allposes: [sensitive: 0],
             recbox: [sensitive: 0], recdb: [allowBlank: 1], 
             posebox: [sensitive: 0], posedb: [allowBlank: 1], 
             panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
             chgbox: [sensitive: 1], recchg: [allowBlank: 0],
+            ligchgbox: [sensitive: 0], 
+            ligchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
+        SetChargeStatus [wkey, status];
+    elseif vals.mode === 'One-to-One' then
+        WindowSetAttr [wkey, [allposes: [sensitive: 0],
+            recbox: [sensitive: 0], recdb: [allowBlank: 1], 
+            posebox: [sensitive: 0], posedb: [allowBlank: 1], 
+            panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
+            chgbox: [sensitive: 1], recchg: [allowBlank: 0],
+            ligchgbox: [sensitive: 1], 
             ligchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
             local las;
             [vals, las] = qb_ResetLigand [wkey, vals];
@@ -1377,6 +1392,7 @@ local function UpdateMode [wkey, vals, status]
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
             panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
             chgbox: [sensitive: 1], recchg: [allowBlank: 0],
+            ligchgbox: [sensitive: 1], 
             ligchg: [allowBlank: 0], poseschg: [sensitive: 1]]];
         SetChargeStatus [wkey, status];
     elseif vals.mode === 'Many-to-Many' then
@@ -2047,13 +2063,13 @@ endfunction
  *  Determine whether atoms in the receptor atoms overlap with the
  *  ligand atoms.
  *
- *  Assumption:  recset was created before ligset in the current system.
+ *  Assumption:  receptor was created before ligset in the current system.
  *
  ****************************************************************************/
-global function qb_InterMoleculeOverlap [recset, ligset]
+global function qb_InterMoleculeOverlap [receptor, ligset]
 
     local mess = '';
-    local pairs = AtomOverlap [recset, ligset];
+    local pairs = AtomOverlap [receptor, ligset];
     if length pairs > 0 then
         local residues = oParent pairs;
         local rnames = rName residues;
@@ -2062,7 +2078,7 @@ global function qb_InterMoleculeOverlap [recset, ligset]
         local anames = aName pairs;
         local indices = aNumber pairs;
         indices = tr indices;
-        indices = [first indices, second indices - length recset];
+        indices = [first indices, second indices - length receptor];
         indices = tr indices;
         local dists = app aDist pairs;
         local ith; 

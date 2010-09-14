@@ -683,7 +683,7 @@ endfunction
  ****************************************************************************/
 local function LoadDB [dbpath]
 
-    local [dbkey, recset, ligand, s, coreopts, c, mess] = 
+    local [dbkey, receptor, ligand, s, coreopts, c, mess] = 
         qb_LoadCoreScoreDB [dbpath, 'qmscore'];
     if dbkey === 0 then
         Warning mess;
@@ -693,7 +693,7 @@ local function LoadDB [dbpath]
     local pwdopts = qb_GetEnvAnal [dbkey];
     pwdopts = tagcat [pwdopts, tag tr QBPWD_OPT_DEFAULTS];
 
-    return [dbkey, recset, ligand, coreopts, pwdopts];
+    return [dbkey, receptor, ligand, coreopts, pwdopts];
 endfunction
 
 /****************************************************************************
