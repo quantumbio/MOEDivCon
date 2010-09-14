@@ -19,6 +19,7 @@ MENU APPEND "Main:Compute:Simulations"
         MENU  "QuantumBio"
             "QMScore..."          exec "run'qmspanel.svl'"
             "NMRScore..."         exec "run'nmrpanel.svl'"
+            "NMR Perturbation..." exec "run'perturbpanel.svl'"
 	    SEPARATOR
             "QB-PWD..."           exec "run'pwdpanel.svl'"
         ENDMENU
