@@ -242,153 +242,12 @@ global function qb_NMRPerturbSetupPanel []
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
     WindowSetData [wkey, perturbdflts];
-
-    local errmess = '';
-    [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
-
-    if not isnull recatoms and not isnull ligatoms then
-        origrecmol = mol_Extract recatoms;
-        origligmol = mol_Extract ligatoms;
-        curcsp = perturbdflts.csp;
-        atomfree = rep [0, length indices];//DEBUG
-        atombound = rep [0, length indices];//DEBUG
-
-        WindowSetAttr [wkey, [
-            radius: [sensitive: 1],
-            showcut: [sensitive: 1], original: [sensitive: 0],
-            guess: [sensitive: 1], opt: [sensitive:1]]];
-
-    elseif recatoms === [] and ligatoms === [] then
-        qb_CoreEnable [wkey, 0];
-        WindowSetAttr [wkey, [
-            radius: [sensitive: 0],
-            showcut: [sensitive: 0], original: [sensitive: 0],
-            csp: [sensitive: 0], experimental: [sensitive:0],
-            guess: [sensitive: 0], opt: [sensitive:0],
-            panel:[sensitive:[0,0,0,1,1]]]];
-    else
-        Warning errmess;
-        WindowDestroy wkey;
-        return;
-    endif
-
     WindowShow [wkey, 1];
 
     loop
         local [vals, trig] = WindowWait wkey;
-        if trig === 'showcut' then
 
-            if qb_IsShowingAllPoses [vals] then
-                [vals, ligatoms] = qb_ResetLigand [wkey, vals];
-            endif
-
-            if second task_fork [statics:'share',
-                    master: 'parent'] === 'child' then
-                task_prio 0;
-
-                ViewSave 1;
-                orignucs = aNucleusLook ligatoms;
-                origbnds = aBondLook ligatoms;
-
-                if qb_IsModeOneToMany [vals] then 
-                    if posemols === [] then
-                        [posemols, errmess] = qb_GetPoses [vals];
-                        if posemols === [] then
-                            Warning errmess;
-                            exit [];
-                        endif
-                    endif
-
-                    [recatoms, errmess] = qb_CutReceptor [posemols, vals.radius];
-                else
-                    [recatoms, errmess] = qb_CutReceptor [[], vals.radius];
-                endif
-
-                if recatoms === [] then
-                    Warning errmess;
-                    exit [];
-                endif
-
-                cutrecmol = mol_Extract recatoms;
-                status = qb_UpdateCharge [wkey, vals, status, 1];
-
-                WindowSetAttr [wkey, [showcut: [sensitive: 0],
-                    original: [sensitive: 1]]];
-                View [];
-                exit [];
-            endif
-
-        elseif trig === 'original' then
-
-            if qb_IsShowingAllPoses [vals] then
-                [vals, ligatoms] = qb_ResetLigand [wkey, vals];
-            endif
-
-            if second task_fork [statics:'share',
-                    master: 'parent'] === 'child' then
-                task_prio 0;
-
-                if origrecmol === [] or origligmol === [] then
-                    Warning 'No original complex.';
-                    exit [];
-                endif
-
-                cutrecmol = [];
-                oDestroy uniq oChains recatoms;
-                recatoms = cat cAtoms mol_Create origrecmol;
-                status = qb_UpdateCharge [wkey, vals, status, 1];
-                WindowSetAttr [wkey, [showcut: [sensitive: 1],
-                    original: [sensitive: 0]]];
-write ['Ligs okay?  {t:}\n', select ['Yes.', 'No!', alltrue oValid ligatoms]];//DEBUG
-                aSetNucleusLook [ligatoms, orignucs];
-                aSetBondLook [ligatoms, origbnds];
-                ViewLoad 1;
-                View [];
-                exit [];
-            endif
-
-        elseif trig === 'csp' then
-            if neL [curcsp, vals.csp] then
-                indices = qb_GetElemIndices [origligmol, vals.csp];
-                atomnames = get [aName ligatoms, indices];
-                indextoks = totok indices;
-                atomnames = tok_cat [indextoks, '-', atomnames];
-                atomfree = [];
-                atombound = [];
-                curcsp = vals.csp;
-            endif
-
-        elseif trig === 'experimental' then
-
-            if WindowShow ['NMRExperimentalData', 1] then continue; endif
-
-            if qb_IsShowingAllPoses [vals] then
-                [vals, ligatoms] = qb_ResetLigand [wkey, vals];
-            endif
-
-            if second task_fork [statics:'share',
-                    master: 'parent'] === 'child' then
-
-                qb_AllPosesEnable [wkey, 0];
-                WindowSetAttr [wkey, [csp: [sensitive: 0]]];
-                ViewSave 2;
-                local lignucs = aNucleusLook ligatoms;
-                local ligbnds = aBondLook ligatoms;
-
-                aSetNucleusLook [ligatoms, 'small-sphere'];
-                aSetBondLook [ligatoms, 'cylinder'];
-                View ligatoms;
-                [atomfree, atombound] = SetupExpDataPanel [ligatoms, indices,
-                    atomfree, atombound];
-                aSetNucleusLook [ligatoms, lignucs];
-                aSetBondLook [ligatoms, ligbnds];
-                ViewLoad 2;
-                qb_AllPosesEnable [wkey, qb_IsModeOneToMany [vals]];
-                WindowSetAttr [wkey, [csp: [sensitive: 1]]];
-                exit [];
-            endif
-
-       elseif trig === 'panel' then
+       if trig === 'panel' then
             if vals.panel === 'Close' then 
                 break;
 
@@ -397,7 +256,7 @@ write ['Ligs okay?  {t:}\n', select ['Yes.', 'No!', alltrue oValid ligatoms]];//
                         master: 'parent'] === 'child' then
                     task_prio 0;
 
-                    local ldkey, wascut;
+                    local ldkey;
                     local dbpath = first FilePrompt [title: 'Load Database', 
                         filter: '*.mdb', allowEmptyList: 0];
                     if not isnull dbpath then
@@ -463,7 +322,6 @@ write ['Ligs okay?  {t:}\n', select ['Yes.', 'No!', alltrue oValid ligatoms]];//
                 endif
 
             elseif vals.panel === 'Run' then
-
 
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 3;
