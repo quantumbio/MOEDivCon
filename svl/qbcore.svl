@@ -38,6 +38,9 @@ const LIGCHG_FIELD = 'Lig Chg';
 const REC_FIELD = 'Receptor';
 const RECCHG_FIELD = 'Rec Chg';
 
+const COL_FIELD = 'Collection';
+const COLCHG_FIELD = 'Col Chg';
+
 const STATUS_FIELD = 'Status';
 
 // Environment tags
@@ -64,6 +67,10 @@ const ANALPWDOPTLV = 'qb_pwdoptLV';
 
 const ANALNMR = 'qb_nmr';
 const ANALNMREXP = 'qb_nmrexperimental';
+
+const ANALNMR = 'qb_nmrperturb';
+const ANALNMRPERSEL = 'qb_nmrperturbselection';
+
 
 //  Charge status color
 const CHG_COLOR = 
