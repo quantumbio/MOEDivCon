@@ -68,7 +68,7 @@ const ANALPWDOPTLV = 'qb_pwdoptLV';
 const ANALNMR = 'qb_nmr';
 const ANALNMREXP = 'qb_nmrexperimental';
 
-const ANALNMR = 'qb_nmrperturb';
+const ANALNMRPER = 'qb_nmrperturb';
 const ANALNMRPERSEL = 'qb_nmrperturbselection';
 
 
@@ -124,7 +124,7 @@ const CORE_OPT_DEFAULTS =
 
 const RUN_MODES =
     [
-    'SinglePoint',
+    'Single Point',
     'One-to-One',
     'One-to-Many',
     'Many-to-Many'
@@ -1070,6 +1070,8 @@ global G_hamsets;
  ****************************************************************************/
 local function HamCompatability [appname, hamname, atoms]
 
+    if appname === 'perturb' then appname = 'nmr'; endif
+
     local elems = uniq aElement atoms;
     local compatlist = tagpeek [G_hamsets, [appname, hamname]];
     local idx = indexof [elems, compatlist];
@@ -1131,15 +1133,18 @@ endfunction
  *  Ensure that the required fields are present.
  *
  ****************************************************************************/
-local function SetScoreFields [dbkey, addreceptor, fields]
+local function SetScoreFields [dbkey, addreceptor, addligand, fields]
 
     if addreceptor then
         db_EnsureField [dbkey, REC_FIELD, 'molecule'];
         db_EnsureField [dbkey, RECCHG_FIELD, 'int'];
     endif
 
-    db_EnsureField [dbkey, LIG_FIELD, 'molecule'];
-    db_EnsureField [dbkey, LIGCHG_FIELD, 'int'];
+    if addligand then
+        db_EnsureField [dbkey, LIG_FIELD, 'molecule'];
+        db_EnsureField [dbkey, LIGCHG_FIELD, 'int'];
+    endif
+
     db_EnsureField [dbkey, STATUS_FIELD, 'char'];
 
     if neL [fields, []] then
@@ -1836,9 +1841,25 @@ global function qb_GetAnalysisData [dbkey, analysis, type]
             datatok = db_GetEnv [dbkey, ANALNMREXP];
             [[data]] = sread [string datatok, '{v}'];
         endif
+
+    elseif analysis === 'perturb' then
+        if type === 'sel' then
+            datatok = db_GetEnv [dbkey, ANALNMRPERSEL];
+            [[data]] = sread [string datatok, '{v}'];
+        endif
     endif
 
     return data;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetColFields
+ *
+ ****************************************************************************/
+global function qb_GetColFields []
+
+    return [COL_FIELD, COLCHG_FIELD];
+
 endfunction
 
 /****************************************************************************
@@ -2178,6 +2199,8 @@ global function qb_LoadCoreScoreDB [dbpath, type]
         typename = 'QMScore';
     elseif type === 'nmrscore' then
         typename = 'NMRScore';
+    elseif type === 'perturb' then
+        typename = 'NMR Perturbation';
     else
         typename = 'Unkown';
     endif
@@ -2206,6 +2229,12 @@ global function qb_LoadCoreScoreDB [dbpath, type]
         db_Close dbkey;
         return [0, [], [], [], [], [],
             twrite ['{}\nis not a QMScore Database.', dbpath]];
+    endif
+
+    if type === 'perturb' and neL [dbtype, NMRPERTURB] then
+        db_Close dbkey;
+        return [0, [], [], [], [], [],
+            twrite ['{}\nis not a NMR Perturbation Database.', dbpath]];
     endif
 
     local [rec, lig, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
@@ -2400,9 +2429,15 @@ global function qb_SaveAnalysisData [dbkey, analysis, type, data]
         elseif type === 'optlv' then
             db_SetEnv [dbkey, ANALPWDOPTLV, twrite ['{}', data]]; //  Integer
         endif
+
     elseif analysis === 'nmr' then
         if type === 'exp' then
             db_SetEnv [dbkey, ANALNMREXP, twrite ['{v}', data]];
+        endif
+
+    elseif analysis === 'perturb' then
+        if type === 'sel' then
+            db_SetEnv [dbkey, ANALNMRPERSEL, twrite ['{v}', data]];
         endif
     endif
 
@@ -2534,9 +2569,48 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
     local receptor = [], recok = 1, recmess = '';
     local ligand = [], ligok = 1, ligmess = '';
     local dbkey = db_Open [coreopts.scoredb, 'create'];
-    SetScoreFields [dbkey, coreopts.mode === 'Many-to-Many', fields];
+    SetScoreFields [dbkey, eqL [coreopts.mode, 'Many-to-Many'],
+        neL [coreopts.mode, 'Single Point'], fields];
 
-    if coreopts.mode === 'One-to-One' or coreopts.mode === 'One-to-Many' then
+    if coreopts.mode === 'Single Point' then
+        local collection = Atoms [];
+        if collection === [] then
+            Warning 'There is no collection in the MOE Window.';
+            exit [];
+        endif
+
+        local colmol = mol_Extract collection;
+        local colname = tok_cat ['col', totok 1];
+        if tok_length colmol(1)(MOL_NAME) > 0 then
+            colname = tok_cat [colname, '=', colmol(1)(MOL_NAME)];
+        endif
+
+        colmol(1)(MOL_NAME) = colname;
+
+        SaveEnv [dbkey, colmol, [], status, coreopts, appopts, [], dbtype];
+
+        stsmess = GetStatusMessage ['Collection', neL [status.recchg, 3]];
+        if dotests then
+            [recok, recmess] = qb_TestDivCon ['collection', collection, 
+                coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
+                coreopts.testH, coreopts.testMM, status.appname,
+                (HAM_KEYS | status.allowham)(coreopts.ham)];
+        endif
+
+        if tok_length recmess > 0 then
+            stsmess = cat [stsmess, string recmess];
+        endif
+
+        local coldata = tag [qb_GetColFields [], 
+            [colmol, coreopts.recchg]];
+        local colrowkey = db_Write [dbkey, 0, coldata];
+
+        if not isnull stsmess then
+            qb_SaveDivConStatus [dbkey, colrowkey, stsmess];
+        endif
+
+    elseif coreopts.mode === 'One-to-One'
+            or coreopts.mode === 'One-to-Many' then
         [receptor, ligand, errmess] = qb_AtomsToMols [];
         if receptor === [] or ligand === [] then
             Warning errmess;
