@@ -189,7 +189,7 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
             success = 1;
             fwrite [stdin, '{c:}\n', 'Ok'];
 
-        elseif return_statement === "QBException" then
+        elseif return_statement === "error" then
             [[return_statement]] = fread [stdout, '{c:*}'];
             if neL [return_statement, "DivCon done."] then
                 divconerrmess = cat [divconerrmess, return_statement];

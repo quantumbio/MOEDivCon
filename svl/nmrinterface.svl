@@ -224,14 +224,10 @@ print [cspidx, cspval];//DEBUG
                 atomindices = append [atomindices, cspidx];
                 atomvalues = append [atomvalues, cspval];
             endloop
-print atomindices;//DEBUG
-            local sidx = x_sort atomindices;
-print sidx;//DEBUG
-            atomindices = atomindices [sidx];
-print atomindices;//DEBUG
-            atomvalues = atomvalues [sidx];
-print atomvalues;//DEBUG
 
+            local sidx = x_sort atomindices;
+            atomindices = atomindices [sidx];
+            atomvalues = atomvalues [sidx];
             if neL [length indices, length atomindices] then
                 errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
                     '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
@@ -252,7 +248,7 @@ print [score];//DEBUG
             success = 1;
             fwrite [stdin, '{c:}\n', 'Ok'];
 
-        elseif return_statement === "QBException" then
+        elseif return_statement === "error" then
             [[return_statement]] = fread [stdout, '{c:*}'];
             if neL [return_statement, "DivCon done."] then
                 divconerrmess = cat [divconerrmess, return_statement];
