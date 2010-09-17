@@ -175,7 +175,7 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
 
         write ['DivCon: {}\n', return_statement];//DEBUG
 
-        if return_statement === "updatescore" then
+        if return_statement === "success" then
             local name, nameValue;
             local parameter, parameterValue;
             [[name]] = fread [stdout, '{c:*}'];

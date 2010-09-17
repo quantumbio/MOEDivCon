@@ -214,7 +214,7 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
 
 write ['DivCon: {}\n', return_statement];//DEBUG
 
-        if return_statement === "updatescore" then
+        if return_statement === "success" then
             local atomindices = [], atomvalues = [];
             local [[numvals]] = fread [stdout, '{n:}'];
             for numvals loop
