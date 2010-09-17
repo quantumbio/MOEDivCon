@@ -1102,6 +1102,8 @@ local function SaveEnv [dbkey, tgtmols, ligmol, status, coreopts, appopts,
 
     if type === 'nmrscore' then
         db_SetEnv [dbkey, DBTYPE, NMRSCORE];
+    elseif type === 'perturb' then
+        db_SetEnv [dbkey, DBTYPE, NMRPERTURB];
     elseif type === 'qmscore' then
         db_SetEnv [dbkey, DBTYPE, QMSCORE];
     endif
@@ -1135,14 +1137,19 @@ endfunction
  ****************************************************************************/
 local function SetScoreFields [dbkey, addreceptor, addligand, fields]
 
-    if addreceptor then
-        db_EnsureField [dbkey, REC_FIELD, 'molecule'];
-        db_EnsureField [dbkey, RECCHG_FIELD, 'int'];
-    endif
+    if not addreceptor and not addligand then
+        db_EnsureField [dbkey, COL_FIELD, 'molecule'];
+        db_EnsureField [dbkey, COLCHG_FIELD, 'int'];
+    else
+        if addreceptor then
+            db_EnsureField [dbkey, REC_FIELD, 'molecule'];
+            db_EnsureField [dbkey, RECCHG_FIELD, 'int'];
+        endif
 
-    if addligand then
-        db_EnsureField [dbkey, LIG_FIELD, 'molecule'];
-        db_EnsureField [dbkey, LIGCHG_FIELD, 'int'];
+        if addligand then
+            db_EnsureField [dbkey, LIG_FIELD, 'molecule'];
+            db_EnsureField [dbkey, LIGCHG_FIELD, 'int'];
+        endif
     endif
 
     db_EnsureField [dbkey, STATUS_FIELD, 'char'];
@@ -2675,7 +2682,8 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         SaveEnv [dbkey, [], [], status, coreopts, appopts, complex, dbtype];
     endif
 
-    if neL [coreopts.mode, 'One-to-One'] then
+    if neL [coreopts.mode, 'Single Point'] 
+            and neL [coreopts.mode, 'One-to-One'] then
         if neL [fext coreopts.posedb, 'mdb'] then
             Warning twrite ['{}\nis not a MOE database.', coreopts.posedb];
             exit [];
