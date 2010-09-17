@@ -37,7 +37,6 @@ function qb_GetCorePanel;
 function qb_GetDefaultsCore;
 function qb_GetDefaultsStatus;
 function qb_GetEnvApp;
-function qb_GetNMRPerturbEnv;
 function qb_InitCorePanel;
 function qb_LoadCoreScoreDB;
 function qb_SaveAnalysisData;
@@ -117,6 +116,7 @@ local function LoadDB [dbpath]
     return [dbkey, colmol, status, coreopts, perturbsopts, indices, names];
 endfunction
 
+function qb_GetNMRPerturbEnv;
 
 /****************************************************************************
  *                          RunCalc
@@ -185,12 +185,12 @@ endfunction
 //  Global Functions
 
 /****************************************************************************
- *                          qb_GetNMRPerturbSEnv
+ *                          qb_GetNMRPerturbEnv
  *
  *  Get the core enviroment and application environment.
  *
  ****************************************************************************/
-global function qb_GetNMRPerturbSEnv [dbkey]
+global function qb_GetNMRPerturbEnv [dbkey]
 
     local [colmol, l, status, coreopts, c] = qb_GetCoreEnv [dbkey];
     local perturbsopts = qb_GetEnvApp [dbkey];
