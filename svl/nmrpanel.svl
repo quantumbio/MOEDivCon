@@ -65,7 +65,7 @@ function qb_SplitComplex;
 function qb_TagCoreVals;
 function qb_UpdateCharge;
 function qb_UpdateCorePanel;
-function qb_VerifyDivCon;
+function qb_VerifyDivConComplex;
 
 function qb_NMRScore;
 
@@ -730,7 +730,6 @@ global function qb_NMRScoreSetupPanel []
                 status = qb_UpdateCharge [wkey, vals, status, 1];
                 WindowSetAttr [wkey, [showcut: [sensitive: 1],
                     original: [sensitive: 0]]];
-write ['Ligs okay?  {t:}\n', select ['Yes.', 'No!', alltrue oValid ligatoms]];//DEBUG
                 aSetNucleusLook [ligatoms, orignucs];
                 aSetBondLook [ligatoms, origbnds];
                 ViewLoad 1;
@@ -873,7 +872,7 @@ write ['Ligs okay?  {t:}\n', select ['Yes.', 'No!', alltrue oValid ligatoms]];//
                     task_prio 3;
                     task_settitle [-1, 'MOEDivCon NMRScore Run'];
 
-                    status = qb_VerifyDivCon [0, status, vals];
+                    status = qb_VerifyDivConComplex [0, status, vals];
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
@@ -911,7 +910,7 @@ write ['Ligs okay?  {t:}\n', select ['Yes.', 'No!', alltrue oValid ligatoms]];//
                     continue;
                 endif
 
-                status = qb_VerifyDivCon [wkey, status, vals];
+                status = qb_VerifyDivConComplex [wkey, status, vals];
                 if not status.verified then continue; endif
 
                 if second task_fork [statics:'share'] === 'child' then

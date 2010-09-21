@@ -72,7 +72,12 @@ const ANALNMRPER = 'qb_nmrperturb';
 const ANALNMRPERSEL = 'qb_nmrperturbselection';
 
 
+
 //  Charge status color
+const CHGWHITE = 1;
+const CHGGREEN = 2;
+const CHGRED = 3;
+
 const CHG_COLOR = 
     [
     'white',
@@ -91,7 +96,9 @@ const STATUS_DEFAULTS =
     ['notforced',    1             ],
     ['recchg',       1             ],
     ['ligchg',       1             ],
+    ['colchg',       1             ],
     ['moerecchg',    0             ],
+    ['moeligchg',    0             ],
     ['moeligchg',    0             ]
     ];
 
@@ -113,6 +120,7 @@ const CORE_OPT_DEFAULTS =
     ['testMM',       1             ],
     ['recchg',       0             ],
     ['ligchg',       0             ],
+    ['colchg',       0             ],
     ['poseschg',     0             ],
     ['ham',          5             ],
     ['scaling',      1             ]
@@ -364,60 +372,88 @@ const CORE_PANEL =
             [
             vertical:0, shadow:'noline', extendH: 0, margin:1
             ],
-        Vbox :
+
+        Pager:
             [
             name: 'chgbox',
-            Hbox :
+            Vbox :
                 [
-                name: 'recchgbox',
-                extendH: 1,
-                Label :
+                Hbox :
                     [
-                    name: 'recflg', title: 'Receptor:',
-                    bubbleHelp:
-                        'Problems with the total charge of receptor?\n'
-                        '   White:   uncalculated or user-entered charge.\n'
-                        '   Green:   charge calculated by MOE.\n'
-                        '   Red:      charge problematic for DivCon.'
+                    name: 'recchgbox',
+                    extendH: 1,
+                    Label :
+                        [
+                        name: 'recflg', title: 'Receptor:',
+                        bubbleHelp:
+                            'Problems with the total charge of receptor?\n'
+                            '   White:   uncalculated or user-entered charge.\n'
+                            '   Green:   charge calculated by MOE.\n'
+                            '   Red:      charge problematic for DivCon.'
+                        ],
+                    Text :
+                        [
+                        name: 'recchg', allowBlank: 0,
+                        type: 'int', minWidth: 4,
+                        onTrigger: 'return',
+                        bubbleHelp:
+                            'Total charge of receptor.'
+                        ]
                     ],
-                Text :
+                Hbox :
                     [
-                    name: 'recchg', allowBlank: 0,
-                    type: 'int', minWidth: 4,
-                    onTrigger: 'return',
-                    bubbleHelp:
-                        'Total charge of receptor.'
+                    extendH: 1,
+                    Label :
+                        [
+                        name: 'ligflg', title: 'Ligand:',
+                            bubbleHelp:
+                            'Problems with the total charge of ligand?\n'
+                            '   White:   uncalculated or user-entered charge.\n'
+                            '   Green:   charge calculated by MOE.\n'
+                            '   Yellow:  MOE\'s charge was adjusted.\n'
+                            '   Red:      charge problematic for DivCon.'
+
+                        ],
+                    Text :
+                        [
+                        name: 'ligchg', allowBlank: 0,
+                        type: 'int', minWidth: 4, extendH: 1,
+                        onTrigger: 'return',
+                        bubbleHelp:
+                            'Total charge of ligand.'
+                        ],
+                    Checkbox :
+                        [
+                        name: 'poseschg', text: 'All Poses',
+                        bubbleHelp:
+                            'Use the ligand charge for all\n'
+                            'poses in the poses database.'
+                        ]
                     ]
                 ],
-            Hbox :
+            Vbox :
                 [
-                name: 'ligchgbox',
-                extendH: 1,
-                Label :
+                Hbox :
                     [
-                    name: 'ligflg', title: 'Ligand:',
+                    name: 'colchgbox',
+                    extendH: 1,
+                    Label :
+                        [
+                        name: 'colflg', title: 'Collection:',
                         bubbleHelp:
-                        'Problems with the total charge of ligand?\n'
-                        '   White:   uncalculated or user-entered charge.\n'
-                        '   Green:   charge calculated by MOE.\n'
-                        '   Yellow:  MOE\'s charge was adjusted.\n'
-                        '   Red:      charge problematic for DivCon.'
-
-                    ],
-                Text :
-                    [
-                    name: 'ligchg', allowBlank: 0,
-                    type: 'int', minWidth: 4, extendH: 1,
-                    onTrigger: 'return',
-                    bubbleHelp:
-                        'Total charge of ligand.'
-                    ],
-                Checkbox :
-                    [
-                    name: 'poseschg', text: 'All Poses',
-                    bubbleHelp:
-                        'Use the ligand charge for all\n'
-                        'poses in the poses database.'
+                            'Problems with the total charge of collection?\n'
+                            '   White:   uncalculated or user-entered charge.\n'
+                            '   Green:   charge calculated by MOE.\n'
+                            '   Red:      charge problematic for DivCon.'
+                        ],
+                    Text :
+                        [
+                        name: 'colchg', allowBlank: 0,
+                        type: 'int', minWidth: 4,
+                        onTrigger: 'return',
+                        bubbleHelp:
+                            'Total charge of collection.'
+                        ]
                     ]
                 ]
             ]
@@ -558,6 +594,26 @@ function ChargeOK;
 function qb_SplitComplex;
 
 /****************************************************************************
+ *                          CalcCollectionCharge
+ *
+ *  Determine the total charge of the collection in the MOE window.
+ *
+ ****************************************************************************/
+local function CalcCollectionCharge []
+
+    local colatoms = Atoms [];
+    if colatoms === [] then
+        return  [[], [], 'There is no collection in the MOE Window.' ];
+    endif
+
+    local colchg = CalcCharge [colatoms];
+    local colcok = ChargeOK [colatoms, colchg];
+
+    return [colchg, colcok, ''];
+endfunction
+
+
+/****************************************************************************
  *                          CalcComplexCharge
  *
  *  Determine the total charge of the ligand and receptor in the MOE window.
@@ -577,7 +633,6 @@ local function CalcComplexCharge []
     local ligok = ChargeOK [ligatoms, ligchg];
 
     return [recchg, recok, ligchg, ligok, ''];
-
 endfunction
 
 /****************************************************************************
@@ -595,80 +650,36 @@ local function ChargeOK [atoms, charge]
 
 endfunction
 
-function CheckComplexCharge;
-function SetChargeStatus;
-
 /****************************************************************************
- *                          CheckCharge
+ *                          CheckChgDivConMol
  *
- *  Check user-defined charges for even number of electrons.
+ *  Determine whether the molecule and its total charge is problematic
+ *  for DivCon.  Also checks if it is a single molecule when flagged.
+ *
+ *  Assume that SystemPush [] and SystemPop [] have already been called,
+ *  if necessary.
  *
  ****************************************************************************/
-local function CheckCharge [wkey, status, recchg, ligchg, warn]
+local function CheckChgDivConMol [mol, chg, single]
 
-    local [recok, ligok, errmess] = CheckComplexCharge [recchg, ligchg];
-    if recok === [] or ligok === [] then
-        if warn then
-            Warning errmess;
-        endif
-
-        if wkey > 0 then
-            SetChargeStatus [wkey, status];
-        endif
-
-        return status;
+    local molok = 1, mess = '';
+    local chn = mol_Create mol;
+    local atms = cat oAtoms chn;
+    if single then
+        molok = SingleMol [atms];
     endif
 
-    if recok then
-        if status.calcchg and recchg === status.moerecchg then
-          status.recchg = 2;
-        else
-          status.recchg = 1;
-        endif
-
-    else
-        status.recchg = 3;
+    if not molok then
+        mess = 'Ligand must be a single molecule.';
     endif
 
-    if ligok then
-        if status.calcchg and ligchg === status.moeligchg then
-            status.ligchg = 2;
-        else
-            status.ligchg = 1;
-        endif
-    else
-        status.ligchg = 3;
-    endif
+    local chgok = ChargeOK [atms, chg];
+    oDestroy chn;
 
-    if wkey > 0 then
-        SetChargeStatus [wkey, status];
-    endif
-
-    return status;
-endfunction
-
-/****************************************************************************
- *                          CheckComplexCharge
- *
- *  Determine whether the given total charges of the ligand and receptor
- *  in the MOE window will result in systems with an even number of electrons.
- *
- ****************************************************************************/
-local function CheckComplexCharge [recchg, ligchg]
-
-    local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
-    if recatoms === [] or ligatoms === [] then
-        return  [[], [], errmess];
-    endif
-
-    local recok = ChargeOK [recatoms, recchg];
-    local ligok = ChargeOK [ligatoms, ligchg];
-
-    return [recok, ligok, ''];
+    return [molok, chgok, mess];
 
 endfunction
 
-function qb_CheckChgDivConMol;
 function qb_GetEnvTag;
 function qb_GetStatusFlags;
 function qb_GetPoseFields;
@@ -719,12 +730,12 @@ local function CheckChgDBMols [dbpath]
     while rowkey = db_NextEntry [dbkey, rowkey] loop
         local recok = 1, recchgok = 1, recmess = '';
         local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
-        local [ligok, ligchgok, ligmess] = qb_CheckChgDivConMol [ligmol,
+        local [ligok, ligchgok, ligmess] = CheckChgDivConMol [ligmol,
             ligchg, 1];
         if coreopts.mode === 'Many-to-Many' then
             local [recmol, recchg] = db_ReadFields [dbkey, rowkey,
                 recflds];
-            [recok, recchgok, recmess] = qb_CheckChgDivConMol [recmol,
+            [recok, recchgok, recmess] = CheckChgDivConMol [recmol,
                 recchg, 0];
         endif
 
@@ -765,6 +776,27 @@ local function CheckChgDBMols [dbpath]
     endif
 
     db_Close dbkey;
+endfunction
+
+/****************************************************************************
+ *                          CheckComplexCharge
+ *
+ *  Determine whether the given total charges of the ligand and receptor
+ *  in the MOE window will result in systems with an even number of electrons.
+ *
+ ****************************************************************************/
+local function CheckComplexCharge [recchg, ligchg]
+
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
+    if recatoms === [] or ligatoms === [] then
+        return  [[], [], errmess];
+    endif
+
+    local recok = ChargeOK [recatoms, recchg];
+    local ligok = ChargeOK [ligatoms, ligchg];
+
+    return [recok, ligok, ''];
+
 endfunction
 
 function DrawChgStatus;
@@ -1116,16 +1148,24 @@ endfunction
  *  Set charge status label.
  *
  ****************************************************************************/
-local function SetChargeStatus [wkey, status]
+local function SetChargeStatus [wkey, iscollection, status]
 
-    local ligkey = DrawChgStatus [status.ligchg];
-    local reckey = DrawChgStatus [status.recchg];
+    if is collection then
+        local colkey = DrawChgStatus [status.colchg];
 
-    WindowSetAttr [wkey, [ligflg: [graphics: ligkey],
-        recflg: [graphics: reckey]]];
-    
-    gr_destroy ligkey;
-    gr_destroy reckey;
+        WindowSetAttr [wkey, [colflg: [graphics: colkey]]];
+        
+        gr_destroy colkey;
+    else
+        local ligkey = DrawChgStatus [status.ligchg];
+        local reckey = DrawChgStatus [status.recchg];
+
+        WindowSetAttr [wkey, [ligflg: [graphics: ligkey],
+            recflg: [graphics: reckey]]];
+        
+        gr_destroy ligkey;
+        gr_destroy reckey;
+    endif
 
 endfunction
 
@@ -1354,6 +1394,96 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
 endfunction
 
 /****************************************************************************
+ *                          UpdateCollectionChargeStatus
+ *
+ *  Check user-defined charges for even number of electrons.
+ *
+ ****************************************************************************/
+local function UpdateCollectionChargeStatus [wkey, status, colchg, warn]
+
+    local colatoms = Atoms [];
+    if colatoms === [] then
+        if warn then
+            Warning 'There is no collection in the MOE Window.';
+        endif
+
+        if wkey > 0 then
+            SetChargeStatus [wkey, 1, status];
+        endif
+
+        return status;
+    endif
+
+    local colok = ChargeOK [colatoms, colchg];
+
+    if colok then
+        if status.calcchg and colchg === status.moecolchg then
+          status.recchg = CHGGREEN;
+        else
+          status.recchg = CHGWHITE;
+        endif
+
+    else
+        status.recchg = CHGRED;
+    endif
+
+    if wkey > 0 then
+        SetChargeStatus [wkey, 1, status];
+    endif
+
+    return status;
+endfunction
+
+/****************************************************************************
+ *                          UpdateComplexChargeStatus
+ *
+ *  Check user-defined charges for even number of electrons.
+ *
+ ****************************************************************************/
+local function UpdateComplexChargeStatus [wkey, status, recchg, ligchg, warn]
+
+    local [recok, ligok, errmess] = CheckComplexCharge [recchg, ligchg];
+    if recok === [] or ligok === [] then
+        if warn then
+            Warning errmess;
+        endif
+
+        if wkey > 0 then
+            SetChargeStatus [wkey, 0, status];
+        endif
+
+        return status;
+    endif
+
+    if recok then
+        if status.calcchg and recchg === status.moerecchg then
+          status.recchg = CHGGREEN;
+        else
+          status.recchg = CHGWHITE;
+        endif
+
+    else
+        status.recchg = CHGRED;
+    endif
+
+    if ligok then
+        if status.calcchg and ligchg === status.moeligchg then
+            status.ligchg = CHGGREEN;
+        else
+            status.ligchg = CHGWHITE;
+        endif
+    else
+        status.ligchg = CHGRED;
+    endif
+
+    if wkey > 0 then
+        SetChargeStatus [wkey, 0, status];
+    endif
+
+    return status;
+endfunction
+
+/****************************************************************************
  *                          UpdateCWD
  *
  *  Update the window based on new CWD value.
@@ -1385,41 +1515,42 @@ function qb_ResetLigand;
  ****************************************************************************/
 local function UpdateMode [wkey, vals, status]
 
-    if vals.mode === 'SinglePoint' then
+    if vals.mode === 'Single Point' then
         WindowSetAttr [wkey, [allposes: [sensitive: 0],
             recbox: [sensitive: 0], recdb: [allowBlank: 1], 
             posebox: [sensitive: 0], posedb: [allowBlank: 1], 
             panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
-            chgbox: [sensitive: 1], recchg: [allowBlank: 0],
-            ligchgbox: [sensitive: 0], 
+            chgbox: [sensitive: 1], colchg: [allowBlank: 0],
+            recchg: [allowBlank: 1],
             ligchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
-        SetChargeStatus [wkey, status];
+        SetChargeStatus [wkey, 1, status];
     elseif vals.mode === 'One-to-One' then
         WindowSetAttr [wkey, [allposes: [sensitive: 0],
             recbox: [sensitive: 0], recdb: [allowBlank: 1], 
             posebox: [sensitive: 0], posedb: [allowBlank: 1], 
             panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
-            chgbox: [sensitive: 1], recchg: [allowBlank: 0],
-            ligchgbox: [sensitive: 1], 
+            chgbox: [sensitive: 1],  colchg: [allowBlank: 1],
+            recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
             local las;
             [vals, las] = qb_ResetLigand [wkey, vals];
-        SetChargeStatus [wkey, status];
+        SetChargeStatus [wkey, 0, status];
     elseif vals.mode === 'One-to-Many' then
         WindowSetAttr [wkey, [allposes: [sensitive: 1],
             recbox: [sensitive: 0], recdb: [allowBlank: 1],
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
             panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
-            chgbox: [sensitive: 1], recchg: [allowBlank: 0],
-            ligchgbox: [sensitive: 1], 
+            chgbox: [sensitive: 1],  colchg: [allowBlank: 1],
+            recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0], poseschg: [sensitive: 1]]];
-        SetChargeStatus [wkey, status];
+        SetChargeStatus [wkey, 0, status];
     elseif vals.mode === 'Many-to-Many' then
         WindowSetAttr [wkey, [allposes: [sensitive: 0],
             recbox: [sensitive: 1], recdb: [allowBlank: 0],
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
             panel:[sensitive: [0,1,1,1,1]], calcchg: [sensitive: 0],
-            chgbox: [sensitive: 0], recchg: [allowBlank: 1],
+            chgbox: [sensitive: 0],  colchg: [allowBlank: 1],
+            recchg: [allowBlank: 1],
             ligchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
         ClearChargeStatus [wkey];
     endif
@@ -1459,36 +1590,6 @@ global function qb_AtomsToMols []
     local recmol = mol_Extract recatoms;
 
     return [recmol, ligmol, ''];
-
-endfunction
-
-/****************************************************************************
- *                          qb_CheckChgDivConMol
- *
- *  Determine whether the molecule and its total charge is problematic
- *  for DivCon.  Also checks if it is a single molecule when flagged.
- *
- *  Assume that SystemPush [] and SystemPop [] have already been called,
- *  if necessary.
- *
- ****************************************************************************/
-global function qb_CheckChgDivConMol [mol, chg, single]
-
-    local molok = 1, mess = '';
-    local chn = mol_Create mol;
-    local atms = cat oAtoms chn;
-    if single then
-        molok = SingleMol [atms];
-    endif
-
-    if not molok then
-        mess = 'Ligand must be a single molecule.';
-    endif
-
-    local chgok = ChargeOK [atms, chg];
-    oDestroy chn;
-
-    return [molok, chgok, mess];
 
 endfunction
 
@@ -1690,7 +1791,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
             [vals, ligatoms] = qb_ResetLigand [wkey, vals];
         endif
 
-        status = CheckCharge [wkey, status, vals.recchg,
+        status = UpdateComplexChargeStatus [wkey, status, vals.recchg,
             vals.ligchg, 1];
 
     elseif trig === 'ligchg' then
@@ -1698,8 +1799,11 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
             [vals, ligatoms] = qb_ResetLigand [wkey, vals];
         endif
 
-        status = CheckCharge [wkey, status, vals.recchg,
+        status = UpdateComplexChargeStatus [wkey, status, vals.recchg,
             vals.ligchg, 1];
+
+    elseif trig === 'colchg' then
+        status = UpdateCollectionChargeStatus [wkey, status, vals.col, 1];
 
     elseif trig === 'browse_scoredb' then
         btid = run ['fbrowse.svl', [trig, wkey, 'Select QMScore DB File', 
@@ -2143,7 +2247,7 @@ function qb_HamSetsInit;
 global function qb_InitCorePanel [wkey, status, defaults]
 
     qb_HamSetsInit [];
-
+print defaults.mode;
     status.prevwd = defaults.workdir;
     WindowSetData [wkey, dropfirst defaults];
     WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1],
@@ -2152,7 +2256,9 @@ global function qb_InitCorePanel [wkey, status, defaults]
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
         poseschg: [sensitive: 0],
         ham: [text: HAMILTONIANS | status.allowham],
-        mode: [text: RUN_MODES | status.allowmode]]];
+        mode: [text: RUN_MODES | status.allowmode],
+        chgbox: [page: select [2, 1, defaults.mode === 'Single Point']]]];
+
     status = qb_UpdateCharge [wkey, defaults, status, 0];
 
     return status;
@@ -2183,6 +2289,15 @@ endfunction
 global function qb_IsModeOneToOne [coreopts]
 
     return coreopts.mode === 'One-to-One';
+endfunction
+
+/****************************************************************************
+ *                          qb_IsModeSinglePoint
+ *
+ ****************************************************************************/
+global function qb_IsModeSinglePoint [coreopts]
+
+    return coreopts.mode === 'Single Point';
 endfunction
 
 /****************************************************************************
@@ -2596,7 +2711,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
 
         SaveEnv [dbkey, colmol, [], status, coreopts, appopts, [], dbtype];
 
-        stsmess = GetStatusMessage ['Collection', neL [status.recchg, 3]];
+        stsmess = GetStatusMessage ['Collection', neL [status.recchg, CHGRED]];
         if dotests then
             [recok, recmess] = qb_TestDivCon ['collection', collection, 
                 coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
@@ -2642,7 +2757,8 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
             dbtype];
 
         if dotests then
-            recstsmess = GetStatusMessage ['Receptor', neL [status.recchg, 3]];
+            recstsmess = GetStatusMessage ['Receptor', neL [status.recchg,
+                CHGRED]];
             [recok, recmess, ligok, ligmess] = TestComplex [
                 coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
                 coreopts.testH, coreopts.testMM, status.appname,
@@ -3079,7 +3195,7 @@ global function qb_UpdateCharge [wkey, vals, status, warn]
             Warning  errmess;
         endif
 
-        SetChargeStatus [wkey, status];
+        SetChargeStatus [wkey, vals.mode === 'Single Point', status];
         return status;
     endif
 
@@ -3087,11 +3203,13 @@ global function qb_UpdateCharge [wkey, vals, status, warn]
     status.moerecchg = recchg;
     if not vals.allposes then status.moeligchg = ligchg; endif
 
-    status.recchg = select [2, 3, recok];
-    if not vals.allposes then status.ligchg = select [2, 3, ligok]; endif
+    status.recchg = select [CHGGREEN, CHGRED, recok];
+    if not vals.allposes then 
+        status.ligchg = select [CHGGREEN, CHGRED, ligok]; 
+    endif
 
     WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
-    SetChargeStatus [wkey, status];
+    SetChargeStatus [wkey, vals.mode === 'Single Point', status];
 
     return status;
 endfunction
@@ -3106,8 +3224,15 @@ endfunction
 global function qb_UpdateCorePanel [wkey, status, coreopts]
 
     WindowSetData [wkey, dropfirst coreopts];
-    status = CheckCharge [wkey, status, coreopts.recchg, coreopts.ligchg,
-        1];  // Now that MtoM complexes are loaded, always update charge
+    // Now MtoM complexes are loaded, always update charge
+    if coreopts.mode === 'Single Point' then
+        status = UpdateCollectionChargeStatus [wkey, status, coreopts.colchg,
+            1];  
+    else
+        status = UpdateComplexChargeStatus [wkey, status, coreopts.recchg, 
+            coreopts.ligchg, 1];  
+    endif
+
     UpdateMode [wkey, coreopts, status];
     status.prevwd = UpdateCWD [wkey, coreopts.cwd, coreopts.workdir, 
         coreopts.workdir];
@@ -3116,7 +3241,7 @@ global function qb_UpdateCorePanel [wkey, status, coreopts]
 endfunction
 
 /****************************************************************************
- *                          qb_VerifyDivCon
+ *                          qb_VerifyDivConCollection
  *
  *  Verify with the user that the current charges and/or molecules should
  *  be used even if they are problematic for DivCon.
@@ -3125,7 +3250,7 @@ endfunction
  *
  *
  ****************************************************************************/
-global function qb_VerifyDivCon [wkey, status, vals]
+global function qb_VerifyDivConCollection [wkey, status, vals]
 
     if vals.mode === 'Many-to-Many' then
         status.verified = 1;
@@ -3136,10 +3261,69 @@ global function qb_VerifyDivCon [wkey, status, vals]
     local msgkey = Message [0, 'Testing ...'];
 
     local ynmess = '';
-    status = CheckCharge [wkey, status, vals.recchg, vals.ligchg,
+    status = UpdateCollectionChargeStatus [wkey, status, vals.colchg, 1]];
+    local colchgok = neL [status.colchg, CHGRED];
+
+    local [recok, rm, ligok, lm] = TestComplex [1, 1, 1, 0, 0, status.appname,
+        (HAM_KEYS | status.allowham)(vals.ham)];
+
+    if not alltrue [recok, recchgok, ligok, ligchgok] then
+        if not alltrue [recok, ligok] then
+            ynmess = tok_cat [ynmess,
+                twrite ['Problematic molecule in {}!\n',
+                qb_GetWhich [not recok, not ligok]]];
+        endif
+
+        if not alltrue [recchgok, ligchgok] then
+            ynmess =  tok_cat [ynmess, 
+                twrite ['Problematic charge for {}!\n', 
+                qb_GetWhich [not recchgok, not ligchgok]]];
+        endif
+
+        ynmess = tok_cat [ynmess, 'Continue anyway?'];
+        if YesNo ynmess then
+            status.verified = 1;
+            status.notforced = 0;
+        else
+            status.verified = 0;
+            status.notforced = 1;
+        endif
+
+    else
+        status.verified = 1;
+        status.notforced = 1;
+    endif
+
+    Message [msgkey, []];
+
+    return status;
+endfunction
+
+/****************************************************************************
+ *                          qb_VerifyDivConComplex
+ *
+ *  Verify with the user that the current charges and/or molecules should
+ *  be used even if they are problematic for DivCon.
+ *
+ *  Assumption:  called from MOE gui, not moebatch.
+ *
+ *
+ ****************************************************************************/
+global function qb_VerifyDivConComplex [wkey, status, vals]
+
+    if vals.mode === 'Many-to-Many' then
+        status.verified = 1;
+        status.notforced = 1;
+        return status;
+    endif
+
+    local msgkey = Message [0, 'Testing ...'];
+
+    local ynmess = '';
+    status = UpdateComplexChargeStatus [wkey, status, vals.recchg, vals.ligchg,
         neL [vals.mode, 'Many-to-Many']];
-    local recchgok = neL [status.recchg, 3];
-    local ligchgok = neL [status.ligchg, 3];
+    local recchgok = neL [status.recchg, CHGRED];
+    local ligchgok = neL [status.ligchg, CHGRED];
     local [recok, rm, ligok, lm] = TestComplex [1, 1, 1, 0, 0, status.appname,
         (HAM_KEYS | status.allowham)(vals.ham)];
 

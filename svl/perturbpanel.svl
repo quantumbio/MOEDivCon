@@ -50,7 +50,7 @@ function qb_SetModeStatus;
 function qb_SetUpScoreDB;
 function qb_TagCoreVals;
 function qb_UpdateCorePanel;
-function qb_VerifyDivCon;
+function qb_VerifyDivConCollection;
 
 function qb_NMRPerturb;
 
@@ -150,8 +150,12 @@ local function RunCalc [dbkey]
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
+/*
     local [results, errmess] = qb_NMRPerturb [collection, perfile,
         coreopts, perturbsopts, status.notforced, indices];
+*/
+
+local results = [], errmess = 'Testing!';//DEBUG
 
     if results === [] then
         if errmess === [] or errmess === '' then
@@ -233,7 +237,7 @@ global function qb_NMRPerturbSetupPanel []
     local coredflts = qb_GetDefaultsCore [];
     coredflts = qb_SetHamDefault [coredflts, 2];
     coredflts.scoredb = 'nmrperturb.mdb';
-    coredflts.mode = 'SinglePoint';
+    coredflts.mode = 'Single Point';
     local perturbdflts = tag tr NMRPERTURB_OPT_DEFAULTS;
 
     local coreopts = [], perturbsopts = [], browsetasks = [], dbkey = 0;
@@ -301,7 +305,7 @@ global function qb_NMRPerturbSetupPanel []
                     task_prio 3;
                     task_settitle [-1, 'MOEDivCon NMR Perturbation Run'];
 
-                    status = qb_VerifyDivCon [0, status, vals];
+                    status = qb_VerifyDivConCollection [0, status, vals];
                     if not status.verified then exit []; endif
 
                     if vals.selonly then
@@ -336,7 +340,7 @@ global function qb_NMRPerturbSetupPanel []
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
 
-                    status = qb_VerifyDivCon [wkey, status, vals];
+                    status = qb_VerifyDivConCollection [wkey, status, vals];
                     if not status.verified then exit []; endif
 
                     if vals.selonly then
