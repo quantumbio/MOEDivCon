@@ -49,7 +49,7 @@ function qb_SetAppStatus;
 function qb_SetUpScoreDB;
 function qb_TagCoreVals;
 function qb_UpdateCorePanel;
-function qb_VerifyDivCon;
+function qb_VerifyDivConComplex;
 
 function qb_QMScore;
 function qb_QMScoreBatch;
@@ -492,7 +492,7 @@ global function qb_QMScoreSetupPanel []
                     task_prio 3;
                     task_settitle [-1, 'MOEDivCon QMScore Run'];
 
-                    status = qb_VerifyDivCon [0, status, vals];
+                    status = qb_VerifyDivConComplex [0, status, vals];
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
@@ -525,7 +525,7 @@ global function qb_QMScoreSetupPanel []
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
 
-                    status = qb_VerifyDivCon [wkey, status, vals];
+                    status = qb_VerifyDivConComplex [wkey, status, vals];
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
