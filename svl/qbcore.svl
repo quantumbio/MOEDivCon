@@ -650,6 +650,8 @@ local function ChargeOK [atoms, charge]
 
 endfunction
 
+function SingleMol;
+
 /****************************************************************************
  *                          CheckChgDivConMol
  *
@@ -1150,7 +1152,7 @@ endfunction
  ****************************************************************************/
 local function SetChargeStatus [wkey, iscollection, status]
 
-    if is collection then
+    if iscollection then
         local colkey = DrawChgStatus [status.colchg];
 
         WindowSetAttr [wkey, [colflg: [graphics: colkey]]];
@@ -3019,7 +3021,7 @@ global function qb_TagCoreVals [vals]
         vals.scoredb,  vals.recdb, vals.posedb,
         vals.testLP, vals.testOverlap, vals.testHam,
         vals.testH, vals.testMM,
-        vals.recchg, vals.ligchg, vals.poseschg,
+        vals.recchg, vals.ligchg, vals.colchg, vals.poseschg,
         vals.ham, vals.scaling]];
 
     return coreopts;
@@ -3261,23 +3263,29 @@ global function qb_VerifyDivConCollection [wkey, status, vals]
     local msgkey = Message [0, 'Testing ...'];
 
     local ynmess = '';
-    status = UpdateCollectionChargeStatus [wkey, status, vals.colchg, 1]];
+    status = UpdateCollectionChargeStatus [wkey, status, vals.colchg, 1];
     local colchgok = neL [status.colchg, CHGRED];
 
-    local [recok, rm, ligok, lm] = TestComplex [1, 1, 1, 0, 0, status.appname,
-        (HAM_KEYS | status.allowham)(vals.ham)];
 
-    if not alltrue [recok, recchgok, ligok, ligchgok] then
-        if not alltrue [recok, ligok] then
+    local collection = Atoms [];
+    if collection === [] then
+        Warning 'There is no collection in the MOE Window.';
+        exit [];
+    endif
+
+    local [colok, colmess] = qb_TestDivCon ['collection', collection, 
+            1, 1, 1, 0, 0, status.appname,
+            (HAM_KEYS | status.allowham)(vals.ham)];
+
+    if not alltrue [colok, colchgok] then
+        if not colok then
             ynmess = tok_cat [ynmess,
-                twrite ['Problematic molecule in {}!\n',
-                qb_GetWhich [not recok, not ligok]]];
+                'Problematic molecule in collection!\n'];
         endif
 
-        if not alltrue [recchgok, ligchgok] then
+        if not colchgok then
             ynmess =  tok_cat [ynmess, 
-                twrite ['Problematic charge for {}!\n', 
-                qb_GetWhich [not recchgok, not ligchgok]]];
+                'Problematic charge for collection!\n'];
         endif
 
         ynmess = tok_cat [ynmess, 'Continue anyway?'];
