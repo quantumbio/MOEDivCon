@@ -110,7 +110,7 @@ global function qb_NMRPerturb [colmol, perfile, coreopts, appopts, errortests,
         errmess = string ckmsg;
     endif
 
-    local divconatoms = cat colressets;
+    local divconatoms = cat oAtoms cat colressets;
     local selatoms = (Atoms []) [indices];
     local divconindices = indexof [selatoms, divconatoms];
     if anytrue (divconindices == 0) then
