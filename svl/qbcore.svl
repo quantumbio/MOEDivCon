@@ -1596,7 +1596,33 @@ global function qb_AtomsToMols []
 endfunction
 
 /****************************************************************************
- *                          qb_CheckChgTestDivConMols
+ *                          qb_CheckChgTestDivConCollection
+ *
+ *  Determine whether the given collection and it's total charge is
+ *  problematic for DivCon.  Return the collection residues separated
+ *  into individual molecules to be compatible with DivCon's backbone.
+ *
+ *  Assume that SystemPush [] and SystemPop [] have already been called,
+ *  if necessary.  Caller is responsible for destroying objects in newly
+ *  created system.
+ *
+ ****************************************************************************/
+global function qb_CheckChgTestDivConCollection [colmol, colchg,
+        lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname]
+
+    local colatms = cat oAtoms mol_Create colmol;
+    local [colok, colmess] = qb_TestDivCon ['collection', colatms, 
+        lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname];
+    local colchgok = ChargeOK [colatms, colchg];
+
+    local colatmsets = SplitCollection [colatms];
+    local colressets = app uniq app oResidues colatmsets;
+
+    return [colressets, colok, colchgok, colmess];
+endfunction
+
+/****************************************************************************
+ *                          qb_CheckChgTestDivConComplex
  *
  *  Determine whether the given molecules and their total charges are
  *  problematic for DivCon.  Return the receptor and ligand residues separated
@@ -1607,7 +1633,7 @@ endfunction
  *  created system.
  *
  ****************************************************************************/
-global function qb_CheckChgTestDivConMols [recmol, recchg, ligmol, ligchg,
+global function qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,
         lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname]
 
     local mess = '';
@@ -2439,9 +2465,6 @@ endfunction
 global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
 
     local recatoms = cat oAtoms cat recressets;
-    local ligatoms = cat oAtoms cat ligressets;
-
-    local [ligvdw_r,ligvdw_e] = get [pot_Parm_vdw [ligatoms, ligatoms], [2,3]];
     local [recvdw_r,recvdw_e] = get [pot_Parm_vdw [recatoms, recatoms], [2,3]];
 
     local handshake, resset, residue, atom, xyz, idx;
@@ -2466,8 +2489,13 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
 
     [handshake] = fread [inpipe, '{n:}\n'];
 
+    if isnull ligressets then return; endif
+
     //  There should be only one molecule (residue set) in the ligand/pose
     //  collection, but we treat all collections similarly.
+    local ligatoms = cat oAtoms cat ligressets;
+    local [ligvdw_r,ligvdw_e] = get [pot_Parm_vdw [ligatoms, ligatoms], [2,3]];
+
     xyz = tr aPos ligatoms;
     fwrite [outpipe, '{n:}\n', length ligressets];
     for resset in ligressets loop
