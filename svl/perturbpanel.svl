@@ -24,9 +24,9 @@
 
 //    perturbpanel.svl    User-interface entrypoint to NMRPerturb calculations
 
-#set title   'QuantumBio NMRPerturb Panel'
+#set title   'QuantumBio Perturbation Panel'
 #set class   'QuantumBio'
-#set version '2010.02'
+#set version '2010.01'
 #set main    'qb_NMRPerturbSetupPanel'
 
 function qb_CoreEnable;
@@ -130,7 +130,7 @@ local function RunCalc [dbkey]
     sleep -1;    // Allow parent to close input window.
 
     local rowkey = first db_Entries [dbkey];
-    local [collection, status, coreopts, perturbsopts]
+    local [colmol, status, coreopts, perturbsopts]
         = qb_GetNMRPerturbEnv [dbkey];
     local [indices, names] = qb_GetAnalysisData [dbkey, 'perturb', 'sel'];
 
@@ -150,12 +150,9 @@ local function RunCalc [dbkey]
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
-/*
-    local [results, errmess] = qb_NMRPerturb [collection, perfile,
-        coreopts, perturbsopts, status.notforced, indices];
-*/
 
-local results = [], errmess = 'Testing!';//DEBUG
+    local [results, errmess] = qb_NMRPerturb [colmol, perfile,
+        coreopts, perturbsopts, status.notforced, indices];
 
     if results === [] then
         if errmess === [] or errmess === '' then

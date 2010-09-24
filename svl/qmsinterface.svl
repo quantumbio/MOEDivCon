@@ -27,7 +27,7 @@
 #set version '2010.02'
 #set main 'qb_QMScore'
 
-function qb_CheckChgTestDivConMols;
+function qb_CheckChgTestDivConComplex;
 function qb_GetWhich;
 function qb_HamSetsInit;
 function qb_PassBackbone;
@@ -62,10 +62,11 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
         [osys, nsys] = SystemPush [];
     endif
 
-    //  If there are any errors, return immediately.  Run all error tests.
+    //  If there are any errors, return immediately.  Run all error tests
+    //  unless forced not to by user.
     qb_HamSetsInit [];
     local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
-        = qb_CheckChgTestDivConMols [recmol, coreopts.recchg, ligmol,
+        = qb_CheckChgTestDivConComplex [recmol, coreopts.recchg, ligmol,
             coreopts.ligchg, errortests, errortests, errortests,
             coreopts.testH, coreopts.testMM,
             'qms', HAM_KEYS (coreopts.ham)];

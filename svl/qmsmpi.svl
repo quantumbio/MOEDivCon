@@ -29,7 +29,7 @@
 #set version '2010.01'
 #set main    'qb_QMScoreMPI'
 
-function qb_CheckChgTestDivConMols;
+function qb_CheckChgTestDivConComplex;
 function qb_GetDivConStatus;
 function qb_GetPoseFields;
 function qb_GetRecFields;
@@ -158,9 +158,9 @@ global function qb_QMScoreMPI [dbpath, jobid]
             recchg = coreopts.recchg;
         endif
 
-        //  Run all error tests unless forced not to do so.
+        //  Run all error tests unless forced not to do so by user.
         local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
-            = qb_CheckChgTestDivConMols [recmol, recchg, posemol, posechg,
+            = qb_CheckChgTestDivConComplex [recmol, recchg, posemol, posechg,
                 status.notforced, status.notforced, status.notforced,
                 coreopts.testH, coreopts.testMM, 'qms',
                 HAM_KEYS (coreopts.ham)];
