@@ -66,12 +66,13 @@ const HEADER =
     windowName: 'NMRPerturbPanel',
     text: ['Run', 'Create', 'Update', 'Load', 'Close'],
     onTrigger: ['validate', 'validate', 'return', 'return', 'return'],
-    bubbleHelp: ['Execute NMRPerturb from MOE Window.',
+    bubbleHelp: ['Execute NMR Perturbation from MOE Window.',
         'Create a score database with collection\n'
         'and run parameters for later execution on cluster.', 
-        'Update only the run parameters and\n'
-        'experimental values in the NMRPerturb database.', 
-        'Load run parameters and collection from a NMRPerturb database.', 
+        'Update only the run parameters\n'
+        'in the NMR Perturbation database.', 
+        'Load run parameters and collection\n'
+        'from a NMR Perturbation database.', 
         '']
     ];
 
