@@ -1,0 +1,109 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+	
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif      
+
+/****************************************************************************
+ *                                qbmmmin.svl
+ *
+ *  The option menu associated with the Tether Atoms defines to which atoms the force is applied. All means all atoms; Heavy means non-hydrogen non-lone pair atoms; Backbone means backbone atoms; Selected means the selected atoms; Unselected means the unselected atoms. 
+ *  If Tether Atoms is on, a quadratic force to the starting geometry is added to the atoms (with a force constant specified by the number to the right) in an attempt to keep the resulting minimum close to the original coordinates. A force constant of 300 is comparable to the strength of a bond. A tether value greater than or equal to 100 000 is interpreted to mean a fixed atom; that is, atoms that are tethered with a weight greater than or equal to 100 000 are frozen during the calculation. 
+ *    moebatch -exec "run ['qbmmmin.svl', ['moedivcon.mdb', 'tether', 'force']]" -exit
+ *
+ ****************************************************************************/
+#set title   'QuantumBio MM Minimization'
+#set class   'QuantumBio'
+#set version '2010.01'
+#set main 'qb_MMMinDB'
+
+const HEAVY		= 'Heavy';
+const BACKBONE	= 'Backbone';
+const SELECTED	= 'Selected';
+const UNSELECTED	= 'Unselected';
+const CSETS		= [ ALL, HEAVY, BACKBONE, SELECTED, UNSELECTED ];
+
+function MM;
+function PartialCharge;
+
+
+global function qb_MMMin [mol, tether, weight]
+    local osys, nsys;
+    if not MOE_BATCH then [osys, nsys] = SystemPush []; endif
+
+    local atoms = mol_Create mol;
+	  local all_atoms = atoms;
+    aSetCharge [atoms, first PartialCharge [atoms, 'FF']];
+	  local tetherWeight = rep [0, length atoms];
+
+	  if not isnull tether and weight > 0 then
+	      tetherWeight = rep [weight, length atoms];
+        if tether == HEAVY then
+		        (tetherWeight | aAtomicNumber atoms <= 1) = 0;
+	      elseif tether == BACKBONE then
+		        (tetherWeight | not aBackbone atoms) = 0;
+	      elseif tether == SELECTED then
+		        (tetherWeight | not aSelected atoms) = 0;
+	      elseif tether == UNSELECTED then
+		        (tetherWeight | aSelected atoms) = 0;
+	  endif
+
+	tetherWeight = put [
+	    rep[REAL_MAX, length all_atoms],
+	    indexof [atoms, all_atoms],
+	    tetherWeight
+	];
+
+	aSetFixed [all_atoms, aFixed all_atoms or tetherWeight >= 100000];
+	(tetherWeight | aFixed all_atoms) = 0;
+
+	if andE (tetherWeight <= 0) then
+	    tetherWeight = 0;
+	endif
+
+	aSetInert [
+	    all_atoms, aInert all_atoms or not indexof [all_atoms, atoms]
+	];
+
+	MM [
+	    gtest:		max [1e-9, val.gtest],
+	    tetherWeight:	tetherWeight,
+	    keep_chirality:	0,
+	    pot_finalize:	0,
+	    pot_charge:		0
+	];
+
+
+    newmol = mol_Extract atoms;
+    if not MOE_BATCH then SystemPop [osys, nsys]; endif
+    
+    return newmol;
+endfunction
+
+
+
+
+global function qb_MMMinDB [dbkey, tether, weight]
+
+endfunction
+
+
+
