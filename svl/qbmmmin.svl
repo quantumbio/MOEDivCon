@@ -3,7 +3,7 @@
  // BEGIN COPYRIGHT
  /***********************************************************************
     Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
-	
+    
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
 
@@ -35,61 +35,58 @@
 #set version '2010.01'
 #set main 'qb_MMMinDB'
 
-const HEAVY		= 'Heavy';
-const BACKBONE	= 'Backbone';
-const SELECTED	= 'Selected';
-const UNSELECTED	= 'Unselected';
-const CSETS		= [ ALL, HEAVY, BACKBONE, SELECTED, UNSELECTED ];
+const HEAVY = 'Heavy';
+const BACKBONE = 'Backbone';
+const SELECTED = 'Selected';
+const UNSELECTED = 'Unselected';
 
 function MM;
 function PartialCharge;
-
 
 global function qb_MMMin [mol, tether, weight]
     local osys, nsys;
     if not MOE_BATCH then [osys, nsys] = SystemPush []; endif
 
     local atoms = mol_Create mol;
-	  local all_atoms = atoms;
+      local all_atoms = atoms;
     aSetCharge [atoms, first PartialCharge [atoms, 'FF']];
-	  local tetherWeight = rep [0, length atoms];
+      local tetherWeight = rep [0, length atoms];
 
-	  if not isnull tether and weight > 0 then
-	      tetherWeight = rep [weight, length atoms];
+      if not isnull tether and weight > 0 then
+          tetherWeight = rep [weight, length atoms];
         if tether == HEAVY then
-		        (tetherWeight | aAtomicNumber atoms <= 1) = 0;
-	      elseif tether == BACKBONE then
-		        (tetherWeight | not aBackbone atoms) = 0;
-	      elseif tether == SELECTED then
-		        (tetherWeight | not aSelected atoms) = 0;
-	      elseif tether == UNSELECTED then
-		        (tetherWeight | aSelected atoms) = 0;
-	  endif
+                (tetherWeight | aAtomicNumber atoms <= 1) = 0;
+          elseif tether == BACKBONE then
+                (tetherWeight | not aBackbone atoms) = 0;
+          elseif tether == SELECTED then
+                (tetherWeight | not aSelected atoms) = 0;
+          elseif tether == UNSELECTED then
+                (tetherWeight | aSelected atoms) = 0;
+      endif
 
-	tetherWeight = put [
-	    rep[REAL_MAX, length all_atoms],
-	    indexof [atoms, all_atoms],
-	    tetherWeight
-	];
+    tetherWeight = put [
+        rep[REAL_MAX, length all_atoms],
+        indexof [atoms, all_atoms],
+        tetherWeight    ];
 
-	aSetFixed [all_atoms, aFixed all_atoms or tetherWeight >= 100000];
-	(tetherWeight | aFixed all_atoms) = 0;
+    aSetFixed [all_atoms, aFixed all_atoms or tetherWeight >= 100000];
+    (tetherWeight | aFixed all_atoms) = 0;
 
-	if andE (tetherWeight <= 0) then
-	    tetherWeight = 0;
-	endif
+    if andE (tetherWeight <= 0) then
+        tetherWeight = 0;
+    endif
 
-	aSetInert [
-	    all_atoms, aInert all_atoms or not indexof [all_atoms, atoms]
-	];
+    aSetInert [
+        all_atoms, aInert all_atoms or not indexof [all_atoms, atoms]
+    ];
 
-	MM [
-	    gtest:		max [1e-9, val.gtest],
-	    tetherWeight:	tetherWeight,
-	    keep_chirality:	0,
-	    pot_finalize:	0,
-	    pot_charge:		0
-	];
+    MM [
+        gtest:        max [1e-9, val.gtest],
+        tetherWeight:    tetherWeight,
+        keep_chirality:    0,
+        pot_finalize:    0,
+        pot_charge:        0
+    ];
 
 
     newmol = mol_Extract atoms;
