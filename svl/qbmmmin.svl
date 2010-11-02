@@ -25,10 +25,16 @@
 /****************************************************************************
  *                                qbmmmin.svl
  *
- *  The option menu associated with the Tether Atoms defines to which atoms the force is applied. All means all atoms; Heavy means non-hydrogen non-lone pair atoms; Backbone means backbone atoms; Selected means the selected atoms; Unselected means the unselected atoms. 
- *  If Tether Atoms is on, a quadratic force to the starting geometry is added to the atoms (with a force constant specified by the number to the right) in an attempt to keep the resulting minimum close to the original coordinates. A force constant of 300 is comparable to the strength of a bond. A tether value greater than or equal to 100 000 is interpreted to mean a fixed atom; that is, atoms that are tethered with a weight greater than or equal to 100 000 are frozen during the calculation. 
  *
- *    moebatch -exec "run ['qbmmmin.svl', ['moedivcon.mdb', 'tether', 'force']]" -exit
+ *  From the MOE documentation for MM:
+ *    A quadratic force to the starting geometry is added to the atoms in an
+ *    attempt to keep the resulting minimum close to the original coordinates. 
+ *    A force constant of 300 is comparable to the strength of a bond. A tether
+ *    value greater than or equal to 100 000 is interpreted to mean a fixed
+ *    atom; that is, atoms that are tethered with a weight greater than or
+ *    equal to 100 000 are frozen during the calculation. 
+ *
+ *    moebatch -exec "run ['qbmmmin.svl', ['moedivcon.mdb', 'force']]" -exit
  *
  ****************************************************************************/
 #set title   'QuantumBio MM Minimization'
@@ -36,24 +42,25 @@
 #set version '2010.01'
 #set main 'qb_MMMinDB'
 
-const HEAVY = 'Heavy';
+
+function qb_GetCoreEnv;
+function qb_GetPoseFields;
+function qb_GetRecFields;
+function qb_IsModeOneToOne;
 
 function MM;
 function PartialCharge;
 
-global function qb_MMMin [atoms, weight]
+local function qb_MMMin [atoms, weight]
 
     aSetCharge [atoms, first PartialCharge [atoms, 'FF']];
     local tetherWeight = rep [weight, length atoms];
     (tetherWeight | aAtomicNumber atoms <= 1) = 0;
 
-
-   ];
-
     MM [
-        gtest:           max [1e-9, 0.01],
         tetherWeight:    tetherWeight,
-        keep_chirality:  0,
+        gtest:           0.05,
+        keep_chirality:  '',
         pot_finalize:    0,
         pot_charge:      0
     ];
@@ -61,16 +68,40 @@ global function qb_MMMin [atoms, weight]
     return atoms;
 endfunction
 
-global function qb_MMMinDB [dbkey, weight]
+local function qb_MMMinDB [dbpath, weight]
+
+    if neL [fext dbpath, 'mdb'] then
+        exit twrite ['{}\nis not a MOE database.', dbpath];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        exit twrite ['Unable to find the database:\n    {}', dbpath];
+    endif
+
+    local dbkey = db_Open [dbpath, 'read-write'];
+    local [recmol, ligmol, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
+    local poseflds = qb_GetPoseFields [dbkey];
+    local recflds = qb_GetRecFields [dbkey];
+    local dbrowkeys = db_Entries dbkey;
+
 
     local osys, nsys;
     if not MOE_BATCH then [osys, nsys] = SystemPush []; endif
 
-        local atoms = mol_Create mol;
+    if qb_IsModeOneToOne coreopts then
 
-        local newmol = mol_Extract Atoms [];
 
-        oDestroy Chains [];
+    else
+
+        local rowkey;
+        for rowkey in dbrowkeys loop
+            local atoms = mol_Create mol;
+
+            local newmol = mol_Extract Atoms [];
+
+            oDestroy Chains [];
+        endloop
+    endif
 
     if not MOE_BATCH then SystemPop [osys, nsys]; endif
 
