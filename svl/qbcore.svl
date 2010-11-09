@@ -682,12 +682,12 @@ local function CheckChgDivConMol [mol, chg, single]
 
 endfunction
 
-function qb_GetEnvTag;
 function qb_GetStatusFlags;
 function qb_GetPoseFields;
 function qb_GetRecFields;
 function qb_GetWhich;
 function qb_SaveDivConStatus;
+function GetEnvTag;
 
 /****************************************************************************
  *                          CheckChgDBMols
@@ -719,7 +719,7 @@ local function CheckChgDBMols [dbpath]
         return;
     endif
 
-    local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
+    local coreopts = GetEnvTag [dbkey, COREOPTS];
     local rowkey = 0;
     local recflds = qb_GetRecFields [dbkey];
     local ligflds = qb_GetPoseFields [dbkey];
@@ -822,9 +822,9 @@ local function ClearChargeStatus [wkey]
 
 endfunction
 
-function qb_GetEnvTag;
 function qb_InterMoleculeOverlap;
 function qb_TestDivCon;
+function GetEnvTag;
 function GetStatusMessage;
 function SingleMol;
 
@@ -847,8 +847,8 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
         return mess;
     endif
 
-    local status = qb_GetEnvTag [resultskey, STATUS];
-    local coreopts = qb_GetEnvTag [resultskey, COREOPTS];
+    local status = GetEnvTag [resultskey, STATUS];
+    local coreopts = GetEnvTag [resultskey, COREOPTS];
 
     //  HACK alert:  temporarily renames mol field to make copying easier
     db_RenameField [resultskey, LIG_FIELD, molfield];
@@ -1076,6 +1076,20 @@ local function DrawChgStatus [cidx]
 endfunction
 
 /****************************************************************************
+ *                          GetEnvTag
+ *
+ *  Get the environment value for the given tag.
+ *
+ ****************************************************************************/
+local function GetEnvTag [dbkey, envtag]
+
+    local tagtok = db_GetEnv [dbkey, envtag];
+    local [[tagval]] = sread [string tagtok, '{v}'];
+
+    return tagval;
+endfunction
+
+/****************************************************************************
  *                          GetStatusMessage
  *
  *  Return a string message describing the charge status.
@@ -1124,10 +1138,10 @@ endfunction
  *  database.
  *
  ****************************************************************************/
-local function SaveEnv [dbkey, tgtmols, ligmol, status, coreopts, appopts,
+local function SaveEnv [dbkey, recmol, ligmol, status, coreopts, appopts,
         complex, type]
 
-    db_SetEnv [dbkey, RECEPTOR, twrite ['{v}', tgtmols]];
+    db_SetEnv [dbkey, RECEPTOR, twrite ['{v}', recmol]];
     db_SetEnv [dbkey, LIGAND, twrite ['{v}', ligmol]];
     db_SetEnv [dbkey, STATUS, twrite ['{v}', status]];
     db_SetEnv [dbkey, COREOPTS, twrite ['{v}', coreopts]];
@@ -1328,7 +1342,7 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
         return;
     endif
 
-    local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
+    local coreopts = GetEnvTag [dbkey, COREOPTS];
     local rowkey = 0;
     local recflds = qb_GetRecFields [dbkey];
     local ligflds = qb_GetPoseFields [dbkey];
@@ -1337,7 +1351,7 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
 
     local recmols, recchns, recatms, recchg;
     if coreopts.mode === 'One-to-Many' then
-        recmols = qb_GetEnvTag [dbkey, RECEPTOR];
+        recmols = GetEnvTag [dbkey, RECEPTOR];
         recchns = mol_Create recmols;
         recatms = cat oAtoms recchns;
     endif
@@ -2010,14 +2024,14 @@ endfunction
  ****************************************************************************/
 global function qb_GetCoreEnv [dbkey]
 
-    local recmol = qb_GetEnvTag [dbkey, RECEPTOR];
-    local ligmol = qb_GetEnvTag [dbkey, LIGAND];
-    local complex = qb_GetEnvTag [dbkey, COMPLEX];
+    local recmol = GetEnvTag [dbkey, RECEPTOR];
+    local ligmol = GetEnvTag [dbkey, LIGAND];
+    local complex = GetEnvTag [dbkey, COMPLEX];
 
-    local status = qb_GetEnvTag [dbkey, STATUS];
+    local status = GetEnvTag [dbkey, STATUS];
     status = tagcat [status, tag tr STATUS_DEFAULTS];
 
-    local coreopts = qb_GetEnvTag [dbkey, COREOPTS];
+    local coreopts = GetEnvTag [dbkey, COREOPTS];
     coreopts = tagcat [coreopts, tag tr CORE_OPT_DEFAULTS];
 
     return [recmol, ligmol, status, coreopts, complex];
@@ -2115,20 +2129,6 @@ endfunction
 global function qb_GetEnvApp [dbkey]
 
     local tagtok = db_GetEnv [dbkey, APPOPTS];
-    local [[tagval]] = sread [string tagtok, '{v}'];
-
-    return tagval;
-endfunction
-
-/****************************************************************************
- *                          qb_GetEnvTag
- *
- *  Get the environment value for the given tag.
- *
- ****************************************************************************/
-global function qb_GetEnvTag [dbkey, envtag]
-
-    local tagtok = db_GetEnv [dbkey, envtag];
     local [[tagval]] = sread [string tagtok, '{v}'];
 
     return tagval;
@@ -2275,7 +2275,7 @@ function qb_HamSetsInit;
 global function qb_InitCorePanel [wkey, status, defaults]
 
     qb_HamSetsInit [];
-print defaults.mode;
+
     status.prevwd = defaults.workdir;
     WindowSetData [wkey, dropfirst defaults];
     WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1],
@@ -2326,6 +2326,32 @@ endfunction
 global function qb_IsModeSinglePoint [coreopts]
 
     return coreopts.mode === 'Single Point';
+endfunction
+
+/****************************************************************************
+ *                          qb_IsMOEDivConDatabase
+ *
+ ****************************************************************************/
+global function qb_IsMOEDivConDatabase [dbkey]
+
+    local dbtype = db_GetEnv [dbkey, DBTYPE];
+
+    if  alltrue neE [dbtype, [NMRSCORE, QMSCORE, NMRPERTURB]] then
+        return 0;
+    endif
+
+    return 1;
+endfunction
+
+/****************************************************************************
+ *                          qb_IsQMScoreDatabase
+ *
+ ****************************************************************************/
+global function qb_IsQMScoreDatabase [dbkey]
+
+    local dbtype = db_GetEnv [dbkey, DBTYPE];
+
+    return dbtype === QMSCORE;
 endfunction
 
 /****************************************************************************
@@ -2596,6 +2622,24 @@ global function qb_SaveAnalysisData [dbkey, analysis, type, data]
 endfunction
 
 /****************************************************************************
+ *                          qb_SaveCoreEnv
+ *
+ *  Save the molecules (ligand, receptor and complex), status and core options
+ *  in the database.
+ *
+ ****************************************************************************/
+global function qb_SaveCoreEnv [dbkey, recmol, ligmol, status, coreopts, 
+        complex]
+
+    db_SetEnv [dbkey, RECEPTOR, twrite ['{v}', recmol]];
+    db_SetEnv [dbkey, LIGAND, twrite ['{v}', ligmol]];
+    db_SetEnv [dbkey, STATUS, twrite ['{v}', status]];
+    db_SetEnv [dbkey, COREOPTS, twrite ['{v}', coreopts]];
+    db_SetEnv [dbkey, COMPLEX, twrite ['{v}', complex]];
+
+endfunction
+
+/****************************************************************************
  *                          qb_SaveDivConStatus
  *
  *  Save the error/status message for the given row.
@@ -2702,6 +2746,19 @@ global function qb_SetModeStatus [status, which]
 
     return status;
 endfunction
+
+/****************************************************************************
+ *                          qb_SetModeManytoMany
+ *
+ *  Change the mode in the core options.
+ *
+ ****************************************************************************/
+global function qb_SetModeManytoMany [coreopts]
+    coreopts = tagpoke [coreopts, 'mode', 'Many-to-Many'];
+
+    return coreopts;
+endfunction
+
 
 /****************************************************************************
  *                          qb_SetUpScoreDB
