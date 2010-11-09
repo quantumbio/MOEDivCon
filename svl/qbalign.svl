@@ -28,16 +28,34 @@
  *  Reads in the protein (first chain) of the receptor collections in 
  *  the source directory, aligns them, renumbers the UIDs, and then 
  *  stores the new receptor collections in the destination directory.  
- *  Supported extensions are pdb, moe, mol2, mdl_mol and macmod.
  *
  *  Assumptions:
  *
  *    -  The protein in the receptor collection is a single chain.
  *    -  The protein chain is the first chain in the receptor collection.
  *
- *  Command:
  *
- *    moebatch -exec "run ['qbalign.svl', ['srcdir', 'destdir', 'ext']]" -exit
+ *  Main function:
+ *
+ *    qb_Align [src, dest, ext, trim]
+ *
+ *  Arguments:
+ *    
+ *    src : token : source directory.
+ *
+ *    dest : token : destination directory.
+ *
+ *    ext : token : molecule file extension.  Supported extensions are
+ *          pdb, moe, mol2, mdl_mol and macmod.
+ *
+ *    trim : boolean : if true, delete leading or trailing residues so that
+ *          all proteins have the same number of residues (provided that
+ *          there are no internal gaps).  This improves the reliability of
+ *          the PLS anaysis for the SAR heat map.
+ *
+ *  Example moebatch command:
+ *
+ *    moebatch -exec "run ['qbalign.svl', ['orig', 'done', 'moe', 1]]" -exit
  *
  ****************************************************************************/
 #set title   'QuantumBio Protein Align'
@@ -48,11 +66,9 @@
 function cAlignmentPositions;
 function pro_Align;
 
-local function readReceptors [srcdir, ext]
-    local patt = twrite ['*.{}', ext];
-    local filelist = flist [srcdir, patt];
+local function readReceptors [srcfilelist, ext]
     local filename, chains;
-    for filename in filelist loop
+    for filename in srcfilelist loop
     write ['Loading {}\n', filename];
         if ext === 'pdb' then
             chains = ReadPDB filename;
@@ -70,11 +86,10 @@ local function readReceptors [srcdir, ext]
     endloop
 endfunction
 
-local function saveReceptors [srcdir, destdir, ext, newuids]
-    local patt = twrite ['*.{}', ext];
-    local filelist = flist [srcdir, patt];
+local function saveReceptors [srcfilelist, destdir, ext, newuids, trim, 
+        sres, eres]
     local filename, idx = 1;
-    for filename in filelist loop
+    for filename in srcfilelist loop
         if ext === 'pdb' then
             ReadPDB filename;
         elseif ext === 'moe' then
@@ -88,7 +103,15 @@ local function saveReceptors [srcdir, destdir, ext, newuids]
         endif
 
         local [residues] = oResidues first Chains [];
-        rSetUID [residues , newuids(idx)];
+        rSetUID [residues, newuids(idx)];
+        rSetPos [residues, newuids(idx)];
+
+        if trim then
+            rSetPos [residues, rPos residues - (sres - 1)];
+            local delresidues = residues | ((rUID residues < sres)
+                or (rUID residues > eres));
+            oDestroy delresidues;
+        endif
 
         local destfn = twrite ['{}/{}', destdir, ftail filename];
         write ['Saving {}\n', destfn];
@@ -109,15 +132,34 @@ local function saveReceptors [srcdir, destdir, ext, newuids]
     endloop
 endfunction
 
-global function qb_Align [src, dest, ext]
+global function qb_Align [src, dest, ext, trim]
+
+    local function hasgap ids = neL [length ids, (last ids) - (first ids) + 1];
+    local function fout f = write ['    {}\n', f];
+
     local osys, nsys;
     if not MOE_BATCH then [osys, nsys] = SystemPush []; endif
-    readReceptors [src, ext];
-    write ['Aligning {} proteins ...', nChains []];
+
+    local patt = twrite ['*.{}', ext];
+    local srcfilelist = flist [src, patt];
+
+    readReceptors [srcfilelist, ext];
+
+    write ['\nAligning {} proteins ...', nChains []];
     pro_Align [Chains [], [superpose:0]];
     local newuids = cAlignmentPositions Chains [];
     Close [force:1];
     write [' done.\n'];
-    saveReceptors [src, dest, ext, newuids];
+
+    local gaps = app hasgap newuids;
+    local startr = max app first newuids;
+    local endr = min app last newuids;
+
+    write ['\nThe following proteins have missing residues (internal gaps):\n'];
+    app fout (srcfilelist | gaps);
+    write ['\n'];
+
+    saveReceptors [srcfilelist, dest, ext, newuids, trim, startr, endr];
+
     if not MOE_BATCH then SystemPop [osys, nsys]; endif
 endfunction

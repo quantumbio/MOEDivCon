@@ -36,7 +36,6 @@ function qb_GetCorePanel;
 function qb_GetDefaultsCore;
 function qb_GetDefaultsStatus;
 function qb_GetEnvApp;
-function qb_GetEnvTag;
 function qb_GetWhich;
 function qb_InitCorePanel;
 function qb_IsModeOneToOne;
@@ -147,7 +146,7 @@ const PANEL =
                 ],
             Text :
                 [
-                name: 'shift', title: 'Shift:', len: 20, extendH: 1, 
+                name: 'shift', title: 'Shift:', len: 30, extendH: 1, 
                 type: 'real', allowBlank: 0,
                 shortcut: ['0.0', '2.0', '4.0', '8.0', '16.0'],
                 bubbleHelp:
@@ -468,6 +467,7 @@ global function qb_QMScoreSetupPanel []
                             mol_Create ldrec;
                             ligatoms = cat oAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
+print oCollections [];//DEBUG
                             aSetNucleusLook [ligatoms, 'small-sphere'];
                             aSetBondLook [ligatoms, 'cylinder'];
         	                View [];
@@ -483,7 +483,7 @@ global function qb_QMScoreSetupPanel []
                 endif
 
             elseif vals.panel === 'Run' then
-
+print oCollections [];//DEBUG
                 if qb_IsShowingAllPoses [vals] then
                     [vals, ligatoms] = qb_ResetLigand [wkey, vals];
                 endif
