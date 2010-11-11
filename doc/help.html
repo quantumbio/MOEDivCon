@@ -90,6 +90,7 @@ QuantumBio Homepage
         <li><a href="#core-charge-editing">Editing</a>
       </ol>
       <li><a href="#core-editmol">Editing Molecules</a>
+      <li><a href="#core-mmmin">MM Minimization</a>
       <li><a href="#core-load">Load, Create, and Update</a>
       <li><a href="#core-clean">Log Files and Postexecution Cleanup</a>
       <li><a href="#core-parallel">Parallel Execution</a>
@@ -120,7 +121,13 @@ QuantumBio Homepage
         <li><a href="#nmr-options-opt">Ligand Optimization</a>
         <li><a href="#nmr-options-guess">Guess</a>
       </ol>
-<!--      <li><a href="#nmr-results">Results</a>  -->
+      <li><a href="#nmr-results">Results</a>
+    </ol>
+  <li><a href="#perturb">MOEDivCon NMR Perturbation</a>
+    <ol id=tocl>
+      <li><a href="#perturb-intro">Introduction</a>
+      <li><a href="#perturb-csp">Chemical Shift Atoms</a>
+      <li><a href="#perturb-results">Results</a>
     </ol>
   <li><a href="#qms">MOEDivCon QMScore</a>
     <ol id=tocl>
@@ -169,7 +176,8 @@ QuantumBio Homepage
   <li><a href="#trouble">Troubleshooting</a>
   <li><a href="#contact">Support Contact Information</a></ol>
 
-<h2><a name="intro"></a>Introduction</h2>
+<h2><a name="intro"></a>Introduction</h2>
+
 <p>
 QuantumBio offers the DivCon Discovery Suite product line, providing
 solutions to achieve high accuracy, performance, and versatility for chemical
@@ -549,6 +557,7 @@ is often listed under this test as well.  It also detects problems not
 caught by the other tests such as truncated residues, incorrect charges on
 metals, incorrect bond orders on sulphates, sulfoxides, sulfonyls, 
 phosphates, and orthovanadate ions, metal coordinations problems, etc.
+
 <p>
 It is recommended that you verify the correctness of the molecular structure
 if you receive this warning.
@@ -665,6 +674,31 @@ pointers relevant for the MOEDivCon Integration Suit.
     molecules, you can resubmit it to the cluster queue and the jobs marked
     successful in the database will be skipped.
 </ul>
+
+<h3><a name="core-mmmin"></a>MM Minimization</h3>
+<p>
+
+ An example moebatch call:
+
+<pre>
+&gt; moebatch -exec "run ['qbmmmin.svl', ['qmscore.mdb', 100]]" -exit
+</pre>
+
+Perform energy minimization using the OPLS-AA + Solvation forcefield
+on the complexes stored in the MOEDivCon QMScore database using the
+given weight on heavy atoms only.
+<p>
+If the mode of the QMScore database is 'One-to-Many', it is changed to
+a 'Many-to-Many' database so that a new copy of the receptor is minimized
+with each pose and the resulting structures are stored in the database.
+<p>
+Note:  The new structures overwrite those currently stored in the database,
+so it is advised that you create a backup before calling the script.
+
+<p>
+<warn>Warning:  Atoms that have been fixed or tethered via other MOE methods
+will affect the minimization calculation.</warn>
+
 
 <h3><a name="core-load"></a>Load, Create, and Update</h3>
 <p>
@@ -1132,11 +1166,18 @@ current value of the shift value in eV is also saved.
 <p>
 <warn>Note:  not yet implemented.</warn>
 
-<!--
 <h3><a name="nmr-results"></a>Results</h3>
 <p>
--->
 
+<h2><a name="perturb"></a>MOEDivCon NMR Perturbation</h2>
+<p>
+
+<h3><a name="perturb-intro"></a>Introduction</h3>
+<p>
+<h3><a name="perturb-csp"></a>Chemical Shift Atoms</h3>
+<p>
+<h3><a name="perturb-results"></a>Results</h3>
+<p>
 <h2><a name="qms"></a>MOEDivCon QMScore</h2>
 <p>
 
@@ -1197,11 +1238,13 @@ The <a
 href="http://www.quantumbioinc.com/publications?tag=qmscore"
 TARGET="_blank">QMScore method</a>
 has been validated on numerious structures and systems both
-in academia and industry.<p>
+in academia and industry.
+<p>
 <object id="ThermodynamicCycle" title="QMScore Thermodynamic Cycle"
 data="images/thermodynamiccyle.png" type=image/png>
 QMScore Thermodynamic Cycle
-</object><ul>
+</object>
+<ul>
     <li> dHf_g: Gas phase heat of formation. 
     <li> Solv_elec: The electrostatic portion of the solvation free energy. 
     <li> LJ_att:  Dispersion interactions from the attractive/dispersive part
@@ -1599,6 +1642,7 @@ doesn't help, please <a href="#contact">contact</a> support.
   <li><p><prob>
     The QuantumBio submenu is not appearing in the MOE menu system.
     </prob>
+
     <p><sol>MOE requires that custom menu files
     (<inline>moe-menus</inline>) reside in the user's home directory.
     See the <a href="#install-menu">installation</a> section.
