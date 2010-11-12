@@ -677,24 +677,36 @@ pointers relevant for the MOEDivCon Integration Suit.
 
 <h3><a name="core-mmmin"></a>MM Minimization</h3>
 <p>
-
- An example moebatch call:
-
-<pre>
-&gt; moebatch -exec "run ['qbmmmin.svl', ['qmscore.mdb', 100]]" -exit
-</pre>
-
-Perform energy minimization using the OPLS-AA + Solvation forcefield
-on the complexes stored in the MOEDivCon QMScore database using the
-given weight on heavy atoms only.
+Misaligned atom coordinates can cause convergence problems in the DivCon 
+calculation.  Since it can be tedious to optimize
+a large set of complexes by hand, the MOEDivcon Integration Suite provides
+an SVL script that performs energy minimization using the OPLS-AA + Solvation 
+forcefield on the complexes stored in a MOEDivCon QMScore database with a
+user-supplied tether weight on the heavy atoms.
 <p>
 If the mode of the QMScore database is 'One-to-Many', it is changed to
 a 'Many-to-Many' database so that a new copy of the receptor is minimized
 with each pose and the resulting structures are stored in the database.
 <p>
-Note:  The new structures overwrite those currently stored in the database,
-so it is advised that you create a backup before calling the script.
+ An example moebatch call of the script:
+<pre>
+&gt; moebatch -exec "run ['qbmmmin.svl', ['qmscore.mdb', 100]]" -exit
+</pre>
+where the second argument, 100, is the tether weight.  The new minimized 
+structures overwrite those currently stored in the database,
+so it is advised that you create a backup copy of the database before 
+calling the script.
 
+<p>
+From the MOE documentation for MM:
+<blockquote>
+A quadratic force to the starting geometry is added to the atoms in an
+attempt to keep the resulting minimum close to the original coordinates. 
+A force constant of 300 is comparable to the strength of a bond. A tether
+value greater than or equal to 100 000 is interpreted to mean a fixed
+atom; that is, atoms that are tethered with a weight greater than or
+equal to 100 000 are frozen during the calculation. 
+</blockquote>
 <p>
 <warn>Warning:  Atoms that have been fixed or tethered via other MOE methods
 will affect the minimization calculation.</warn>
@@ -1344,22 +1356,34 @@ Two assumptions are made:
   <li>  The protein chain is the first chain in the receptor collection.
 </ul>
 
+The main function of the script is
+<pre>
+qb_Align [src, dest, ext, trim]
+</pre>
+where the arguments are 
+<table border="0" cellspacing="8">
+  <tr><th> src <td> token <td> source directory.
+   <tr><th> dest <td> token <td> destination directory.
+   <tr><th> ext <td> token <td> molecule file extension.  
+   <tr><th> trim <td> boolean <td> if true, delete leading or trailing residues.
+</table>
+<p>
+Supported extensions are pdb, moe, mol2, mdl_mol and macmod.  Trimming 
+the proteins so that they all have the same number of residues 
+(provided that there are no internal gaps) improves the reliability of
+the PLS anaysis for the SAR heat map.
+<p>
 There are two methods to execute the SVL script.  The first uses moebatch from a
 shell command line in the parent directory of the source and destination
-subdirectories.  The extension identifies the molecule file
-type (supported extensions are pdb, moe, mol2, mdl_mol and macmod).
+subdirectories.  An example:
 <pre>
-&gt; moebatch -exec "run ['qbalign.svl', ['srcdir', 'destdir', 'ext']]" -exit
-</pre>
-An example:
-<pre>
-&gt; moebatch -exec "run ['qbalign.svl', ['recs', 'alignrecs', 'pdb']]" -exit
+&gt; moebatch -exec "run ['qbalign.svl', ['recs', 'aligned', 'pdb', 1]]" -exit
 </pre>
 The other method is to call the function from MOE's SVL command line (assuming
 that moe was started in the parent directory of the source and destination
 subdirectories.
 <pre>
-svl&gt; qb_Align ['srcdir', 'destdir', 'ext']
+svl&gt; qb_Align ['recs', 'newrecs', 'mol2', 0]
 </pre>
 Finally, create a MOE database containing the aligned proteins.
 
@@ -1522,14 +1546,14 @@ easy to identify the residues that have the largest absolute effect on ligand
 binding.  Below is an example interaction heat map and associated surface for
 ligand 4.
 <p>
-<object id="QBHeatMapInterPoly" title="QB Heat Map Interaction"
-data="images/qbheatmapinterastexpoly.png" type=image/png>
+<object id="QBHeatMapInterMono" title="QB Heat Map Interaction"
+data="images/qbheatmapinterastexmono.png" type=image/png>
 QB Heat Map Interaction
 </object>
 <p>
 
-<object id="SurfaceInterPoly" title="Surface Interaction" width=956
-data="images/surfaceinterastexlig4poly.png" type=image/png>
+<object id="SurfaceInterMono" title="Surface Interaction" width=956
+data="images/surfaceinterastexlig30mono.png" type=image/png>
 Surface Interaction
 </object>
 <p>
@@ -1540,13 +1564,13 @@ and repulsive), which highlights residues that are most critical to discriminati
 between more and less potent ligands (see the PWD section for more details).
 Below is an example SAR heat map and associated surface for ligand 6.
 <p>
-<object id="QBHeatMapInterMono" title="QB Heat Map SAR"
-data="images/qbheatmapsarastexmono.png" type=image/png>
+<object id="QBHeatMapInterPoly" title="QB Heat Map SAR"
+data="images/qbheatmapsarastexpoly.png" type=image/png>
 QB Heat Map SAR
 </object>
 <p>
-<object id="SurfaceSARMono" title="Surface SAR" width=956
-data="images/surfacesarastexlig6mono.png" type=image/png>
+<object id="SurfaceSARPoly" title="Surface SAR" width=956
+data="images/surfacesarastexlig37poly.png" type=image/png>
 Surface SAR
 </object>
 <p>
