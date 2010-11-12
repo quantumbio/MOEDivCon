@@ -467,7 +467,6 @@ global function qb_QMScoreSetupPanel []
                             mol_Create ldrec;
                             ligatoms = cat oAtoms mol_Create origligmol;
                             oSetCollection ['QB_LIGAND', ligatoms];
-print oCollections [];//DEBUG
                             aSetNucleusLook [ligatoms, 'small-sphere'];
                             aSetBondLook [ligatoms, 'cylinder'];
         	                View [];
@@ -483,7 +482,7 @@ print oCollections [];//DEBUG
                 endif
 
             elseif vals.panel === 'Run' then
-print oCollections [];//DEBUG
+
                 if qb_IsShowingAllPoses [vals] then
                     [vals, ligatoms] = qb_ResetLigand [wkey, vals];
                 endif
