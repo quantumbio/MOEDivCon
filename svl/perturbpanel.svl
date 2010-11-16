@@ -119,16 +119,36 @@ endfunction
 
 function qb_GetNMRPerturbEnv;
 
+
+//  Global Functions
+
 /****************************************************************************
- *                          RunCalc
+ *                          qb_GetNMRPerturbEnv
  *
- *  Run the One-to-One scoring from the MOE Window.
+ *  Get the core enviroment and application environment.
  *
  ****************************************************************************/
-local function RunCalc [dbkey]
+global function qb_GetNMRPerturbEnv [dbkey]
 
-    local msgkey = Message [0, 'NMR Perturbution is running ...'];
-    sleep -1;    // Allow parent to close input window.
+    local [colmol, l, status, coreopts, c] = qb_GetCoreEnv [dbkey];
+    local perturbsopts = qb_GetEnvApp [dbkey];
+    perturbsopts = tagcat [perturbsopts, tag tr NMRPERTURB_OPT_DEFAULTS];
+
+    return [colmol, status, coreopts, perturbsopts];
+endfunction
+
+/****************************************************************************
+ *                          qb_RunNMRPerturb
+ *
+ *  Run the NMR Perturbation job in the database.
+ *
+ ****************************************************************************/
+global function qb_RunNMRPerturb [dbkey, jobid]
+
+    if not MOE_BATCH then
+        local msgkey = Message [0, 'NMR Perturbution is running ...'];
+        sleep -1;    // Allow parent to close input window.
+    endif
 
     local rowkey = first db_Entries [dbkey];
     local [colmol, status, coreopts, perturbsopts]
@@ -147,10 +167,22 @@ local function RunCalc [dbkey]
         workdir = fabsname coreopts.workdir;
     endif
 
+    if not isnull jobid then
+        workdir = twrite ['{}/{}', workdir, jobid];
+        local okay = _fmkdir workdir;
+        if okay === -1 then
+            local mess = twrite ['Unable to create subdirectory:  {}\n',  
+                workdir];
+            qb_SaveDivConStatus [dbkey, rowkey, 
+                swrite ['Error:  {}\n', mess]];
+            write ['NMR Perturbation Error:  {}\n', mess];
+            return;
+        endif
+    endif
+
     coreopts.workdir = workdir;
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
-
 
     local [results, errmess] = qb_NMRPerturb [colmol, perfile,
         coreopts, perturbsopts, status.notforced, indices];
@@ -178,27 +210,11 @@ local function RunCalc [dbkey]
         qb_SaveDivConStatus [dbkey, rowkey, sucmess];
     endif
 
-    Message [msgkey, 'NMR Perturbation is done.'];
+    if not MOE_BATCH then
+        Message [msgkey, 'NMR Perturbation is done.'];
+    endif
 
     return;
-endfunction
-
-
-//  Global Functions
-
-/****************************************************************************
- *                          qb_GetNMRPerturbEnv
- *
- *  Get the core enviroment and application environment.
- *
- ****************************************************************************/
-global function qb_GetNMRPerturbEnv [dbkey]
-
-    local [colmol, l, status, coreopts, c] = qb_GetCoreEnv [dbkey];
-    local perturbsopts = qb_GetEnvApp [dbkey];
-    perturbsopts = tagcat [perturbsopts, tag tr NMRPERTURB_OPT_DEFAULTS];
-
-    return [colmol, status, coreopts, perturbsopts];
 endfunction
 
 /****************************************************************************
@@ -299,18 +315,23 @@ global function qb_NMRPerturbSetupPanel []
 
             elseif vals.panel === 'Run' then
 
+                if vals.selonly then
+                    atoms = Atoms [] | (aSelected Atoms []);
+                else
+                    atoms = Atoms [];
+                endif
+
+                if length atoms === 0 then
+                    Warning 'There are no atoms selected.';
+                    continue;
+                endif
+
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 3;
                     task_settitle [-1, 'MOEDivCon NMR Perturbation Run'];
 
                     status = qb_VerifyDivConCollection [0, status, vals];
                     if not status.verified then exit []; endif
-
-                    if vals.selonly then
-                        atoms = Atoms [] | (aSelected Atoms []);
-                    else
-                        atoms = Atoms [];
-                    endif
 
                     indices =  aNumber atoms;
                     atomnames = aName atoms;
@@ -325,7 +346,7 @@ global function qb_NMRPerturbSetupPanel []
                         [], atomnames, 'perturb', status.notforced];
                     qb_SaveAnalysisData [dbkey, 'perturb', 'sel',
                         [indices, atomnames]];
-                    RunCalc [dbkey];
+                    qb_RunNMRPerturb [dbkey];
                     dbv_Open db_Filename dbkey;
                     db_Close dbkey;
                     exit [];
@@ -335,17 +356,22 @@ global function qb_NMRPerturbSetupPanel []
 
             elseif vals.panel === 'Create' then
 
+                if vals.selonly then
+                    atoms = Atoms [] | (aSelected Atoms []);
+                else
+                    atoms = Atoms [];
+                endif
+
+                if length atoms === 0 then
+                    Warning 'There are no atoms selected.';
+                    continue;
+                endif
+
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
 
                     status = qb_VerifyDivConCollection [wkey, status, vals];
                     if not status.verified then exit []; endif
-
-                    if vals.selonly then
-                        atoms = Atoms [] | (aSelected Atoms []);
-                    else
-                        atoms = Atoms [];
-                    endif
 
                     indices =  aNumber atoms;
                     atomnames = aName atoms;

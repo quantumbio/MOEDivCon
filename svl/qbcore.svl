@@ -99,7 +99,7 @@ const STATUS_DEFAULTS =
     ['colchg',       1             ],
     ['moerecchg',    0             ],
     ['moeligchg',    0             ],
-    ['moeligchg',    0             ]
+    ['moecolchg',    0             ]
     ];
 
 /*  NOTE:  Non-GUI opt task must be the first tag.  */
@@ -1434,13 +1434,13 @@ local function UpdateCollectionChargeStatus [wkey, status, colchg, warn]
 
     if colok then
         if status.calcchg and colchg === status.moecolchg then
-          status.recchg = CHGGREEN;
+          status.colchg = CHGGREEN;
         else
-          status.recchg = CHGWHITE;
+          status.colchg = CHGWHITE;
         endif
 
     else
-        status.recchg = CHGRED;
+        status.colchg = CHGRED;
     endif
 
     if wkey > 0 then
@@ -1845,7 +1845,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
             vals.ligchg, 1];
 
     elseif trig === 'colchg' then
-        status = UpdateCollectionChargeStatus [wkey, status, vals.col, 1];
+        status = UpdateCollectionChargeStatus [wkey, status, vals.colchg, 1];
 
     elseif trig === 'browse_scoredb' then
         btid = run ['fbrowse.svl', [trig, wkey, 'Select QMScore DB File', 
@@ -2285,7 +2285,8 @@ global function qb_InitCorePanel [wkey, status, defaults]
         poseschg: [sensitive: 0],
         ham: [text: HAMILTONIANS | status.allowham],
         mode: [text: RUN_MODES | status.allowmode],
-        chgbox: [page: select [2, 1, defaults.mode === 'Single Point']]]];
+        chgbox: [page: select [2, 1, defaults.mode === 'Single Point']],
+        ckdbchg: [sensitive: 0]]];
 
     status = qb_UpdateCharge [wkey, defaults, status, 0];
 
@@ -3275,28 +3276,47 @@ global function qb_UpdateCharge [wkey, vals, status, warn]
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
-    local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
-    if (recchg === [] or recok === []
-            or (not vals.allposes and (ligchg === [] or ligok === []))) then
-        if warn then
-            Warning  errmess;
+    if vals.mode === 'Single Point' then
+        local [colchg, colok, colerrmess] = CalcCollectionCharge [];
+        if (colchg === [] or colok === []) then
+            if warn then
+                Warning  colerrmess;
+            endif
+
+            SetChargeStatus [wkey, 1, status];
+            return status;
         endif
 
-        SetChargeStatus [wkey, vals.mode === 'Single Point', status];
-        return status;
+        status.calcchg = 1;
+        status.moecolchg = colchg;
+        status.colchg = select [CHGGREEN, CHGRED, colok];
+
+        WindowSetData [wkey, [colchg: colchg]];
+        SetChargeStatus [wkey, 1, status];
+    else
+        local [recchg, recok, ligchg, ligok, errmess] = CalcComplexCharge [];
+        if (recchg === [] or recok === []
+                or (not vals.allposes and (ligchg === [] or ligok === []))) then
+            if warn then
+                Warning  errmess;
+            endif
+
+            SetChargeStatus [wkey, 0, status];
+            return status;
+        endif
+
+        status.calcchg = 1;
+        status.moerecchg = recchg;
+        if not vals.allposes then status.moeligchg = ligchg; endif
+
+        status.recchg = select [CHGGREEN, CHGRED, recok];
+        if not vals.allposes then 
+            status.ligchg = select [CHGGREEN, CHGRED, ligok]; 
+        endif
+
+        WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
+        SetChargeStatus [wkey, 0, status];
     endif
-
-    status.calcchg = 1;
-    status.moerecchg = recchg;
-    if not vals.allposes then status.moeligchg = ligchg; endif
-
-    status.recchg = select [CHGGREEN, CHGRED, recok];
-    if not vals.allposes then 
-        status.ligchg = select [CHGGREEN, CHGRED, ligok]; 
-    endif
-
-    WindowSetData [wkey, [ligchg: ligchg, recchg: recchg]];
-    SetChargeStatus [wkey, vals.mode === 'Single Point', status];
 
     return status;
 endfunction

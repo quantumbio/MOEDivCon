@@ -51,20 +51,6 @@ const DIVCON_HAM_KEYS =
     'mndo_nmr'
     ];
 
-const GEOM_KEYS =
-    [
-    'NOOPT',
-    'HONLYOPT',
-    'HETEROOPT',
-    'ALLOPT'
-    ];
-const CSP_KEYS =
-    [
-    'H_ONLY',
-    'C_ONLY',
-    'ALL'
-    ];
-
 global function qb_NMRPerturb [colmol, perfile, coreopts, appopts, errortests, 
         indices]
 
