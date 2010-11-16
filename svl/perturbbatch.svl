@@ -27,22 +27,17 @@
 #set title   'QuantumBio NMR Pertubation Batch'
 #set class   'QuantumBio'
 #set version '2010.01'
-#set main    'qb_NMRPerturbBatch'
+#set main    'NMRPerturbBatch'
 
 function qb_RunNMRPerturb;
 
-/*  NOTE:  If you change the key lists here, you need to update the
- *         option lists and default indices in qbcore.svl and nmrpanel.svl.
-           The unused Hamilitonians were masked when the core was created.
- */
-
 /****************************************************************************
- *                          qb_NMRPerturbBatch
+ *                          NMRPerturbBatch
  *
  *  Run the NMR Perturbation job in the database (using moebatch).
  *
 ****************************************************************************/
-global function qb_NMRPerturbBatch [dbpath, jobid]
+local function NMRPerturbBatch [dbpath, jobid]
 
     if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
 
