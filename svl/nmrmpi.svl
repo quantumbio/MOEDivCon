@@ -355,6 +355,10 @@ print [score];//DEBUG
 
             result_ith = result_ith + 1;
 
+        elseif return_statement === "DivCon done." then
+            fwrite [stdin, '{c:}\n', 'Ok'];
+            break;
+
         else
             write ['what is: {}\n', return_statement];  //  abort?
         endif
