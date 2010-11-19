@@ -130,7 +130,6 @@ global function qb_PWDAnalysis [qmsfilename]
 
     local return_statement;
     local sleep_time = -1;
-    local rscripterrmess = "";
     while exe_status process_key loop
         if not MOE_BATCH then
             sleep sleep_time;
@@ -211,11 +210,11 @@ global function qb_PWDAnalysis [qmsfilename]
         elseif return_statement === "error" then
             [[return_statement]] = fread [stdout, '{c:*}'];
             if neL [return_statement, "Analysis done."] then
-                rscripterrmess = cat [rscripterrmess, return_statement];
+                errmess = cat [errmess, return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
             endif
             while neL [return_statement, "Analysis done."] loop
-                rscripterrmess = cat [rscripterrmess, "\n", return_statement];
+                errmess = cat [errmess, "\n", return_statement];
                 [[return_statement]] = fread [stdout, '{c:*}'];
             endloop;
             fwrite [stdin, '{c:}\n', 'Ok'];
@@ -242,8 +241,8 @@ global function qb_PWDAnalysis [qmsfilename]
     qb_SaveAnalysisData [qmsdbkey, 'pwd', 'optlv', optLV];
     db_Close qmsdbkey;
 
-    if success === 0 and isnull rscripterrmess then
-        rscripterrmess = "Unknown error!";
+    if success === 0 and isnull errmess then
+        errmess = "Unknown error!";
     endif
 
     return errmess;
