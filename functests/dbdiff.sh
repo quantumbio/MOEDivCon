@@ -12,7 +12,15 @@ for bf in $bfiles ; do
   bn=`basename $bf`
   nf="${2}/$bn"
   if [ -e $nf ] ; then
-    moebatch -exec "run ['qbmdbdiff.svl', ['qbmdbdiff-error.log', '$bf', '$nf', 'all', 0.05]]" -exit
+    
+    if [ `echo $bn | fgrep "pwd"` ] ; then
+        testpwd=1
+    else
+        testpwd=0
+    fi
+
+    moebatch -exec "run ['qbmdbdiff.svl', ['qbmdbdiff-error.log', '$bf', '$nf', 'all', 0.05, $testpwd]]" -exit
+
   else
     echo "$nf doesn't exist."
   fi
