@@ -762,6 +762,8 @@ local function MatchResidue [restok, restokset]
             restok = twrite ['{}{}', 'CYS', rnum];
         elseif rname === 'HID' or rname === 'HIE' or rname === 'HIP' then
             restok = twrite ['{}{}', 'HIS', rnum];
+        elseif rname === 'SEP' then
+            restok = twrite ['{}{}', 'SER', rnum];
         endif
 
         residx = indexof [restok, restokset];
