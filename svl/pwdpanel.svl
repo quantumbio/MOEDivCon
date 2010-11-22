@@ -552,7 +552,8 @@ endfunction
  *                          FindResidue
  *
  *  Find the residue with the given name and number in the receptor 
- *  in the MOE Window.
+ *  in the MOE Window.  Check to make sure  MOE didn't rename it.
+ *  Or, in the case of SEP, bio3d.
  *
  *  Returns the index of the residue and its atom set.
  *
@@ -745,7 +746,7 @@ endfunction
  *                          MatchResidue
  *
  *  Look up the residue by NameUID token.  If not found, check to make sure
- *  MOE didn't rename it.
+ *  MOE didn't rename it.  Or, in the case of SEP, bio3d.
  *
  ****************************************************************************/
 local function MatchResidue [restok, restokset]
