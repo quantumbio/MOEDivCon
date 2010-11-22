@@ -1,0 +1,289 @@
+#svl
+//    qbmdbdiff.svl    Compare the values in the test database against those  
+//                     in the base database for the given field and if any
+//                     value differs more than delta percent, report an error
+//                     in the error log and to stdout.  If the field is 'all', 
+//                     all numeric (assumed to be double) fields will be tested.
+//                     If pwd is true, then test PWD tables as well.
+//
+//    Command:
+//        moebatch -exec "run ['qbmdbdiff.svl', ['errlog', 'basemdb', \
+//        'testmdb', 'field', delta, pwd]]" -exit
+//
+
+#set title   'QuantumBio MOE Database Diff'
+#set class   'QuantumBio'
+#set version '2009.01'
+
+function qb_GetAnalysisData;
+
+local function diff [n1, n2, d] = abs (n1 - n2) <= abs (d * n1 / 100);
+
+local function printTitle [ef, title]
+    title = tok_keep [title, 30];
+    fwrite [ef, '{t:50}\n', title];
+    write ['{t:40}\n', title];
+endfunction
+
+local function printHeader [ef, n1Title, n2Title, which]
+    n1Title = tok_keep [n1Title, -25];
+    n2Title = tok_keep [n2Title, -25];
+    fwrite [ef, '{t:5}{t:30}{t:30}\n', which, n1Title, n2Title];
+    write ['{t:5}{t:30}{t:30}\n', which, n1Title, n2Title];
+endfunction
+
+
+local function printRow [ef, row]
+    local [i, n1, n2] = row;
+
+    //grrr!  MOE ignores null numbers instead of printing blanks
+    local n1f, n2f;
+    if isnull n1 then
+        n1f = '{t:30}';
+        n1 = ' ';
+    else
+        n1f = '{n:30.5f}';
+    endif
+
+    if isnull n2 then
+        n2f = '{t:30}';
+        n2 = ' ';
+    else
+        n2f = '{n:30.5f}';
+    endif
+
+
+    fwrite [ef, tok_cat ['{n:5}', n1f, n2f, '\n'], i, n1, n2];
+    write [tok_cat ['{n:5}', n1f, n2f, '\n'], i, n1, n2];
+endfunction
+
+local function fielddiff [ef, bkey, tkey, field, delta]
+
+    local function fdiff [data]
+        local [n1, n2, d] = data;
+        if isnull n1 or isnull n2 then
+            if isnull n1 and isnull n2 then
+                return 1;
+            else
+                return 0;
+            endif
+        endif
+
+        return diff [n1, n2, d];
+    endfunction
+
+
+
+    local bnums = db_ReadColumn [bkey, field];
+    local tnums = db_ReadColumn [tkey, field];
+    if neL [length bnums, length tnums] then
+            fwrite [ef, 'Databases have a different number of entries'
+                ' for numeric field:  {}\n  {}:  {}\n  {}:  {}\n', field,
+                db_Filename bkey, length bnums, db_Filename tkey,
+                length tnums];
+            write ['Databases have a different number of entries'
+                ' for numeric field:  {}\n  {}:  {}\n  {}:  {}\n', field,
+                db_Filename bkey, length bnums, db_Filename tkey,
+                length tnums];
+            exit [];
+        endif
+
+    local data = tr [bnums, tnums, rep [delta, length bnums]];
+    local okay = apt fdiff [data];
+    if not alltrue okay then
+        local notokay = not okay;
+        local idx = (igen length bnums) | notokay;
+        bnums = bnums | notokay;
+        tnums = tnums | notokay;
+        data = tr [idx, bnums, tnums];
+        printTitle [ef, field];
+        printHeader [ef, db_Filename bkey, db_Filename tkey, 'Row'];
+        apt printRow [ef, data];
+    else
+        write ['Databases okay for numeric field:  {}\n  {}\n  {}\n', field,
+            db_Filename bkey, db_Filename tkey];
+
+    endif
+endfunction
+
+local function tablediff [ef, title, bn, tn, bd, td, d]
+    if isnull bd or isnull td then
+        if not (isnull bd and isnull td) then
+            if isnull bd then
+                fwrite [ef, 'Database {} is missing {} table.\n', bn, title];
+                write ['Database {} is missing {} table.\n', bn, title];
+            else
+                fwrite [ef, 'Database {} is missing {} table.\n', tn, title];
+                write ['Database {} is missing {} table.\n', tn, title];
+            endif
+        else
+            write ['Skipping empty table:  {}\n  {}\n  {}\n', title,  bn, tn];
+        endif
+
+        return;
+    endif
+
+    local [brns, brd] = bd;
+    local [trns, trd] = td;
+
+    if neL [length brns, length trns] then
+            fwrite [ef, 'Databases have a different number of columns'
+                ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                bn, length brns, tn, length trns];
+            write ['Databases have a different number of columns'
+                ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                bn, length brns, tn, length trns];
+            return;
+        endif
+
+    if not alltrue eqE [brns, trns] then
+            fwrite [ef, 'Databases have different column names'
+                ' for table:  {}\n  {}:  {v}\n  {}:  {v}\n', title,
+                bn, brns, tn, trns];
+            write ['Databases have different column names'
+                ' for table:  {}\n  {}:  {v}\n  {}:  {v}\n', title,
+                bn, brns, tn, trns];
+            return;
+        endif
+
+    if neL [length brd, length trd] then
+            fwrite [ef, 'Databases have a different number of rows'
+                ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                bn, length brd, tn, length trd];
+            write ['Databases have a different number of rows'
+                ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                bn, length brd, tn, length trd];
+            return;
+        endif
+
+    local r_i, brow, trow;
+    for r_i = 1, length brd, 1 loop
+
+        brow = brd (r_i);
+        trow = trd (r_i);
+        if neL [first brow, first trow] then
+                fwrite [ef, 'Databases have a different row name'
+                    ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                    bn, first brow, tn, first trow];
+                write ['Databases have a different row name'
+                    ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                    bn, first brow, tn, first trow];
+                continue;
+        endif
+
+        brow = second brow;
+        trow = second trow;
+        local data = tr [brow, trow, rep [d, length brow]];
+print data;//DEBUG
+        local okay = app diff data;
+print okay;//DEBUG
+        if not alltrue okay then
+            local notokay = not okay;
+            local idx = (igen length brow) | notokay;
+            brow = brow | notokay;
+            trow = trow | notokay;
+            data = tr [idx, brow, trow];
+            printTitle [ef, twrite ['{} - Row {}', title, r_i]];
+            printHeader [ef, bn, tn, 'Col'];
+            apt printRow [ef, data];
+        else
+            write ['Databases okay for table:  {}\n  {}\n  {}\n',
+                twrite ['{} - Row {}', title, r_i],  bn, tn];
+        endif
+    endloop
+endfunction
+
+local function pwddiff [ef, bkey, tkey, delta]
+    local bfn = db_Filename bkey;
+    local tfn = db_Filename tkey;
+
+    local bdata = qb_GetAnalysisData [bkey, 'pwd', 'optlv'];
+    local tdata = qb_GetAnalysisData [tkey, 'pwd', 'optlv'];
+    if isnull bdata or isnull tdata then
+        if not (isnull bdata and isnull tdata) then
+            if isnull bdata then
+                fwrite [ef, 'Database {} is missing OptLV.\n', bfn];
+                write ['Database {} is missing OptLV.\n', bfn];
+            else
+                fwrite [ef, 'Database {} is missing OptLV.\n', tfn];
+                write ['Database {} is missing OptLV.\n', tfn];
+            endif
+        else
+            write ['Skipping empty OptLV:\n  {}\n  {}\n', bfn, tfn];
+        endif
+
+    else
+        if neL [bdata, tdata] then
+            fwrite [ef, 'Databases have a different OptLV:\n'
+                '{}:  {}\n  {}:  {}\n', bfn, bdata, tfn, tdata];
+            write ['Databases have a different OptLV:\n'
+                '{}:  {}\n  {}:  {}\n', bfn, bdata, tfn, tdata];
+        endif
+    endif
+
+    bdata = qb_GetAnalysisData [bkey, 'pwd', 'pls'];
+    tdata = qb_GetAnalysisData [tkey, 'pwd', 'pls'];
+    tablediff [ef, 'PLS Results Table', bfn, tfn, bdata, tdata, delta];
+
+    bdata = qb_GetAnalysisData [bkey, 'pwd', 'act'];
+    tdata = qb_GetAnalysisData [tkey, 'pwd', 'act'];
+    tablediff [ef, 'Activities Table', bfn, tfn, bdata, tdata, delta];
+
+    bdata = qb_GetAnalysisData [bkey, 'pwd', 'inter'];
+    tdata = qb_GetAnalysisData [tkey, 'pwd', 'inter'];
+    tablediff [ef, 'Interaction Map', bfn, tfn, bdata, tdata, delta];
+
+    bdata = qb_GetAnalysisData [bkey, 'pwd', 'sar'];
+    tdata = qb_GetAnalysisData [tkey, 'pwd', 'sar'];
+    tablediff [ef, 'SAR Map', bfn, tfn, bdata, tdata, delta];
+
+endfunction
+
+local function main [errlog, basemdb, testmdb, field, delta, pwd]
+    local errf = fopenx errlog;
+    errf = fseek [errf, fsize errf];
+    local basekey = db_Open [basemdb, 'read'];
+    local testkey = db_Open [testmdb, 'read'];
+
+    local numfields = [];
+    if field === 'all' then
+        numfields = db_NumericFields basemdb;
+        local mchg = m_findmatch ['* Chg', numfields];
+        numfields = numfields | not mchg;
+        local tnfs = db_NumericFields testmdb;
+        mchg = m_findmatch ['* Chg', tnfs];
+        tnfs = tnfs | not mchg;
+        if neE [length numfields, length tnfs] then
+            fwrite [errf, 'Databases have a differ number of numeric'
+                ' fields:\n  {}:  {v}\n  {}:  {v}\n', basemdb, numfields, 
+                testmdb, tnfs];
+            write ['Databases have a differ number of numeric'
+                ' fields:\n  {}:  {v}\n  {}:  {v}\n', basemdb, numfields, 
+                testmdb, tnfs];
+            exit [];
+        endif
+        if not alltrue eqE [numfields, tnfs] then
+            fwrite [errf, 'Databases have different numerical field names:\n'
+                '  {}:  {v}\n  {}:  {v}\n', basemdb, numfields, testmdb, tnfs];
+            write ['Databases have different numerical field names:\n'
+                '  {}:  {v}\n  {}:  {v}\n', basemdb, numfields, testmdb, tnfs];
+            exit [];
+        endif
+    else
+        numfields = field;
+    endif
+
+    local nf;
+    for nf in numfields loop
+        fielddiff [errf, basekey, testkey, nf, delta];
+    endloop
+
+    if pwd then
+        pwddiff [errf, basekey, testkey, delta];
+    endif
+
+    fclose errf;
+    db_Close basekey;
+    db_Close testkey;
+endfunction
+
