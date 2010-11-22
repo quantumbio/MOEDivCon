@@ -572,6 +572,8 @@ local function FindResidue [restok]
         rname = ['CYS', 'CYX'];
     elseif rname === 'HIS' then
         rname = ['HIS', 'HID', 'HIE', 'HIP'];
+    elseif rname === 'SER' then
+        rname = ['SER', 'SEP'];
     endif
 
     local indices = cat indicesof [rname, resnames];
