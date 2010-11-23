@@ -38,6 +38,8 @@ function qb_GetAnalysisData;
 function qb_GetEnvAnal;
 function qb_GetPoseFields;
 function qb_LoadCoreScoreDB;
+function qb_ResNameCanonical;
+function qb_ResNameEquivSet;
 function qb_SaveEnvAnal;
 function qb_SplitComplex;
 
@@ -552,8 +554,7 @@ endfunction
  *                          FindResidue
  *
  *  Find the residue with the given name and number in the receptor 
- *  in the MOE Window.  Check to make sure  MOE didn't rename it.
- *  Or, in the case of SEP, bio3d.
+ *  in the MOE Window.  Check to make sure  MOE or bio3d didn't rename it.
  *
  *  Returns the index of the residue and its atom set.
  *
@@ -569,15 +570,10 @@ local function FindResidue [restok]
     local residues = Residues [];
     local resnames = rName residues;
     local rname = tok_keep [restok, rnidx];
-    if rname === 'CYS' then
-        rname = ['CYS', 'CYX'];
-    elseif rname === 'HIS' then
-        rname = ['HIS', 'HID', 'HIE', 'HIP'];
-    elseif rname === 'SER' then
-        rname = ['SER', 'SEP'];
-    endif
+    local equivset = qb_ResNameEquivSet rname;
+    if isnull equivset then equivset = rname; endif
 
-    local indices = cat indicesof [rname, resnames];
+    local indices = cat indicesof [equivset, resnames];
     if length indices > 0 then
         local rnum = atoi tok_drop [restok, rnidx];
         local idx_i = indexof [rnum, rUID residues [indices]];
@@ -746,7 +742,7 @@ endfunction
  *                          MatchResidue
  *
  *  Look up the residue by NameUID token.  If not found, check to make sure
- *  MOE didn't rename it.  Or, in the case of SEP, bio3d.
+ *  MOE or bio3d didn't rename it.
  *
  ****************************************************************************/
 local function MatchResidue [restok, restokset]
@@ -759,14 +755,9 @@ local function MatchResidue [restok, restokset]
 
         local rname = tok_keep [restok, rnidx];
         local rnum = atoi tok_drop [restok, rnidx];
-        if rname === 'CYX' then
-            restok = twrite ['{}{}', 'CYS', rnum];
-        elseif rname === 'HID' or rname === 'HIE' or rname === 'HIP' then
-            restok = twrite ['{}{}', 'HIS', rnum];
-        elseif rname === 'SEP' then
-            restok = twrite ['{}{}', 'SER', rnum];
-        endif
-
+        local canonical = qb_ResNameCanonical rname;
+        if isnull canonical then canonical = rname; endif
+        restok = twrite ['{}{}', canonical, rnum];
         residx = indexof [restok, restokset];
     endif
 

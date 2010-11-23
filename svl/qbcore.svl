@@ -505,6 +505,37 @@ const MESS_WINDOW =
         ]
     ];
 
+//  Based on the table found in the MOE documentation for Seq_NameToLetter
+//  and Seq_LetterToName
+
+const RESNAMESEQUIVSETS =
+    [
+    A : ['ALA', 'ABA', 'AIB', 'DAL', 'MAA'],
+    B : ['ASX'],
+    C : ['CYS', 'CEA', 'CSD', 'CSO', 'CSP', 'CSW', 'DCY'],
+    D : ['ASP', 'DAS'],
+    E : ['GLU', '5HP', 'DGL', 'PCA'],
+    F : ['PHE', 'DPN'],
+    G : ['GLY', 'SAR'],
+    H : ['HIS', 'DHI', 'HIS', 'HIE', 'HIP'],
+    I : ['ILE', 'DIL'],
+    K : ['LYS', 'DLY'],
+    L : ['LEU', 'DLE', 'MLE', 'NLE'],
+    M : ['MET', 'CXM', 'FME', 'MSE', 'OMT'],
+    N : ['ASN', 'DGN', 'MEN'],
+    P : ['PRO', 'DPR', 'HYP'],
+    Q : [;GLN'],
+    R : ['ARG', 'DAR'],
+    S : ['SER', 'DSN', 'SEP'],
+    T : ['THR', 'BMT', 'DTH', 'TPO'],
+    V : ['VAL', 'DIV', 'DVA', 'IVA', 'MVA', 'NVA'],
+    W : ['TRP', 'DTR'],
+    Y : ['TYR', 'DTY', 'PTR', 'TYS'],
+    Z : ['GLX']
+    ];
+
+
+
 //***********************  Local Functions  *********************************
 
 /****************************************************************************
@@ -2544,6 +2575,33 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
 
     [handshake] = fread [inpipe, '{n:}\n'];
 
+endfunction
+
+/****************************************************************************
+ *                          qb_ResNameCanonical
+ *
+ *  Return the canonical abbreviation of the given residue.
+ *
+ ****************************************************************************/
+global function qb_ResNameCanonical [resname]
+
+    local abbrev = Seq_NameToLetter resname;
+
+    return first RESNAMESEQUIVSETS.abbrev;
+endfunction
+
+/****************************************************************************
+ *                          qb_ResNameEquivSet
+ *
+ *  Return the equivalent set of the given residue (that is, all variations 
+ *  of the residue that map to the same single letter abbreviation).
+ *
+ ****************************************************************************/
+global function qb_ResNameEquivSet [resname]
+
+    local abbrev = Seq_NameToLetter resname;
+
+    return RESNAMESEQUIVSETS.abbrev;
 endfunction
 
 /****************************************************************************
