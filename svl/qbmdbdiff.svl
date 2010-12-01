@@ -106,7 +106,7 @@ local function fielddiff [ef, bkey, tkey, field, delta]
     endif
 endfunction
 
-local function tablediff [ef, title, bn, tn, bd, td, d]
+local function tablediff [ef, title, bn, tn, bd, td, d, strict]
     if isnull bd or isnull td then
         if not (isnull bd and isnull td) then
             if isnull bd then
@@ -123,74 +123,114 @@ local function tablediff [ef, title, bn, tn, bd, td, d]
         return;
     endif
 
-    local [brns, brd] = bd;
-    local [trns, trd] = td;
+    local [bcns, brd] = bd;
+    local [tcns, trd] = td;
 
-    if neL [length brns, length trns] then
-            fwrite [ef, 'Databases have a different number of columns'
-                ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
-                bn, length brns, tn, length trns];
-            write ['Databases have a different number of columns'
-                ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
-                bn, length brns, tn, length trns];
-            return;
-        endif
-
-    if not alltrue eqE [brns, trns] then
-            fwrite [ef, 'Databases have different column names'
-                ' for table:  {}\n  {}:  {v}\n  {}:  {v}\n', title,
-                bn, brns, tn, trns];
-            write ['Databases have different column names'
-                ' for table:  {}\n  {}:  {v}\n  {}:  {v}\n', title,
-                bn, brns, tn, trns];
-            return;
-        endif
-
-    if neL [length brd, length trd] then
-            fwrite [ef, 'Databases have a different number of rows'
-                ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
-                bn, length brd, tn, length trd];
-            write ['Databases have a different number of rows'
-                ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
-                bn, length brd, tn, length trd];
-            return;
-        endif
-
-    local r_i, brow, trow;
-    for r_i = 1, length brd, 1 loop
-
-        brow = brd (r_i);
-        trow = trd (r_i);
-        if neL [first brow, first trow] then
-                fwrite [ef, 'Databases have a different row name'
+    if strict then
+        //  Exactly the same columns and rows
+        if neL [length bcns, length tcns] then
+                fwrite [ef, 'Databases have a different number of columns'
                     ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
-                    bn, first brow, tn, first trow];
-                write ['Databases have a different row name'
+                    bn, length bcns, tn, length tcns];
+                write ['Databases have a different number of columns'
                     ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
-                    bn, first brow, tn, first trow];
-                continue;
-        endif
+                    bn, length bcns, tn, length tcns];
+                return;
+            endif
 
-        brow = second brow;
-        trow = second trow;
-        local data = tr [brow, trow, rep [d, length brow]];
+        if not alltrue eqE [bcns, tcns] then
+                fwrite [ef, 'Databases have different column names'
+                    ' for table:  {}\n  {}:  {v}\n  {}:  {v}\n', title,
+                    bn, bcns, tn, tcns];
+                write ['Databases have different column names'
+                    ' for table:  {}\n  {}:  {v}\n  {}:  {v}\n', title,
+                    bn, bcns, tn, tcns];
+                return;
+            endif
+
+        if neL [length brd, length trd] then
+                fwrite [ef, 'Databases have a different number of rows'
+                    ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                    bn, length brd, tn, length trd];
+                write ['Databases have a different number of rows'
+                    ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                    bn, length brd, tn, length trd];
+                return;
+            endif
+//  Change this to column based comparison??-DEBUG
+        local r_i, brow, trow;
+        for r_i = 1, length brd, 1 loop
+
+            brow = brd (r_i);
+            trow = trd (r_i);
+            if neL [first brow, first trow] then
+                    fwrite [ef, 'Databases have a different row name'
+                        ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                        bn, first brow, tn, first trow];
+                    write ['Databases have a different row name'
+                        ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                        bn, first brow, tn, first trow];
+                    continue;
+            endif
+
+            brow = second brow;
+            trow = second trow;
+            local data = tr [brow, trow, rep [d, length brow]];
 print data;//DEBUG
-        local okay = app diff data;
+            local okay = app diff data;
 print okay;//DEBUG
-        if not alltrue okay then
-            local notokay = not okay;
-            local idx = (igen length brow) | notokay;
-            brow = brow | notokay;
-            trow = trow | notokay;
-            data = tr [idx, brow, trow];
-            printTitle [ef, twrite ['{} - Row {}', title, r_i]];
-            printHeader [ef, bn, tn, 'Col'];
-            apt printRow [ef, data];
-        else
-            write ['Databases okay for table:  {}\n  {}\n  {}\n',
-                twrite ['{} - Row {}', title, r_i],  bn, tn];
-        endif
-    endloop
+            if not alltrue okay then
+                local notokay = not okay;
+                local idx = (igen length brow) | notokay;
+                brow = brow | notokay;
+                trow = trow | notokay;
+                data = tr [idx, brow, trow];
+                printTitle [ef, twrite ['{} - Row {}', title, r_i]];
+                printHeader [ef, bn, tn, 'Col'];
+                apt printRow [ef, data];
+            else
+                write ['Databases okay for table:  {}\n  {}\n  {}\n',
+                    twrite ['{} - Row {}', title, r_i],  bn, tn];
+            endif
+        endloop
+    else
+        //  Assume same rows (maybe different order) but check only shared cols
+
+        local bidx = x_sort app first brd;
+        local tidx = x_sort app first trd;
+        brd = app second brd [bidx];
+        trd = app second trd [tidx];
+
+        local bcn, tcn;
+        for bcn in bcns loop
+            bidx = indexof [bcn, bcns];
+            tidx = indexof [bcn, tcns];
+            if bidx > 0 and tidx > 0 then
+                local bnums = app peek [bidx, brd];
+                local tnums = app peek [tidx, trd];
+                local cdata = tr [bnums, tnums, rep [d, length bnums]];
+print cdata;//DEBUG
+                local okay = app diff cdata;
+print okay;//DEBUG
+                if not alltrue okay then
+                    local notokay = not okay;
+                    local idx = (igen length bnums) | notokay;
+                    bnums = bnums | notokay;
+                    tnums = tnums | notokay;
+                    data = tr [idx, bnums, tnums];
+                    printTitle [ef, twrite ['{} - Col {}', title, bcn]];
+                    printHeader [ef, bn, tn, 'Col'];
+                    apt printCol [ef, cdata];
+                else
+                    write ['Databases okay for table:  {}\n  {}\n  {}\n',
+                        twrite ['{} - Row {}', title, r_i],  bn, tn];
+                endif
+
+            endif
+         endloop
+
+    endif
+
 endfunction
 
 local function pwddiff [ef, bkey, tkey, delta]
@@ -223,19 +263,19 @@ local function pwddiff [ef, bkey, tkey, delta]
 
     bdata = qb_GetAnalysisData [bkey, 'pwd', 'pls'];
     tdata = qb_GetAnalysisData [tkey, 'pwd', 'pls'];
-    tablediff [ef, 'PLS Results Table', bfn, tfn, bdata, tdata, delta];
+    tablediff [ef, 'PLS Results Table', bfn, tfn, bdata, tdata, delta, 1];
 
     bdata = qb_GetAnalysisData [bkey, 'pwd', 'act'];
     tdata = qb_GetAnalysisData [tkey, 'pwd', 'act'];
-    tablediff [ef, 'Activities Table', bfn, tfn, bdata, tdata, delta];
+    tablediff [ef, 'Activities Table', bfn, tfn, bdata, tdata, delta, 1];
 
     bdata = qb_GetAnalysisData [bkey, 'pwd', 'inter'];
     tdata = qb_GetAnalysisData [tkey, 'pwd', 'inter'];
-    tablediff [ef, 'Interaction Map', bfn, tfn, bdata, tdata, delta];
+    tablediff [ef, 'Interaction Map', bfn, tfn, bdata, tdata, delta, 0];
 
     bdata = qb_GetAnalysisData [bkey, 'pwd', 'sar'];
     tdata = qb_GetAnalysisData [tkey, 'pwd', 'sar'];
-    tablediff [ef, 'SAR Map', bfn, tfn, bdata, tdata, delta];
+    tablediff [ef, 'SAR Map', bfn, tfn, bdata, tdata, delta, 0];
 
 endfunction
 
@@ -244,6 +284,9 @@ local function main [errlog, basemdb, testmdb, field, delta, pwd]
     errf = fseek [errf, fsize errf];
     local basekey = db_Open [basemdb, 'read'];
     local testkey = db_Open [testmdb, 'read'];
+
+//  Strict for Score databases, Loose for Interaction/SMR databases?
+//  Loose, only compare shared fields in database
 
     local numfields = [];
     if field === 'all' then
