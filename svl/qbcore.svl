@@ -30,6 +30,7 @@
 
 function _Atoms;
 function pro_HydrogenBonds;
+function Seq_NameToLetter;
 
 //  Database Fields
 const LIG_FIELD = 'Ligand/Pose';
@@ -524,7 +525,7 @@ const RESNAMESEQUIVSETS =
     M : ['MET', 'CXM', 'FME', 'MSE', 'OMT'],
     N : ['ASN', 'DGN', 'MEN'],
     P : ['PRO', 'DPR', 'HYP'],
-    Q : [;GLN'],
+    Q : ['GLN'],
     R : ['ARG', 'DAR'],
     S : ['SER', 'DSN', 'SEP'],
     T : ['THR', 'BMT', 'DTH', 'TPO'],
