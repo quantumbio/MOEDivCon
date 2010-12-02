@@ -176,9 +176,7 @@ local function tablediff [ef, title, bn, tn, bd, td, d, strict]
             brow = second brow;
             trow = second trow;
             local data = tr [brow, trow, rep [d, length brow]];
-print data;//DEBUG
             local okay = app diff data;
-print okay;//DEBUG
             if not alltrue okay then
                 local notokay = not okay;
                 local idx = (igen length brow) | notokay;
@@ -195,37 +193,43 @@ print okay;//DEBUG
         endloop
     else
         //  Assume same rows (maybe different order) but check only shared cols
-
         local bidx = x_sort app first brd;
         local tidx = x_sort app first trd;
         brd = app second brd [bidx];
         trd = app second trd [tidx];
-
-        local bcn, tcn;
+print app length brd;//DEBUG
+print app length trd;//DEBUG
+        local bcn;
         for bcn in bcns loop
             bidx = indexof [bcn, bcns];
             tidx = indexof [bcn, tcns];
+print bidx;//DEBUG
+print tidx;//DEBUG
             if bidx > 0 and tidx > 0 then
-                local bnums = app peek [bidx, brd];
-                local tnums = app peek [tidx, trd];
+                local bnums = app peek [brd, bidx];
+                local tnums = app peek [trd, tidx];
+print bnums;//DEBUG
+print tnums;//DEBUG
                 local cdata = tr [bnums, tnums, rep [d, length bnums]];
 print cdata;//DEBUG
-                local okay = app diff cdata;
+                local cokay = app diff cdata;
 print okay;//DEBUG
-                if not alltrue okay then
-                    local notokay = not okay;
-                    local idx = (igen length bnums) | notokay;
-                    bnums = bnums | notokay;
-                    tnums = tnums | notokay;
-                    data = tr [idx, bnums, tnums];
+                if not alltrue cokay then
+                    local cnotokay = not cokay;
+                    local cidx = (igen length bnums) | cnotokay;
+                    bnums = bnums | cnotokay;
+                    tnums = tnums | cnotokay;
+                    data = tr [cidx, bnums, tnums];
                     printTitle [ef, twrite ['{} - Col {}', title, bcn]];
                     printHeader [ef, bn, tn, 'Col'];
-                    apt printCol [ef, cdata];
+                    apt printRow [ef, cdata];
                 else
                     write ['Databases okay for table:  {}\n  {}\n  {}\n',
-                        twrite ['{} - Row {}', title, r_i],  bn, tn];
+                        bcn,  bn, tn];
                 endif
 
+            else
+                write ['Column missing from table:  {}\n  {}\n', bcn, tn];
             endif
          endloop
 
