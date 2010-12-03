@@ -19,7 +19,7 @@ for bf in $bfiles ; do
         testpwd=0
     fi
 
-    moebatch -exec "run ['qbmdbdiff.svl', ['qbmdbdiff-error.log', '$bf', '$nf', 'all', 0.05, $testpwd]]" -exit
+    moebatch -exec "run ['qbmdbdiff.svl', ['qbmdbdiff-error.log', '$bf', '$nf', 'all', 0.25, $testpwd]]" -exit
 
   else
     echo "$nf doesn't exist."
