@@ -1,0 +1,47 @@
+#svl
+//    qbchgcalc.svl    For the input directory,  
+//                     calculate the hybridization for PDB files
+//                     and write .hyb to the output directory.
+//
+//
+//    Command:
+//        moebatch -exec "run ['qbhybcalc.svl', ['indir', 'outdir']]" -exit
+//
+
+#set title   'QuantumBio Hybrid Calculator'
+#set class   'QuantumBio'
+#set version '2009.01'
+
+
+local function calc [inf, outf]
+
+    local chains = ReadPDB inf;
+
+    if chains === [] then
+        return;
+    endif
+
+    local of = fopenw outf;
+
+    local atoms = cat cAtoms chains;
+    local hybrids = aGeometry atoms;
+    local h;
+    for h in hybrids loop
+        fwrite [of, '{}\n', h];
+    endloop
+
+    oDestroy chains;
+    fclose of;
+endfunction
+
+local function main [indir, outdir]
+    local filelist = flist [indir, '*.pdb'];
+    local infile;
+    for infile in filelist loop
+        local basename = fbase ftail infile;
+        local outfile = twrite ['{}/{}.hyb', outdir, basename];
+        calc [infile, outfile];
+    endloop
+
+endfunction
+

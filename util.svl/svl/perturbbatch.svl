@@ -1,0 +1,49 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information,
+ including trade secrets, belonging to QuantumBio Inc. and/or its
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly
+ prohibited without prior written authorization by the management of
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif
+
+//    nmrperturbbatch.svl    Executes NMR Perturbation as a batch job
+
+#set title   'QuantumBio NMR Pertubation Batch'
+#set class   'QuantumBio'
+#set version '2010.01'
+#set main    'NMRPerturbBatch'
+
+function qb_RunNMRPerturb;
+
+/****************************************************************************
+ *                          NMRPerturbBatch
+ *
+ *  Run the NMR Perturbation job in the database (using moebatch).
+ *
+****************************************************************************/
+local function NMRPerturbBatch [dbpath, jobid]
+
+    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
+
+    local dbkey = db_Open [dbpath, 'read-write'];
+    qb_RunNMRPerturb [dbkey, jobid];
+    db_Close dbkey;
+
+endfunction
+

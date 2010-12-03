@@ -1,0 +1,1418 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif      
+
+//    pwdpanel.svl    User-interface entrypoint to QB-PWD calculations
+
+#set title   'QuantumBio PWD Panel'
+#set class   'QuantumBio'
+#set version '2010.02'
+#set main    'qb_QBPWDSetupPanel'
+
+function grid_isoidx_emit;
+function msurf_MolecularSurface;
+function pboltz_AtomParameters;
+
+function qb_CreateMessWin;
+function qb_GetAnalysisData;
+function qb_GetEnvAnal;
+function qb_GetPoseFields;
+function qb_LoadCoreScoreDB;
+function qb_ResNameCanonical;
+function qb_ResNameEquivSet;
+function qb_SaveEnvAnal;
+function qb_SplitComplex;
+
+function qb_HeatMapSetupPanel;
+
+function qb_PWDAnalysis;
+
+
+const PWD_EXPACT_HDR = 'Exp Act';
+
+const MAT_TRANS_MIN = 0x80;
+
+const QBPWD_OPT_DEFAULTS =
+    [
+    ['title',        'PWD Analysis'],
+    ['analysis',     3             ],
+    ['sf_e_ab',      1             ],
+    ['sf_e_abp',     0             ],
+    ['sf_e_abc',     0             ],
+    ['sf_e_r6',      1             ],
+    ['sf_e_r12',     0             ],
+    ['sf_e_ele',     0             ],
+    ['prune_zero',   95            ],
+    ['prune_sd',     0.05          ],
+    ['expact_hdr',   PWD_EXPACT_HDR],
+    ['numtopres',    25            ],
+    ['numcomps',     10            ],
+    ['trainingset',  0             ]
+    ];
+
+const ANALYSIS =
+    [
+    'PLS Results Table',
+    'Activities Table',
+    'Interaction Heat Map',
+    'SAR Heat Map'
+    ];
+
+const ANALOPTLV = 5;
+const ANALKEYS =
+    [
+    'pls',
+    'act',
+    'inter',
+    'sar',
+    'optlv'
+    ];
+
+const HEADER = 
+    [
+    name: 'panel', 
+    title: 'QB-PWD',
+    windowName: 'QB-PWDPanel',
+    text: ['Apply', 'Load', 'Close'],
+    onTrigger: ['return', 'return', 'return'],
+    bubbleHelp: ['Perform QB-PWD analysis.',
+            'Load QB-PWD data from a QMScore database.', 
+            '']
+    ];
+
+const PANEL =
+    [
+    Vbox :
+        [
+        name: 'analbox',
+        Hbox :
+            [
+            title: 'Title       ',
+            extendH: 1,
+            Text :
+                [
+                name: 'title', allowBlank: 0,
+                type: 'char', len: 40,
+                bubbleHelp:
+                    'The title is used to label heat maps\n'
+                    'and tables, and to form filenames.'
+                ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            title: 'Scoring     ',
+            extendH: 1,
+            Checkbox :
+                [
+                name: 'sf_e_ab', text: 'E_AB', title: 'QM:',
+                bubbleHelp:
+                    'E_AB is the exchange between atoms.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Checkbox :
+                [
+                name: 'sf_e_abp', text: 'E_ABp',
+                bubbleHelp:
+                    'E_ABp is the electron-electron repulsion.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Checkbox :
+                [
+                name: 'sf_e_abc', text: 'E_ABc',
+                bubbleHelp:
+                    'E_ABc is the core-electron interaction.'
+                ]
+            ],
+
+        Hbox :
+            [
+            title: 'Function    ',
+            extendH: 1,
+            Checkbox :
+                [
+                name: 'sf_e_r6', text: 'E_R6', title: 'MM:',
+                bubbleHelp:
+                    'E_R6 is the van der Waals repulsive component.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Checkbox :
+                [
+                name: 'sf_e_r12', text: 'E_R12',
+                bubbleHelp:
+                    'E_R12 is the van der Waals attractive component.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Checkbox :
+                [
+                name: 'sf_e_ele', text: 'E_ELE',
+                bubbleHelp:
+                    'E_ELE is the electrostatic component.'
+                ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            title: 'Activities  ',
+            extendH: 1,
+            Text :
+                [
+                name: 'expact_hdr', allowBlank: 0, title: 'Field:',
+                type: 'char', len: 40,
+                bubbleHelp:
+                    'The MOE database field name for\n'
+                    'the experimental activity values.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Button :
+                [
+                name: 'loadact', text: 'Load',
+                bubbleHelp:
+                    'Load in the experimental activity data\n'
+                    'from a csv file using the given field name.'
+                ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            title: 'Residues    ',
+            extendH: 1,
+            Label :
+                [
+                font: 'mediumBold', text: 'Pruning:'
+                ],
+            Text :
+                [
+                name: 'prune_zero', allowBlank: 0,
+                title: 'Maximum percent zero:',
+                type: 'int', len: 5,
+                bubbleHelp:
+                    'Prune residues which have greater than the\n'
+                    'specified % of zero values for the selected\n'
+                    'energies for the ligands in the training set;\n'
+                    'that is; those distant from the pocket with\n'
+                    'very little interaction with the ligands.'
+                ],
+            Label :
+                [
+                font: 'mediumBold', text: '%'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Text :
+                [
+                name: 'prune_sd', allowBlank: 0, title: 'Minimum SD:',
+                type: 'real', len: 5,
+                bubbleHelp:
+                    'Prune residues which have a smaller standard\n'
+                    'deviation over the values of the selected energies\n'
+                    'for the ligands in the training set than the\n'
+                    'specified SD; that is, exclude those that do have\n'
+                    'not distinguishing characteristic.'
+                ]
+            ],
+
+        Hbox :
+            [
+            title: '            ',
+            extendH: 1,
+            Text :
+                [
+                name: 'numtopres', allowBlank: 0,
+                title: 'Number of top scorers:',
+                type: 'int', len: 5,
+                bubbleHelp:
+                    'Keep only the specified number of top scoring\n'
+                    'residues to show in the Heat Map (max 30).'
+                ]
+            ],
+
+        Separator : [flushLeft:1, extendH:1, margin:1],
+
+        Hbox :
+            [
+            title: 'PLS         ',
+            extendH: 1,
+            Text :
+                [
+                name: 'numcomps', allowBlank: 0,
+                title: 'Number of components:',
+                type: 'int', len: 5,
+                bubbleHelp:
+                    'Number of components to include in\n'
+                    'the model during PLS analysis.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Text :
+                [
+                name: 'trainingset', title: 'Training set size:',
+                len: 5, extendH: 0, 
+                type: 'int', allowBlank: 0,
+                bubbleHelp:
+                    'Size of the training set (the first N ligands\n'
+                    'or receptors/ligand pairs are treated as\n'
+                    'the training set during PLS analysis).'
+                ]
+            ]
+        ],
+
+        
+    Separator : [flushLeft:1, extendH:1, margin:1],
+
+    Hbox :
+        [
+        name: 'selbox',
+        title: 'Analysis    ',
+        extendH: 1,
+        Option :
+            [
+            name: 'analysis', text: ANALYSIS,
+            type: 'int', minWidth: 8,
+            bubbleHelp:
+                'Chose an analysis data set to view and/or save.'
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+        Button :
+            [
+            name: 'analview', text: 'View',
+            bubbleHelp:
+                'View the analytic results (table or heat map).'
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+        Button :
+            [
+            name: 'analsave', text: 'Save',
+            bubbleHelp:
+                'Save the analytic results in a csv file.'
+            ]
+        ],
+        
+    Separator : [flushLeft:1, extendH:1, margin:1]
+    ];
+
+//  Global Variables
+
+    global G_surface;                     // Callback function needs access
+
+//  Local Functions
+
+function MatchResidue;
+
+/****************************************************************************
+ *
+ *                          CalcDist
+ *
+ *  Determine a distance that include all residues in heat map.
+ *
+ ****************************************************************************/
+local function CalcDist [restokens, recatoms, ligatoms]
+
+    local atom, dist = 10.0;
+    for atom in recatoms loop
+        local residue = aResidue atom;
+        local restok = twrite ['{}{}', rName residue, rUID residue];
+        local idx = MatchResidue [restok, restokens];
+        if idx > 0 then
+            dist = max [max aDist [atom, ligatoms], dist];
+        endif
+    endloop
+
+    return dist;
+
+endfunction
+
+function FindResidue;
+
+/****************************************************************************
+ *
+ *                          CheckResidues
+ *
+ *  Check whether the residue names and numbers match those present
+ *  in the receptor in the MOE Window.
+ *
+ *  Returns the list of residues tokens not found in the receptor.
+ *
+ ****************************************************************************/
+local function CheckResidues [restoks]
+
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+
+    local res, missing = [];
+    for res in restoks loop
+        local [residx, ra] = FindResidue res;
+        if residx === 0 then
+            missing = append [missing, res];
+        endif
+    endloop
+
+    return missing;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          ClearSurfaceMap
+ *
+ *  Clear the surface map of the pocket and the residue label.
+ *
+ *  Acknowledgement:  borrowed heavily from surfmap.svl.
+ *
+ ****************************************************************************/
+local function ClearSurfaceMap [title]
+
+    local gobjs = GKeyList [];
+    GDestroy (gobjs | m_findmatch [tok_cat [title,'*'], GTitle gobjs]);
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          ColorAtoms
+ *
+ *  Determine the color of the residue atoms based on its interaction with
+ *  the ligand.  If ligidx is zero, return all white.
+ *
+ ****************************************************************************/
+local function ColorAtoms [data, ligidx, residx, recatoms, 
+        mincut, maxcut, colors]
+
+    if ligidx === 0 then
+        return rep [0xFFFFFF, length recatoms];
+    endif
+
+    local step = (maxcut - mincut) / (length colors);
+    local [titles, restokens, resabbrevs, rowdata] = data;
+    local rowvals = third rowdata (ligidx);
+    local atom, atomcolors = [];
+    for atom in recatoms loop
+        local residue = aResidue atom;
+        local restok = twrite ['{}{}', rName residue, rUID residue];
+        local idx = MatchResidue [restok, restokens];
+        if idx > 0 and (residx === 0 or residx === idx) then
+            local cidx, value = rowvals (idx);
+            if value <= mincut then
+                cidx = 1;
+            elseif value >= maxcut then
+                cidx = length colors;
+            else
+                cidx = ceil ((value - mincut) / step);
+            endif
+
+            atomcolors = append [atomcolors, colors (cidx)];
+        else
+            atomcolors = append [atomcolors, 0xFFFFFF];  // White
+        endif
+    endloop
+
+    return atomcolors;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          CreateSurfaceMap
+ *
+ *  Create a surface map of the pocket.
+ *
+ *  Acknowledgement:  borrowed heavily from surfmap.svl.
+ *
+ ****************************************************************************/
+local function CreateSurfaceMap [restokens]
+
+    const CLASS = 1;  // Connolly
+    const RDIST = 10;
+
+    local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
+    if recatoms === [] or ligatoms === [] then
+        Warning errmess;
+        return [];
+    endif
+
+    local dist = CalcDist [restokens, recatoms, ligatoms];
+    dist = dist / 2;
+
+    local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
+    local gridopt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
+        clipmode: 0];
+
+    G_surface =
+        [
+        title    : 'QB Heat Map',
+        class    : CLASS,
+        colorby  : 'Constant',
+        colconst : 0xFFFFFF,            // White
+        surfdim  : 3,
+        trans_f  : 96,
+        trans_b  : 96,
+        rec      : recatoms,
+        recpos   : aPos recatoms,
+        lig      : ligatoms,
+        ligpos   : aPos ligatoms,
+        ligidx   : 0,
+        ligmols  : [],
+        lignames : [],
+        origvw   : 7,
+        orignuk  : '',
+        origbnd  : '',
+        restok   : '',
+        resatms  : [],
+        dist     : dist,
+        rad      : vdwR,
+        eps      : vdwE,
+        gridopt  : gridopt,
+		fix      : 0,
+        gvtx     : [],
+        gobj     : []
+        ];
+
+    G_surface.gvtx = msurf_MolecularSurface [G_surface.recpos, 
+        G_surface.rad, G_surface.eps, G_surface.ligpos, G_surface.dist, 
+        G_surface.gridopt];
+
+    local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
+    s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
+    G_surface.gvtx = poke [G_surface.gvtx, 1, s_idx];
+
+    if add GKey G_surface.gobj then
+        GSetTitle [G_surface.gobj, G_surface.title];
+        G_surface.gobj = GCreateUnique G_surface.gobj;
+    else
+        G_surface.gobj = GCreateUnique G_surface.title;
+    endif
+
+    local trans = [G_surface.trans_f, G_surface.trans_b];
+    GSetTransparency [G_surface.gobj, trans];
+    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
+    GSetMaterial [G_surface.gobj, mat];
+    GVertex [G_surface.gobj, G_surface.surfdim, s_idx, G_surface.colconst,
+      s_vpt, s_vnorm];
+
+    ViewSave G_surface.origvw;
+    G_surface.orignuc = aNucleusLook G_surface.lig (1);
+    G_surface.origbnd = aBondLook G_surface.lig (1);
+
+    aSetNucleusLook [G_surface.lig, 'sphere'];
+    aSetBondLook [G_surface.lig, 'none'];
+    View G_surface.lig;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          FindResidue
+ *
+ *  Find the residue with the given name and number in the receptor 
+ *  in the MOE Window.  Check to make sure  MOE or bio3d didn't rename it.
+ *
+ *  Returns the index of the residue and its atom set.
+ *
+ ****************************************************************************/
+local function FindResidue [restok]
+
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+
+    local rnidx = indexof ["1234567890", string restok];
+    rnidx = rnidx | rnidx <> 0;
+    rnidx = (min rnidx) - 1;
+    local residx = 0, resatms = []; 
+    local residues = Residues [];
+    local resnames = rName residues;
+    local rname = tok_keep [restok, rnidx];
+    local equivset = qb_ResNameEquivSet rname;
+    if isnull equivset then equivset = rname; endif
+
+    local indices = cat indicesof [equivset, resnames];
+    if length indices > 0 then
+        local rnum = atoi tok_drop [restok, rnidx];
+        local idx_i = indexof [rnum, rUID residues [indices]];
+        if idx_i > 0 then
+            residx = indices (idx_i);
+            resatms = cat oChildren residues (residx);
+        endif
+    endif
+
+    return [residx, resatms];
+endfunction
+
+/****************************************************************************
+ *                          GetAnalData
+ *
+ *  Get the analysis and repackage for heat map.
+ *
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
+ *
+ ****************************************************************************/
+local function GetAnalData [dbpath, title, type]
+
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+
+    if neL [fext dbpath, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', dbpath];
+        exit [];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        Warning twrite ['Unable to find the QMScore/PWD database:\n'
+            '    {}', dbpath];
+        exit [];
+    endif
+
+    local dbkey = db_Open [dbpath, 'read'];
+    local data = qb_GetAnalysisData [dbkey, 'pwd', type];
+    db_Close dbkey;
+
+    if data === [] then
+        return [];
+    endif
+
+    local fulltitle;
+    if type === 'sar' then
+        fulltitle = twrite ['{} SAR Map', title];
+    elseif type === 'inter' then
+        fulltitle = twrite ['{} Interaction Map', title];
+    elseif type === 'act' then
+        fulltitle = twrite ['{} Activities Table', title];
+    elseif type === 'pls' then
+        fulltitle = twrite ['{} PLS Results Table', title];
+    else
+        fulltitle = title;
+    endif
+
+    local function trim [t]
+        local i = indexof ["=", string t];
+        if i > 0 then return tok_keep [t, i - 1]; else return t; endif
+   endfunction
+
+    local function where [r]
+        local rnidx = indexof ["1234567890", string r];
+        rnidx = rnidx | rnidx <> 0;
+        return  (min rnidx) - 1;
+    endfunction
+
+    //  Create abbreviated names for heat map and check residues
+    if type === 'sar' or type === 'inter' then
+        local [resnames, ligdata] = data;
+        local idx = app where resnames;
+        local resabbrevs = apt tok_drop [resnames, idx];
+        resabbrevs = apt tok_keep [resabbrevs, -3];
+        local lignames = app first ligdata;
+        local newlignames = app trim lignames;
+        local ligabbrevs = apt tok_drop [newlignames, 3];
+        ligabbrevs = apt tok_keep [ligabbrevs, -3];
+        local ligvals = app second ligdata;
+        data = [[fulltitle, 'Ligands', 'Residues'], resnames, resabbrevs,
+            tr [lignames, ligabbrevs, ligvals]];
+
+        local missing = CheckResidues [second data];
+        if length missing > 0 then
+            Warning twrite ['The following residues are not \n'
+                'present in receptor in MOE Window:\n{v}\n',
+                missing];
+            exit [];
+        endif
+    elseif type === 'act' or type === 'pls' then
+        data = [fulltitle, data];
+    endif
+
+    return data;
+
+endfunction
+
+/****************************************************************************
+ *                          LoadDB
+ *
+ *  Get the core enviroment and application environment.
+ *
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
+ *
+ ****************************************************************************/
+local function LoadDB [dbpath]
+
+    local [dbkey, receptor, ligand, s, coreopts, c, mess] = 
+        qb_LoadCoreScoreDB [dbpath, 'qmscore'];
+    if dbkey === 0 then
+        Warning mess;
+        exit [];
+    endif
+
+    local pwdopts = qb_GetEnvAnal [dbkey];
+    pwdopts = tagcat [pwdopts, tag tr QBPWD_OPT_DEFAULTS];
+
+    return [dbkey, receptor, ligand, coreopts, pwdopts];
+endfunction
+
+/****************************************************************************
+ *                          LoadLigs
+ *
+ *  Load the ligands from the PWD database.
+ *
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
+ *
+****************************************************************************/
+local function LoadLigs [pwdfilename]
+
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+
+    if neL [fext pwdfilename, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', pwdfilename];
+        exit [];
+    endif
+
+    if neL [ftype pwdfilename, 'file'] then
+        Warning twrite ['Unable to find the QMScore/PWD database:\n'
+            '    {}', pwdfilename];
+        exit [];
+    endif
+
+    local dbkey = db_Open [pwdfilename, 'read'];
+
+    local ligmols = [];
+    local lignames = [];
+    local rowkey = 0;
+    local ligflds = qb_GetPoseFields [dbkey];
+
+    while rowkey = db_NextEntry [dbkey, rowkey] loop
+        local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
+        ligmols = append [ligmols, ligmol];
+        lignames = append [lignames, ligmol(1)(MOL_NAME)];
+    endloop
+
+    G_surface.ligmols = ligmols;
+    G_surface.lignames = lignames;
+    db_Close dbkey;
+
+endfunction
+
+/****************************************************************************
+ *                          MatchResidue
+ *
+ *  Look up the residue by NameUID token.  If not found, check to make sure
+ *  MOE or bio3d didn't rename it.
+ *
+ ****************************************************************************/
+local function MatchResidue [restok, restokset]
+
+    local residx = indexof [restok, restokset];
+    if residx === 0 then
+        local rnidx = indexof ["1234567890", string restok];
+        rnidx = rnidx | rnidx <> 0;
+        rnidx = (min rnidx) - 1;
+
+        local rname = tok_keep [restok, rnidx];
+        local rnum = atoi tok_drop [restok, rnidx];
+        local canonical = qb_ResNameCanonical rname;
+        if isnull canonical then canonical = rname; endif
+        restok = twrite ['{}{}', canonical, rnum];
+        residx = indexof [restok, restokset];
+    endif
+
+    return residx;
+endfunction
+
+/****************************************************************************
+ *
+ *                          NearestAtomColor
+ *
+ *  Computes the surface colors as the closest atom colors to the
+ *  surface points (weighted by distance).
+ *
+ *  Local function copied from surfmap.svl (ask CCG to change it to global?).
+ *  Note:  the atom colors are based on the interaction between its residue
+ *  and the ligand.
+ *
+ ****************************************************************************/
+local function NearestAtomColor [pos, rad, acolor, spos]
+    const NAC_BUCKET_SIZE = 4.0;
+    const NAC_MAX_POINTS  = 100000;
+
+    const ALPHA = 2.5;
+    local maxrad = max [1, max rad];
+    local argb = bitand [0xFF, bitshr [[acolor],[16,8,0]]];
+    local r = rep [0, l_length spos], g = r, b = r;
+    local vsum = rep [0, l_length spos];
+
+    // Do a proximity check to determine the minimum distance
+    // that will associate a point with an atom.  NAC_BUCKET_SIZE
+    // is the bin size for the search, and so the maximum distance
+    // allowed.  We'll use at most NAC_MAX_POINT gridpoints for
+    // the check.
+
+    local pprox = prox_open [NAC_BUCKET_SIZE, pos, NAC_BUCKET_SIZE];
+    local Upts;
+
+    if length first spos > NAC_MAX_POINTS then
+    Upts = apt keep [spos, NAC_MAX_POINTS];
+    else
+    Upts = spos;
+    endif
+
+    local [seg, idx, r2] = prox_find [pprox, Upts, 0];
+    local d_ndx = split [idx, seg];
+    local min_dist = max app min apt get [[r2], d_ndx];
+
+    prox_close pprox;
+
+    // Use the larger of the caller's and 'found' distances
+
+    maxrad = max [maxrad, sqrt min_dist - 1];
+    local sprox = prox_open [1 + maxrad, spos, 1 + maxrad];
+    local i;
+    for i = 1, l_length pos loop
+    [seg, idx, r2] = prox_find [sprox, apt peek [pos, i], 0];
+    if not length idx then continue; endif
+    local w = exp (-ALPHA * maxE [0, sqrt r2 - 0.95 * rad(i)] );
+    vsum[idx] = vsum[idx] + w;
+    r[idx] = r[idx] + w * argb(1)(i);
+    g[idx] = g[idx] + w * argb(2)(i);
+    b[idx] = b[idx] + w * argb(3)(i);
+    endloop
+
+    prox_close sprox;
+
+    local vrgb = [r,g,b] * [invz vsum];
+    vrgb = maxE [0, minE [0xFF, vrgb]];
+    return bitor bitshl [vrgb,[16,8,0]];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          ReadExpActData
+ *
+ *  Read experimental activity data, separated by white space, from the file 
+ *  and store it in the given QMScore database in the ExpAct field.  It is
+ *  assumed that the orderings are consistent.
+ *
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
+ *
+ ****************************************************************************/
+local function ReadExpActData [expactfn, qmsdbfn, header]
+
+write ['Act file:  {}\n', expactfn];//DEBUG
+
+    if neL [fext qmsdbfn, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', qmsdbfn];
+        exit [];
+    endif
+
+    if neL [ftype qmsdbfn, 'file'] then
+        Warning twrite ['Unable to find the QMScore/PWD database:\n    {}',
+            qmsdbfn];
+        exit [];
+    endif
+
+    if neL [ftype expactfn, 'file'] then
+        Warning twrite ['Unable to find the file\n    {}', expactfn];
+        exit [];
+    endif
+
+    local qdbkey = db_Open [qmsdbfn, 'read-write'];
+    local eaf = fopenr expactfn;
+
+    db_EnsureField [qdbkey, header, 'double'];
+    local rowkey = 0;
+    while rowkey = db_NextEntry [qdbkey, rowkey] loop
+        local val = fread [eaf, '{n:}'];
+        db_Write [qdbkey, rowkey, tag [header, val]];
+    endloop
+
+    fclose eaf;
+    db_Close qdbkey;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          ReadMatrixData
+ *
+ *  Return data formatted for the heat map.
+ *
+ ****************************************************************************/
+local function ReadMatrixData [filename]
+
+    local f = fopenr filename;
+    local lines = freadb [f, 'line', INT_MAX];
+    local line = first lines;
+    local strings = wordsplit [line, ","];
+    local colnames = app token strings;
+    lines = dropfirst lines;
+
+    //  row labels and values
+    local rowdata = [];
+    for line in lines loop
+        strings = wordsplit [line, ","];
+        local rowname = token first strings;
+        strings = dropfirst strings;
+        local rowvals = atof app token strings;
+        rowdata = append [rowdata, [rowname, rowvals]];
+    endloop
+
+    fclose f;
+
+    return [colnames, rowdata];
+endfunction
+
+/****************************************************************************
+ *
+ *                          SaveMatrixData
+ *
+ *  Save the matrix data in csv format.
+ *
+ ****************************************************************************/
+local function SaveMatrixData [filename, matrixdata, type]
+
+    local title, rowlbl, collbl, colnames, colabbrevs, rowdata;
+    if type === 'sar' or type === 'inter' then
+        [[title, rowlbl, collbl], colnames, colabbrevs, rowdata] = matrixdata;
+    elseif type === 'act' or type === 'pls' then
+        [title, [colnames, rowdata]] = matrixdata;
+    else
+        Warning ['Unknown analysis data type.'];
+        return [];
+    endif
+
+    local f = fopenw filename;
+
+    local cname;
+    for cname in colnames loop
+        fwrite [f, ',{t:}', cname];          // first column name empty
+    endloop
+
+    fwrite [f, '\n'];
+
+    local row;
+    for row in rowdata loop
+        local rowname, rowabbrev, rowvals;
+        if type === 'sar' or type === 'inter' then
+            [rowname, rowabbrev, rowvals] = row;
+        elseif type === 'act' or type === 'pls' then
+            [rowname, rowvals] = row;
+        endif
+
+        fwrite [f, '{t:}', rowname];
+        local val;
+        for val in rowvals loop
+            fwrite [f, ',{n:f}', val];
+        endloop
+
+        fwrite [f, '\n'];
+    endloop
+
+    fclose f;
+
+    return;
+endfunction
+
+/****************************************************************************
+ *                          SaveOptions
+ *
+ *  Save the analysis options in the QMScore database.
+ *
+ ****************************************************************************/
+local function SaveOptions [dbpath, options]
+
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+
+    if neL [fext dbpath, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', dbpath];
+        return;
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        Warning twrite ['Unable to find the QMScore/PWD database:\n'
+            '    {}', dbpath];
+        return;
+    endif
+
+    local dbkey = db_Open [dbpath, 'read-write'];
+    local data = qb_SaveEnvAnal [dbkey, options];
+    db_Close dbkey;
+
+endfunction
+
+/****************************************************************************
+ *                          ShowTable
+ *
+ *  Format the table data and display it in the message window.
+ *
+ *
+ ****************************************************************************/
+local function ShowTable [data, postscript]
+
+    local function writeNfield [nf]
+        return twrite ['{n:15.5f}', nf];
+    endfunction
+
+    local function writeTfield [tf]
+        return twrite ['{t:15}', tf];
+    endfunction
+
+    local [title, [colNames, rowdata]] = data;
+    local buffer = twrite ['{t:50}\n\n', title];
+    buffer = tok_cat [buffer, writeTfield ' '];
+    buffer = tok_cat [buffer, tok_cat app writeTfield colNames, '\n'];
+
+    local row;
+    for row in rowdata loop
+        local [lbl, values] = row;
+        buffer = tok_cat [buffer, writeTfield lbl];
+        buffer = tok_cat [buffer, tok_cat app writeNfield values, '\n'];
+    endloop
+
+    if neL [postscript, ''] then
+        buffer = tok_cat [buffer, postscript];
+    endif
+
+    qb_CreateMessWin [string buffer, 40, 80];
+
+endfunction
+
+
+/****************************************************************************
+ *
+ *                          UpdateComplex
+ *
+ *  Replace the ligand in the MOE window with the given ligand.
+ *
+ ****************************************************************************/
+local function UpdateComplex [ligtok]
+
+    local lignum = indexof [ligtok, G_surface.lignames];
+
+    if G_surface.ligidx === lignum then return; endif
+    if length G_surface.lig === 0 then return; endif
+
+    local lignuc = aNucleusLook G_surface.lig (1);
+    local ligbnd = aBondLook G_surface.lig (1);
+
+    oDestroy uniq oChains G_surface.lig;
+    local ligchn = mol_Create G_surface.ligmols (lignum);
+
+    G_surface.lig = cat cAtoms ligchn;
+    G_surface.ligidx = lignum;
+
+    oSetCollection ['QB_LIGAND', G_surface.lig];
+    aSetNucleusLook [G_surface.lig, lignuc];
+    aSetBondLook [G_surface.lig, ligbnd];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          UpdateResidue
+ *
+ *  Name highlight, and shift the view towards the selected residue.
+ *
+ *  Acknowledgement:  labeling the residue was borrowed from LabelResidue
+ *                    in menu.svl.
+ *
+ ****************************************************************************/
+local function UpdateResidue [restok, row, col, zoom]
+
+    if col === 0 then
+        aSetLabelRes [G_surface.resatms, 0];
+        G_surface.resatms = [];
+        G_surface.restok = '';
+        return;
+    endif
+
+    if G_surface.restok === restok and row > 0 then return; endif
+
+    aSetLabelRes [G_surface.resatms, 0];
+
+    local [residx, resatms] = FindResidue restok;
+    if residx === 0 then return; endif
+
+    G_surface.restok = restok;
+    G_surface.resatms = resatms;
+
+	local [idx, m] = sam graph_ccomponent BondGraph resatms;
+    local aa;
+	for aa in split [resatms [idx], mtoc m] loop
+	    aSetLabelRes [sample [aa | graph_center BondGraph aa, 1], 1];
+	endloop
+
+    if zoom then
+        View resatms;
+    endif
+
+endfunction
+
+//  Global Functions
+
+/****************************************************************************
+ *
+ *                          qb_QBPWDCloseHandler
+ *
+ ****************************************************************************/
+global function qb_QBPWDCloseHandler []
+
+    if not isnull G_surface then
+        ClearSurfaceMap G_surface.title;
+        aSetLabelRes [G_surface.resatms, 0];
+        aSetNucleusLook [G_surface.lig, G_surface.orignuc];
+        aSetBondLook [G_surface.lig, G_surface.origbnd];
+        ViewLoad G_surface.origvw;
+        G_surface = [];
+    endif
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          qb_QBPWDSelectHandler
+ *
+ ****************************************************************************/
+global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
+        colors]
+    
+    local [titles, resnames, resabbrevs, rowdata] = data;
+    local restok = '', ligtok = '', ligabbrev = '', ligdata = [];
+    if selrow === 0 and selcol === 0 then
+        return;
+    elseif selrow === 0 then
+        restok = resnames (selcol);
+        if selcol > 0 then
+            UpdateResidue [restok, selrow, selcol, 1];
+            return;
+        endif
+    elseif selcol === 0 then
+        [ligtok, ligabbrev, ligdata] = rowdata (selrow);
+    else
+        restok = resnames (selcol);
+        [ligtok, ligabbrev, ligdata] = rowdata (selrow);
+    endif
+
+    ClearSurfaceMap G_surface.title;
+    UpdateComplex ligtok;
+    local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
+        mincut, maxcut, colors];
+
+	local vcolor = NearestAtomColor [G_surface.recpos, G_surface.rad,
+        atomcolors, G_surface.gvtx(3)];
+
+    local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
+    if add GKey G_surface.gobj then
+        GSetTitle [G_surface.gobj, G_surface.title];
+        G_surface.gobj = GCreateUnique G_surface.gobj;
+    else
+        G_surface.gobj = GCreateUnique G_surface.title;
+    endif
+
+    local trans = [G_surface.trans_f, G_surface.trans_b];
+    GSetTransparency [G_surface.gobj, trans];
+    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
+    GSetMaterial [G_surface.gobj, mat];
+
+    GVertex [G_surface.gobj, G_surface.surfdim, s_idx, vcolor,
+      s_vpt, s_vnorm];
+
+    UpdateResidue [restok, selrow, selcol, 0];
+
+    if not G_surface.fix then
+        View G_surface.lig;
+        G_surface.fix = 1;
+    endif
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          qb_QBPWDSetupPanel
+ *
+ ****************************************************************************/
+global function qb_QBPWDSetupPanel []
+
+    const INITLIG = 1;
+    const SIGNIFRES = 5;
+
+    static pwdfilename;                     //  Shared with child tasks.
+    static pwddata;
+
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+    if WindowShow ['QB-PWDPanel', 1] then return; endif
+
+    pwdfilename = '';
+    pwddata = [[], [], [], [], []];
+
+    local msgkey;
+    local appdflts = tag tr QBPWD_OPT_DEFAULTS;
+    local pwdopts = [];
+    local wkey = WindowCreate cat [HEADER, PANEL];
+
+    G_surface = [];
+    WindowSetData [wkey, appdflts];
+    WindowSetAttr [wkey, [analbox: [sensitive: 0], selbox: [sensitive: 0],
+        panel: [sensitive: [0,1,1]]]];
+
+    WindowShow [wkey, 1];
+
+    loop
+        local [vals, trig] = WindowWait wkey;
+
+        if trig === 'analview' then
+
+            if second task_fork [statics:'share', 
+                    master:'parent'] === 'child' then
+
+                // Load and setup data
+                if isnull peek [pwddata, vals.analysis] then
+                    pwddata = poke [pwddata, vals.analysis, 
+                        GetAnalData [pwdfilename, vals.title,
+                        ANALKEYS (vals.analysis)]];
+                    if isnull peek [pwddata, vals.analysis] then
+                        Warning 'No analysis data to view.';
+                        exit [];
+                    endif
+                endif
+
+                if ANALKEYS (vals.analysis) === 'pls' then
+                    if isnull peek [pwddata, ANALOPTLV] then
+                        pwddata = poke [pwddata, ANALOPTLV, 
+                            GetAnalData [pwdfilename, vals.title,
+                            ANALKEYS (ANALOPTLV)]];
+                    endif
+
+                    ShowTable [pwddata (vals.analysis),
+                        twrite ['\nOptimal LV:  {}\n', pwddata (ANALOPTLV)]];
+                    exit [];
+                endif
+
+                if ANALKEYS (vals.analysis) === 'act' then
+                    ShowTable [pwddata (vals.analysis), ''];
+                    exit [];
+                endif
+
+                //  Create surface if necessary
+                if isnull G_surface then
+                    msgkey = Message [0, 'Calculating surface ...'];
+                    CreateSurfaceMap [second pwddata (vals.analysis)];
+                    msgkey = Message [msgkey, ''];
+                endif
+
+                //  Make sure ligand atoms sets are loaded.
+                if isnull G_surface.ligmols then
+                    LoadLigs [pwdfilename];
+                endif
+
+                //  Make sure first ligand is in MOE Window
+                UpdateComplex G_surface.lignames (INITLIG);
+                qb_HeatMapSetupPanel [pwddata (vals.analysis),
+                    SIGNIFRES, 'qb_QBPWDSelectHandler', INITLIG, 1,
+                    'qb_QBPWDCloseHandler'];
+
+                exit [];
+            endif
+
+        elseif trig === 'analsave' then
+
+            if second task_fork [statics:'share'] === 'child' then
+                task_prio 0;
+
+                // Load and setup data
+                if isnull peek [pwddata, vals.analysis] then
+                    pwddata = poke [pwddata, vals.analysis, 
+                        GetAnalData [pwdfilename, vals.title,
+                        ANALKEYS (vals.analysis)]];
+                    if isnull peek [pwddata, vals.analysis] then
+                        Warning 'No analysis data to save.';
+                        exit [];
+                    endif
+                endif
+
+                local savefile = twrite ['{} {}.csv', vals.title, 
+                    ANALYSIS(vals.analysis)];
+                SaveMatrixData [savefile, pwddata (vals.analysis), 
+                    ANALKEYS(vals.analysis)];
+                exit [];
+            endif
+
+        elseif trig === 'loadact' then
+
+            if second task_fork [master: 'parent',
+                    statics:'share'] === 'child' then
+                task_prio 0;
+
+                if neL [ftype pwdfilename, 'file']
+                        or neL [fext pwdfilename, 'mdb'] then
+                    Warning 
+                        twrite ['Cannot find the QMScore/PWD database:\n{}.',
+                            pwdfilename];
+                    exit [];
+                endif
+
+                local actfile = first FilePrompt [title: 'Load Activities File', 
+                    filter: '*.csv', allowEmptyList: 0];
+                if not isnull actfile then
+                    ReadExpActData [actfile, pwdfilename, vals.expact_hdr];
+                endif
+
+                exit [];
+            endif
+
+        elseif trig === 'panel' then
+
+            if vals.panel === 'Close' then
+                task_prio 0;
+
+	            if tok_length pwdfilename > 0 then
+                    pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
+                        vals.title,
+                        vals.analysis, vals.sf_e_ab, vals.sf_e_abp,
+                        vals.sf_e_abc, vals.sf_e_r6,
+                        vals.sf_e_r12, vals.sf_e_ele, vals.prune_zero,
+                        vals.prune_sd, vals.expact_hdr,
+                        vals.numtopres, vals.numcomps, vals.trainingset]];
+                    SaveOptions [pwdfilename, pwdopts];
+                endif
+                break;
+
+            elseif vals.panel === 'Apply' then
+
+                if second task_fork [statics:'share', 
+                        master:'parent'] === 'child' then
+                    task_prio 3;
+                    task_settitle [-1, 'MOEDivCon PWD Analysis'];
+
+                    if neL [ftype pwdfilename, 'file']
+                            or neL [fext pwdfilename, 'mdb'] then
+                        Warning 
+                            twrite ['Can\'t find the QMScore/PWD database: {}.',
+                            pwdfilename];
+                        exit [];
+                    endif
+
+                    local acts = db_ReadColumn [pwdfilename, vals.expact_hdr];
+                    if isnull acts then
+                        Warning twrite ['Missing activities in database: {}.',
+                            pwdfilename];
+                        exit [];
+                    endif
+
+                    pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
+                        vals.title,
+                        vals.analysis, vals.sf_e_ab, vals.sf_e_abp,
+                        vals.sf_e_abc, vals.sf_e_r6,
+                        vals.sf_e_r12, vals.sf_e_ele, vals.prune_zero,
+                        vals.prune_sd, vals.expact_hdr,
+                        vals.numtopres, vals.numcomps, vals.trainingset]];
+                    SaveOptions [pwdfilename, pwdopts];
+
+                    msgkey = Message [0, 'PWD Analysis is running ...'];
+                    local errmess = qb_PWDAnalysis [pwdfilename];
+                    Message [msgkey, 'PWD Analysis is done.'];
+                    if length errmess > 0 then
+                        qb_CreateMessWin [errmess, 10, 160];
+                    else
+                        sleep 2;
+                    endif
+
+                    pwddata = [[], [], [], [], []];
+                    WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
+                    exit [];
+                endif
+
+            elseif vals.panel === 'Load' then
+
+                if second task_fork [master: 'parent',
+                        statics:'share'] === 'child' then
+                    task_prio 0;
+
+                    local tempfile = first FilePrompt [title: 'Load Database', 
+                        filter: '*.mdb', allowEmptyList: 0];
+                    if not isnull tempfile then
+                        if neL [ftype tempfile, 'file']
+                                or neL [fext tempfile, 'mdb'] then
+                            Warning 
+                                twrite ['{}\nis not a QMScore/PWD database.',
+                                tempfile];
+                            exit [];
+                        endif
+
+                        pwdfilename = tempfile;
+                        local [ldkey, ldrec, ldlig, ldcoreopts, ldpwdopts]
+                            = LoadDB [pwdfilename];
+
+                        Close [force:1];
+                        if neL [ldrec, []] and neL [ldlig, []] then
+                            local ldligatoms = cat cAtoms mol_Create ldlig;
+                            oSetCollection ['QB_LIGAND', ldligatoms];
+                            aSetNucleusLook [ldligatoms, 'small-sphere'];
+                            aSetBondLook [ldligatoms, 'cylinder'];
+                            mol_Create ldrec;
+                            View [];
+                        endif
+
+                        db_Close ldkey;
+                        WindowSetData [wkey, ldpwdopts];
+                        WindowSetAttr [wkey, [analbox: [sensitive: 1],
+                            panel: [sensitive: [1,1,1]]]];
+WindowSetAttr [wkey, [sf_e_r12: [sensitive: 0], sf_e_ele: [sensitive: 0]]];//DEBUG
+                    endif
+
+                    exit [];
+                endif
+            endif
+        endif
+    endloop
+
+    qb_QBPWDCloseHandler [];
+    WindowDestroy wkey;
+
+endfunction

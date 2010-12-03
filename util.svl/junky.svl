@@ -1,0 +1,1356 @@
+
+
+
+print app length brd;//DEBUG
+print app length trd;//DEBUG
+print bidx;//DEBUG
+print tidx;//DEBUG
+print bnums;//DEBUG
+print tnums;//DEBUG
+print okay;//DEBUG
+
+
+
+//  Change this to column based comparison??-DEBUG
+        local r_i, brow, trow;
+        for r_i = 1, length brd, 1 loop
+            brow = brd (r_i);
+            trow = trd (r_i);
+            if neL [first brow, first trow] then
+                    fwrite [ef, 'Databases have a different row name'
+                        ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                        bn, first brow, tn, first trow];
+                    write ['Databases have a different row name'
+                        ' for table:  {}\n  {}:  {}\n  {}:  {}\n', title,
+                        bn, first brow, tn, first trow];
+                    continue;
+            endif
+
+            brow = second brow;
+            trow = second trow;
+            local data = tr [brow, trow, rep [d, length brow]];
+            local okay = app diff data;
+            if not alltrue okay then
+                local notokay = not okay;
+                local idx = (igen length brow) | notokay;
+                brow = brow | notokay;
+                trow = trow | notokay;
+                data = tr [idx, brow, trow];
+                printTitle [ef, twrite ['{} - Row {}', title, r_i]];
+                printHeader [ef, bn, tn, 'Col'];
+                apt printRow [ef, data];
+            else
+                write ['Databases okay for table:  {}\n  {}\n  {}\n',
+                    twrite ['{} - Row {}', title, r_i],  bn, tn];
+            endif
+        endloop
+
+
+/*  Don't touch NMR complex?????????????????????????????????????????????
+
+    if not isnull complex then
+        [recmol, ligmol] = complex;
+        recchns = mol_Create recmol;
+        ligchns = mol_Create ligmol;
+
+        qb_MMMin weight;
+
+        newrecmol = mol_Extract recchns;
+        newrecmol(1)(MOL_NAME) = recmol(1)(MOL_NAME);
+        newligmol = mol_Extract ligchns;
+        newligmol(1)(MOL_NAME) = ligmol(1)(MOL_NAME);
+
+        complex = [newrecmol, newligmol];
+        oDestroy Chains [];
+    endif
+
+*/
+
+//    pot_Setup [solEnable: 1, eleDist: 0];
+
+
+    if not addreceptor and not addligand then
+        db_EnsureField [dbkey, COL_FIELD, 'molecule'];
+        db_EnsureField [dbkey, COLCHG_FIELD, 'int'];
+    endif
+
+
+
+
+
+
+
+
+
+
+
++    local ith, success = 0;
+
+-    fwrite [stdin, '{c:}\n', CSP_KEYS(appopts.csp)];
++    fwrite [stdin, '{n:}\n', length divconindices];
++    for ith = 1, length divconindices, 1 loop
++        fwrite [stdin, '{n:}\n', divconindices (ith)];
++    endloop
+
+-    local poseidxs = qb_GetElemIndices [ligmol, appopts.csp];
+-    if neL [length indices, length poseidxs] then
++    local divconatoms = cat [cat recressets, cat ligressets];
++    local selatoms = (Atoms []) [indices];
++    local divconindices = indexof [selatoms, divconatoms];
++    if anytrue (divconindices == 0) then
+         errmess = cat [swrite ['Skipping!  Atom indices are inconsistent:\n'
++            '     MOE: {v}\n  DivCon: {v}\n', indices, divconindices], errmess];
+
+
+                        if mol_aCount origrecmol === mol_aCount cutrecmol then
+                            cutrecmol = [];
+                        endif
+
++            local atomvalues = rep [0.0, length divconindices];
+
++                local idxidx = indexof [cspidx, divconindices];
++                if idxidx === 0 then
++                    errmess = cat [swrite ['Error! Atom index not found:\n'
++                        '   {} not in {v}\n', cspidx, divconindices],
++                        errmess];
++                    return [[], errmess];
++                endif
++
++                atomvalues = poke [atomvalues, idxidx, cspval];
+
+
+    if not alltrue eqE [indices, poseidxs] then
+        errmess = cat [swrite ['Skipping!  Atom indices are inconsistent:\n'
+            '    Orig: {v}\n    Pose: {v}\n', indices, poseidxs], errmess];
+
+        oDestroy uniq cat oChains cat recressets;
+        oDestroy uniq cat oChains cat ligressets;
+        if not MOE_BATCH then
+            SystemPop [osys, nsys];
+        endif
+
+        return [[], errmess];
+    endif
+ 
+
+
+const CSP_KEYS =
+    [
+    'H_ONLY',
+    'C_ONLY',
+    'ALL'
+    ];
+
+    fwrite [stdin, '{c:}\n', CSP_KEYS(nmrsopts.csp)];
+
+    fwrite [stdin, '{c:}\n', CSP_KEYS(appopts.csp)];
+
+    static wkey;      //  Child task with prio = 5 can't access parent's locals
+
+    local dbtype;
+    if appname === 'qms' then
+        dbtype = 'QMScore';
+    elseif appname === 'nmr' then
+        dbtype = 'NMRScore';
+    else
+        dbtype = 'Unkown';
+    endif
+
+    if neL [fext dbpath, 'mdb'] then
+        Warning twrite ['{}\n is not a MOE database.', dbpath];
+        exit [];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        Warning twrite ['Unable to find the {} database:\n'
+            '    {}\nCreate it first.', dbtype, dbpath];
+        exit [];
+    endif
+
+    local dbkey = db_Open [dbpath, 'read-write'];
+
+    if appname === 'qms' then
+        if neL [db_GetEnv [dbkey, DBTYPE], QMSCORE] then
+            Warning twrite ['{}\n is not a QMScore database.', dbpath];
+            exit [];
+        endif
+    elseif appname === 'nmr' then
+        if neL [db_GetEnv [dbkey, DBTYPE], NMRSCORE] then
+            Warning twrite ['{}\n is not a NMRScore database.', dbpath];
+            exit [];
+        endif
+    else
+        Warning twrite ['{}\n is not a MOEDivCon database.', dbpath];
+        exit [];
+    endif
+
+    local dblist = dbv_KeyList [];
+    if isnull dblist or isnull indexof [dbkey, dblist] then
+        Warning twrite ['The {} database isn\'t open.\n'
+            'Create it or Load it first.', dbtype];
+        return;
+    endif
+
+
+                //  Ligand atoms are needed for the first call to qb_ShowLigPoses
+                ligatoms = cat cAtoms mol_Create origligmol;
+write ['after create lig  {}\n', nAtoms []];//DEBUG
+                oSetCollection ['QB_LIGAND', ligatoms];
+
+
+write ['after reset lig  {}\n', nAtoms []];//DEBUG
+write ['NMR all poses:  {}\n', select ['TRUE', 'FALSE', vals.allposes]];//DEBUG
+
+
+write ['after create rec  {}\n', nAtoms []];//DEBUG
+write ['before {}\n', length ligatoms];//DEBUG
+write ['after  {}\n', length ligatoms];//DEBUG
+
+write ['S: {}\nV: {v}\n', score,  posevals];  //DEBUG
+
+/*
+                [ligatoms, errmess] = qb_GetLigandAtoms [];
+                if ligatoms === [] then
+                    Warning errmess;
+                    exit [];
+                endif
+*/
+/*
+                [ligatoms, errmess] = qb_GetLigandAtoms [];
+                if ligatoms === [] then
+                    Warning errmess;
+                    return;
+                endif
+*/
+/*
+                    //  Make sure atom names are unique for DB fields.
+                    [ligatoms, errmess] = qb_GetLigandAtoms [];
+                    if ligatoms === [] then
+                        Warning errmess;
+                        exit [];
+                    endif
+*/
+/*
+                    //  Make sure atom names are unique for DB fields.
+                    [ligatoms, errmess] = qb_GetLigandAtoms [];
+                    if ligatoms === [] then
+                        Warning errmess;
+                        exit [];
+                    endif
+*/
+
+write ['Create Pose Chains:  {v}\n', cNumber uniq oChains poseatoms];//DEBUG
+write ['Delete Pose Chains:  {v}\n', cNumber uniq oChains poseatoms];//DEBUG
+
+
+                    atomnames = get [aName ligatoms, indices];
+                    indextoks = totok indices;
+                    atomnames = tok_cat [indextoks, '-', atomnames];
+
+/****************************************************************************
+ *                          qb_SetRecField
+ *
+ *  Ensure that the receptor field is present.
+ *
+ ****************************************************************************/
+global function qb_SetRecField [dbkey]
+
+    db_EnsureField [dbkey, REC_FIELD, 'moleclule'];
+
+endfunction
+
+/****************************************************************************
+ *                          SetUpDB
+ *
+ *  Create the output database for storing QMScore results and ensure that
+ *  the required fields are present.  Store the molecules and run options 
+ *  in the DB environment.
+ *
+ *  Note:  it is assumed that this function is called from a child process
+ *  and will exit on an error.
+ *
+ ****************************************************************************/
+local function SetUpDB [status, opts]
+
+    local qmskey = db_Open [opts.scoredb, 'create'];
+    qb_SetQMScoreFields [qmskey, opts.mode === 'Many-to-Many'];
+
+    if opts.mode === 'One-to-One' or opts.mode === 'One-to-Many' then
+        local [recset, ligand, errmess] = qb_AtomsToMols [];
+        if recset === [] or ligand === [] then
+            Warning [errmess];
+            exit [];
+        endif
+
+        qb_SaveEnv [qmskey, recset, ligand, status, opts, [], 'qmscore'];
+    else
+        qb_SaveEnv [qmskey, [], [], status, opts, [], 'qmscore'];
+    endif
+
+    if opts.mode === 'One-to-One' then
+        local posedata = tag [qb_GetPoseFields [], [ligand, opts.ligchg]];
+        local stsmess = qb_GetStatusMessage ['Receptor', 
+            eqL [opts.recchg, status.moerecchg],
+            neL [status.rprint app length brd;//DEBUG
+print app length trd;//DEBUG
+ecchg, 4], status.adjrecchg];
+        stsmess = cat [stsmess, qb_GetStatusMessage ['Ligand',
+            eqL [opts.ligchg, status.moeligchg],
+            neL [status.ligchg, 4], status.adjligchg]];
+        posedata = cat [posedata, tag [[qb_GetStatusField []], [stsmess]]];
+        db_Write [qmskey, 0, posedata];
+
+    else
+        local posekey = db_Open [opts.posedb, 'read'];
+        if qmskey === posekey then
+            Warning twrite ['{} and {}\n are the same database', 
+                opts.scoredb, opts.posedb];
+            exit [];
+        endif
+
+        if opts.mode === 'One-to-Many' then
+            local pmess = qb_CopyPoseDB [qmskey, posekey];
+            if neL [pmess, ''] then
+                db_Close posekey;
+                db_Close qmskey;
+                Warning pmess;
+                exit [];
+            endif
+        else
+            local reckey = db_Open [opts.recdb, 'read'];
+            if qmskey === reckey then
+                Warning twrite ['{} and {}\n are the same database', 
+                    opts.scoredb, opts.recdb];
+                exit [];
+            endif
+
+            local rmess = qb_CopyRecPoseDB [qmskey, reckey, posekey];
+            if neL [rmess, ''] then
+                db_Close reckey;
+                db_Close posekey;
+                db_Close qmskey;
+                Warning rmess;
+                exit [];
+            endif
+
+            db_Close reckey;
+        endif
+
+        db_Close posekey;
+    endif
+
+    return qmskey;
+endfunction
+
+/****************************************************************************
+ *                          qb_GetTagsQMScore
+ *
+ *  Return the tags for QMScore.
+ *
+ ****************************************************************************/
+global function qb_GetTagsQMScore []
+    return first tr QMSCORE_OPT_DEFAULTS;
+endfunction
+
+
+/****************************************************************************
+ *                          qb_MolsChargeOK
+ *
+ *  Determine whether the given total charge of the molecules will result
+ *  in a system with an even number of electrons.
+ *
+ ****************************************************************************/
+global function qb_MolsChargeOK [recmols, recchg, ligmol, ligchg]
+
+    local [osys, nsys] = SystemPush [];
+
+    local ligchn = mol_Create ligmol;
+    local ligatms = cat cAtoms ligchn;
+    local ligok = ChargeOK [ligatms, ligchg];
+    oDestroy ligchn;
+
+    local recchns = app mol_Create recmols;
+    local recatms = cat cAtoms recchns;
+    local recok = ChargeOK [recatms, recchg];
+    oDestroy recchns;
+
+    SystemPop [osys, nsys];
+
+    return [recok, ligok];
+
+endfunction
+
+/****************************************************************************
+ *                          AtomsToMols
+ *
+ *  Given the set of atoms in the MOE Window, identify and separate the
+ *  ligand, then split up the receptor atoms into individual molecules.
+ *  Returns the extracted molecules.
+ *
+ ****************************************************************************/
+local function AtomsToMols []
+
+    local [recatoms, ligatoms, errmess] = SplitComplex [];
+
+    if recatoms === [] or ligatoms === [] then
+        return [[], [], errmess];
+    endif
+
+    local recsets = SplitReceptor [recatoms];
+
+    if recsets === [] then
+        return [[], [], 'No receptor was recognized.'];
+    endif
+
+    local ligmol = mol_Extract ligatoms;
+    local recmols = app mol_Extract recsets;
+
+    return [recmols, ligmol, ''];
+
+endfunction
+
+    local function overlap [[x1,y1,z1], [x2,y2,z2]]
+        return (sqrt ((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1)
+                + (z2-z1)*(z2-z1))) < 0.5;
+    endfunction
+
+    for subset in split [x_id atoms, 100] loop
+        local key = prox_open [1.0, aPos recatoms[subset], 0.0];
+        for length atoms loop
+            local cutidx = uniq second prox_find [key, aPos atm, 0.5];
+        prox_close key;
+        cutset = cat [cutset, subset[cutidx]];
+    endloop
+
+
+    indices = [];
+    local atm_i, atm_j;
+    for atm_i = 1, length atoms loop
+        for atm_j = 1, atm_i - 1 loop
+            if overlap [aPos atoms(atm_i), aPos atoms(atm_j)] then
+                indices = cat [indices, [atm_j, atm_i]];
+            endif
+        endloop
+    endloop
+
+
+            Hbox:
+                [
+                Separator : 
+                    [
+                    vertical:0, shadow:'noline', extendH: 0, margin:1
+                    ],
+
+                ],
+            Hbox :
+                [
+                Separator : 
+                    [
+                    vertical:0, shadow:'noline', extendH: 0, margin:1
+                    ],
+                ]
+
+
+    ['testChg',      1             ],
+
+ vals.testChg, 
+           Checkbox :
+                [
+                name: 'testChg', text: 'Charges',
+                bubbleHelp:
+                    'Check to ensure that the total charges\n'
+                    'calculated by MOE are compatible with Divcon.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+
+
+    //  Look for implicit H
+    [indices] = indicesof [1, pot_Parm_uh atoms];
+    if length indices > 0 then
+        residues = oParent atoms [indices];
+        rnames = rName residues;
+        rnums = rNumber residues;
+        anames = aName atoms [indices];
+        ith = 0; 
+        mess = tok_cat [mess, 'Warning!  Implicit (united) H on atoms:\n'];
+        for length indices loop
+            ith = ith + 1;
+            mess = tok_cat [mess, twrite ['    {}:  {} in {} {}\n', 
+                indices(ith), anames(ith), rnames(ith), rnums(ith)]];
+        endloop
+
+        warn = 1;
+    endif
+
+
+
+        stsmess = cat [stsmess, GetStatusMessage ['Pose', posechgok]];
+        local [poseok, posemess] = qb_TestDivcon [poseatms, lp, overlap,
+            missH, MM];
+
+
+        if ltL [poseok, 2] then
+            stsmess = cat [stsmess, "Warning!  Problematic pose:\n"];
+            if tok_length posemess > 0 then
+                stsmess = cat [stsmess, string posemess, "\n"]];
+            endif
+        endif
+
+        stsmess = GetStatusMessage ['Receptor', recchgok];
+        if ltL [recok, 2] then
+            stsmess = cat [stsmess, "Warning!  Problematic receptor:\n"];
+            if tok_length recmess > 0 then
+                stsmess = cat [stsmess, string recmess];
+            endif
+        endif
+
+
+    if not MOE_BATCH then
+        local [osys, nsys] = SystemPush [];
+    endif
+
+    if not MOE_BATCH then
+        SystemPop [osys, nsys];
+    endif
+
+
+
+write ['Names:  {v}\nNums: {v}\n, resnames, resnums];//DEBUG
+write ['ResName:  {}\n, rName res];//DEBUG
+
+write ['Idx:  {},  ResNumber: {}\n, idx, rNumber res];//DEBUG
+
+            write ['CreateSurfaceMap:  cannot find residue {}.\n', 
+
+            else 
+                rdist = RDIST;
+                break;
+
+        else
+            rdist = RDIST;
+            break;
+
+
+NMR:
+
+Radius must be greater than zero.
+No receptor atoms within radius {n:.1f} of the ligand pose atoms.
+{}is not a NMRScore Database.
+
+//    local data = GenerateData [2.5, 30, 40];//DEBUG
+
+/****************************************************************************
+ *
+ *                          GenerateData
+ *
+ *  Return data formatted for the heat map.
+ *
+ ****************************************************************************/
+local function GenerateData [pivot, numres, numlig]
+
+    local resnames = [], ligdata = [];
+    randseed 101;
+
+    //  Residue labels
+    const RESLIST = ['ARG', 'MET', 'THR', 'GLY', 'PHE', 'GLU', 'ALA', 'LEU',
+        'LYS', 'PRO', 'VAL', 'SER', 'GLN', 'ASN', 'ASP'];
+
+    local res_i, lig_i;
+    for res_i = 1, numres, 1 loop
+        resnames = append [resnames, twrite ['{}{}',
+            RESLIST (mod [res_i, length resnames - 1] + 1), rand 999]];
+    endloop
+
+    //  ligand labels and values
+    for lig_i = 1, numlig, 1 loop
+        local ligvals = [];
+        local ligname = twrite ['lig{}', lig_i];
+        for res_i = 1, numres, 1 loop
+            ligvals = append [ligvals, randN pivot];
+        endloop
+
+        ligdata = append [ligdata, [ligname, ligvals]];
+    endloop
+
+    return [resnames, ligdata];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          BreakResidueNames
+ *
+ *  Insert a line break between the residue name and number for better
+ *  formatting of heat map.
+ *
+ ****************************************************************************/
+local function BreakResidueNames [names]
+
+    local n, broken = [];
+    for n in names loop
+//        broken = append [broken, cat [keep [n,3], "\n", drop [n,3]]];
+        broken = append [broken, tok_cat [token keep [n,3],
+            '\n', token drop [n,3]]];
+    endloop
+
+    return broken;
+
+endfunction
+
+//    if monochrome then  data = ShiftData [data];    endif
+
+
+/****************************************************************************
+ *
+ *                          ShiftData
+ *
+ * Shift data to go from min to 0.
+ *
+ ****************************************************************************/
+local function ShiftData [data]
+
+    local [resnames, resabbrevs, rowdata] = data;
+
+    local row, minnum = 0;
+    for row in rowdata loop
+        minnum = min [min third row, minnum];
+    endloop
+
+    local newrowdata = [];
+    for row in rowdata loop
+        local [ligname, ligabbrev, ligvals] = row;
+        newrowdata = append [newrowdata, [ligname, ligabbrev, 
+            sub [ligvals, minnum]]];
+    endloop
+
+    return [resnames, resabbrevs, newrowdata];
+
+endfunction
+
+
+
+            Button :
+                [
+                name: 'heatmap', text: 'Heat Map',
+                bubbleHelp:
+                    ''
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+
+
+/*
+    local panel = tagpoke [PANEL, ['Hbox', 'Vbox', 'Radio', 'graphics'],
+        bgraphics];
+    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Radio', 'columns'],
+        numcols + 1];
+    if (help) then
+            panel = tagpoke [panel, ['Hbox', 'Vbox', 'Radio', 'bubbleHelp'],
+                bhelp];
+    endif
+*/
+
+
+/****************************************************************************
+ *
+ *                          DrawColLabels
+ *
+ *  Returns a graphics object with the column labels using formated texts.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawColLabels [ftexts, width, height]
+
+    local key = gr_create [size: [length ftexts * (width + MOE_PAD_W) + 1,
+        height], units: 'pt'];
+    local x = 1, ft;
+    for ft in ftexts loop
+        gr_text [key, [0, [x + width/2 , height/2], ft, 'sys-b', 
+            icolor'black', 8, [position: 'middlecenter']]];
+        x = x + width + MOE_PAD_W;
+    endloop
+
+    return key;
+
+endfunction
+/****************************************************************************
+ *
+ *                          DrawRowLabels
+ *
+ *  Returns a graphics object with the row labels using formated texts.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawRowLabels [ftexts, width, height]
+
+    local key = gr_create [size: [width,
+        length ftexts * (height + MOE_PAD_H) + 1], units: 'pt'];
+    local y = 1, ft;
+    for ft in ftexts loop
+        gr_text [key, [0, [width/2 , y + height/2], ft, 'sys-b', 
+            icolor'black', 8, [position: 'middlecenter']]];
+        y = y + height + MOE_PAD_H;
+    endloop
+
+    return key;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          Antialias
+ *
+ *  Uses simple average of neighboring pixels (grayscale).
+ *
+ ****************************************************************************/
+local function Antialias [pm]
+
+    local x, y, newpm = [];
+    local xlen = l_length pm;
+    local ylen = length pm;
+    for y = 1, ylen, 1 loop
+        local newrow = [];
+        for x = 1, xlen, 1 loop
+            local i, j, count = 0, sum = 0;
+            for i = x - 1, x + 1, 1 loop
+                if i > 0 and i <= xlen then
+                    for j = y - 1, y + 1, 1 loop
+                        if j > 0 and j <= ylen then
+                            count = count + 1;
+                            sum = sum + bitand [pm(j)(i), 0x000000FF];
+                        endif
+                    endloop  // j
+                endif
+            endloop  // i
+            local pix = round (sum/count);
+	        pix = bitor [0xFF000000, bitshl [pix, 16], bitshl [pix, 8], pix];
+            newrow = append [newrow, pix];
+        endloop  // x
+        newpm = append [newpm, newrow];
+    endloop // y
+
+local f = fopenw '/tmp/antipm.txt';//DEBUG
+fwrite [f, 'After: {v}\n{v}\n{v}\n', length newpm,
+    l_length newpm, newpm];//DEBUG
+fclose f;//DEBUG
+
+    return newpm;
+
+endfunction
+
+
+
+    local [osys, nsys] = SystemPush [];
+                local posech = mol_Create posemol;
+                local poseatms = cat cAtoms posech;
+                oDestroy posech;
+    SystemPop [osys, nsys];
+
+
+write ['{v}\n', tr [aName resatoms, aGeometry resatoms, aHCount resatoms,
+aExplicitHCount resatoms]];  //DEBUG
+
+write ['{v}\n', tr [aName resatoms, aGeometry resatoms, aHCount resatoms,
+aExplicitHCount resatoms]];  //DEBUG
+
+
+/*
+// set up a monitor task to monitor stderr
+local [mtask_id, tcode] = task_fork [master:'parent', creator: 'detach', 
+    prio: 0, idle: 1];
+if tcode == 'child' then
+    local newerror;
+    loop
+        write ['MOEDivcon: child started.\n'];//DEBUG
+        [[newerror]] = fread [stderr, '{c:*}'];
+        write ['MOEDivcon: {}\n', newerror];//DEBUG
+        errmess = cat [newerror, errmess];
+    endloop
+endif
+
+        write ['MOEDivcon: parent started.\n'];//DEBUG
+*/
+/*
+task_kill mtask_id;        // parent kills monitor child
+fwrite [stderr, 'done.'];
+*/
+
+const ELEM_TYPES =
+    [
+    'H',
+    'C',
+    'O',
+    'N',
+    'F'
+    ];
+
+        Listbox :
+            [
+            name: 'elem', text: ELEM_TYPES, type: 'char', multiSelect: 2,
+            extendH: 0, len: 1, width: 30, multiColumn: 1
+            ],
+
+
+
+
+                Close [force:1];
+                [ligatoms, posemols, poseatoms]
+                    = ShowLigPoses [vals, ligmol, ligatoms,
+                    posemols, poseatoms];
+
+                mol_Create cutrecmol;
+                if not vals.allposes then
+                    status = qb_UpdateCharge [wkey, status, 1];
+                endif
+
+                elems = ELEM_TYPES | [vals.elemH, vals.elemC, vals.elemO, 
+                    vals.elemN, vals.elemF];
+                [ligatoms, indices, errmess] = qb_GetLigandAtomsIndices [elems];
+                if ligatoms === [] or indices === [] then
+                    Warning errmess;
+                    exit [];
+                endif
+
+                if not vals.allposes then
+                    status = qb_UpdateCharge [wkey, status, 1];
+                endif
+
+                elems = ELEM_TYPES | [vals.elemH, vals.elemC, vals.elemO, 
+                    vals.elemN, vals.elemF];
+                [ligatoms, indices, errmess] = qb_GetLigandAtomsIndices [elems];
+                if ligatoms === [] or indices === [] then
+                    Warning errmess;
+                    exit [];
+                endif
+
+
+                if not vals.allposes then
+                    status = qb_UpdateCharge [wkey, status, 1];
+                endif
+                            if ligatoms === [] or indices === [] then
+                                Warning errmess;
+                                exit [];
+                            endif
+
+                elems = ELEM_TYPES | [vals.elemH, vals.elemC, vals.elemO, 
+                    vals.elemN, vals.elemF];
+                [curatoms, curidx] = qb_GetLigandAtomsIndices [elems];
+                if not alltrue eqE [curatoms, ligatoms]
+                        or not alltrue eqE [curidx, indices] then
+                    Warning 'Ligand has been modified.\n'
+                            'Reenter experimental values before runnning.';
+                    continue;
+                endif
+
+                elems = ELEM_TYPES | [vals.elemH, vals.elemC, vals.elemO, 
+                    vals.elemN, vals.elemF];
+                [curatoms, curidx] = qb_GetLigandAtomsIndices [elems];
+                if not alltrue eqE [curatoms, ligatoms]
+                        or not alltrue eqE [curidx, indices] then
+                    Warning 'Ligand has been modified.\n'
+                            'Reenter experimental values before saving.';
+                    continue;
+                endif
+
+
+    ['cut',          0             ],
+
+        Checkbox :
+            [
+            name: 'cut', text: 'Cut?', 
+            onTrigger: 'return',
+            bubbleHelp:
+                'Cut the receptor at the specified radius.'
+            ],
+        Separator : 
+            [
+            vertical:0, shadow:'noline', extendH: 0, margin:1
+            ],
+
+        if trig === 'cut' then
+            if vals.cut === 0 then
+                WindowSetAttr [wkey, [radius: [sensitive: 0, allowBlank: 1],
+                    showcut: [sensitive: 0]]];
+            else
+                WindowSetAttr [wkey, [radius: [sensitive: 1, allowBlank: 0],
+                    showcut: [sensitive: 1]]];
+            endif
+
+write ['subi {}\nseg {v}\nidx {v}\natoms {v}\nsqrdist {v}\n', 
+sub_i, seg, idx, aName bigset [idx], sqrdist];
+
+write ['qi: {}\natmidx: {v}\nqatm: {}\nsatms: {v}\n', 
+    q_i, atmidx (q_i), qatm, satms];
+
+write ['m: {v}\n', m];
+
+
+
+
+/*
+        indices = [];
+        local atom, atm_i = 1;
+        for atom in atoms loop
+            local dists = aDist [atom, atoms];
+            local [subindices] = indicesof [1, (dists < 0.5)];
+            subindices = subindices | (subindices < atm_i);
+            indices = cat [indices, cat apt cat [subindices, atm_i]];
+            atm_i = atm_i + 1;
+        endloop
+
+        if length indices > 0 then
+            residues = oParent atoms [indices];
+            rnames = rName residues;
+            rnums = rNumber residues;
+            anames = aName atoms [indices];
+            ith = 0; 
+            mess = tok_cat [mess, '    Error!  Overlapping atoms:\n'];
+            for ith = 1, length indices, 2 loop
+                mess = tok_cat [mess, twrite ['        {}:  {} in {} {}'
+                     ' with {}:  {} in {} {}\n', 
+                    indices(ith), anames(ith), rnames(ith), rnums(ith),
+                    indices(ith+1), anames(ith+1), rnames(ith+1),
+                    rnums(ith+1)]];
+            endloop
+
+            error = 1;
+        endif
+*/
+
+function qb_TestDivconMol;
+
+/****************************************************************************
+ *                          qb_TestDivconMol
+ *
+ *  Determine whether there are any detectable problems with the molecule.
+ *
+ *  Assume that SystemPush [] and SystemPop [] have already been called,
+ *  if necessary.
+ *
+ ****************************************************************************/
+global function qb_TestDivconMol [which, mol, lonepair, overlap,
+        missextraH, MMtype]
+
+    local chn = mol_Create mol;
+    local atms = cat cAtoms chn;
+
+    local [molok, mess] = qb_TestDivcon [which, atms, lonepair, overlap,
+        missextraH, MMtype];
+
+    if which === 'ligand' then
+        if not SingleMol [atms] then
+            mess = tok_cat ['Error!  Ligand must be a single molecule.\n',
+                mess];
+            molok = 0;
+        endif
+    endif
+
+    oDestroy chn;
+
+    return [molok, mess];
+endfunction
+
+/*
+                        elems = ELEM_TYPES | [nmrsopts.elemH,
+                            nmrsopts.elemC, nmrsopts.elemO, 
+                            nmrsopts.elemN, nmrsopts.elemF];
+                        indices = qb_GetElemIndices [ligmol, elems];
+*/
+
+                else
+                    break;
+
+
+write['Lig: {v}\nIdx: {v}\nAN: {v}\nAF: {v}\nAB: {v}\n',
+aName ligatoms, indices, atomnames, atomfree, atombound];//DEBUG
+
+            Warning 'Deselect the option "Show all poses?"\n'
+                'before attempting to calculate charges.';
+            return [status, btasks];
+
+            Warning 'Deselect the option "Show all poses?"\n'
+                'before attempting to perform molecule tests.';
+            return [status, btasks];
+
+            Warning 'Deselect the option "Show all poses?"\n'
+                'before attempting to edit the receptor charge.';
+            return [status, btasks];
+
+            Warning 'Deselect the option "Show all poses?"\n'
+                'before attempting to edit the ligand charge.';
+            return [status, btasks];
+
+                    Warning 'Deselect the option "Show all poses?"\n'
+                        'before attempting to run NMRScore.';
+                    continue;
+
+                Warning 'Deselect the option "Show all poses?"\n'
+                    'before attempting to enter/edit experimental data.';
+                continue;
+
+                    Warning 'Deselect the option "Show all poses?"\n'
+                        'before attempting to save NMRScore database.';
+                    continue;
+
+
+                    Warning 'Deselect the option "Show all poses?"\n'
+                        'before attempting to run QMScore.';
+                    continue;
+
+                    Warning 'Deselect the option "Show all poses?"\n'
+                        'before attempting to save QMScore database.';
+                    continue;
+
+
+
+    local recmolset = app mol_Extract recatmsets;
+
+    if oldkey === 0 then
+        Warning 'The MOEDivcon database hasn\'t been created.';
+        return;
+    endif
+
+    local dblist = dbv_KeyList [];
+    if isnull dblist or isnull indexof [oldkey, dblist] then
+        Warning 'The MOEDivcon database isn\'t open.';
+        return;
+    endif
+
+
+    if oldkey === 0 then
+        Warning 'The MOEDivcon database hasn\'t been created.';
+        return;
+    endif
+
+    local dblist = dbv_KeyList [];
+    if isnull dblist or isnull indexof [oldkey, dblist] then
+        Warning 'The MOEDivcon database isn\'t open.';
+        return;
+    endif
+
+write ['LoadKey:  {}  {}\nBefore:  {}\n',
+ ldkey, db_Filename ldkey, status.dbkey];//DEBUG
+
+                        if status.dbkey > 0 then
+
+                            status.dbkey = 0;
+                        endif
+
+write ['Closed:  {}\n', db_Filename status.dbkey];//DEBUG
+
+                        status.dbkey = ldkey;
+
+write ['After:  {}\n', db_Filename status.dbkey];//DEBUG
+
+                        if status.dbkey > 0 then
+                            db_Close status.dbkey;
+                            status.dbkey = 0;
+                        endif
+
+write ['Saved Before:  {}\n', status.dbkey];//DEBUG
+
+                    if status.dbkey > 0 then
+                        db_Close status.dbkey;
+                        status.dbkey = 0;
+                    endif
+
+write ['Save Closed:  {}\n', status.dbkey];//DEBUG
+
+                    status.dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
+                        [], QMS_NUM_FIELDS, 'qmscore', 1];
+
+write ['Saved Created:  {}\n', db_Filename status.dbkey];//DEBUG
+
+    if status.dbkey > 0 then
+        db_Close status.dbkey;
+        status.dbkey = 0;
+    endif
+
+                        if status.dbkey > 0 then
+                            db_Close status.dbkey;
+                            status.dbkey = 0;
+                        endif
+
+                        status = tagpoke [status, 'dbkey', ldkey];
+
+                    if status.dbkey > 0 then
+                        db_Close status.dbkey;
+                        status.dbkey = 0;
+                    endif
+
+                    if status.dbkey > 0 then
+                        db_Close status.dbkey;
+                        status.dbkey = 0;
+                    endif
+
+    if status.dbkey > 0 then
+        db_Close status.dbkey;
+        status.dbkey = 0;
+    endif
+
+
+    ['optLV',        0             ],
+    ['optLVval',     0             ],
+
+
+            Checkbox :
+                [
+                name: 'optLV', text: 'Optimal LV',
+                bubbleHelp:
+                    ''
+                ],
+            Text :
+                [
+                name: 'optLVval', allowBlank: 0,
+                type: 'int', len: 5,
+                bubbleHelp:
+                    ''
+                ]
+
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            ],
+
+        Hbox :
+            [
+            title: '            ',
+            extendH: 1,
+
+
+/****************************************************************************
+ *                          UpdateOptLV
+ *
+ *  Update the window based on new optLV value.
+ *
+ ****************************************************************************/
+local function UpdateOptLV [wkey, optLV]
+
+    if optLV === 0 then
+        WindowSetAttr [wkey, [optLVval: [sensitive: 0, allowBlank: 1]]];
+    else
+        WindowSetAttr [wkey, [optLVval: [sensitive: 1, allowBlank: 0]]];
+    endif
+endfunction
+
+        if trig === 'optLV' then
+            UpdateOptLV [wkey, vals.optLV];
+
+
+vals.optLV, vals.optLVval, 
+vals.optLV, vals.optLVval, 
+
+
+/*
+write ['Before: {v}\n', ldpwdopts];//DEBUG
+ldpwdopts = cat [keep [ldpwdopts, 12], keep [ldpwdopts, -2]];
+write ['After: {v}\n', ldpwdopts];//DEBUG
+*/
+
+/*
+    for row in rowdata loop
+        numbers = cat [numbers, keep [third row, cols]];
+    endloop
+*/
+
+local function DrawMap [data, numrows, numcols, mincut, maxcut, colors, ticks]
+write ['csw {}, csh {}, tcsw {}, tcsh {}, csx {}, cxy {}\nstep {}, delta {}\n', 
+cs_w, cs_h, tcs_w, tcs_h, cs_x, cs_y, csstep, delta];//DEBUG
+
+write ['Loaded:  {v}\n', mod_find ['*hamcompat.svl']];//DEBUG
+write ['Globals:  {v}\n', mod_globals ['QuantumBio Core']];//DEBUG
+
+write ['Hamsets:  {v}\n', G_hamsets];//DEBUG
+
+    load 'hamcompat.svl';
+
+write ['Loaded after:  {v}\n', mod_find []];//DEBUG
+
+    ['sf_e_vdw',     0             ],
+
+            Checkbox :
+                [
+                name: 'sf_e_vdw', text: 'E_VDW', title: 'MM:',
+                bubbleHelp:
+                    ''
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+
+vals.sf_e_vdw, 
+vals.sf_e_vdw, 
+
+"E_VDW", 
+
+pwdopts.sf_e_vdw, 
+
+write ['l: {}->{}, w: {}->{}\n', len, msglen, wd, msgwd];//DEBUG
+
+
+    SETCAR (list_p, mkString (persistencePath));
+    SET_TAG (list_p, mkString ("persistencePath"));
+    list_p = CDR (list_p);
+
+    SETCAR (list_p, mkString (title));
+    SET_TAG (list_p, mkString ("title"));
+    list_p = CDR (list_p);
+
+
+    local lignuc = aNucleusLook G_surface.lig (1);
+    local ligbnd = aBondLook G_surface.lig (1);
+
+    aSetNucleusLook [G_surface.lig, lignuc];
+    aSetBondLook [G_surface.lig, ligbnd];
+
+
+
+
+    local receptorname, ligandname;
+        receptorname = 'receptor';
+        ligandname = 'ligand';
+        receptorname = twrite ['rec{}', coreopts.task];
+        ligandname = twrite ['lig{}', coreopts.task];
+
+
+local f = fopenw '/tmp/split.txt';//DEBUG
+fwrite [f, 'Receptor:  {}  {v}\n{v}\n{v}\n', length recressets,//DEBUG
+app length recressets, rName recressets, rNumber recressets];//DEBUG
+fwrite [f, 'Ligand:  {}  {v}\n{v}\n{v}\n', length ligressets,//DEBUG
+app length ligressets, rName ligressets, rNumber ligressets];//DEBUG
+fclose f;
+
+
+write ['Receptor:  {}  {v}\n{v}\n{v}\n', length recressets,//DEBUG
+app length recressets, rName recressets, rNumber recressets];//DEBUG
+write ['Ligand:  {}  {v}\n{v}\n{v}\n', length ligressets,//DEBUG
+app length ligressets, rName ligressets, rNumber ligressets];//DEBUG
+
+
+local f = fopenw '/tmp/fatty.txt';//DEBUG
+fwrite [f, 'Rlen:  {}\n{v}\n{v}\n', length recatoms,//DEBUG
+aName recatoms, aNumber recatoms];//DEBUG
+
+fwrite [f, 'Rlen:  {}  xyz len {}\n{v}\n{v}\n', length recatoms, length xyz,//DEBUG
+aName recatoms, aNumber recatoms];//DEBUG
+
+fwrite [f, 'Llen:  {}  xyz len {}\n{v}\n', length ligatoms, length xyz, aNumber ligatoms];//DEBUG
+fclose f;//DEBUG
+
+write ['{}:  {}\n', ANALKEYS (ANALOPTLV), pwddata (ANALOPTLV)];//DEBUG
+if type === 'optlv' then print ['optLV:  ', data]; endif//DEBUG
+
+
+/* //DEBUG
+    msgkey = Message [0, 'PWD Analysis is running ...'];
+    local dbkey = db_Open [pwdfilename, 'read-write'];
+    local plsdata = ReadMatrixData 'pls_table.csv';
+    qb_SaveAnalysisData [dbkey, 'pwd', 'pls', plsdata];
+    local actdata = ReadMatrixData 'act_table.csv';
+    qb_SaveAnalysisData [dbkey, 'pwd', 'act', actdata];
+    local sardata = ReadMatrixData 'sar_heatmap.csv';
+    qb_SaveAnalysisData [dbkey, 'pwd', 'sar', sardata];
+    local interdata = ReadMatrixData 'inter_heatmap.csv';
+    qb_SaveAnalysisData [dbkey, 'pwd', 'inter', interdata];
+    local optlvdata = [4];
+    qb_SaveAnalysisData [dbkey, 'pwd', 'optlv', optlvdata];
+    db_Close dbkey;
+    Message [msgkey, 'PWD Analysis is done.'];
+*/ //DEBUG
+
+write ['Warning: {}\n', warnings(rowcnt)];//DEBUG
+print return_statement;//DEBUG
+write ['Num receptors:  {n:}\n', length recressets];//DEBUG
+write ['Num residues:  {n:}\n', length resset];//DEBUG
+write ['    {c:} {n:} {n:}\n', 
+    rName residue, rUID residue, rAtomCount residue];//DEBUG
+write ['Num ligs:  {n:}\n', length ligressets];//DEBUG
+write ['Num residues:  {n:}\n', length resset];//DEBUG
+write ['    {c:} {n:} {n:}\n', 
+    rName residue, rUID residue, rAtomCount residue];//DEBUG
+
+
+write ['Handshake: {}\n', handshake];//DEBUG
+write ['Results exe_status:  {}\n', exe_status process_keys];//DEBUG
+
+write ['Dist:  {}\n', dist];//DEBUG
+
+//DEBUG                aSetNucleusLook [ligatoms, 'small-sphere'];//DEBUG
+//DEBUG                aSetBondLook [ligatoms, 'cylinder'];//DEBUG
+
+
+    if recatoms === [] or ligatoms === [] then
+        Warning errmess;
+        return;
+    endif
+
+        atomfree = rep [0, length indices];
+        atombound = rep [0, length indices];
+
+            atomfree = rep [0, length indices];
+            atombound = rep [0, length indices];
+
+/*  Was before return badpairs.
+
+    //  Ignore HBonds pairs
+    local [donors, acceptors] = pro_HydrogenBonds uniq cat [bigset, littleset];
+    local bp, mkeep = [];
+    for bp in badpairs loop
+
+//DEBUG
+            local residues = oParent bp;
+            local rnames = rName residues;
+            local rnums = rNumber residues;
+            local ruids = rUID residues;
+            local anames = aName bp;
+            local indices = aNumber bp;
+
+            write ['{}: {} in {}: {} {} is {}A from {}: {} in {}: {} {}\n', 
+                    indices(1), anames(1), rnums(1), 
+                    rnames(1), ruids(1),  aDist bp, indices(2), 
+                    anames(2), rnums(2), rnames(2),
+                    ruids(2)];
+//DEBUG
+
+
+print uniq aElement donors;//DEBUG
+print uniq aElement acceptors;//DEBUG
+
+        if ltL [aDist bp, CLASH] then
+            mkeep = append [mkeep, 1];
+        else
+            local [latm, ratm] = bp;
+            local ldidx = first indicesof [latm, donors];
+            local rdidx = first indicesof [ratm, donors];
+            local laidx = [], raidx = [];
+            if isnull ldidx and isnull rdidx then
+                mkeep = append [mkeep, 1];
+print mkeep;
+            elseif not isnull ldidx then
+                mkeep = append [mkeep,
+    not anytrue eqE [ratm, acceptors [ldidx]]];
+            else
+                mkeep = append [mkeep, not anytrue eqE [latm, acceptors [rdidx]]];
+            endif
+        endif
+    endloop
+
+    badpairs = badpairs | mkeep;
+*/
+
+
+
+
+
+
+

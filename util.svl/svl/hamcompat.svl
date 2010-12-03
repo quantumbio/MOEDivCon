@@ -1,0 +1,71 @@
+#svl
+//    hamcompat.svl    
+//
+//    Atoms that are compatible with each Hamiltonian implemented
+//    by QuantumBio DivCon.
+
+#set title   'QuantumBio Hamiltonian Compatibility'
+#set class   'QuantumBio'
+#set version '2010.01'
+
+global G_hamsets;
+
+global function qb_HamSetsInit []
+
+if not isnull G_hamsets then return; endif
+
+G_hamsets = 
+    [
+    nmr:
+        [
+        am1:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Al', 'Si', 'P',
+            'S', 'Cl', 'K', 'Ca', 'Zn', 'Ge', 'Br', 'I', 'Hg'
+            ],
+        mndo:
+            [
+            'H', 'C', 'N', 'O', 'P', 'S', 'Cl', 'B', 'F', 'Zn', 'Br'
+            ]
+        ],
+    qms:
+        [
+        am1:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Al', 'Si', 'P',
+            'S', 'Cl', 'K', 'Ca', 'Zn', 'Ge', 'Br', 'I', 'Hg'
+            ],
+        mndo:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Al', 'Si', 'P',
+            'S', 'Cl', 'Zn', 'Ge', 'Br', 'Sn', 'I', 'Hg', 'Pb'
+            ],
+        mndod:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si',
+            'P', 'S', 'Cl', 'Zn', 'Br', 'Cd', 'I', 'Hg'
+            ],
+        pddgpm3:
+            [
+            'H', 'C', 'N', 'O', 'F', 'S', 'Cl', 'Br', 'I'
+            ],
+        pm3:
+            [
+            'H', 'Be', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si', 'P', 'S',
+            'Cl', 'K', 'Ca', 'Zn', 'Ga', 'Ge', 'Ar', 'Se', 'Br', 'Cd', 'In',
+            'Sn', 'Sb', 'Te', 'I', 'Hg', 'Tl', 'Pb', 'Bi'
+            ],
+        pm6:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si',
+            'P', 'S', 'Cl', 'K', 'Fe', 'Zn', 'Br', 'Cd', 'I', 'Hg'
+            ],
+        qbm1:
+            [
+            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si',
+            'P', 'S', 'Cl', 'K', 'Fe', 'Zn', 'Br', 'Cd', 'I', 'Hg'
+            ]
+        ]
+    ];
+
+endfunction
