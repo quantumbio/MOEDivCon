@@ -1,0 +1,66 @@
+#svl
+//    qbcheck.svl      Recursively descends the given directory and 
+//                     check for problems  with PDB, MOE, MOL2,
+//                     MDLMOL and MACMOD molecular files.
+//
+//                     NOTE:  writes results in sanitycheck.txt in cwd.
+//
+//    Command:
+//        moebatch -exec "run ['qbcheck.svl', ['directory']]" -exit
+//
+
+#set title   'QuantumBio Sanity Check'
+#set class   'QuantumBio'
+#set version '2010.01'
+
+function qb_TestDivcon;
+//[which, atoms, LP, overlap, hamcompat, missextraH, MMtype, appname, hamname]
+
+local function check [dir, outf]
+    local filelist = flist [dir];
+    local filename;
+    for filename in filelist loop
+        local chains = [];
+        local type = ftype filename;
+        if type == 'dir' then
+            check [filename, outf];
+        else
+            local extension = fext filename;
+            if extension === 'pdb' then
+	            chains = ReadPDB filename;
+            elseif extension === 'moe' then
+    	        chains = ReadMOE filename;
+            elseif extension === 'mol2' then
+    	        chains = ReadTriposMOL2 filename;
+            elseif extension === 'mdl_mol' then
+    	        chains = ReadMDLMOL filename;
+            elseif extension === 'macmod' then
+    	        chains = ReadMacroModel filename;
+            endif
+
+            if chains === [] then
+                continue;
+            endif
+
+            local atoms = cat cAtoms chains;
+            local [ok, mess] = qb_TestDivcon ['rec', atoms, 0, 1, 0, 0, 0, 
+                'nmr', 'mndo'];
+            if ok === 2 then
+                fwrite [outf, '{}:  okay\n', filename];
+            else
+                fwrite [outf, '{}:\n{}\n', filename, mess];
+            endif
+
+            oDestroy chains;
+        endif
+    endloop
+endfunction
+
+function qb_HamSetsInit;
+
+local function main [dirpath]
+    local outfile = fopenw 'sanitycheck.txt';
+    qb_HamSetsInit [];
+    check [dirpath, outfile];
+    fclose outfile;
+endfunction

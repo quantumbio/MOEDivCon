@@ -1,0 +1,601 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+	
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif      
+
+//    qbheatmap.svl    Interactive Heap Map
+
+#set title   'QuantumBio Heat Map'
+#set class   'QuantumBio'
+#set version '2010.01'
+
+//  Colors
+const NEG_RANGE_MAX = 896;
+const POS_RANGE_MAX = 704;
+const G_FACTOR = 256;
+const R_FACTOR = 256 * 256;
+
+//  Page
+const PAGE_HT_MAX = 750;
+const PAGE_WD_MAX = 900;
+
+//  Scale
+const SCALE_PAD = 10;
+const SCALE_CELL_WD = 10;
+const TICK_LEN = 5;
+
+//  Cells
+const CELL_WD = 21;
+const CELL_HT = 11;
+
+const MOE_PAD_W = 3.7;
+const MOE_PAD_H = 4.3;
+
+//  Window GUI
+const HEADER = 
+    [
+    name: 'panel', 
+    title: 'QB Heat Map',
+    windowName: 'QB Heat Map',
+    text: ['Close'],
+    onTrigger: ['return']
+    ];
+
+//  HACK ALERT:  Had to wrap second Hbox in a Vbox so that tag_poke could
+//               distinguish them.
+
+const ROWLBL = 
+    [
+    Label :
+        [
+        name: 'rowlabel', extendV: 0, centerV: 0, resizeV: 0,
+        grScale: 'none', shadow: 'none'
+        ]
+    ];
+
+const RADIO =
+    [
+    Radio :
+        [
+        name: 'mapradio', shadow: 'none',
+        type: 'int', grPosition: 'right',
+        margin: 0, font: 'smallBold'
+        ]
+    ];
+
+const COLLBL =
+    [
+    Vbox : [
+    Hbox :
+        [
+        Separator :
+            [
+            vertical:1, shadow:'noline', extendV: 1, extendH: 1
+            ],
+        Label :
+            [
+            name: 'collabel', extendH: 0, centerH: 0, resizeH: 0,
+            grScale: 'none', shadow: 'none'
+            ]
+        ] ]
+    ];
+
+//  Local Functions
+
+function StandardDeviation;
+
+/****************************************************************************
+ *
+ *                          CalculateCuts
+ *
+ *  Return the average and standard deviation of the flat vector of numbers.
+ *
+ ****************************************************************************/
+local function CalculateCuts [data, cutoff, cols]
+
+    local rowdata = second data;
+    local row, numbers = [];
+    for row in rowdata loop
+        numbers = cat [numbers, keep [second row, cols]];
+    endloop
+
+    local [avg, sigma] = StandardDeviation [numbers];
+
+write ['A: {}, S: {}\n', avg, sigma];//DEBUG
+
+    return [avg - (cutoff * sigma), avg + (cutoff * sigma)];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          DrawCell
+ *
+ *  Returns a graphics object with the appropriate background color
+ *  representing its value.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawCell [colors, width, height, mincut, maxcut, value]
+
+    local cidx;
+    if value <= mincut then
+        cidx = 1;
+    elseif value >= maxcut then
+        cidx = length colors;
+    else
+        local step = (maxcut - mincut) / (length colors);
+        cidx = ceil ((value - mincut) / step);
+    endif
+
+    local key = gr_create [size: [width, height], units: 'pt'];
+    gr_box [key, [0, [0, 0], [width , height],
+        colors (cidx), 1, colors (cidx)]];
+
+    return key;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          DrawColorScale
+ *
+ *  Draws a scale of colors starting with color that represents mincut (blue
+ *  or white) at the bottom and ending with the color that represents maxcut
+ *  (white or red) at the top.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawColorScale [colors, cell_w, cell_h, mincut, maxcut, ticks]
+
+    local width = cell_w + 40;  // cell + ticks
+    local height = cell_h * length colors;
+    local key = gr_create [title: 'colorscale',
+        size: [width, height  + 2 * SCALE_PAD], units: 'pt'];
+    local ith;
+    for ith = 1, length colors, 1 loop
+        gr_box [key, [0, [0, (ith - 1) * cell_h + SCALE_PAD],
+            [cell_w , ith * cell_h  + SCALE_PAD],
+            colors (ith), 1, colors (ith)]];
+    endloop
+    local step = height / (ticks - 1);
+    local delta = (maxcut - mincut) / (ticks - 1);
+    for ith = 0, ticks, 1 loop
+        gr_line [key, [0, [cell_w, ith * step  + SCALE_PAD],
+            [cell_w + TICK_LEN, ith * step + SCALE_PAD],
+            icolor'black', 1]];
+        gr_text [key, [0, [cell_w + TICK_LEN * 1.5, ith * step + SCALE_PAD],
+            twrite ['{n:.2f}', mincut + (ith * delta)], 'sys', icolor'black',
+            10, [position: 'middleleft']]];
+    endloop
+
+    return [key, width, height];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          DrawCellLabel
+ *
+ *  Returns a graphics object with the formated text drawn.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawCellLabel [ftext, width, height]
+
+    local key = gr_create [size: [width, height], units: 'pt'];
+    gr_text [key, [0, [width/2 , height/2], ftext, 'sys-b', 
+        icolor'black', 8, [position: 'middlecenter']]];
+
+    return key;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          DrawColLabels
+ *
+ *  Returns a graphics object with the column labels using formated texts.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawColLabels [ftexts, width, height]
+
+
+    local key = gr_create [size: [length ftexts * (width + MOE_PAD_W) + 1,
+        height], units: 'pt'];
+    local x = 1, ft;
+    for ft in ftexts loop
+        gr_text [key, [0, [x + width/2 , height/2], ft, 'sys-b', 
+            icolor'black', 8, [position: 'middlecenter']]];
+        x = x + width + MOE_PAD_W;
+    endloop
+
+    return key;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          DrawRowLabels
+ *
+ *  Returns a graphics object with the row labels using formated texts.
+ *
+ *  NOTE:  calling function should call gr_destroy on key after using it.
+ *
+ ****************************************************************************/
+local function DrawRowLabels [ftexts, width, height]
+
+    local key = gr_create [size: [width,
+        length ftexts * (height + MOE_PAD_H) + 1], units: 'pt'];
+    local y = 1, ft;
+    for ft in ftexts loop
+        gr_text [key, [0, [width/2 , y + height/2], ft, 'sys-b', 
+            icolor'black', 8, [position: 'middlecenter']]];
+        y = y + height + MOE_PAD_H;
+    endloop
+
+    return key;
+
+endfunction
+
+function GetNegColors;
+function GetPosColors;
+
+/****************************************************************************
+ *
+ *                          GetColors
+ *
+ *  Returns a scale of num colors starting with the color that
+ *  represent mincut (blue or white) and ending with the color that
+ *  represents maxcut (white or red).
+ *
+ ****************************************************************************/
+local function GetColors [mincut, maxcut, num]
+
+    local colors = [];
+
+    if mincut === 0 and maxcut > 0 and num > 0 then
+        colors = GetPosColors [maxcut, num - 1];
+    elseif maxcut === 0 and mincut < 0 and num > 0 then
+        colors = GetNegColors [mincut, num - 1];
+    elseif mincut < 0 and maxcut > 0 and num > 0 then
+        local mid = max [1, floor ((num - 1) * (mincut / (mincut - maxcut)))];
+        colors = GetNegColors [mincut, mid];
+        colors = cat [colors, dropfirst  GetPosColors [maxcut, num - mid - 1]];
+    else
+        return [[], twrite ['Cannot generate colors with minimum {},\n'
+            'maximum {}, and number {}\n', mincut, maxcut, num]];
+    endif
+
+    return [colors, ''];
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          GetNegColors
+ *
+ *  Return num number of scaled colors, plus white, ordered from blue to white.
+ *
+ ****************************************************************************/
+local function GetNegColors [mincut, num]
+
+    local colors = [], newcolor;
+    local r, g, b;
+    local delta = floor (NEG_RANGE_MAX / num);
+
+    //  Blue
+    r = 0; g = 0; b = 127;
+    while b < 256 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        b = b + delta;
+    endloop
+
+    //  Turquoise
+    g = b - 256; r = 0; b = 255;
+    while g < 256 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        g = g + delta;
+    endloop
+
+    //  Aquamarine
+    b = 256 - (g - 256); r = 0; g = 255;
+    while b >= 0 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        b = b - delta;
+    endloop
+
+    //  Green
+    r = -b; g = 255; b = 0;
+    while r < 256 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        r = r + delta;
+    endloop
+
+    if length colors > num then
+        colors = drop [colors, num - length colors];
+    endif
+
+    //  White
+    r = 255; g = 255; b = 255;
+    newcolor = r * R_FACTOR + g * G_FACTOR + b;
+    colors = append [colors, newcolor];
+
+    return colors;
+
+endfunction
+
+/****************************************************************************
+ *
+ *                          GetPosColors
+ *
+ *  Return num number of scaled colors, plus white, ordered from white to red.
+ *
+ ****************************************************************************/
+local function GetPosColors [maxcut, num]
+
+    local colors = [], newcolor;
+    local r, g, b;
+    local delta = floor (POS_RANGE_MAX / num);
+
+    //  Since we prefer darker colors, build red to white and then reverse.
+    //  Maroon
+    r = 95; g = 0; b = 95;
+    while r < 128 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        r = r + delta;
+        b = b + delta;
+    endloop
+
+    //  Red
+     r = 127 + r - 128; g = 0; b = 0;
+    while r < 256 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        r = r + delta;
+    endloop
+    
+    //  Orange
+    g = r - 256; r = 255; b = 0;
+    while g < 256 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        g = g + delta;
+    endloop
+
+    //  Yellow
+     b = g - 256; r = 255; g = 255;
+    while b < 256 loop
+        newcolor = r * R_FACTOR + g * G_FACTOR + b;
+        colors = append [colors, newcolor];
+        b = b + delta;
+    endloop
+
+    if length colors > num then
+        colors = drop [colors, num - length colors];
+    endif
+
+    //  White
+    r = 255; g = 255; b = 255;
+    newcolor = r * R_FACTOR + g * G_FACTOR + b;
+    colors = append [colors, newcolor];
+
+    return reverse colors;
+endfunction
+
+/****************************************************************************
+ *
+ *                          StandardDeviation
+ *
+ *  Return the average and standard deviation of the flat vector of numbers.
+ *
+ ****************************************************************************/
+local function StandardDeviation [nums]
+
+    local n = length nums;
+    if n === 0 then
+        return 0;
+    endif
+    local avg = (add nums) / n;
+    local sigma = sqrt ((add (sqr (nums - avg))) / n);
+
+    return [avg, sigma];
+endfunction
+
+//  Global Functions
+
+/****************************************************************************
+ *
+ *                          qb_HeatMapSetupPanel
+ *
+ *  Note, data has the format:
+ *
+ *  [[colNames], [[rowName1, [values1]], [rowName2, [values2]], ...
+ *      ... , [rowNameN, [valuesN]]]
+ *  where length colNames === length values1 === ... === length valuesN,
+ *  and the names are tokens and the values are numbers.
+ *
+ *  Note:  uses only the last three characters of ColNames and RowNames for
+ *  labels.
+ *
+ ****************************************************************************/
+global function qb_HeatMapSetupPanel [data, letselrow, letselcol, cutoff, 
+        numsignifcols, numcolors, ticks, selfun, initsel, help]
+
+    if MOE_BATCH then return; endif
+    if WindowShow ['QB Heat Map', 1] then return; endif
+
+    local [mincut, maxcut] = CalculateCuts [data, cutoff, numsignifcols];
+    local [colors, errmess] = GetColors [mincut, maxcut, numcolors];
+    if colors === [] then
+        Warning errmess;
+        return;
+    endif
+
+    local [colnames, rowdata] = data;
+    local numcols = length colnames;
+    local numrows = length rowdata;
+    local extracol = select [1, 0, letselrow];
+    local extrarow = select [1, 0, letselcol];
+    local page_w = (numcols + extracol) * (CELL_WD + MOE_PAD_W) + MOE_PAD_W;
+    local page_h = (numrows + extrarow) * (CELL_HT + MOE_PAD_H) + MOE_PAD_H;
+
+    local scalecell_h = floor (page_h / numcolors);
+    local scalecell_w =  SCALE_CELL_WD;
+    local [scalekey, s_w, s_h] = DrawColorScale [colors, scalecell_w,
+        scalecell_h, mincut, maxcut, ticks];
+
+    //  Color map cells and store row labels
+    local row_i, col_i, bgraphics = [], bhelp = [];
+    for row_i = 1, numrows, 1 loop
+        local [rowlabel, rowvals] = rowdata (row_i);
+        if letselrow then
+            bgraphics = append [bgraphics, DrawCellLabel [keep [rowlabel, -3],
+                CELL_WD, CELL_HT]];
+            bhelp = append [bhelp, twrite ['row: {}', rowlabel]];
+        endif
+
+        for col_i = 1, numcols, 1 loop
+            bgraphics = append [bgraphics, DrawCell [colors, 
+                CELL_WD, CELL_HT, mincut, maxcut, rowvals (col_i)]];
+                bhelp = append [bhelp, twrite ['cell: [{},{}]', rowlabel,
+                    colnames (col_i)]];
+        endloop
+    endloop
+
+    //  Empty corner label
+    if letselcol and letselrow then
+        bgraphics = append [bgraphics, 0];
+    endif
+
+    //  Column labels
+    if letselcol then
+        for col_i = 1, numcols, 1 loop
+            bgraphics = append [bgraphics, 
+                DrawCellLabel [keep [colnames (col_i), -3], CELL_WD, CELL_HT]];
+            bhelp = append [bhelp, twrite ['col: {}', colnames (col_i)]];
+        endloop
+    endif
+
+    //  Panel
+    local rowlbl, collbl;
+    if letselrow then rowlbl = []; else rowlbl = ROWLBL; endif
+    if letselcol then collbl = []; else collbl = COLLBL; endif
+    local radiobox = [Hbox : cat [rowlbl, RADIO]];
+    local panel =
+        [
+        Hbox :
+            [
+            extendH: 1,
+            Vbox :
+                [
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Label :
+                [
+                name: 'colorscale', extendV: 0, centerV: 1, resizeV: 0,
+                grScale: 'none'
+                ]
+            ]
+        ];
+
+    panel = tagpoke [panel, ['Hbox', 'Vbox'], cat [radiobox, collbl]];
+    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Hbox', 'Radio', 'graphics'],
+        bgraphics];
+    panel = tagpoke [panel, ['Hbox', 'Vbox', 'Hbox', 'Radio', 'columns'],
+        numcols + extracol];
+    if (help) then
+            panel = tagpoke [panel, ['Hbox', 'Vbox', 'Hbox', 'Radio',
+                'bubbleHelp'], bhelp];
+    endif
+
+    if not letselrow then
+        local rownames = app first second data;
+        local rowgraphics = DrawRowLabels [rownames, CELL_WD, CELL_HT];
+        panel = tagpoke [panel, ['Hbox', 'Vbox', 'Hbox', 'Label', 'graphics'],
+            rowgraphics];
+    endif
+
+    if not letselcol then
+        local colgraphics = DrawColLabels [colnames, CELL_WD, 2 * CELL_HT];
+        panel = tagpoke [panel, ['Hbox', 'Vbox', 'Vbox', 'Hbox', 'Radio',
+            'graphics'], colgraphics];
+    endif
+
+    local wkey = WindowCreate cat [HEADER, panel];
+    WindowSetData [wkey, [mapradio: initsel]];
+    WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
+    WindowShow [wkey, 1];
+
+    gr_destroy scalekey;
+    app gr_destroy bgraphics;
+
+    //  Selected cells have row numbers from 1 to numrows
+    //      and col numbers from 1 to numcols
+    //  Selected rows have col number 0
+    //  Selected cols have row number 0
+    local selrow = ceil (initsel / (numcols + 1));
+    if selrow === numrows + 1 then
+        selrow = 0;
+    endif
+
+    local selcol = mod [initsel, numcols + 1] - 1;
+    selcol = select [numcols, selcol, selcol === -1];
+    local selerrmess = call [selfun, [data, selrow, selcol, mincut,
+        maxcut, colors]];
+
+    loop
+        local [vals, trig] = WindowWait wkey;
+        if trig === 'panel' then
+            if vals.panel === 'Close' then 
+                break;
+            endif
+        elseif trig === 'mapradio' then
+            selrow = ceil (vals.mapradio / (numcols + 1));
+            if selrow === numrows + 1 then
+                selrow = 0;
+            endif
+
+            selcol = mod [vals.mapradio, numcols + 1] - 1;
+            selcol = select [numcols, selcol, selcol === -1];
+            selerrmess = call [selfun, [data, selrow, selcol, mincut,
+                maxcut, colors]];
+        endif
+    endloop
+
+    WindowDestroy wkey;
+
+endfunction
+

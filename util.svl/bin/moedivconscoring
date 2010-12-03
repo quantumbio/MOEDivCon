@@ -1,0 +1,27 @@
+#!/bin/sh
+
+if [ ! "$QBHOME" ]; then
+    PRG=$0
+    
+    progdir=`dirname "$PRG"`
+    
+    if [ "`echo "$progdir" | grep -s '^/'`" ]; then
+        progdir=$progdir
+    else
+        progdir=`pwd`/"$progdir"
+    fi
+    
+    QBHOME=`echo "$progdir" | sed 's:/bin$::'`
+    export QBHOME
+fi
+
+if [ -z "$QBENVSET" ]; then
+    . $QBHOME/etc/qbenv.sh
+fi
+
+if [ -e $QBHOME/bin/moedivconscoring.bin ]; then
+    exec "$QBHOME/bin/moedivconscoring.bin" "$@" "-" 
+fi
+
+exit $?
+

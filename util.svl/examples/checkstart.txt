@@ -1,0 +1,545 @@
+buf=PWD Analysis
+persistencePath=/net/vulcan/home/daren/dev/MOEDivcon/examples/qmscorePM3withAct.h5
+title=PWD Analysis
+pruneZero=0.95
+pruneSd=0.05
+numberOfTopResidues=20
+numberOfComps=10
+trainingSetRange=13
+numberOfScoreTerms=2
+MOEDivConAnalysis analysisCount=39
+0 MOEDivConAnalysis target=rec4 ligand=lig4
+1 MOEDivConAnalysis target=rec5 ligand=lig5
+2 MOEDivConAnalysis target=rec12 ligand=lig12
+3 MOEDivConAnalysis target=rec27 ligand=lig27
+4 MOEDivConAnalysis target=rec29 ligand=lig29
+5 MOEDivConAnalysis target=rec30 ligand=lig30
+6 MOEDivConAnalysis target=rec31 ligand=lig31
+7 MOEDivConAnalysis target=rec36 ligand=lig36
+8 MOEDivConAnalysis target=rec38 ligand=lig38
+9 MOEDivConAnalysis target=rec40 ligand=lig40
+10 MOEDivConAnalysis target=rec42 ligand=lig42
+11 MOEDivConAnalysis target=rec43 ligand=lig43
+12 MOEDivConAnalysis target=rec45 ligand=lig45
+13 MOEDivConAnalysis target=rec1 ligand=lig1
+14 MOEDivConAnalysis target=rec2 ligand=lig2
+15 MOEDivConAnalysis target=rec3 ligand=lig3
+16 MOEDivConAnalysis target=rec6 ligand=lig6
+17 MOEDivConAnalysis target=rec8 ligand=lig8
+18 MOEDivConAnalysis target=rec9 ligand=lig9
+19 MOEDivConAnalysis target=rec10 ligand=lig10
+20 MOEDivConAnalysis target=rec11 ligand=lig11
+21 MOEDivConAnalysis target=rec13 ligand=lig13
+22 MOEDivConAnalysis target=rec15 ligand=lig15
+23 MOEDivConAnalysis target=rec16 ligand=lig16
+24 MOEDivConAnalysis target=rec18 ligand=lig18
+25 MOEDivConAnalysis target=rec19 ligand=lig19
+26 MOEDivConAnalysis target=rec20 ligand=lig20
+27 MOEDivConAnalysis target=rec21 ligand=lig21
+28 MOEDivConAnalysis target=rec22 ligand=lig22
+29 MOEDivConAnalysis target=rec23 ligand=lig23
+30 MOEDivConAnalysis target=rec24 ligand=lig24
+31 MOEDivConAnalysis target=rec26 ligand=lig26
+32 MOEDivConAnalysis target=rec32 ligand=lig32
+33 MOEDivConAnalysis target=rec33 ligand=lig33
+34 MOEDivConAnalysis target=rec35 ligand=lig35
+35 MOEDivConAnalysis target=rec37 ligand=lig37
+36 MOEDivConAnalysis target=rec39 ligand=lig39
+37 MOEDivConAnalysis target=rec41 ligand=lig41
+38 MOEDivConAnalysis target=rec44 ligand=lig44
+exists? PWD Analysis
+MOEDivConAnalysis analysisCount=39
+MOEDivConAnalysis exec=/net/vulcan/home/daren/playground/quantumbio-linux-5.0.0.1alpha_b18/bin/rscriptor
+
+39
+rec4
+lig4
+-6.567
+rec5
+lig5
+-6.536
+rec12
+lig12
+-6.397
+rec27
+lig27
+-8.22
+rec29
+lig29
+-8.3
+rec30
+lig30
+-9.299
+rec31
+lig31
+-3.999
+rec36
+lig36
+-4.096
+rec38
+lig38
+-5.283
+rec40
+lig40
+-4.113
+rec42
+lig42
+-7.467
+rec43
+lig43
+-6.552
+rec45
+lig45
+-7.743
+rec1
+lig1
+-6.08
+rec2
+lig2
+-6.035
+rec3
+lig3
+-4.228
+rec6
+lig6
+-3.958
+rec8
+lig8
+-5.795
+rec9
+lig9
+-5.494
+rec10
+lig10
+-5.021
+rec11
+lig11
+-4.386
+rec13
+lig13
+-6.365
+rec15
+lig15
+-8.044
+rec16
+lig16
+-7.601
+rec18
+lig18
+-7.147
+rec19
+lig19
+-8.521
+rec20
+lig20
+-7.999
+rec21
+lig21
+-7.698
+rec22
+lig22
+-6.744
+rec23
+lig23
+-6.112
+rec24
+lig24
+-6.46
+rec26
+lig26
+-7.601
+rec32
+lig32
+-6.054
+rec33
+lig33
+-7.919
+rec35
+lig35
+-3.869
+rec37
+lig37
+-4.92
+rec39
+lig39
+-5.522
+rec41
+lig41
+-6.291
+rec44
+lig44
+-6.698
+Done.
+
+ Reply is: Ok 
+
+RScriptor errcode=0
+
+InterMap 39 50 lig30,lig19,lig29,lig27,lig15,lig20,lig33,lig45,lig21,lig16,lig26,lig42,lig18,lig22,lig44,lig4,lig43,lig5,lig24,lig12,lig13,lig41,lig23,lig1,lig32,lig2,lig8,lig39,lig9,lig38,lig10,lig37,lig11,lig3,lig40,lig36,lig31,lig6,lig35 THR41,LEU42,GLY43,THR44,GLY45,SER46,PHE47,GLY48,ARG49,VAL50,MET51,TYR62,ALA63,MET64,LYS65,ILE66,LEU67,ASP68,LEU96,THR97,LYS98,VAL112,MET113,GLU114,TYR115,ALA116,PRO117,GLY119,GLU120,MET121,LEU160,LYS161,PRO162,GLU163,ASN164,LEU165,MET166,ILE167,VAL175,THR176,ASP177,PHE178,ASN319,PHE320,ASP321,ASP322,TYR323,GLY356,ARG357,ARG358
+ActTable 39 3 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39 ExpAct,CalcAct,Error %
+PLSTable 10 8 1,2,3,4,5,6,7,8,9,10 X_Expl,Act_Expl,R2,Q2,SDEC,SDEP,SDEP_Ext,R2_Ext
+SARMap 39 20 lig30,lig13,lig21,lig29,lig33,lig27,lig20,lig26,lig19,lig18,lig16,lig24,lig45,lig15,lig42,lig44,lig12,lig22,lig5,lig6,lig43,lig1,lig41,lig23,lig32,lig4,lig11,lig10,lig9,lig2,lig8,lig3,lig38,lig39,lig37,lig36,lig31,lig35,lig40 MET166,GLU120,LEU42,GLU163,GLU114,GLY48,VAL91,THR97,LYS174,ASP177,PHE93,ALA116,LEU99,PHE320,LEU150,THR44,PHE307,MET113,ILE143,PHE122
+buf=PWD Analysis
+persistencePath=/net/vulcan/home/daren/dev/MOEDivcon/examples/qmscorePM3withAct.h5
+title=PWD Analysis
+pruneZero=0.95
+pruneSd=0.05
+numberOfTopResidues=20
+numberOfComps=10
+trainingSetRange=13
+numberOfScoreTerms=2
+MOEDivConAnalysis analysisCount=39
+0 MOEDivConAnalysis target=rec4 ligand=lig4
+1 MOEDivConAnalysis target=rec5 ligand=lig5
+2 MOEDivConAnalysis target=rec12 ligand=lig12
+3 MOEDivConAnalysis target=rec27 ligand=lig27
+4 MOEDivConAnalysis target=rec29 ligand=lig29
+5 MOEDivConAnalysis target=rec30 ligand=lig30
+6 MOEDivConAnalysis target=rec31 ligand=lig31
+7 MOEDivConAnalysis target=rec36 ligand=lig36
+8 MOEDivConAnalysis target=rec38 ligand=lig38
+9 MOEDivConAnalysis target=rec40 ligand=lig40
+10 MOEDivConAnalysis target=rec42 ligand=lig42
+11 MOEDivConAnalysis target=rec43 ligand=lig43
+12 MOEDivConAnalysis target=rec45 ligand=lig45
+13 MOEDivConAnalysis target=rec1 ligand=lig1
+14 MOEDivConAnalysis target=rec2 ligand=lig2
+15 MOEDivConAnalysis target=rec3 ligand=lig3
+16 MOEDivConAnalysis target=rec6 ligand=lig6
+17 MOEDivConAnalysis target=rec8 ligand=lig8
+18 MOEDivConAnalysis target=rec9 ligand=lig9
+19 MOEDivConAnalysis target=rec10 ligand=lig10
+20 MOEDivConAnalysis target=rec11 ligand=lig11
+21 MOEDivConAnalysis target=rec13 ligand=lig13
+22 MOEDivConAnalysis target=rec15 ligand=lig15
+23 MOEDivConAnalysis target=rec16 ligand=lig16
+24 MOEDivConAnalysis target=rec18 ligand=lig18
+25 MOEDivConAnalysis target=rec19 ligand=lig19
+26 MOEDivConAnalysis target=rec20 ligand=lig20
+27 MOEDivConAnalysis target=rec21 ligand=lig21
+28 MOEDivConAnalysis target=rec22 ligand=lig22
+29 MOEDivConAnalysis target=rec23 ligand=lig23
+30 MOEDivConAnalysis target=rec24 ligand=lig24
+31 MOEDivConAnalysis target=rec26 ligand=lig26
+32 MOEDivConAnalysis target=rec32 ligand=lig32
+33 MOEDivConAnalysis target=rec33 ligand=lig33
+34 MOEDivConAnalysis target=rec35 ligand=lig35
+35 MOEDivConAnalysis target=rec37 ligand=lig37
+36 MOEDivConAnalysis target=rec39 ligand=lig39
+37 MOEDivConAnalysis target=rec41 ligand=lig41
+38 MOEDivConAnalysis target=rec44 ligand=lig44
+exists? PWD Analysis
+remove PWD Analysis
+MOEDivConAnalysis analysisCount=39
+MOEDivConAnalysis exec=/net/vulcan/home/daren/playground/quantumbio-linux-5.0.0.1alpha_b18/bin/rscriptor
+
+39
+rec4
+lig4
+-6.567
+rec5
+lig5
+-6.536
+rec12
+lig12
+-6.397
+rec27
+lig27
+-8.22
+rec29
+lig29
+-8.3
+rec30
+lig30
+-9.299
+rec31
+lig31
+-3.999
+rec36
+lig36
+-4.096
+rec38
+lig38
+-5.283
+rec40
+lig40
+-4.113
+rec42
+lig42
+-7.467
+rec43
+lig43
+-6.552
+rec45
+lig45
+-7.743
+rec1
+lig1
+-6.08
+rec2
+lig2
+-6.035
+rec3
+lig3
+-4.228
+rec6
+lig6
+-3.958
+rec8
+lig8
+-5.795
+rec9
+lig9
+-5.494
+rec10
+lig10
+-5.021
+rec11
+lig11
+-4.386
+rec13
+lig13
+-6.365
+rec15
+lig15
+-8.044
+rec16
+lig16
+-7.601
+rec18
+lig18
+-7.147
+rec19
+lig19
+-8.521
+rec20
+lig20
+-7.999
+rec21
+lig21
+-7.698
+rec22
+lig22
+-6.744
+rec23
+lig23
+-6.112
+rec24
+lig24
+-6.46
+rec26
+lig26
+-7.601
+rec32
+lig32
+-6.054
+rec33
+lig33
+-7.919
+rec35
+lig35
+-3.869
+rec37
+lig37
+-4.92
+rec39
+lig39
+-5.522
+rec41
+lig41
+-6.291
+rec44
+lig44
+-6.698
+Done.
+
+ Reply is: Ok 
+
+RScriptor errcode=0
+
+InterMap 39 50 lig30,lig19,lig29,lig27,lig15,lig20,lig33,lig45,lig21,lig16,lig26,lig42,lig18,lig22,lig44,lig4,lig43,lig5,lig24,lig12,lig13,lig41,lig23,lig1,lig32,lig2,lig8,lig39,lig9,lig38,lig10,lig37,lig11,lig3,lig40,lig36,lig31,lig6,lig35 THR41,LEU42,GLY43,THR44,GLY45,SER46,PHE47,GLY48,ARG49,VAL50,MET51,TYR62,ALA63,MET64,LYS65,ILE66,LEU67,ASP68,LEU96,THR97,LYS98,VAL112,MET113,GLU114,TYR115,ALA116,PRO117,GLY119,GLU120,MET121,LEU160,LYS161,PRO162,GLU163,ASN164,LEU165,MET166,ILE167,VAL175,THR176,ASP177,PHE178,ASN319,PHE320,ASP321,ASP322,TYR323,GLY356,ARG357,ARG358
+ActTable 39 3 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39 ExpAct,CalcAct,Error %
+PLSTable 10 8 1,2,3,4,5,6,7,8,9,10 X_Expl,Act_Expl,R2,Q2,SDEC,SDEP,SDEP_Ext,R2_Ext
+SARMap 39 20 lig30,lig13,lig21,lig29,lig33,lig27,lig20,lig26,lig19,lig18,lig16,lig24,lig45,lig15,lig42,lig44,lig12,lig22,lig5,lig6,lig43,lig1,lig41,lig23,lig32,lig4,lig11,lig10,lig9,lig2,lig8,lig3,lig38,lig39,lig37,lig36,lig31,lig35,lig40 MET166,GLU120,LEU42,GLU163,GLU114,GLY48,VAL91,THR97,LYS174,ASP177,PHE93,ALA116,LEU99,PHE320,LEU150,THR44,PHE307,MET113,ILE143,PHE122
+buf=PWD Analysis
+persistencePath=/net/vulcan/home/daren/dev/MOEDivcon/examples/qmscorePM3withAct.h5
+title=PWD Analysis
+pruneZero=0.95
+pruneSd=0.05
+numberOfTopResidues=20
+numberOfComps=10
+trainingSetRange=13
+numberOfScoreTerms=2
+MOEDivConAnalysis analysisCount=39
+0 MOEDivConAnalysis target=rec4 ligand=lig4
+1 MOEDivConAnalysis target=rec5 ligand=lig5
+2 MOEDivConAnalysis target=rec12 ligand=lig12
+3 MOEDivConAnalysis target=rec27 ligand=lig27
+4 MOEDivConAnalysis target=rec29 ligand=lig29
+5 MOEDivConAnalysis target=rec30 ligand=lig30
+6 MOEDivConAnalysis target=rec31 ligand=lig31
+7 MOEDivConAnalysis target=rec36 ligand=lig36
+8 MOEDivConAnalysis target=rec38 ligand=lig38
+9 MOEDivConAnalysis target=rec40 ligand=lig40
+10 MOEDivConAnalysis target=rec42 ligand=lig42
+11 MOEDivConAnalysis target=rec43 ligand=lig43
+12 MOEDivConAnalysis target=rec45 ligand=lig45
+13 MOEDivConAnalysis target=rec1 ligand=lig1
+14 MOEDivConAnalysis target=rec2 ligand=lig2
+15 MOEDivConAnalysis target=rec3 ligand=lig3
+16 MOEDivConAnalysis target=rec6 ligand=lig6
+17 MOEDivConAnalysis target=rec8 ligand=lig8
+18 MOEDivConAnalysis target=rec9 ligand=lig9
+19 MOEDivConAnalysis target=rec10 ligand=lig10
+20 MOEDivConAnalysis target=rec11 ligand=lig11
+21 MOEDivConAnalysis target=rec13 ligand=lig13
+22 MOEDivConAnalysis target=rec15 ligand=lig15
+23 MOEDivConAnalysis target=rec16 ligand=lig16
+24 MOEDivConAnalysis target=rec18 ligand=lig18
+25 MOEDivConAnalysis target=rec19 ligand=lig19
+26 MOEDivConAnalysis target=rec20 ligand=lig20
+27 MOEDivConAnalysis target=rec21 ligand=lig21
+28 MOEDivConAnalysis target=rec22 ligand=lig22
+29 MOEDivConAnalysis target=rec23 ligand=lig23
+30 MOEDivConAnalysis target=rec24 ligand=lig24
+31 MOEDivConAnalysis target=rec26 ligand=lig26
+32 MOEDivConAnalysis target=rec32 ligand=lig32
+33 MOEDivConAnalysis target=rec33 ligand=lig33
+34 MOEDivConAnalysis target=rec35 ligand=lig35
+35 MOEDivConAnalysis target=rec37 ligand=lig37
+36 MOEDivConAnalysis target=rec39 ligand=lig39
+37 MOEDivConAnalysis target=rec41 ligand=lig41
+38 MOEDivConAnalysis target=rec44 ligand=lig44
+exists? PWD Analysis
+remove PWD Analysis
+MOEDivConAnalysis analysisCount=39
+MOEDivConAnalysis exec=/net/vulcan/home/daren/playground/quantumbio-linux-5.0.0.1alpha_b18/bin/rscriptor
+
+39
+rec4
+lig4
+-6.567
+rec5
+lig5
+-6.536
+rec12
+lig12
+-6.397
+rec27
+lig27
+-8.22
+rec29
+lig29
+-8.3
+rec30
+lig30
+-9.299
+rec31
+lig31
+-3.999
+rec36
+lig36
+-4.096
+rec38
+lig38
+-5.283
+rec40
+lig40
+-4.113
+rec42
+lig42
+-7.467
+rec43
+lig43
+-6.552
+rec45
+lig45
+-7.743
+rec1
+lig1
+-6.08
+rec2
+lig2
+-6.035
+rec3
+lig3
+-4.228
+rec6
+lig6
+-3.958
+rec8
+lig8
+-5.795
+rec9
+lig9
+-5.494
+rec10
+lig10
+-5.021
+rec11
+lig11
+-4.386
+rec13
+lig13
+-6.365
+rec15
+lig15
+-8.044
+rec16
+lig16
+-7.601
+rec18
+lig18
+-7.147
+rec19
+lig19
+-8.521
+rec20
+lig20
+-7.999
+rec21
+lig21
+-7.698
+rec22
+lig22
+-6.744
+rec23
+lig23
+-6.112
+rec24
+lig24
+-6.46
+rec26
+lig26
+-7.601
+rec32
+lig32
+-6.054
+rec33
+lig33
+-7.919
+rec35
+lig35
+-3.869
+rec37
+lig37
+-4.92
+rec39
+lig39
+-5.522
+rec41
+lig41
+-6.291
+rec44
+lig44
+-6.698
+Done.
+
+ Reply is: Ok 
+
+RScriptor errcode=0
+
+InterMap 39 50 lig30,lig19,lig29,lig27,lig15,lig20,lig33,lig45,lig21,lig16,lig26,lig42,lig18,lig22,lig44,lig4,lig43,lig5,lig24,lig12,lig13,lig41,lig23,lig1,lig32,lig2,lig8,lig39,lig9,lig38,lig10,lig37,lig11,lig3,lig40,lig36,lig31,lig6,lig35 THR41,LEU42,GLY43,THR44,GLY45,SER46,PHE47,GLY48,ARG49,VAL50,MET51,TYR62,ALA63,MET64,LYS65,ILE66,LEU67,ASP68,LEU96,THR97,LYS98,VAL112,MET113,GLU114,TYR115,ALA116,PRO117,GLY119,GLU120,MET121,LEU160,LYS161,PRO162,GLU163,ASN164,LEU165,MET166,ILE167,VAL175,THR176,ASP177,PHE178,ASN319,PHE320,ASP321,ASP322,TYR323,GLY356,ARG357,ARG358
+ActTable 39 3 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39 ExpAct,CalcAct,Error %
+PLSTable 10 8 1,2,3,4,5,6,7,8,9,10 X_Expl,Act_Expl,R2,Q2,SDEC,SDEP,SDEP_Ext,R2_Ext
+SARMap 39 20 lig30,lig13,lig21,lig29,lig33,lig27,lig20,lig26,lig19,lig18,lig16,lig24,lig45,lig15,lig42,lig44,lig12,lig22,lig5,lig6,lig43,lig1,lig41,lig23,lig32,lig4,lig11,lig10,lig9,lig2,lig8,lig3,lig38,lig39,lig37,lig36,lig31,lig35,lig40 MET166,GLU120,LEU42,GLU163,GLU114,GLY48,VAL91,THR97,LYS174,ASP177,PHE93,ALA116,LEU99,PHE320,LEU150,THR44,PHE307,MET113,ILE143,PHE122

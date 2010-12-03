@@ -1,0 +1,14 @@
+TOTAL SCORE                        -431.594520
+GAS PHASE HEAT OF FORMATION         -89.610227
+ELECTROSTATIC SOLVATION             117.005405
+ATTRACTIVE LENNARD JONES            -69.243705
+SOLVATION ENTROPY                  -342.601615
+VIBRATIONAL ENTROPY                  47.144379
+ELECTRONIC INTERACTION ENERGY   -266724.502590
+MRM STERIC ENERGY                   -25.261871
+MRM ELECTROSTATIC ENERGY            -37.229943
+MRM SOLVATION ENERGY                 31.260962
+MRM TOTAL ENERGY                    -31.230851
+
+divcon -i int2.5_rec.mol2 int2.5_lig.mol2 --pwd --qmscore freq --screen --scrf -s 8
+

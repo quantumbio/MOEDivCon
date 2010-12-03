@@ -1,0 +1,307 @@
+
+'SinglePoint' mode
+
+CORE_PANEL DONE, added pager for charge
+
+qb_GetAnalysisData       'perturb' DONE
+qb_SaveAnalysisData       'perturb' DONE
+
+qb_GetNMRPerturbEnv DONE
+qb_NMRPerturb  DONE
+qb_SaveNMRPerturb DONE
+
+qb_CoreHandler DONE
+qb_InitCorePanel DONE
+qb_IsModeSinglePoint DONE
+qb_LoadCoreScoreDB       'perturb'  DONE (both env & field)
+qb_SetUpScoreDB       'perturb'  DONE (both env & field)
+
+
+SetScoreFields flags for lig and rec fields  DONE
+
+CheckChgDBMols SKIP, single collection only
+TestDBMols  SKIP, single collection only
+
+UpdateMode DONE
+
+qb_UpdateCharge DONE
+qb_VerifyDivCon  DONE
+
+
+CalcCharge  SKIP, atom set
+CheckCharge SKIP
+ChargeOK  SKIP
+
+CheckComplexCharge  SKIP, don't use for singlepoint (used only in qb_UpdateCharge)
+
+ClearChargeStatus SKIP, only for M-M
+SetChargeStatus DONE
+
+Index: nmrinterface.svl
+===================================================================
+--- nmrinterface.svl	(revision 6307)
++++ nmrinterface.svl	(working copy)
+@@ -58,12 +58,6 @@
+     'HETEROOPT',
+     'ALLOPT'
+     ];
+-const CSP_KEYS =
+-    [
+-    'H_ONLY',
+-    'C_ONLY',
+-    'ALL'
+-    ];
+ 
+ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts, 
+         errortests, indices, free, bound]
+@@ -134,10 +128,12 @@
+         endif
+     endif
+ 
+-    local poseidxs = qb_GetElemIndices [ligmol, appopts.csp];
+-    if neL [length indices, length poseidxs] then
++    local divconatoms = cat [cat recressets, cat ligressets];
++    local selatoms = (Atoms []) [indices];
++    local divconindices = indexof [selatoms, divconatoms];
++    if anytrue (divconindices == 0) then
+         errmess = cat [swrite ['Skipping!  Atom indices are inconsistent:\n'
+-            '    Orig: {v}\n    Pose: {v}\n', indices, poseidxs], errmess];
++            '     MOE: {v}\n  DivCon: {v}\n', indices, divconindices], errmess];
+ 
+         oDestroy uniq cat oChains cat recressets;
+         oDestroy uniq cat oChains cat ligressets;
+@@ -148,19 +144,6 @@
+         return [[], errmess];
+     endif
+  
+-    if not alltrue eqE [indices, poseidxs] then
+-        errmess = cat [swrite ['Skipping!  Atom indices are inconsistent:\n'
+-            '    Orig: {v}\n    Pose: {v}\n', indices, poseidxs], errmess];
+-
+-        oDestroy uniq cat oChains cat recressets;
+-        oDestroy uniq cat oChains cat ligressets;
+-        if not MOE_BATCH then
+-            SystemPop [osys, nsys];
+-        endif
+-
+-        return [[], errmess];
+-    endif
+- 
+     //  exe_open child process inherits parent's environment.
+     local process_key = exe_open ['moedivconnmr', subdirname, [], 1];
+     local process_keys = [process_key];
+@@ -178,7 +161,7 @@
+     //  SplitReceptor ensures that there is only one chain per molecule
+     //  in the receptor collection.
+ 
+-    local success = 0;
++    local ith, success = 0;
+ 
+     fwrite [stdin, '{c:}\n', perfile];
+     fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
+@@ -188,7 +171,10 @@
+         coreopts.scaling === 1]];
+     fwrite [stdin, '{c:}\n', GEOM_KEYS(appopts.opt)];
+     fwrite [stdin, '{c:}\n', select ['GUESS', 'NOGUESS', appopts.guess]];
+-    fwrite [stdin, '{c:}\n', CSP_KEYS(appopts.csp)];
++    fwrite [stdin, '{n:}\n', length divconindices];
++    for ith = 1, length divconindices, 1 loop
++        fwrite [stdin, '{n:}\n', divconindices (ith)];
++    endloop
+ 
+     fwrite [stdin, '{n:}\n', coreopts.recchg];
+     fwrite [stdin, '{n:}\n', coreopts.ligchg];
+@@ -215,30 +201,23 @@
+ write ['DivCon: {}\n', return_statement];//DEBUG
+ 
+         if return_statement === "updatescore" then
+-            local atomindices = [], atomvalues = [];
++            local atomvalues = rep [0.0, length divconindices];
+             local [[numvals]] = fread [stdout, '{n:}'];
+             for numvals loop
+                 local [[cspidx]] = fread [stdout, '{n:}'];
+                 local [[cspval]] = fread [stdout, '{n:}'];
+ print [cspidx, cspval];//DEBUG
+-                atomindices = append [atomindices, cspidx];
+-                atomvalues = append [atomvalues, cspval];
++                local idxidx = indexof [cspidx, divconindices];
++                if idxidx === 0 then
++                    errmess = cat [swrite ['Error! Atom index not found:\n'
++                        '   {} not in {v}\n', cspidx, divconindices],
++                        errmess];
++                    return [[], errmess];
++                endif
++
++                atomvalues = poke [atomvalues, idxidx, cspval];
+             endloop
+ 
+-            if neL [length indices, length atomindices] then
+-                errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
+-                    '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
+-                    errmess];
+-                return [[], errmess];
+-            endif
+-
+-            if not alltrue eqE [indices, atomindices] then
+-                errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
+-                    '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
+-                    errmess];
+-                return [[], errmess];
+-            endif
+-
+             local score = qb_RMSD [atomvalues, free - bound];
+ print [score];//DEBUG
+             results = [score, atomvalues];
+Index: nmrpanel.svl
+===================================================================
+--- nmrpanel.svl	(revision 6307)
++++ nmrpanel.svl	(working copy)
+@@ -99,12 +99,12 @@
+ 
+ const CSP_OPTS =
+     [
+-    'H only',
+-    'C only',
+-    'all atoms'
++    'Ligand - H only',
++    'Ligand - C only',
++    'All ligand atoms',
++    'Selected atoms'
+     ];
+ 
+-
+ const HEADER = 
+     [
+     name: 'panel', 
+@@ -160,7 +160,11 @@
+             type: 'int', minWidth: 11, onTrigger: 'return',
+             bubbleHelp:
+                 'The set of atoms on which to perform\n'
+-                'chemical shift perturbation.'
++                'chemical shift perturbation.  Note:  the\n'
++                'atoms are selected immediately after changing\n'
++                'this option.  Warning:  any experimental values\n'
++                'entered are deleted immediately after changing\n'
++                'this option.'            
+             ],
+         Separator : 
+             [
+@@ -666,6 +670,7 @@
+ 
+     loop
+         local [vals, trig] = WindowWait wkey;
++
+         if trig === 'showcut' then
+ 
+             if qb_IsShowingAllPoses [vals] then
+@@ -718,16 +723,18 @@
+                     master: 'parent'] === 'child' then
+                 task_prio 0;
+ 
+-                if origrecmol === [] or origligmol === [] then
+-                    Warning 'No original complex.';
++                if origrecmol === [] then
++                    Warning 'No original receptor molecule.';
+                     exit [];
+                 endif
+ 
++                cutrecmol = [];
+                 oDestroy uniq oChains recatoms;
+                 recatoms = cat cAtoms mol_Create origrecmol;
+                 status = qb_UpdateCharge [wkey, vals, status, 1];
+                 WindowSetAttr [wkey, [showcut: [sensitive: 1],
+                     original: [sensitive: 0]]];
++write ['Ligs okay?  {t:}\n', select ['Yes.', 'No!', alltrue oValid ligatoms]];//DEBUG
+                 aSetNucleusLook [ligatoms, orignucs];
+                 aSetBondLook [ligatoms, origbnds];
+                 ViewLoad 1;
+@@ -736,7 +743,19 @@
+             endif
+ 
+         elseif trig === 'csp' then
+-            if neL [curcsp, vals.csp] then
++
++print vals.csp;//DEBUG
++
++            if CSP_OPTS (vals.csp) === 'Selected atoms' then
++                indices = aNumber (Atoms [] | (aSelected Atoms []));
++                atomnames = get [aName ligatoms, indices];
++                indextoks = totok indices;
++                atomnames = tok_cat [indextoks, '-', atomnames];
++                atomfree = [];
++                atombound = [];
++                curcsp = vals.csp;
++
++            elseif neL [curcsp, vals.csp] then
+                 indices = qb_GetElemIndices [origligmol, vals.csp];
+                 atomnames = get [aName ligatoms, indices];
+                 indextoks = totok indices;
+@@ -746,6 +765,8 @@
+                 curcsp = vals.csp;
+             endif
+ 
++print indices;//DEBUG
++
+         elseif trig === 'experimental' then
+ 
+             if WindowShow ['NMRExperimentalData', 1] then continue; endif
+@@ -796,17 +817,23 @@
+                         endif
+ 
+                         [ldkey, cutrecmol, origligmol, status, coreopts,
+-                            nmrsopts, [origrecmol, origligmol], indices,
++                            nmrsopts, origrecmol, indices,
+                             atomnames, atomfree, atombound] = LoadDB [dbpath];
+ 
++                        if mol_aCount origrecmol === mol_aCount cutrecmol then
++                            cutrecmol = [];
++                        endif
++
+                         Close [force:1];
+-                        if neL [cutrecmol, []] then
++                        if not isnull cutrecmol then
+                             wascut = 1;
+                             recatoms = cat cAtoms mol_Create cutrecmol;
+-                            ligatoms = cat oAtoms mol_Create origligmol;
++                            ligatoms = cat cAtoms mol_Create origligmol;
+                             oSetCollection ['QB_LIGAND', ligatoms];
+                             aSetNucleusLook [ligatoms, 'small-sphere'];
+                             aSetBondLook [ligatoms, 'cylinder'];
++                            orignucs = aNucleusLook ligatoms;
++                            origbnds = aBondLook ligatoms;
+                         else
+                             wascut = 0;
+                             recatoms = cat cAtoms mol_Create origrecmol;
+@@ -814,6 +841,8 @@
+                             oSetCollection ['QB_LIGAND', ligatoms];
+                             aSetNucleusLook [ligatoms, 'small-sphere'];
+                             aSetBondLook [ligatoms, 'cylinder'];
++                            orignucs = aNucleusLook ligatoms;
++                            origbnds = aBondLook ligatoms;
+                         endif
+ 
+                         posemols = [];
+@@ -870,9 +899,8 @@
+                         vals.radius]];
+ 
+                     dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
+-                        [origrecmol, origligmol],
+-                        cat [NMR_NUM_FIELDS, atomnames], 'nmrscore',
+-                        status.notforced];
++                        origrecmol, cat [NMR_NUM_FIELDS, atomnames], 
++                        'nmrscore', status.notforced];
+                     qb_SaveAnalysisData [dbkey, 'nmr', 'exp',
+                         [indices, atomnames, atomfree, atombound]];
+ 
+@@ -911,9 +939,8 @@
+                         vals.radius]];
+ 
+                     dbkey = qb_SetUpScoreDB [status, coreopts, nmrsopts, 
+-                        [origrecmol, origligmol],
+-                        cat [NMR_NUM_FIELDS, atomnames], 'nmrscore',
+-                        status.notforced];
++                        origrecmol, cat [NMR_NUM_FIELDS, atomnames],
++                        'nmrscore', status.notforced];
+                     qb_SaveAnalysisData [dbkey, 'nmr', 'exp',
+                         [indices, atomnames, atomfree, atombound]];
+                     dbv_Open db_Filename dbkey;
