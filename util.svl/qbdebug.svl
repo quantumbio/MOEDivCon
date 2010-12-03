@@ -1,0 +1,97 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information,
+ including trade secrets, belonging to QuantumBio Inc. and/or its
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly
+ prohibited without prior written authorization by the management of
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif
+
+//    qbdebug.svl    Functions to assist in debugging
+
+#set title   'QuantumBio Debug'
+#set class   'QuantumBio'
+#set version '2010.02'
+
+global function qb_dumpEnvVars [worker]
+  local tempf = fopenw 'envvars.txt';
+  local c = getenv 'PWD';
+  local q = getenv 'QBHOME';
+  local m = getenv 'MOE_SVL_LOAD';
+  local l = getenv 'LD_LIBRARY_PATH';
+  local k = getenv 'MKLROOT';
+  local t = getenv 'MTKROOT';
+  local tp = getenv 'MTKppDIR';
+  local r = getenv 'MOE_SVL_RUNPATH';
+  local p = getenv 'PATH';
+  fwrite [tempf, 'Environments for {}:\n\n', worker];
+  fwrite [tempf, 'PWD={}\nQBHOME={}\nMOE_SVL_LOAD={}\nLD_LIBRARY_PATH={}\n'
+      'MKLROOT={}\nMTKROOT={}\nMTKppDIR={}\nMOE_SVL_RUNPATH={}\nPATH={}\n',
+      c, q, m, l, k, t, tp, r, p];
+  fclose tempf;
+endfunction
+
+global function qb_dumpMDBEnv [filename]
+    local env = db_Environment (filename);
+    local envtok = twrite ['{v}', env];
+    local f = fopenw 'mdbenv.txt';
+    fwrite [f, '{}\n', envtok];
+    fclose f;
+endfunction
+
+global function qb_dumpMol []
+    local chains = Chains [];
+    local exmol =  mol_Extract chains;
+    local moltok = twrite ['{v}', exmol];
+    local f = fopenw 'complex.txt';
+    fwrite [f, '{}\n', moltok];
+    fclose f;
+endfunction
+
+global function qb_FCharge []
+    write ['Formal Charge:  {}\n', add aFCharge Atoms []];
+endfunction
+
+global function qb_dumpAtoms [atomset]
+    if atomset === [] or atomset === '' then atomset = Atoms []; endif
+
+    local f = fopenw 'atoms.txt';
+    local molnum, residue, atom, x, y, z;
+    residue = oParent first atomset;
+    fwrite [f, '{} {}\n', rName residue, rUID residue];
+    for atom in atomset loop
+       local r = oParent atom;
+       if r <> residue then
+          residue = r;
+          fwrite [f, '{} {}\n', rName residue, rUID residue];
+       endif
+      [x, y, z] = aPos [atom];
+      fwrite [f, '{} {}[{}] {} ({},{},{})\n', aMoleculeNumber [atom], 
+          aName [atom], aElement [atom], aFCharge [atom], x, y, z];
+    endloop
+    fclose f;
+endfunction
+
+global function qb_transXY [this]
+    local [[mn], [cn, ct, ch, cr], [rn, ru, ri, rt, rc], 
+        [ae, ai, ag, ac, ah, ab, ap, an, ad, ax, ay, az]] = this;
+    local that = [[mn], [cn, ct, ch, cr], [rn, ru, ri, rt, rc], 
+        [ae, ai, ag, ac, ah, ab, ap, an, ad, ay, ax, az]];
+    return that;
+endfunction
+
