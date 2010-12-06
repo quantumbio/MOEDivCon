@@ -1,0 +1,78 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif      
+
+//    pwdbatch.svl     Executes PWD Analysis as a batch job
+//
+//    Command:
+//        moebatch -exec "run ['pwdbatch.svl', ['qmscore-pwd.mdb', 'Exp Act', 15]]" -exit
+
+#set title   'QuantumBio PWD Batch'
+#set class   'QuantumBio'
+#set version '2010.01'
+#set main    'qb_QBPWDBatch'
+
+function qb_QBPWDGetDefaults;
+function qb_SaveEnvAnal;
+
+function qb_PWDAnalysis;
+
+/****************************************************************************
+ *
+ *                          qb_QBPWDBatch
+ *
+ ****************************************************************************/
+global function qb_QBPWDBatch [dbpath, expact, tset]
+
+    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
+
+    if neL [fext dbpath, 'mdb'] then
+        exit twrite ['{}\n is not a MOE database.', dbpath];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        exit twrite ['Unable to find the QMScore/PWD database:\n'
+            '    {}', dbpath];
+    endif
+
+    local pwdopts = qb_QBPWDGetDefaults [];
+    pwdopts.expact_hdr = expact;
+    pwdopts.trainingset = tset;
+
+    local dbkey = db_Open [dbpath, 'read-write'];
+    local acts = db_ReadColumn [dbkey, expact];
+    if isnull acts then
+        exit twrite ['Missing activities in database: {}.',
+            dbpath];
+    endif
+
+    qb_SaveEnvAnal [dbkey, pwdopts];
+    db_Close dbkey;
+
+    local errmess = qb_PWDAnalysis [dbpath];
+
+    if length errmess > 0 then
+        exit errmess;
+    endif
+
+endfunction
