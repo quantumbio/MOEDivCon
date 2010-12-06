@@ -2318,7 +2318,7 @@ global function qb_InitCorePanel [wkey, status, defaults]
         ham: [text: HAMILTONIANS | status.allowham],
         mode: [text: RUN_MODES | status.allowmode],
         chgbox: [page: select [2, 1, defaults.mode === 'Single Point']],
-        ckdbchg: [sensitive: 0]]];
+        ckdbchg: [sensitive: 1]]];
 
     status = qb_UpdateCharge [wkey, defaults, status, 0];
 

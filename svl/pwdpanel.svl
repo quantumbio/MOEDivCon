@@ -981,7 +981,7 @@ local function SaveOptions [dbpath, options]
     endif
 
     local dbkey = db_Open [dbpath, 'read-write'];
-    local data = qb_SaveEnvAnal [dbkey, options];
+    qb_SaveEnvAnal [dbkey, options];
     db_Close dbkey;
 
 endfunction
@@ -1112,6 +1112,16 @@ global function qb_QBPWDCloseHandler []
         G_surface = [];
     endif
 
+endfunction
+
+/****************************************************************************
+ *
+ *                          qb_QBPWDGetDefaults
+ *
+ ****************************************************************************/
+global function qb_QBPWDGetDefaults []
+
+   return tag tr QBPWD_OPT_DEFAULTS;
 endfunction
 
 /****************************************************************************
