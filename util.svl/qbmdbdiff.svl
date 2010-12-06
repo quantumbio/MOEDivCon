@@ -175,7 +175,7 @@ local function tablediff [ef, title, bn, tn, bd, td, d, strict]
         trd = app second trd;
 
         local idx;
-        for idx = 1, length brd, 1 loop
+        for idx = 1, length first brd, 1 loop
             bcol = apt peek [brd, idx];
             tcol = apt peek [trd, idx];
             data = tr [bcol, tcol, rep [d, length bcol]];
@@ -190,8 +190,8 @@ local function tablediff [ef, title, bn, tn, bd, td, d, strict]
                 printHeader [ef, bn, tn, 'Row'];
                 apt printRow [ef, data];
             else
-                write ['Databases okay for table:  {}\n  {}\n  {}\n',
-                    bcns(idx),  bn, tn];
+                write ['Databases okay for table:  {} - {}\n  {}\n  {}\n',
+                    title, bcns(idx),  bn, tn];
             endif
         endloop
     else
@@ -230,11 +230,12 @@ local function tablediff [ef, title, bn, tn, bd, td, d, strict]
                     printHeader [ef, bn, tn, 'Row'];
                     apt printRow [ef, data];
                 else
-                    write ['Databases okay for table:  {}\n  {}\n  {}\n',
-                        bcn,  bn, tn];
+                    write ['Databases okay for table:  {} - {}\n  {}\n  {}\n',
+                        title, bcn,  bn, tn];
                 endif
             else
-                write ['Column missing from table:  {}\n  {}\n', bcn, tn];
+                write ['Column missing from table:  {} - {}\n  {}\n', title,
+                    bcn, tn];
             endif
          endloop
 
