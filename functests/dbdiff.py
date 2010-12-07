@@ -53,9 +53,9 @@ def run(cmd):
 for basefile in glob(basedir + '/*.mdb'):
         filename = os.path.basename(basefile)
         if re.search("pwd", filename):
-		testpwd = 1
+		testpwd = '1'
 	else: 
-		testpwd = 0
+		testpwd = '0'
 	newfile = newdir + '/' + filename
 	if not os.path.exists(newfile):
 		raise Exception('Fatal: "' + newfile + '" does not exist')
