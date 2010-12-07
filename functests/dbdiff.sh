@@ -9,20 +9,23 @@ if [ $# != 2 ] ; then
   exit
 fi
 
-bfiles=`/bin/ls -1 $1/*.mdb`
+#  Submit new jobs to PBS queue
 
-for bf in $bfiles ; do
+basefiles=`/bin/ls -1 $1/*.mdb`
+
+for bf in $basefiles ; do
   bn=`basename $bf`
   nf="${2}/$bn"
   if [ -e $nf ] ; then
     
     if [ `echo $bn | fgrep "pwd"` ] ; then
         testpwd=1
+        moebatch -exec "run ['pwdbatch.svl', ['$nf', 'QMScore', 15]]" -exit
     else
         testpwd=0
     fi
 
-    moebatch -exec "run ['qbmdbdiff.svl', ['qbmdbdiff-error.log', '$bf', '$nf', 'all', 0.25, $testpwd]]" -exit
+    moebatch -exec "run ['qbmdbdiff.svl', ['qbmdbdiff-error.log', '$bf', '$nf', 'all', 0.5, $testpwd]]" -exit
 
   else
     echo "$nf doesn't exist."
