@@ -62,4 +62,11 @@ for basefile in glob(basedir + '/*.mdb'):
 	if testpwd:
 		run('moebatch -exec "run [\'pwdbatch.svl\', [\'' + newfile + '\', \'QMScore\', 15]]" -exit')
 	run('moebatch -exec "run [\'qbmdbdiff.svl\', [\'qbmdbdiff-error.log\', \'' + basefile + '\', \'' + newfile + '\', \'all\', 0.5, ' + testpwd + ']]" -exit')
-
+output_file = "qbmdbdiff-error.log"
+if not os.path.exists(output_file):
+	print "Output file does not exist. Something went wrong with the comparison."
+if os.path.getsize(output_file) == 0:
+	print "Output file is empty. Databases are the same."
+else:
+	print "Databases differ. See https://ci.quantumbioinc.com/job/MOEDivconIntegrationTests/ws/MOEDivcon/functests/qbmdbdiff-error.log for details."
+	sys.exit(1)
