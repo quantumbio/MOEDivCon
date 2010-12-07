@@ -1,6 +1,9 @@
 #!/bin/bash
 #
 
+set -e  # Exit if we encounter any errors.
+set -x  # Trace each command as it's executed.
+
 if [ $# != 2 ] ; then
   echo "Usage:  dbdiff.sh basedir newdir"
   exit
