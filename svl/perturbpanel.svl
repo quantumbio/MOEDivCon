@@ -212,6 +212,8 @@ global function qb_RunNMRPerturb [dbkey, jobid]
 
     if not MOE_BATCH then
         Message [msgkey, 'NMR Perturbation is done.'];
+        sleep 2;
+        Message [msgkey, []];
     endif
 
     return;

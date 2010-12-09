@@ -951,6 +951,8 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
     if not MOE_BATCH then
         SystemPop [osys, nsys];
         Message [msgkey, 'Saving database ... done.'];
+        sleep 2;
+        Message [msgkey, []];
     endif
 
     db_RenameField [resultskey, molfield, LIG_FIELD];
@@ -1084,6 +1086,8 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
     if not MOE_BATCH then
         SystemPop [osys, nsys];
         Message [msgkey, 'Saving database ... done.'];
+        sleep 2;
+        Message [msgkey, []];
     endif
 
     db_RenameField [resultskey, posemolfield, LIG_FIELD];
@@ -1786,17 +1790,31 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
 
 
         local recok = 1, recmess = '', ligok = 1, ligmess = '';
+        local colok = 1, colmess = '';
         local msgkey = Message [0, 
             'Running tests on complex in MOE Window ...'];
 
         if neL [vals.mode, 'Many-to-Many'] then
-            [recok, recmess, ligok, ligmess] = TestComplex [
-                vals.testLP, vals.testOverlap, vals.testHam,
-                vals.testH, vals.testMM, status.appname,
-                (HAM_KEYS | status.allowham)(vals.ham)];
+            if vals.mode === 'Single Point' then
+                local collection = Atoms [];
+                if collection === [] then
+                    Warning 'There is no collection in the MOE Window.';
+                    exit [];
+                endif
+
+                [colok, colmess] = qb_TestDivCon ['collection', collection, 
+                    vals.testLP, vals.testOverlap, vals.testHam,
+                    vals.testH, vals.testMM, status.appname,
+                    (HAM_KEYS | status.allowham)(vals.ham)];
+            else
+                [recok, recmess, ligok, ligmess] = TestComplex [
+                    vals.testLP, vals.testOverlap, vals.testHam,
+                    vals.testH, vals.testMM, status.appname,
+                    (HAM_KEYS | status.allowham)(vals.ham)];
+            endif
         endif
 
-        if neL [vals.mode, 'One-to-One'] then
+        if vals.mode === 'One-to-Many' or vals.mode === 'Many-to-Many' then
             if second task_fork [statics:'share'] === 'child' then
                 local msgkey2 = Message [0, 
                     'Running tests on MOEDivCon database ...'];
@@ -1815,6 +1833,22 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
                 'Running tests on complex in MOE Window ... skipping.'];
             sleep 2;
             Message [msgkey, []];
+        elseif vals.mode === 'Single Point' then
+            if [colok and colmess === ''] then
+                Message [msgkey, 
+                    'Running tests on complex in MOE Window ... done.'];
+                qb_CreateMessWin [
+                    "No problems detected for complex in MOE Window.",
+                    1, 40];
+                Message [msgkey, []];
+                return [status, [], btasks];
+            else
+                Message [msgkey, 
+                    'Running tests on complex in MOE Window ... done.'];
+                qb_CreateMessWin [string colmess];
+                Message [msgkey, []];
+                return [status, [], btasks];
+            endif
         else
             if [recok and ligok and recmess === '' and ligmess === ''] then
                 if vals.mode === 'One-to-One' then
@@ -2318,7 +2352,8 @@ global function qb_InitCorePanel [wkey, status, defaults]
         ham: [text: HAMILTONIANS | status.allowham],
         mode: [text: RUN_MODES | status.allowmode],
         chgbox: [page: select [2, 1, defaults.mode === 'Single Point']],
-        ckdbchg: [sensitive: 1]]];
+        ckdbchg: [sensitive: defaults.mode === 'One-to-Many' 
+        or defaults.mode === 'Many-to-Many']]];
 
     status = qb_UpdateCharge [wkey, defaults, status, 0];
 
@@ -2843,6 +2878,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
 
     if coreopts.mode === 'Single Point' then
         local collection = Atoms [];
+        local colok = 1, colmess = '';
         if collection === [] then
             Warning 'There is no collection in the MOE Window.';
             exit [];
@@ -2858,20 +2894,20 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
 
         SaveEnv [dbkey, colmol, [], status, coreopts, appopts, [], dbtype];
 
-        stsmess = GetStatusMessage ['Collection', neL [status.recchg, CHGRED]];
+        stsmess = GetStatusMessage ['Collection', neL [status.colchg, CHGRED]];
         if dotests then
-            [recok, recmess] = qb_TestDivCon ['collection', collection, 
+            [colok, colmess] = qb_TestDivCon ['collection', collection, 
                 coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
                 coreopts.testH, coreopts.testMM, status.appname,
                 (HAM_KEYS | status.allowham)(coreopts.ham)];
         endif
 
-        if tok_length recmess > 0 then
-            stsmess = cat [stsmess, string recmess];
+        if tok_length colmess > 0 then
+            stsmess = cat [stsmess, string colmess];
         endif
 
         local coldata = tag [qb_GetColFields [], 
-            [colmol, coreopts.recchg]];
+            [colmol, coreopts.colchg]];
         local colrowkey = db_Write [dbkey, 0, coldata];
 
         if not isnull stsmess then
