@@ -55,7 +55,7 @@ const MAT_TRANS_MIN = 0x80;
 const QBPWD_OPT_DEFAULTS =
     [
     ['title',        'PWD Analysis'],
-    ['analysis',     3             ],
+    ['analysis',     1             ],
     ['sf_e_ab',      1             ],
     ['sf_e_abp',     0             ],
     ['sf_e_abc',     0             ],
@@ -72,19 +72,19 @@ const QBPWD_OPT_DEFAULTS =
 
 const ANALYSIS =
     [
-    'PLS Results Table',
-    'Activities Table',
     'Interaction Heat Map',
-    'SAR Heat Map'
+    'SAR Heat Map',
+    'Activities Table',
+    'PLS Results Table'
     ];
 
 const ANALOPTLV = 5;
 const ANALKEYS =
     [
-    'pls',
-    'act',
     'inter',
     'sar',
+    'act',
+    'pls',
     'optlv'
     ];
 
@@ -589,13 +589,34 @@ endfunction
 /****************************************************************************
  *                          GetAnalData
  *
- *  Get the analysis and repackage for heat map.
+ *  Get the analysis data and repackage the tables for heat map.
  *
  *  Note:  it is assumed that this function is called from a child process
  *  and will exit on an error.
  *
  ****************************************************************************/
-local function GetAnalData [dbpath, title, type]
+local function GetAnalData [dbpath, title]
+
+    local function trim [t]
+        local i = indexof ["=", string t];
+        if i > 0 then return tok_keep [t, i - 1]; else return t; endif
+   endfunction
+
+    local function where [r]
+        local rnidx = indexof ["1234567890", string r];
+        rnidx = rnidx | rnidx <> 0;
+        return  (min rnidx) - 1;
+    endfunction
+
+    local function abbreviate [rn, ln]
+        local idx = app where rn;
+        local arn = apt tok_drop [rn, idx];
+        arn = apt tok_keep [arn, -3];
+        local aln = app trim ln;
+        aln = apt tok_drop [aln, 3];
+        aln = apt tok_keep [aln, -3];
+        return [arn, aln];
+    endfunction
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
@@ -611,63 +632,46 @@ local function GetAnalData [dbpath, title, type]
     endif
 
     local dbkey = db_Open [dbpath, 'read'];
-    local data = qb_GetAnalysisData [dbkey, 'pwd', type];
+    local interdata = qb_GetAnalysisData [dbkey, 'pwd', 'inter'];
+    local sardata = qb_GetAnalysisData [dbkey, 'pwd', 'sar'];
+    local actdata = qb_GetAnalysisData [dbkey, 'pwd', 'act'];
+    local plsdata = qb_GetAnalysisData [dbkey, 'pwd', 'pls'];
+    local lvdata = qb_GetAnalysisData [dbkey, 'pwd', 'optlv'];
     db_Close dbkey;
 
-    if data === [] then
-        return [];
-    endif
-
-    local fulltitle;
-    if type === 'sar' then
-        fulltitle = twrite ['{} SAR Map', title];
-    elseif type === 'inter' then
+    local fulltitle, resnames, resabbrevs;
+    local ligdata, lignames, ligabbrevs, ligvals;
+    if not isnull interdata then
         fulltitle = twrite ['{} Interaction Map', title];
-    elseif type === 'act' then
-        fulltitle = twrite ['{} Activities Table', title];
-    elseif type === 'pls' then
-        fulltitle = twrite ['{} PLS Results Table', title];
-    else
-        fulltitle = title;
-    endif
-
-    local function trim [t]
-        local i = indexof ["=", string t];
-        if i > 0 then return tok_keep [t, i - 1]; else return t; endif
-   endfunction
-
-    local function where [r]
-        local rnidx = indexof ["1234567890", string r];
-        rnidx = rnidx | rnidx <> 0;
-        return  (min rnidx) - 1;
-    endfunction
-
-    //  Create abbreviated names for heat map and check residues
-    if type === 'sar' or type === 'inter' then
-        local [resnames, ligdata] = data;
-        local idx = app where resnames;
-        local resabbrevs = apt tok_drop [resnames, idx];
-        resabbrevs = apt tok_keep [resabbrevs, -3];
-        local lignames = app first ligdata;
-        local newlignames = app trim lignames;
-        local ligabbrevs = apt tok_drop [newlignames, 3];
-        ligabbrevs = apt tok_keep [ligabbrevs, -3];
-        local ligvals = app second ligdata;
-        data = [[fulltitle, 'Ligands', 'Residues'], resnames, resabbrevs,
+        [resnames, ligdata] = interdata;
+        lignames = app first ligdata;
+        ligvals = app second ligdata;
+        [resabbrevs, ligabbrevs] = abbreviate [resnames, lignames];
+        interdata = [[fulltitle, 'Ligands', 'Residues'], resnames, resabbrevs,
             tr [lignames, ligabbrevs, ligvals]];
-
-        local missing = CheckResidues [second data];
-        if length missing > 0 then
-            Warning twrite ['The following residues are not \n'
-                'present in receptor in MOE Window:\n{v}\n',
-                missing];
-            exit [];
-        endif
-    elseif type === 'act' or type === 'pls' then
-        data = [fulltitle, data];
     endif
 
-    return data;
+    if not isnull sardata then
+        fulltitle = twrite ['{} SAR Map', title];
+        [resnames, ligdata] = sardata;
+        lignames = app first ligdata;
+        ligvals = app second ligdata;
+        [resabbrevs, ligabbrevs] = abbreviate [resnames, lignames];
+        sardata = [[fulltitle, 'Ligands', 'Residues'], resnames, resabbrevs,
+            tr [lignames, ligabbrevs, ligvals]];
+    endif
+
+    if not isnull actdata then
+        fulltitle = twrite ['{} Activities Table', title];
+        actdata = [fulltitle, actdata];
+    endif
+
+    if not isnull plsdata then
+        fulltitle = twrite ['{} PLS Results Table', title];
+        plsdata = [fulltitle, plsdata];
+    endif
+
+    return [interdata, sardata, actdata, plsdata, lvdata];
 
 endfunction
 
@@ -1222,37 +1226,38 @@ global function qb_QBPWDSetupPanel []
                     master:'parent'] === 'child' then
 
                 // Load and setup data
-                if isnull peek [pwddata, vals.analysis] then
-                    pwddata = poke [pwddata, vals.analysis, 
-                        GetAnalData [pwdfilename, vals.title,
-                        ANALKEYS (vals.analysis)]];
-                    if isnull peek [pwddata, vals.analysis] then
-                        Warning 'No analysis data to view.';
-                        exit [];
-                    endif
+                local data = pwddata (val.analysis);
+                if isnull data then
+                    Warning 'No analysis data to view.';
+                    exit [];
+
                 endif
 
-                if ANALKEYS (vals.analysis) === 'pls' then
-                    if isnull peek [pwddata, ANALOPTLV] then
-                        pwddata = poke [pwddata, ANALOPTLV, 
-                            GetAnalData [pwdfilename, vals.title,
-                            ANALKEYS (ANALOPTLV)]];
-                    endif
 
-                    ShowTable [pwddata (vals.analysis),
+                if ANALKEYS (vals.analysis) === 'pls' then
+                    ShowTable [data,
                         twrite ['\nOptimal LV:  {}\n', pwddata (ANALOPTLV)]];
                     exit [];
                 endif
 
                 if ANALKEYS (vals.analysis) === 'act' then
-                    ShowTable [pwddata (vals.analysis), ''];
+                    ShowTable [data, ''];
+                    exit [];
+                endif
+
+                //  Otherwise, Heat Map - check residue names
+                local missing = CheckResidues [second data];
+                if length missing > 0 then
+                    Warning twrite ['The following residues are not \n'
+                        'present in the receptor in the MOE Window:\n{v}\n',
+                        missing];
                     exit [];
                 endif
 
                 //  Create surface if necessary
                 if isnull G_surface then
                     msgkey = Message [0, 'Calculating surface ...'];
-                    CreateSurfaceMap [second pwddata (vals.analysis)];
+                    CreateSurfaceMap [second data];
                     msgkey = Message [msgkey, ''];
                 endif
 
@@ -1263,10 +1268,8 @@ global function qb_QBPWDSetupPanel []
 
                 //  Make sure first ligand is in MOE Window
                 UpdateComplex G_surface.lignames (INITLIG);
-                qb_HeatMapSetupPanel [pwddata (vals.analysis),
-                    SIGNIFRES, 'qb_QBPWDSelectHandler', INITLIG, 1,
-                    'qb_QBPWDCloseHandler'];
-
+                qb_HeatMapSetupPanel [data,  SIGNIFRES, 
+                    'qb_QBPWDSelectHandler', INITLIG, 1, 'qb_QBPWDCloseHandler'];
                 exit [];
             endif
 
@@ -1277,13 +1280,8 @@ global function qb_QBPWDSetupPanel []
 
                 // Load and setup data
                 if isnull peek [pwddata, vals.analysis] then
-                    pwddata = poke [pwddata, vals.analysis, 
-                        GetAnalData [pwdfilename, vals.title,
-                        ANALKEYS (vals.analysis)]];
-                    if isnull peek [pwddata, vals.analysis] then
-                        Warning 'No analysis data to save.';
-                        exit [];
-                    endif
+                    Warning 'No analysis data to save.';
+                    exit [];
                 endif
 
                 local savefile = twrite ['{} {}.csv', vals.title, 
@@ -1373,7 +1371,8 @@ global function qb_QBPWDSetupPanel []
                         sleep 2;
                     endif
 
-                    pwddata = [[], [], [], [], []];
+                    pwddata = GetAnalData [pwdfilename, vals.title];
+//DEBUG - warn if no data and show only choices for avaiable data
                     WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
                     exit [];
                 endif
@@ -1411,6 +1410,8 @@ global function qb_QBPWDSetupPanel []
 
                         db_Close ldkey;
                         WindowSetData [wkey, ldpwdopts];
+                        pwddata = GetAnalData [pwdfilename, vals.title];
+//DEBUG - show only choices for avaiable data
                         WindowSetAttr [wkey, [analbox: [sensitive: 1],
                             panel: [sensitive: [1,1,1]]]];
 WindowSetAttr [wkey, [sf_e_r12: [sensitive: 0], sf_e_ele: [sensitive: 0]]];//DEBUG
