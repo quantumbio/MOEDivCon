@@ -1226,13 +1226,11 @@ global function qb_QBPWDSetupPanel []
                     master:'parent'] === 'child' then
 
                 // Load and setup data
-                local data = pwddata (val.analysis);
+                local data = pwddata (vals.analysis);
                 if isnull data then
                     Warning 'No analysis data to view.';
                     exit [];
-
                 endif
-
 
                 if ANALKEYS (vals.analysis) === 'pls' then
                     ShowTable [data,
@@ -1372,8 +1370,18 @@ global function qb_QBPWDSetupPanel []
                     endif
 
                     pwddata = GetAnalData [pwdfilename, vals.title];
-//DEBUG - warn if no data and show only choices for avaiable data
-                    WindowSetAttr [wkey, [selbox: [sensitive: 1]]];
+                    local dmap = app isnull pwddata;
+print dmap;//DEBUG
+                    if alltrue dmap then
+                        Warning ['PWD Analysis failed.'];
+                        WindowSetAttr [wkey, [selbox: [sensitive: 0]]];
+                    else
+                        dmap = not droplast dmap;
+print dmap;//DEBUG
+                        WindowSetAttr [wkey, [selbox: [sensitive: 1],
+                            analysis: [text: (ANALYSIS | dmap)]]];
+                    endif
+
                     exit [];
                 endif
 
@@ -1411,9 +1419,20 @@ global function qb_QBPWDSetupPanel []
                         db_Close ldkey;
                         WindowSetData [wkey, ldpwdopts];
                         pwddata = GetAnalData [pwdfilename, vals.title];
-//DEBUG - show only choices for avaiable data
-                        WindowSetAttr [wkey, [analbox: [sensitive: 1],
-                            panel: [sensitive: [1,1,1]]]];
+                        local datam = app isnull pwddata;
+print datam;//DEBUG
+                        if alltrue datam then
+                            WindowSetAttr [wkey, [selbox: [sensitive: 0],
+                                panel: [sensitive: [1,1,1]]]];
+                        else
+                            datam = not droplast datam;
+print datam;//DEBUG
+                            WindowSetAttr [wkey, [selbox: [sensitive: 1],
+                                analysis: [text: (ANALYSIS | datam)],
+                                analbox: [sensitive: 1],
+                                panel: [sensitive: [1,1,1]]]];
+                        endif
+
 WindowSetAttr [wkey, [sf_e_r12: [sensitive: 0], sf_e_ele: [sensitive: 0]]];//DEBUG
                     endif
 
