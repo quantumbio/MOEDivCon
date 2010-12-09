@@ -847,9 +847,6 @@ endfunction
  *
  ****************************************************************************/
 local function ReadExpActData [expactfn, qmsdbfn, header]
-
-write ['Act file:  {}\n', expactfn];//DEBUG
-
     if neL [fext qmsdbfn, 'mdb'] then
         Warning twrite ['{}\n is not a MOE database.', qmsdbfn];
         exit [];
@@ -1369,15 +1366,15 @@ global function qb_QBPWDSetupPanel []
                         sleep 2;
                     endif
 
+                    Message [msgkey, []];
+
                     pwddata = GetAnalData [pwdfilename, vals.title];
                     local dmap = app isnull pwddata;
-print dmap;//DEBUG
                     if alltrue dmap then
                         Warning ['PWD Analysis failed.'];
                         WindowSetAttr [wkey, [selbox: [sensitive: 0]]];
                     else
                         dmap = not droplast dmap;
-print dmap;//DEBUG
                         WindowSetAttr [wkey, [selbox: [sensitive: 1],
                             analysis: [text: (ANALYSIS | dmap)]]];
                     endif
@@ -1420,13 +1417,12 @@ print dmap;//DEBUG
                         WindowSetData [wkey, ldpwdopts];
                         pwddata = GetAnalData [pwdfilename, vals.title];
                         local datam = app isnull pwddata;
-print datam;//DEBUG
                         if alltrue datam then
                             WindowSetAttr [wkey, [selbox: [sensitive: 0],
+                                analbox: [sensitive: 1],
                                 panel: [sensitive: [1,1,1]]]];
                         else
                             datam = not droplast datam;
-print datam;//DEBUG
                             WindowSetAttr [wkey, [selbox: [sensitive: 1],
                                 analysis: [text: (ANALYSIS | datam)],
                                 analbox: [sensitive: 1],

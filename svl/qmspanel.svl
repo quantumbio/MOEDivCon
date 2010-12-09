@@ -284,6 +284,7 @@ local function RunCalc [dbkey]
     write ['{}\n', timemess];
     Message [msgkey, timemess];
     sleep 3;
+    Message [msgkey, []];
 
     return;
 endfunction
@@ -374,6 +375,7 @@ local function RunOneToManyCalc [oldkey]
         endif
     endloop
 
+    Message [msgkey, []];
     db_Close dbkey;
 
 endfunction

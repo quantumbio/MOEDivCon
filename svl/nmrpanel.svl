@@ -361,6 +361,8 @@ local function RunCalc [dbkey]
     endif
 
     Message [msgkey, 'NMRScore is done.'];
+    sleep 2;
+    Message [msgkey, []];
 
     return;
 endfunction
@@ -451,6 +453,7 @@ local function RunOneToManyCalc [oldkey]
         endif
     endloop
 
+    Message [msgkey, []];
     db_Close dbkey;
 
 endfunction
