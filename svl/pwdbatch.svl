@@ -46,6 +46,8 @@ global function qb_QBPWDBatch [dbpath, expact, tset]
 
     if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
 
+qb_dumpEnvVars ['PWD Batch'];//DEBUG
+
     if neL [fext dbpath, 'mdb'] then
         exit twrite ['{}\n is not a MOE database.', dbpath];
     endif
