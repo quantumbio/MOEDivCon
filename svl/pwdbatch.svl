@@ -32,10 +32,10 @@
 #set version '2010.01'
 #set main    'qb_QBPWDBatch'
 
-function qb_QBPWDGetDefaults;
-function qb_SaveEnvAnal;
+#function qb_QBPWDGetDefaults;
+#function qb_SaveEnvAnal;
 
-function qb_PWDAnalysis;
+#function qb_PWDAnalysis;
 
 /****************************************************************************
  *
@@ -48,6 +48,9 @@ global function qb_QBPWDBatch [dbpath, expact, tset]
 
 qb_dumpEnvVars ['PWD Batch'];//DEBUG
 
+return;
+endfunction
+/*
     if neL [fext dbpath, 'mdb'] then
         exit twrite ['{}\n is not a MOE database.', dbpath];
     endif
@@ -78,3 +81,4 @@ qb_dumpEnvVars ['PWD Batch'];//DEBUG
     endif
 
 endfunction
+*/
