@@ -37,6 +37,7 @@
 
 //function qb_PWDAnalysis;
 
+function qb_dumpEnvVars;//DEBUG
 /****************************************************************************
  *
  *                          qb_QBPWDBatch
