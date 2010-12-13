@@ -32,10 +32,10 @@
 #set version '2010.01'
 #set main    'qb_QBPWDBatch'
 
-#function qb_QBPWDGetDefaults;
-#function qb_SaveEnvAnal;
+//function qb_QBPWDGetDefaults;
+//function qb_SaveEnvAnal;
 
-#function qb_PWDAnalysis;
+//function qb_PWDAnalysis;
 
 /****************************************************************************
  *
