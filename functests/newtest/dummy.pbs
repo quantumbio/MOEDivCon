@@ -8,5 +8,5 @@ hostname
 date
 cat $PBS_NODEFILE
 
-wait 30
+sleep 30
 echo "Dummy is done."
