@@ -2493,7 +2493,6 @@ global function qb_LoadCoreScoreDB [dbpath, type]
 
         coreopts.recchg = recchg;
         coreopts.ligchg = ligchg;
-
     endif
 
     return [dbkey, rec, lig, status, coreopts, complex, ''];
@@ -3369,7 +3368,7 @@ endfunction
  ****************************************************************************/
 global function qb_UpdateCharge [wkey, vals, status, warn]
 
-    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+    if MOE_BATCH then exit ['Should only be run from MOE Window.']; endif
 
     if vals.mode === 'Single Point' then
         local [colchg, colok, colerrmess] = CalcCollectionCharge [];
@@ -3445,20 +3444,15 @@ endfunction
 /****************************************************************************
  *                          qb_VerifyDivConCollection
  *
- *  Verify with the user that the current charges and/or molecules should
+ *  Verify with the user that the current charge and/or collection should
  *  be used even if they are problematic for DivCon.
  *
  *  Assumption:  called from MOE gui, not moebatch.
  *
- *
  ****************************************************************************/
 global function qb_VerifyDivConCollection [wkey, status, vals]
 
-    if vals.mode === 'Many-to-Many' then
-        status.verified = 1;
-        status.notforced = 1;
-        return status;
-    endif
+    if MOE_BATCH then exit ['Should only be run from MOE Window.']; endif
 
     local msgkey = Message [0, 'Testing ...'];
 
@@ -3518,6 +3512,8 @@ endfunction
  *
  ****************************************************************************/
 global function qb_VerifyDivConComplex [wkey, status, vals]
+
+    if MOE_BATCH then exit ['Should only be run from MOE Window.']; endif
 
     if vals.mode === 'Many-to-Many' then
         status.verified = 1;
