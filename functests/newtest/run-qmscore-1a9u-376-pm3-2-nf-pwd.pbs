@@ -7,7 +7,7 @@
 
 hostname
 date
-env
+env | sort
 cat $PBS_NODEFILE
 
 # Change the path and name for the MOE database.
