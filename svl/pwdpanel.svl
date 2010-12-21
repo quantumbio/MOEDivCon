@@ -51,6 +51,7 @@ function qb_PWDAnalysis;
 const PWD_EXPACT_HDR = 'Exp Act';
 
 const MAT_TRANS_MIN = 0x80;
+const INITDIST = 0.0;       // Not equal to INITRADS
 
 const QBPWD_OPT_DEFAULTS =
     [
@@ -350,6 +351,7 @@ const PANEL =
 
 function MatchResidue;
 
+//DEBUG -- Remove (first try max of min)
 /****************************************************************************
  *
  *                          CalcDist
@@ -359,16 +361,25 @@ function MatchResidue;
  ****************************************************************************/
 local function CalcDist [restokens, recatoms, ligatoms]
 
-    local atom, dist = 10.0;
-    for atom in recatoms loop
-        local residue = aResidue atom;
-        local restok = twrite ['{}{}', rName residue, rUID residue];
+    local res, atom, dist = 5.0;
+    local residues = uniq aResidue recatoms;
+    for res in residues loop
+        local restok = twrite ['{}{}', rName res, rUID res];
         local idx = MatchResidue [restok, restokens];
         if idx > 0 then
-            dist = max [max aDist [atom, ligatoms], dist];
+            local rdist = 100.0;
+            local ratoms = first rAtoms res;
+            for atom in ratoms loop
+                local rmin = min aDist [atom, ligatoms];
+
+                rdist = min [rmin, rdist];
+            endloop
+write ['{t:8}: {n:7.2f}\n', restok, rdist];//DEBUG
+            dist = max [rdist, dist];
         endif
     endloop
 
+write ['Dist:  {}\n', dist];//DEBUG
     return dist;
 
 endfunction
@@ -398,22 +409,6 @@ local function CheckResidues [restoks]
     endloop
 
     return missing;
-
-endfunction
-
-/****************************************************************************
- *
- *                          ClearSurfaceMap
- *
- *  Clear the surface map of the pocket and the residue label.
- *
- *  Acknowledgement:  borrowed heavily from surfmap.svl.
- *
- ****************************************************************************/
-local function ClearSurfaceMap [title]
-
-    local gobjs = GKeyList [];
-    GDestroy (gobjs | m_findmatch [tok_cat [title,'*'], GTitle gobjs]);
 
 endfunction
 
@@ -460,6 +455,8 @@ local function ColorAtoms [data, ligidx, residx, recatoms,
 
 endfunction
 
+function UpdateSurfaceMap;
+
 /****************************************************************************
  *
  *                          CreateSurfaceMap
@@ -471,17 +468,11 @@ endfunction
  ****************************************************************************/
 local function CreateSurfaceMap [restokens]
 
-    const CLASS = 1;  // Connolly
-    const RDIST = 10;
-
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
     if recatoms === [] or ligatoms === [] then
         Warning errmess;
         return [];
     endif
-
-    local dist = CalcDist [restokens, recatoms, ligatoms];
-    dist = dist / 2;
 
     local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
     local gridopt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
@@ -490,7 +481,6 @@ local function CreateSurfaceMap [restokens]
     G_surface =
         [
         title    : 'QB Heat Map',
-        class    : CLASS,
         colorby  : 'Constant',
         colconst : 0xFFFFFF,            // White
         surfdim  : 3,
@@ -508,7 +498,7 @@ local function CreateSurfaceMap [restokens]
         origbnd  : '',
         restok   : '',
         resatms  : [],
-        dist     : dist,
+        dist     : INITDIST,
         rad      : vdwR,
         eps      : vdwE,
         gridopt  : gridopt,
@@ -517,27 +507,7 @@ local function CreateSurfaceMap [restokens]
         gobj     : []
         ];
 
-    G_surface.gvtx = msurf_MolecularSurface [G_surface.recpos, 
-        G_surface.rad, G_surface.eps, G_surface.ligpos, G_surface.dist, 
-        G_surface.gridopt];
-
-    local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
-    s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
-    G_surface.gvtx = poke [G_surface.gvtx, 1, s_idx];
-
-    if add GKey G_surface.gobj then
-        GSetTitle [G_surface.gobj, G_surface.title];
-        G_surface.gobj = GCreateUnique G_surface.gobj;
-    else
-        G_surface.gobj = GCreateUnique G_surface.title;
-    endif
-
-    local trans = [G_surface.trans_f, G_surface.trans_b];
-    GSetTransparency [G_surface.gobj, trans];
-    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
-    GSetMaterial [G_surface.gobj, mat];
-    GVertex [G_surface.gobj, G_surface.surfdim, s_idx, G_surface.colconst,
-      s_vpt, s_vnorm];
+    UpdateSurfaceMap [1, []];
 
     ViewSave G_surface.origvw;
     G_surface.orignuc = aNucleusLook G_surface.lig (1);
@@ -911,6 +881,40 @@ endfunction
 
 /****************************************************************************
  *
+ *                          ResizeSurfaceMap
+ *
+ *  Resize a surface map of the pocket.
+ *
+ *  Acknowledgement:  borrowed heavily from surfmap.svl.
+ *
+ ****************************************************************************/
+local function ResizeSurfaceMap [dist]
+
+    if isnull G_surface then return; endif
+
+    G_surface.dist = dist;
+
+    G_surface.gvtx = msurf_MolecularSurface [G_surface.recpos, 
+        G_surface.rad, G_surface.eps, G_surface.ligpos, G_surface.dist, 
+        G_surface.gridopt];
+
+    local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
+    s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
+    G_surface.gvtx = poke [G_surface.gvtx, 1, s_idx];
+    GClearVertexData G_surface.gobj;
+
+    local trans = [G_surface.trans_f, G_surface.trans_b];
+    GSetTransparency [G_surface.gobj, trans];
+    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
+    GSetMaterial [G_surface.gobj, mat];
+    GVertex [G_surface.gobj, G_surface.surfdim, s_idx, G_surface.colconst,
+      s_vpt, s_vnorm];
+
+endfunction
+
+
+/****************************************************************************
+ *
  *                          SaveMatrixData
  *
  *  Save the matrix data in csv format.
@@ -1095,6 +1099,47 @@ local function UpdateResidue [restok, row, col, zoom]
 
 endfunction
 
+/****************************************************************************
+ *
+ *                          UpdateSurfaceMap
+ *
+ *  Update the surface map of the pocket.
+ *
+ *  Acknowledgement:  borrowed heavily from surfmap.svl.
+ *
+ ****************************************************************************/
+local function UpdateSurfaceMap [replace, atomcolors]
+
+    if isnull G_surface then return; endif
+
+    if replace then
+        GClearVertexData G_surface.gobj;
+        G_surface.gvtx = msurf_MolecularSurface [G_surface.recpos, 
+            G_surface.rad, G_surface.eps, G_surface.ligpos, G_surface.dist, 
+            G_surface.gridopt];
+        local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
+        s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
+        G_surface.gvtx = poke [G_surface.gvtx, 1, s_idx];
+    endif
+
+    local vcolor;
+    if isnull atomcolors then
+        vcolor = G_surface.colconst;
+    else
+	    vcolor = NearestAtomColor [G_surface.recpos, G_surface.rad,
+            atomcolors, G_surface.gvtx(3)];
+    endif
+
+    local trans = [G_surface.trans_f, G_surface.trans_b];
+    GSetTransparency [G_surface.gobj, trans];
+    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
+    GSetMaterial [G_surface.gobj, mat];
+    GVertex [G_surface.gobj, G_surface.surfdim, s_idx, vcolor,
+      s_vpt, s_vnorm];
+
+endfunction
+
+
 //  Global Functions
 
 /****************************************************************************
@@ -1105,10 +1150,12 @@ endfunction
 global function qb_QBPWDCloseHandler []
 
     if not isnull G_surface then
-        ClearSurfaceMap G_surface.title;
-        aSetLabelRes [G_surface.resatms, 0];
-        aSetNucleusLook [G_surface.lig, G_surface.orignuc];
-        aSetBondLook [G_surface.lig, G_surface.origbnd];
+        GDestroy G_surface.gobj;
+        aSetLabelRes [(G_surface.resatms | oValid G_surface.resatms), 0];
+        aSetNucleusLook [(G_surface.lig | oValid G_surface.lig), 
+            G_surface.orignuc];
+        aSetBondLook [(G_surface.lig | oValid G_surface.lig), 
+            G_surface.origbnd];
         ViewLoad G_surface.origvw;
         G_surface = [];
     endif
@@ -1130,9 +1177,13 @@ endfunction
  *                          qb_QBPWDSelectHandler
  *
  ****************************************************************************/
-global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
-        colors]
-    
+global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
+        mincut, maxcut, colors]
+
+    if isnull G_surface then return; endif
+    if allfalse eqE [G_surface.gobj, GKeyList []] then return; endif
+    if isnull Atoms [] then return; endif
+
     local [titles, resnames, resabbrevs, rowdata] = data;
     local restok = '', ligtok = '', ligabbrev = '', ligdata = [];
     if selrow === 0 and selcol === 0 then
@@ -1150,30 +1201,11 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, mincut, maxcut,
         [ligtok, ligabbrev, ligdata] = rowdata (selrow);
     endif
 
-    ClearSurfaceMap G_surface.title;
+
     UpdateComplex ligtok;
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
         mincut, maxcut, colors];
-
-	local vcolor = NearestAtomColor [G_surface.recpos, G_surface.rad,
-        atomcolors, G_surface.gvtx(3)];
-
-    local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
-    if add GKey G_surface.gobj then
-        GSetTitle [G_surface.gobj, G_surface.title];
-        G_surface.gobj = GCreateUnique G_surface.gobj;
-    else
-        G_surface.gobj = GCreateUnique G_surface.title;
-    endif
-
-    local trans = [G_surface.trans_f, G_surface.trans_b];
-    GSetTransparency [G_surface.gobj, trans];
-    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
-    GSetMaterial [G_surface.gobj, mat];
-
-    GVertex [G_surface.gobj, G_surface.surfdim, s_idx, vcolor,
-      s_vpt, s_vnorm];
-
+    UpdateSurfaceMap [neL [radius, G_surface.dist], atomcolors];
     UpdateResidue [restok, selrow, selcol, 0];
 
     if not G_surface.fix then
@@ -1191,6 +1223,8 @@ endfunction
 global function qb_QBPWDSetupPanel []
 
     const INITLIG = 1;
+    const INITRAD = 5.0;
+    const SHOWHELP = 1;
     const SIGNIFRES = 5;
 
     static pwdfilename;                     //  Shared with child tasks.
@@ -1264,7 +1298,8 @@ global function qb_QBPWDSetupPanel []
                 //  Make sure first ligand is in MOE Window
                 UpdateComplex G_surface.lignames (INITLIG);
                 qb_HeatMapSetupPanel [data,  SIGNIFRES, 
-                    'qb_QBPWDSelectHandler', INITLIG, 1, 'qb_QBPWDCloseHandler'];
+                    'qb_QBPWDSelectHandler', INITLIG, INITRAD, SHOWHELP,
+                    'qb_QBPWDCloseHandler'];
                 exit [];
             endif
 
