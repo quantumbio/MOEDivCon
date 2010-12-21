@@ -3,9 +3,11 @@
 #PBS -l nodes=7:ppn=3
 #PBS -l pmem=1gb
 #PBS -j oe
+#PBS -v PATH,MOE_SVL_LOAD,MOE_SVL_RUNPATH
 
 hostname
 date
+env
 cat $PBS_NODEFILE
 
 # Change the path and name for the MOE database.
