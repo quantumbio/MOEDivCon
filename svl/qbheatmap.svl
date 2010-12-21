@@ -77,6 +77,11 @@ const ROWCOLFONT_H = 10;
  *          values greater than the maximum are assigned the same color as
  *          the maximum.
  *
+ *    ticks : int : the number of ticks to display on the color scale showing
+ *          the values represented by the colors.
+ *
+ *    radius : real : the radius used to draw the surface for the heat map.
+ *
  *    numcolors : int : the number of different colors used to generate the
  *          color scale for the heat map.
  *
@@ -84,23 +89,23 @@ const ROWCOLFONT_H = 10;
  *          blue for negative) to generate the color scale.  Otherwise,
  *          use a rainbow spectrum of colors.
  *
- *    ticks : int : the number of ticks to display on the color scale showing
- *          the values represented by the colors.
- *
  *****************************************************************************/
 const OPT_DEFAULTS =
     [
     ['mapradio',     1             ],
     ['cutoff',       1             ],
     ['sigma',        3.0           ],
+    ['nticks',       9             ],
+    ['radius',       5.0           ],
     ['ncolors',     16             ],
-    ['mono',         1             ],
-    ['nticks',       9             ]
+    ['mono',         1             ]
     ];
 
+
 const SIGMAS = ['1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0'];
-const NUM_COLORS = ['4', '8', '12', '16', '24', '32'];
 const NUM_TICKS  = ['5', '9', '13', '17', '25', '33'];
+const RADII = ['3.0', '4.0', '5.0', '6.0', '7.0'];
+const NUM_COLORS = ['4', '8', '12', '16', '24', '32'];
 
 //  Window GUI
 const HEADER = 
@@ -216,6 +221,30 @@ const PANEL =
                 [
                 vertical:0, shadow:'noline', extendH: 0, margin:1
                 ],
+           Text :
+                [
+                name: 'nticks', len: 7,
+                title: 'Number of ticks:',
+                type: 'int', allowBlank: 0,
+                shortcut: NUM_TICKS,
+                bubbleHelp: 'Number of labeled ticks on color scale.'
+                ]
+            ],
+        Hbox :
+            [
+            extendH: 1,
+            Text :
+                [
+                name: 'radius', len: 7,
+                title: 'Radius:',
+                type: 'real', allowBlank: 0,
+                shortcut: RADII,
+                bubbleHelp: 'Radius of surface.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
             Text :
                 [
                 name: 'ncolors', len: 7,
@@ -234,16 +263,9 @@ const PANEL =
                 bubbleHelp:
                     'Use a monochrome color scheme\n'
                     '(red positive, blue negative).'
-                ],
-            Text :
-                [
-                name: 'nticks', len: 7,
-                title: 'Number of ticks:',
-                type: 'int', allowBlank: 0,
-                shortcut: NUM_TICKS,
-                bubbleHelp: 'Number of labeled ticks on color scale.'
                 ]
             ],
+
         Separator : 
             [
             vertical:1, shadow:'noline', extendV: 0, margin:1
@@ -260,13 +282,13 @@ const PANEL =
  *  Automatically selects rows, columns or cells.
  *
  ****************************************************************************/
-local function Animate [dir, data, numrows, numcols, selfun, mincut, 
+local function Animate [dir, data, numrows, numcols, selfun, radius, mincut, 
         maxcut, colors];
 
     local selrow, selcol, errmess;
     if dir === 'row' then
         for selrow = 1, numrows, 1 loop
-            errmess = call [selfun, [data, selrow, 0, mincut,
+            errmess = call [selfun, [data, selrow, 0, radius, mincut,
                 maxcut, colors]];
             if not isnull errmess and neL [errmess, ''] then
                 Warning errmess;
@@ -278,7 +300,7 @@ local function Animate [dir, data, numrows, numcols, selfun, mincut,
 
     elseif dir === 'col' then
         for selcol = 1, numcols, 1 loop
-            errmess = call [selfun, [data, 0, selcol, mincut,
+            errmess = call [selfun, [data, 0, selcol, radius, mincut,
                 maxcut, colors]];
             if not isnull errmess and neL [errmess, ''] then
                 Warning errmess;
@@ -291,7 +313,7 @@ local function Animate [dir, data, numrows, numcols, selfun, mincut,
     elseif dir === 'cell' then
         for selrow = 1, numrows, 1 loop
             for selcol = 1, numcols, 1 loop
-                errmess = call [selfun, [data, selrow, selcol, mincut,
+                errmess = call [selfun, [data, selrow, selcol, radius, mincut,
                     maxcut, colors]];
                 if not isnull errmess and neL [errmess, ''] then
                     Warning errmess;
@@ -1211,7 +1233,7 @@ endfunction
  *
  ****************************************************************************/
 global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
-        help, closefun]
+        initrad, help, closefun]
     static selrow, selcol;
 
     if MOE_BATCH then return; endif
@@ -1220,6 +1242,7 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
     local bgraphics = [], scalekey = [], mincut = [], maxcut = [], colors = [];
     local optdflts = tag tr OPT_DEFAULTS;
     optdflts.mapradio = initsel;
+    optdflts.radius = initrad;
     selrow = initsel; selcol = 0;
 
     //  Currently, only MAX_COLS columns and MAX_ROWS rows are allowed.
@@ -1292,8 +1315,8 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
     app gr_destroy bgraphics;
 
     [selrow, selcol] = IndexToRowCol [initsel, numrows, numcols];
-    local selerrmess = call [selfun, [data, selrow, selcol, mincut,
-        maxcut, colors]];
+    local selerrmess = call [selfun, [data, selrow, selcol, optdflts.radius, 
+        mincut, maxcut, colors]];
     if not isnull selerrmess and neL [selerrmess, ''] then
         WindowDestroy wkey;
         Warning selerrmess;
@@ -1324,15 +1347,15 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
 
             elseif vals.panel === 'Animate' then
                 WindowShow [wkey, 0];
-                Animate ['row', data, numrows, numcols, selfun, mincut, 
-                    maxcut, colors];
+                Animate ['row', data, numrows, numcols, selfun, vals.radius,
+                    mincut, maxcut, colors];
                 WindowShow [wkey, 1];
 
                 //  Show previous selection after animation
                 [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows,
                     numcols];
-                selerrmess = call [selfun, [data, selrow, selcol, mincut,
-                    maxcut, colors]];
+                selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
+                    mincut, maxcut, colors]];
                 if not isnull selerrmess and neL [selerrmess, ''] then
                     Warning selerrmess;
                     break;
@@ -1351,8 +1374,8 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                      WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
                 endif
 
-                selerrmess = call [selfun, [data, selrow, selcol, mincut,
-                    maxcut, colors]];
+                selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
+                    mincut, maxcut, colors]];
                 if not isnull selerrmess and neL [selerrmess, ''] then
                     Warning selerrmess;
                     break;
@@ -1364,8 +1387,8 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
 
         elseif trig === 'mapradio' then
             [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows, numcols];
-            selerrmess = call [selfun, [data, selrow, selcol, mincut,
-                maxcut, colors]];
+            selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
+                mincut, maxcut, colors]];
             if not isnull selerrmess and neL [selerrmess, ''] then
                 Warning selerrmess;
                 break;
