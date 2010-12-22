@@ -51,7 +51,7 @@ function qb_PWDAnalysis;
 const PWD_EXPACT_HDR = 'Exp Act';
 
 const MAT_TRANS_MIN = 0x80;
-const INITDIST = 0.0;       // Not equal to INITRADS
+const INITDIST = 5.0;
 
 const QBPWD_OPT_DEFAULTS =
     [
@@ -466,7 +466,7 @@ function UpdateSurfaceMap;
  *  Acknowledgement:  borrowed heavily from surfmap.svl.
  *
  ****************************************************************************/
-local function CreateSurfaceMap [restokens]
+local function CreateSurfaceMap []
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
     if recatoms === [] or ligatoms === [] then
@@ -507,6 +507,11 @@ local function CreateSurfaceMap [restokens]
         gobj     : []
         ];
 
+    G_surface.gobj = GCreateUnique G_surface.title;
+    local trans = [G_surface.trans_f, G_surface.trans_b];
+    GSetTransparency [G_surface.gobj, trans];
+    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
+    GSetMaterial [G_surface.gobj, mat];
     UpdateSurfaceMap [1, []];
 
     ViewSave G_surface.origvw;
@@ -1112,12 +1117,14 @@ local function UpdateSurfaceMap [replace, atomcolors]
 
     if isnull G_surface then return; endif
 
+    local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
+
     if replace then
         GClearVertexData G_surface.gobj;
         G_surface.gvtx = msurf_MolecularSurface [G_surface.recpos, 
             G_surface.rad, G_surface.eps, G_surface.ligpos, G_surface.dist, 
             G_surface.gridopt];
-        local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
+        [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
         s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
         G_surface.gvtx = poke [G_surface.gvtx, 1, s_idx];
     endif
@@ -1130,10 +1137,6 @@ local function UpdateSurfaceMap [replace, atomcolors]
             atomcolors, G_surface.gvtx(3)];
     endif
 
-    local trans = [G_surface.trans_f, G_surface.trans_b];
-    GSetTransparency [G_surface.gobj, trans];
-    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
-    GSetMaterial [G_surface.gobj, mat];
     GVertex [G_surface.gobj, G_surface.surfdim, s_idx, vcolor,
       s_vpt, s_vnorm];
 
@@ -1201,6 +1204,7 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
         [ligtok, ligabbrev, ligdata] = rowdata (selrow);
     endif
 
+// if M-M replace rec and surface?
 
     UpdateComplex ligtok;
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
@@ -1223,7 +1227,6 @@ endfunction
 global function qb_QBPWDSetupPanel []
 
     const INITLIG = 1;
-    const INITRAD = 5.0;
     const SHOWHELP = 1;
     const SIGNIFRES = 5;
 
@@ -1286,10 +1289,10 @@ global function qb_QBPWDSetupPanel []
                 //  Create surface if necessary
                 if isnull G_surface then
                     msgkey = Message [0, 'Calculating surface ...'];
-                    CreateSurfaceMap [second data];
+                    CreateSurfaceMap [];
                     msgkey = Message [msgkey, ''];
                 endif
-
+//DEBUG - if *-M, load ligs; if M-M, load recs and set flag?
                 //  Make sure ligand atoms sets are loaded.
                 if isnull G_surface.ligmols then
                     LoadLigs [pwdfilename];
@@ -1298,7 +1301,7 @@ global function qb_QBPWDSetupPanel []
                 //  Make sure first ligand is in MOE Window
                 UpdateComplex G_surface.lignames (INITLIG);
                 qb_HeatMapSetupPanel [data,  SIGNIFRES, 
-                    'qb_QBPWDSelectHandler', INITLIG, INITRAD, SHOWHELP,
+                    'qb_QBPWDSelectHandler', INITLIG, INITDIST, SHOWHELP,
                     'qb_QBPWDCloseHandler'];
                 exit [];
             endif
@@ -1437,7 +1440,7 @@ global function qb_QBPWDSetupPanel []
                         pwdfilename = tempfile;
                         local [ldkey, ldrec, ldlig, ldcoreopts, ldpwdopts]
                             = LoadDB [pwdfilename];
-
+//DEBUG - if *-M, load ligs; if M-M, load recs and set flag?
                         Close [force:1];
                         if neL [ldrec, []] and neL [ldlig, []] then
                             local ldligatoms = cat cAtoms mol_Create ldlig;
