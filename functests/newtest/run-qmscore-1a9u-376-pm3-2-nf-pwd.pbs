@@ -6,7 +6,7 @@
 #PBS -v MOE_SVL_LOAD,MOE_SVL_RUNPATH
 
 # Prepend hudson's path here for now, since I can't figure out how else to get it in here.
-export PATH=/home/hudson/workspace/DivConDiscoverySuite/bin:$PATH
+export PATH=/home/hudson/shared_workspace/MOEDivconIntegrationTests/DivConDiscoverySuite/bin:$PATH
 
 # Verify environment.
 hostname
