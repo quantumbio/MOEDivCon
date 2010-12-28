@@ -1025,19 +1025,26 @@ local function UpdateComplex [ligtok]
 
 print ligtok;
 
-    local lignum = indexof [ligtok, G_surface.lignames];
+    local molidx = indexof [ligtok, G_surface.lignames];
 
-    if G_surface.molidx === lignum then return; endif
+    if G_surface.molidx === molidx then return; endif
     if length G_surface.lig === 0 then return; endif
+    if length G_surface.rec === 0 then return; endif
+
+    if not isnull G_surface.recmols then
+        oDestroy uniq oChains G_surface.rec;
+        local recchn = mol_Create G_surface.recmols (molidx);
+        G_surface.rec = cat cAtoms recchn;
+    endif
 
     local lignuc = aNucleusLook G_surface.lig (1);
     local ligbnd = aBondLook G_surface.lig (1);
 
     oDestroy uniq oChains G_surface.lig;
-    local ligchn = mol_Create G_surface.ligmols (lignum);
+    local ligchn = mol_Create G_surface.ligmols (molidx);
 
     G_surface.lig = cat cAtoms ligchn;
-    G_surface.molidx = lignum;
+    G_surface.molidx = molidx;
 
     oSetCollection ['QB_LIGAND', G_surface.lig];
     aSetNucleusLook [G_surface.lig, lignuc];
