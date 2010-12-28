@@ -104,7 +104,7 @@ const OPT_DEFAULTS =
 
 const SIGMAS = ['1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0'];
 const NUM_TICKS  = ['5', '9', '13', '17', '25', '33'];
-const RADII = ['3.0', '4.0', '5.0', '6.0', '7.0'];
+const RADII = ['5.0', '6.0', '7.0', '8.0', '9.0', '10.0'];
 const NUM_COLORS = ['4', '8', '12', '16', '24', '32'];
 
 //  Window GUI
@@ -221,6 +221,29 @@ const PANEL =
                 [
                 vertical:0, shadow:'noline', extendH: 0, margin:1
                 ],
+            Text :
+                [
+                name: 'ncolors', len: 7,
+                title: 'Number of colors:',
+                type: 'int', allowBlank: 0,
+                shortcut: NUM_COLORS,
+                bubbleHelp: 'Number of distinct colors.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Checkbox :
+                [
+                name: 'mono', text: 'Monochromatic',
+                bubbleHelp:
+                    'Use a monochrome color scheme\n'
+                    '(red positive, blue negative).'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
            Text :
                 [
                 name: 'nticks', len: 7,
@@ -244,25 +267,6 @@ const PANEL =
             Separator : 
                 [
                 vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Text :
-                [
-                name: 'ncolors', len: 7,
-                title: 'Number of colors:',
-                type: 'int', allowBlank: 0,
-                shortcut: NUM_COLORS,
-                bubbleHelp: 'Number of distinct colors.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Checkbox :
-                [
-                name: 'mono', text: 'Monochromatic',
-                bubbleHelp:
-                    'Use a monochrome color scheme\n'
-                    '(red positive, blue negative).'
                 ]
             ],
 

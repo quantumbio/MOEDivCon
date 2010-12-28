@@ -35,8 +35,11 @@ function pboltz_AtomParameters;
 
 function qb_CreateMessWin;
 function qb_GetAnalysisData;
+function qb_GetCoreOpts;
 function qb_GetEnvAnal;
 function qb_GetPoseFields;
+function qb_GetRecFields;
+function qb_IsModeManyToMany;
 function qb_LoadCoreScoreDB;
 function qb_ResNameCanonical;
 function qb_ResNameEquivSet;
@@ -466,7 +469,7 @@ function UpdateSurfaceMap;
  *  Acknowledgement:  borrowed heavily from surfmap.svl.
  *
  ****************************************************************************/
-local function CreateSurfaceMap []
+local function CreateSurfaceMap [radius]
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
     if recatoms === [] or ligatoms === [] then
@@ -488,9 +491,10 @@ local function CreateSurfaceMap []
         trans_b  : 96,
         rec      : recatoms,
         recpos   : aPos recatoms,
+        recmols  : [],
         lig      : ligatoms,
         ligpos   : aPos ligatoms,
-        ligidx   : 0,
+        molidx   : 0,
         ligmols  : [],
         lignames : [],
         origvw   : 7,
@@ -498,7 +502,7 @@ local function CreateSurfaceMap []
         origbnd  : '',
         restok   : '',
         resatms  : [],
-        dist     : INITDIST,
+        dist     : 0.0,
         rad      : vdwR,
         eps      : vdwE,
         gridopt  : gridopt,
@@ -512,7 +516,7 @@ local function CreateSurfaceMap []
     GSetTransparency [G_surface.gobj, trans];
     local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
     GSetMaterial [G_surface.gobj, mat];
-    UpdateSurfaceMap [1, []];
+    UpdateSurfaceMap [radius, []];
 
     ViewSave G_surface.origvw;
     G_surface.orignuc = aNucleusLook G_surface.lig (1);
@@ -671,19 +675,21 @@ local function LoadDB [dbpath]
     local pwdopts = qb_GetEnvAnal [dbkey];
     pwdopts = tagcat [pwdopts, tag tr QBPWD_OPT_DEFAULTS];
 
+
+
     return [dbkey, receptor, ligand, coreopts, pwdopts];
 endfunction
 
 /****************************************************************************
- *                          LoadLigs
+ *                          LoadMols
  *
- *  Load the ligands from the PWD database.
+ *  Load the ligands (and receptors, if necessary) from the PWD database.
  *
  *  Note:  it is assumed that this function is called from a child process
  *  and will exit on an error.
  *
 ****************************************************************************/
-local function LoadLigs [pwdfilename]
+local function LoadMols [pwdfilename]
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
@@ -699,18 +705,26 @@ local function LoadLigs [pwdfilename]
     endif
 
     local dbkey = db_Open [pwdfilename, 'read'];
+    local coreopts = qb_GetCoreOpts dbkey;
 
+    local recmols = [];
     local ligmols = [];
     local lignames = [];
     local rowkey = 0;
-    local ligflds = qb_GetPoseFields [dbkey];
+    local ligflds = qb_GetPoseFields [];
 
     while rowkey = db_NextEntry [dbkey, rowkey] loop
-        local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
+        local [ligmol, lc] = db_ReadFields [dbkey, rowkey, ligflds];
         ligmols = append [ligmols, ligmol];
         lignames = append [lignames, ligmol(1)(MOL_NAME)];
     endloop
 
+    if qb_IsModeManyToMany [coreopts] then
+        local recflds = qb_GetRecFields [];
+        recmols = db_ReadColumn [dbkey, first recflds];
+    endif
+
+    G_surface.recmols = recmols;
     G_surface.ligmols = ligmols;
     G_surface.lignames = lignames;
     db_Close dbkey;
@@ -886,40 +900,6 @@ endfunction
 
 /****************************************************************************
  *
- *                          ResizeSurfaceMap
- *
- *  Resize a surface map of the pocket.
- *
- *  Acknowledgement:  borrowed heavily from surfmap.svl.
- *
- ****************************************************************************/
-local function ResizeSurfaceMap [dist]
-
-    if isnull G_surface then return; endif
-
-    G_surface.dist = dist;
-
-    G_surface.gvtx = msurf_MolecularSurface [G_surface.recpos, 
-        G_surface.rad, G_surface.eps, G_surface.ligpos, G_surface.dist, 
-        G_surface.gridopt];
-
-    local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
-    s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
-    G_surface.gvtx = poke [G_surface.gvtx, 1, s_idx];
-    GClearVertexData G_surface.gobj;
-
-    local trans = [G_surface.trans_f, G_surface.trans_b];
-    GSetTransparency [G_surface.gobj, trans];
-    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
-    GSetMaterial [G_surface.gobj, mat];
-    GVertex [G_surface.gobj, G_surface.surfdim, s_idx, G_surface.colconst,
-      s_vpt, s_vnorm];
-
-endfunction
-
-
-/****************************************************************************
- *
  *                          SaveMatrixData
  *
  *  Save the matrix data in csv format.
@@ -1043,9 +1023,11 @@ endfunction
  ****************************************************************************/
 local function UpdateComplex [ligtok]
 
+print ligtok;
+
     local lignum = indexof [ligtok, G_surface.lignames];
 
-    if G_surface.ligidx === lignum then return; endif
+    if G_surface.molidx === lignum then return; endif
     if length G_surface.lig === 0 then return; endif
 
     local lignuc = aNucleusLook G_surface.lig (1);
@@ -1055,7 +1037,7 @@ local function UpdateComplex [ligtok]
     local ligchn = mol_Create G_surface.ligmols (lignum);
 
     G_surface.lig = cat cAtoms ligchn;
-    G_surface.ligidx = lignum;
+    G_surface.molidx = lignum;
 
     oSetCollection ['QB_LIGAND', G_surface.lig];
     aSetNucleusLook [G_surface.lig, lignuc];
@@ -1113,14 +1095,15 @@ endfunction
  *  Acknowledgement:  borrowed heavily from surfmap.svl.
  *
  ****************************************************************************/
-local function UpdateSurfaceMap [replace, atomcolors]
+local function UpdateSurfaceMap [radius, atomcolors]
 
     if isnull G_surface then return; endif
 
+    GClearVertexData G_surface.gobj;
     local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
 
-    if replace then
-        GClearVertexData G_surface.gobj;
+    if neL [radius, G_surface.dist] then
+        G_surface.dist = radius;
         G_surface.gvtx = msurf_MolecularSurface [G_surface.recpos, 
             G_surface.rad, G_surface.eps, G_surface.ligpos, G_surface.dist, 
             G_surface.gridopt];
@@ -1204,12 +1187,13 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
         [ligtok, ligabbrev, ligdata] = rowdata (selrow);
     endif
 
-// if M-M replace rec and surface?
+//DEBUG - if M-M replace rec and surface?
+
 
     UpdateComplex ligtok;
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
         mincut, maxcut, colors];
-    UpdateSurfaceMap [neL [radius, G_surface.dist], atomcolors];
+    UpdateSurfaceMap [radius, atomcolors];
     UpdateResidue [restok, selrow, selcol, 0];
 
     if not G_surface.fix then
@@ -1289,13 +1273,13 @@ global function qb_QBPWDSetupPanel []
                 //  Create surface if necessary
                 if isnull G_surface then
                     msgkey = Message [0, 'Calculating surface ...'];
-                    CreateSurfaceMap [];
+                    CreateSurfaceMap [INITDIST];
                     msgkey = Message [msgkey, ''];
                 endif
-//DEBUG - if *-M, load ligs; if M-M, load recs and set flag?
-                //  Make sure ligand atoms sets are loaded.
+
+                //  Make sure molecules are loaded.
                 if isnull G_surface.ligmols then
-                    LoadLigs [pwdfilename];
+                    LoadMols [pwdfilename];
                 endif
 
                 //  Make sure first ligand is in MOE Window
