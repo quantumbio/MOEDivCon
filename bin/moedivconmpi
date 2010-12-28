@@ -30,5 +30,4 @@ else
     QBMACHINEFILE=""
 fi
 
-#${QBHOME}/bin/mpirun -x OPAL_PREFIX -x QBHOME -x PATH -x LD_LIBRARY_PATH -x MKL_NUM_THREADS -x MKL_DYNAMIC ${QBMACHINEFILE} ${QBHOME}/bin/moedivconmpi.bin $@ - 
-${QBHOME}/bin/moedivconmpi.bin
+${QBHOME}/bin/mpirun -x OPAL_PREFIX -x QBHOME -x PATH -x LD_LIBRARY_PATH -x MKL_NUM_THREADS -x MKL_DYNAMIC ${QBMACHINEFILE} ${QBHOME}/bin/moedivconmpi.bin $@ - 
