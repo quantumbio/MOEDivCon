@@ -2104,6 +2104,20 @@ global function qb_GetCoreEnv [dbkey]
 endfunction
 
 /****************************************************************************
+ *                          qb_GetCoreOpts
+ *
+ *  Get the core options from the database.
+ *
+ ****************************************************************************/
+global function qb_GetCoreOpts [dbkey]
+
+    local coreopts = GetEnvTag [dbkey, COREOPTS];
+    coreopts = tagcat [coreopts, tag tr CORE_OPT_DEFAULTS];
+
+    return coreopts;
+endfunction
+
+/****************************************************************************
  *
  *                          qb_GetCorePanel
  *
