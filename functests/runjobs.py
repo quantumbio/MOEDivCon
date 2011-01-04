@@ -31,4 +31,5 @@ while submitted_job_ids != completed_job_ids:
         print "Here are the ones that are still running:"
         for job_id in submitted_job_ids - completed_job_ids:
             print "    " + job_id
+        sys.exit(1)
 print 'All jobs are complete'
