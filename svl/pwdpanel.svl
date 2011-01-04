@@ -54,7 +54,7 @@ function qb_PWDAnalysis;
 const PWD_EXPACT_HDR = 'Exp Act';
 
 const MAT_TRANS_MIN = 0x80;
-const INITDIST = 5.0;
+const INITDIST = 7.5;
 
 const QBPWD_OPT_DEFAULTS =
     [
@@ -490,10 +490,8 @@ local function CreateSurfaceMap [radius]
         trans_f  : 96,
         trans_b  : 96,
         rec      : recatoms,
-        recpos   : aPos recatoms,
         recmols  : [],
         lig      : ligatoms,
-        ligpos   : aPos ligatoms,
         molidx   : 0,
         ligmols  : [],
         lignames : [],
@@ -516,7 +514,7 @@ local function CreateSurfaceMap [radius]
     GSetTransparency [G_surface.gobj, trans];
     local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
     GSetMaterial [G_surface.gobj, mat];
-    UpdateSurfaceMap [radius, []];
+    UpdateSurfaceMap [radius, 0, []];
 
     ViewSave G_surface.origvw;
     G_surface.orignuc = aNucleusLook G_surface.lig (1);
@@ -1035,6 +1033,9 @@ print ligtok;
         oDestroy uniq oChains G_surface.rec;
         local recchn = mol_Create G_surface.recmols (molidx);
         G_surface.rec = cat cAtoms recchn;
+        local [vdwR, vdwE] = pboltz_AtomParameters G_surface.rec;
+        G_surface.rad = vdwR;
+        G_surface.eps = vdwE;
     endif
 
     local lignuc = aNucleusLook G_surface.lig (1);
@@ -1102,17 +1103,17 @@ endfunction
  *  Acknowledgement:  borrowed heavily from surfmap.svl.
  *
  ****************************************************************************/
-local function UpdateSurfaceMap [radius, atomcolors]
+local function UpdateSurfaceMap [radius, redogrid, atomcolors]
 
     if isnull G_surface then return; endif
 
     GClearVertexData G_surface.gobj;
     local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
 
-    if neL [radius, G_surface.dist] then
+    if neL [radius, G_surface.dist] or redogrid then
         G_surface.dist = radius;
-        G_surface.gvtx = msurf_MolecularSurface [G_surface.recpos, 
-            G_surface.rad, G_surface.eps, G_surface.ligpos, G_surface.dist, 
+        G_surface.gvtx = msurf_MolecularSurface [aPos G_surface.rec, 
+            G_surface.rad, G_surface.eps, aPos G_surface.lig, G_surface.dist, 
             G_surface.gridopt];
         [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
         s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
@@ -1123,7 +1124,7 @@ local function UpdateSurfaceMap [radius, atomcolors]
     if isnull atomcolors then
         vcolor = G_surface.colconst;
     else
-	    vcolor = NearestAtomColor [G_surface.recpos, G_surface.rad,
+	    vcolor = NearestAtomColor [aPos G_surface.rec, G_surface.rad,
             atomcolors, G_surface.gvtx(3)];
     endif
 
@@ -1173,6 +1174,8 @@ endfunction
 global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
         mincut, maxcut, colors]
 
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+
     if isnull G_surface then return; endif
     if allfalse eqE [G_surface.gobj, GKeyList []] then return; endif
     if isnull Atoms [] then return; endif
@@ -1200,7 +1203,10 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
     UpdateComplex ligtok;
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
         mincut, maxcut, colors];
-    UpdateSurfaceMap [radius, atomcolors];
+    local msgkey = Message [0, 'Calculating surface ...'];
+    UpdateSurfaceMap [radius, not isnull G_surface.recmols, atomcolors];
+    Message [msgkey, ''];
+
     UpdateResidue [restok, selrow, selcol, 0];
 
     if not G_surface.fix then
@@ -1289,7 +1295,7 @@ global function qb_QBPWDSetupPanel []
                     LoadMols [pwdfilename];
                 endif
 
-                //  Make sure first ligand is in MOE Window
+                //  Make sure first receptor/ligand is in MOE Window
                 UpdateComplex G_surface.lignames (INITLIG);
                 qb_HeatMapSetupPanel [data,  SIGNIFRES, 
                     'qb_QBPWDSelectHandler', INITLIG, INITDIST, SHOWHELP,
