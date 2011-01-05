@@ -43,6 +43,7 @@ function qb_IsModeManyToMany;
 function qb_LoadCoreScoreDB;
 function qb_ResNameCanonical;
 function qb_ResNameEquivSet;
+function qb_RMSD;
 function qb_SaveEnvAnal;
 function qb_SplitComplex;
 
@@ -53,6 +54,7 @@ function qb_PWDAnalysis;
 
 const PWD_EXPACT_HDR = 'Exp Act';
 
+const RMSD_MAX = 0.1;
 const MAT_TRANS_MIN = 0x80;
 const INITDIST = 7.5;
 
@@ -469,7 +471,7 @@ function UpdateSurfaceMap;
  *  Acknowledgement:  borrowed heavily from surfmap.svl.
  *
  ****************************************************************************/
-local function CreateSurfaceMap [radius]
+local function CreateSurfaceMap [radius, molidx, nummols]
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
     if recatoms === [] or ligatoms === [] then
@@ -478,6 +480,7 @@ local function CreateSurfaceMap [radius]
     endif
 
     local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
+    local grids = rep [[], nummols];
     local gridopt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
         clipmode: 0];
 
@@ -492,7 +495,8 @@ local function CreateSurfaceMap [radius]
         rec      : recatoms,
         recmols  : [],
         lig      : ligatoms,
-        molidx   : 0,
+        nummols  : nummols,
+        molidx   : molidx,
         ligmols  : [],
         lignames : [],
         origvw   : 7,
@@ -505,7 +509,7 @@ local function CreateSurfaceMap [radius]
         eps      : vdwE,
         gridopt  : gridopt,
 		fix      : 0,
-        gvtx     : [],
+        grids    : grids,
         gobj     : []
         ];
 
@@ -514,7 +518,7 @@ local function CreateSurfaceMap [radius]
     GSetTransparency [G_surface.gobj, trans];
     local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
     GSetMaterial [G_surface.gobj, mat];
-    UpdateSurfaceMap [radius, 0, []];
+    UpdateSurfaceMap [radius, 1, []];
 
     ViewSave G_surface.origvw;
     G_surface.orignuc = aNucleusLook G_surface.lig (1);
@@ -1021,17 +1025,27 @@ endfunction
  ****************************************************************************/
 local function UpdateComplex [ligtok]
 
-print ligtok;
-
+    local redosurf = 0;
     local molidx = indexof [ligtok, G_surface.lignames];
 
-    if G_surface.molidx === molidx then return; endif
-    if length G_surface.lig === 0 then return; endif
-    if length G_surface.rec === 0 then return; endif
+    if G_surface.molidx === molidx then return redosurf; endif
+    if length G_surface.lig === 0 then return redosurf; endif
+    if length G_surface.rec === 0 then return redosurf; endif
 
+    //  If Many-to-Many, check to see whether to replace surface.
     if not isnull G_surface.recmols then
+        local currheavy = G_surface.rec | aElement G_surface.rec <> 'H';
+        local curpos = cat aPos currheavy;
+        local nextrec = G_surface.recmols (molidx);
+        local nextheavy = nextrec(4) | nextrec(4)(MOL_ATOM_EL) <> 'H';
+        local nextpos = cat [nextrec(4)(MOL_ATOM_X, nextrec(4)(MOL_ATOM_Y,
+            nextrec(4)(MOL_ATOM_Z];
+        local rmsd = qb_RMSD [curpos, nextpos];
+write ['RMSD for recs {} and {}:  {}\n', G_surface.molidx, molidx, rmsd];//DEBUG
+        redosurf = rmsd > RMSD_MAX;
+        
         oDestroy uniq oChains G_surface.rec;
-        local recchn = mol_Create G_surface.recmols (molidx);
+        local recchn = mol_Create nextrec;
         G_surface.rec = cat cAtoms recchn;
         local [vdwR, vdwE] = pboltz_AtomParameters G_surface.rec;
         G_surface.rad = vdwR;
@@ -1051,6 +1065,7 @@ print ligtok;
     aSetNucleusLook [G_surface.lig, lignuc];
     aSetBondLook [G_surface.lig, ligbnd];
 
+    return redosurf;
 endfunction
 
 /****************************************************************************
@@ -1110,14 +1125,20 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
     GClearVertexData G_surface.gobj;
     local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
 
-    if neL [radius, G_surface.dist] or redogrid then
-        G_surface.dist = radius;
-        G_surface.gvtx = msurf_MolecularSurface [aPos G_surface.rec, 
+    if neL [radius, G_surface.dist] or (redogrid
+            and isnull G_surface.grids(G_surface.molidx) then
+        if neL [radius, G_surface.dist] then
+            local grids = rep [[], G_surface.nummols];
+            G_surface.grids = grids;
+            G_surface.dist = radius;
+        endif
+        local gvtx = msurf_MolecularSurface [aPos G_surface.rec, 
             G_surface.rad, G_surface.eps, aPos G_surface.lig, G_surface.dist, 
             G_surface.gridopt];
-        [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
+        [s_idx, s_color, s_vpt, s_vnorm] = gvtx;
         s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
-        G_surface.gvtx = poke [G_surface.gvtx, 1, s_idx];
+        gvtx = poke [gvtx, 1, s_idx];
+        G_surface.grids = poke [G_surface.grids, G_surface.molidx, gvtx];//DEBUG
     endif
 
     local vcolor;
@@ -1197,15 +1218,18 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
         [ligtok, ligabbrev, ligdata] = rowdata (selrow);
     endif
 
-//DEBUG - if M-M replace rec and surface?
 
-
-    UpdateComplex ligtok;
+    local redosurf = UpdateComplex ligtok;
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
         mincut, maxcut, colors];
-    local msgkey = Message [0, 'Calculating surface ...'];
-    UpdateSurfaceMap [radius, not isnull G_surface.recmols, atomcolors];
-    Message [msgkey, ''];
+
+    if redosurf then
+        local msgkey = Message [0, 'Calculating surface ...'];
+        UpdateSurfaceMap [radius, 1, atomcolors];
+        Message [msgkey, ''];
+    else
+        UpdateSurfaceMap [radius, 0, atomcolors];
+    endif
 
     UpdateResidue [restok, selrow, selcol, 0];
 
