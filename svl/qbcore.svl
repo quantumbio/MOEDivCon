@@ -2681,7 +2681,7 @@ global function qb_RMSD [calc, obs]
 
     local n = length calc;
     if neL [n, length obs] then
-        return REAL_MIN;
+        return REAL_MAX;
     endif
 
     if n === 0 then
