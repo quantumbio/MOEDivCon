@@ -460,6 +460,8 @@ local function ColorAtoms [data, ligidx, residx, recatoms,
 
 endfunction
 
+function LoadMols;
+function UpdateComplex;
 function UpdateSurfaceMap;
 
 /****************************************************************************
@@ -471,7 +473,7 @@ function UpdateSurfaceMap;
  *  Acknowledgement:  borrowed heavily from surfmap.svl.
  *
  ****************************************************************************/
-local function CreateSurfaceMap [radius, molidx, nummols]
+local function CreateSurfaceMap [radius, ligtok, pwdfilename]
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
     if recatoms === [] or ligatoms === [] then
@@ -480,7 +482,6 @@ local function CreateSurfaceMap [radius, molidx, nummols]
     endif
 
     local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
-    local grids = rep [[], nummols];
     local gridopt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
         clipmode: 0];
 
@@ -495,8 +496,8 @@ local function CreateSurfaceMap [radius, molidx, nummols]
         rec      : recatoms,
         recmols  : [],
         lig      : ligatoms,
-        nummols  : nummols,
-        molidx   : molidx,
+        numgrids : 0,
+        molidx   : 0,
         ligmols  : [],
         lignames : [],
         origvw   : 7,
@@ -509,10 +510,24 @@ local function CreateSurfaceMap [radius, molidx, nummols]
         eps      : vdwE,
         gridopt  : gridopt,
 		fix      : 0,
-        grids    : grids,
+        grids    : [],
         gobj     : []
         ];
 
+
+
+    //  Make sure first receptor/ligand is in MOE Window
+    LoadMols [pwdfilename];
+    G_surface.molidx = indexof [ligtok, G_surface.lignames];
+    UpdateComplex ligtok;
+
+    if isnull G_surface.recmols then
+        G_surface.numgrids = 1;
+    else
+        G_surface.numgrids = length G_surface.recmols;
+    endif
+
+    G_surface.grids = rep [[], G_surface.numgrids];
     G_surface.gobj = GCreateUnique G_surface.title;
     local trans = [G_surface.trans_f, G_surface.trans_b];
     GSetTransparency [G_surface.gobj, trans];
@@ -1025,6 +1040,8 @@ endfunction
  ****************************************************************************/
 local function UpdateComplex [ligtok]
 
+print ligtok;//DEBUG
+
     local redosurf = 0;
     local molidx = indexof [ligtok, G_surface.lignames];
 
@@ -1038,8 +1055,8 @@ local function UpdateComplex [ligtok]
         local curpos = cat aPos currheavy;
         local nextrec = G_surface.recmols (molidx);
         local nextheavy = nextrec(4) | nextrec(4)(MOL_ATOM_EL) <> 'H';
-        local nextpos = cat [nextrec(4)(MOL_ATOM_X, nextrec(4)(MOL_ATOM_Y,
-            nextrec(4)(MOL_ATOM_Z];
+        local nextpos = cat [nextrec(4)(MOL_ATOM_X), nextrec(4)(MOL_ATOM_Y),
+            nextrec(4)(MOL_ATOM_Z)];
         local rmsd = qb_RMSD [curpos, nextpos];
 write ['RMSD for recs {} and {}:  {}\n', G_surface.molidx, molidx, rmsd];//DEBUG
         redosurf = rmsd > RMSD_MAX;
@@ -1123,30 +1140,36 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
     if isnull G_surface then return; endif
 
     GClearVertexData G_surface.gobj;
-    local [s_idx, s_color, s_vpt, s_vnorm] = G_surface.gvtx;
+write ['Index:  {}, Ligname:  {}\n', G_surface.molidx, G_surface.lignames(G_surface.molidx)];//DEBUG
+    local gvtx = G_surface.grids(select [1, G_surface.molidx, 
+        G_surface.numgrids === 1]);
+    local [s_idx, s_color, s_vpt, s_vnorm] = gvtx;
 
-    if neL [radius, G_surface.dist] or (redogrid
-            and isnull G_surface.grids(G_surface.molidx) then
+    if neL [radius, G_surface.dist] or (redogrid and isnull gvtx) then
         if neL [radius, G_surface.dist] then
-            local grids = rep [[], G_surface.nummols];
+            local grids = rep [[], G_surface.numgrids];
             G_surface.grids = grids;
             G_surface.dist = radius;
         endif
-        local gvtx = msurf_MolecularSurface [aPos G_surface.rec, 
+
+        gvtx = msurf_MolecularSurface [aPos G_surface.rec, 
             G_surface.rad, G_surface.eps, aPos G_surface.lig, G_surface.dist, 
             G_surface.gridopt];
         [s_idx, s_color, s_vpt, s_vnorm] = gvtx;
         s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
         gvtx = poke [gvtx, 1, s_idx];
-        G_surface.grids = poke [G_surface.grids, G_surface.molidx, gvtx];//DEBUG
+
+        G_surface.grids = poke [G_surface.grids, 
+            select [1, G_surface.molidx, G_surface.numgrids === 1], gvtx];
     endif
 
+write ['Vpt length:  {}\n', length s_vpt];//DEBUG
     local vcolor;
     if isnull atomcolors then
         vcolor = G_surface.colconst;
     else
 	    vcolor = NearestAtomColor [aPos G_surface.rec, G_surface.rad,
-            atomcolors, G_surface.gvtx(3)];
+            atomcolors, s_vpt];
     endif
 
     GVertex [G_surface.gobj, G_surface.surfdim, s_idx, vcolor,
@@ -1218,7 +1241,6 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
         [ligtok, ligabbrev, ligdata] = rowdata (selrow);
     endif
 
-
     local redosurf = UpdateComplex ligtok;
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
         mincut, maxcut, colors];
@@ -1253,12 +1275,14 @@ global function qb_QBPWDSetupPanel []
 
     static pwdfilename;                     //  Shared with child tasks.
     static pwddata;
+    static heatmaptask;
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
     if WindowShow ['QB-PWDPanel', 1] then return; endif
 
     pwdfilename = '';
     pwddata = [[], [], [], [], []];
+    heatmaptask = 0;
 
     local msgkey;
     local appdflts = tag tr QBPWD_OPT_DEFAULTS;
@@ -1278,7 +1302,7 @@ global function qb_QBPWDSetupPanel []
         if trig === 'analview' then
 
             if second task_fork [statics:'share', 
-                    master:'parent'] === 'child' then
+                master:'parent'] === 'child' then
 
                 // Load and setup data
                 local data = pwddata (vals.analysis);
@@ -1307,20 +1331,28 @@ global function qb_QBPWDSetupPanel []
                     exit [];
                 endif
 
-                //  Create surface if necessary
-                if isnull G_surface then
-                    msgkey = Message [0, 'Calculating surface ...'];
-                    CreateSurfaceMap [INITDIST];
-                    msgkey = Message [msgkey, ''];
+                //  Destroy current surface if necessary
+                local heatmapkey = WindowKey 'QB Heat Map';
+                if heatmapkey > 0 then
+                    GDestroy G_surface.gobj;
+                    G_surface = [];
+                    WindowDestroy heatmapkey;
+
+                    //  What about child task?
+                    if heatmaptask > 0 then
+print task_info heatmaptask;//DEBUG
+                        task_kill heatmaptask;
+                    endif
+
                 endif
 
-                //  Make sure molecules are loaded.
-                if isnull G_surface.ligmols then
-                    LoadMols [pwdfilename];
-                endif
+                local rowdata = last data;
+                msgkey = Message [0, 'Calculating surface ...'];
+                CreateSurfaceMap [INITDIST, first rowdata (INITLIG), 
+                    pwdfilename];
+                msgkey = Message [msgkey, ''];
 
-                //  Make sure first receptor/ligand is in MOE Window
-                UpdateComplex G_surface.lignames (INITLIG);
+                heatmaptask = task_key -1;
                 qb_HeatMapSetupPanel [data,  SIGNIFRES, 
                     'qb_QBPWDSelectHandler', INITLIG, INITDIST, SHOWHELP,
                     'qb_QBPWDCloseHandler'];
