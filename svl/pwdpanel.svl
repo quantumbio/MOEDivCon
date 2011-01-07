@@ -403,8 +403,6 @@ function FindResidue;
  ****************************************************************************/
 local function CheckResidues [restoks]
 
-    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
-
     local res, missing = [];
     for res in restoks loop
         local [residx, ra] = FindResidue res;
@@ -1040,8 +1038,6 @@ endfunction
  ****************************************************************************/
 local function UpdateComplex [ligtok]
 
-print ligtok;//DEBUG
-
     local redosurf = 0;
     local molidx = indexof [ligtok, G_surface.lignames];
 
@@ -1140,7 +1136,6 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
     if isnull G_surface then return; endif
 
     GClearVertexData G_surface.gobj;
-write ['Index:  {}, Ligname:  {}\n', G_surface.molidx, G_surface.lignames(G_surface.molidx)];//DEBUG
     local gvtx = G_surface.grids(select [1, G_surface.molidx, 
         G_surface.numgrids === 1]);
     local [s_idx, s_color, s_vpt, s_vnorm] = gvtx;
@@ -1163,7 +1158,6 @@ write ['Index:  {}, Ligname:  {}\n', G_surface.molidx, G_surface.lignames(G_surf
             select [1, G_surface.molidx, G_surface.numgrids === 1], gvtx];
     endif
 
-write ['Vpt length:  {}\n', length s_vpt];//DEBUG
     local vcolor;
     if isnull atomcolors then
         vcolor = G_surface.colconst;
@@ -1342,8 +1336,8 @@ global function qb_QBPWDSetupPanel []
                     if heatmaptask > 0 then
 print task_info heatmaptask;//DEBUG
                         task_kill heatmaptask;
+                        heatmaptask = 0;
                     endif
-
                 endif
 
                 local rowdata = last data;
@@ -1391,7 +1385,7 @@ print task_info heatmaptask;//DEBUG
                     exit [];
                 endif
 
-                local actfile = first FilePrompt [title: 'Load Activities File', 
+                local actfile = first FilePrompt [title: 'Load Activities File',
                     filter: '*.csv', allowEmptyList: 0];
                 if not isnull actfile then
                     ReadExpActData [actfile, pwdfilename, vals.expact_hdr];
@@ -1423,6 +1417,20 @@ print task_info heatmaptask;//DEBUG
                         master:'parent'] === 'child' then
                     task_prio 3;
                     task_settitle [-1, 'MOEDivCon PWD Analysis'];
+
+                //  Destroy current surface  and reset view if necessary
+                local heatmapkey = WindowKey 'QB Heat Map';
+                if heatmapkey > 0 then
+                   qb_QBPWDCloseHandler [];
+                   WindowDestroy heatmapkey;
+
+                    //  What about child task?
+                    if heatmaptask > 0 then
+print task_info heatmaptask;//DEBUG
+                        task_kill heatmaptask;
+                        heatmaptask = 0;
+                    endif
+                endif
 
                     if neL [ftype pwdfilename, 'file']
                             or neL [fext pwdfilename, 'mdb'] then
@@ -1493,7 +1501,7 @@ print task_info heatmaptask;//DEBUG
                         pwdfilename = tempfile;
                         local [ldkey, ldrec, ldlig, ldcoreopts, ldpwdopts]
                             = LoadDB [pwdfilename];
-//DEBUG - if *-M, load ligs; if M-M, load recs and set flag?
+
                         Close [force:1];
                         if neL [ldrec, []] and neL [ldlig, []] then
                             local ldligatoms = cat cAtoms mol_Create ldlig;
@@ -1520,7 +1528,8 @@ print task_info heatmaptask;//DEBUG
                                 panel: [sensitive: [1,1,1]]]];
                         endif
 
-WindowSetAttr [wkey, [sf_e_r12: [sensitive: 0], sf_e_ele: [sensitive: 0]]];//DEBUG
+WindowSetAttr [wkey, [sf_e_r12: [sensitive: 0], //DEBUG
+sf_e_ele: [sensitive: 0]]];//DEBUG
                     endif
 
                     exit [];
