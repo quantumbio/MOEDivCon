@@ -541,9 +541,9 @@ local function CreateSurfaceMap [radius, ligtok, pwdfilename]
             ];
 
         ViewSave G_origview.view;
-        aSetNucleusLook [G_surface.lig, 'sphere'];
-        aSetBondLook [G_surface.lig, 'none'];
-        View G_surface.lig;
+        aSetNucleusLook [G_surface.lig | oValid G_surface.lig, 'sphere'];
+        aSetBondLook [G_surface.lig | oValid G_surface.lig, 'none'];
+        View (G_surface.lig | oValid G_surface.lig);
     endif
 
 
@@ -1086,8 +1086,8 @@ write ['RMSD for recs {} and {}:  {}\n', G_surface.molidx, molidx, rmsd];//DEBUG
     G_surface.molidx = molidx;
 
     oSetCollection ['QB_LIGAND', G_surface.lig];
-    aSetNucleusLook [G_surface.lig, lignuc];
-    aSetBondLook [G_surface.lig, ligbnd];
+    aSetNucleusLook [G_surface.lig | oValid G_surface.lig, lignuc];
+    aSetBondLook [G_surface.lig | oValid G_surface.lig, ligbnd];
 
     return redosurf;
 endfunction
@@ -1105,7 +1105,7 @@ endfunction
 local function UpdateResidue [restok, row, col, zoom]
 
     if col === 0 then
-        aSetLabelRes [G_surface.resatms, 0];
+        aSetLabelRes [G_surface.resatms | oValid G_surface.resatms, 0];
         G_surface.resatms = [];
         G_surface.restok = '';
         return;
@@ -1113,7 +1113,7 @@ local function UpdateResidue [restok, row, col, zoom]
 
     if G_surface.restok === restok and row > 0 then return; endif
 
-    aSetLabelRes [G_surface.resatms, 0];
+    aSetLabelRes [G_surface.resatms | oValid G_surface.resatms, 0];
 
     local [residx, resatms] = FindResidue restok;
     if residx === 0 then return; endif
@@ -1148,17 +1148,12 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
 
     GClearVertexData G_surface.gobj;
 
-/*
-    local gvtx = G_surface.grids(select [1, G_surface.molidx, 
-        G_surface.numgrids === 1]);
-*/
     local gvtx = [];
     if G_surface.numgrids === 1 then
         gvtx = G_surface.grids(1);
     else
         gvtx = G_surface.grids(G_surface.molidx);
         while isscalarnum gvtx loop
-print gvtx;//DEBUG
             gvtx = G_surface.grids(gvtx);
         endloop
     endif
