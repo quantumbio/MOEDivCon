@@ -1,7 +1,8 @@
 #!/bin/bash
 #PBS -S /bin/bash
 #PBS -l nodes=7:ppn=3
-#PBS -l pmem=1gb
+#PBS -l pmem=750gb
+#PBS -l walltime=1:00:00
 #PBS -j oe
 #PBS -v MOE_SVL_LOAD,MOE_SVL_RUNPATH
 
@@ -18,3 +19,5 @@ cat $PBS_NODEFILE
 USER_DATADB="$PBS_O_WORKDIR/qmscore-1a9u-376-pm3-2-nf-pwd.mdb"
 
 moebatch -exec "run ['qmsmpi.svl', ['$USER_DATADB', '$PBS_JOBID']]" -exit
+
+date
