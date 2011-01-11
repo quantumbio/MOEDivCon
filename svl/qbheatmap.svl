@@ -1325,58 +1325,88 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
         local [vals, trig] = WindowWait wkey;
         if trig === 'panel' then
             if vals.panel === 'Close' then
-                local closeerrmess = call [closefun, []];
-                if not isnull closeerrmess and neL [closeerrmess, ''] then
-                    Warning closeerrmess;
+
+                if second task_fork [statics:'share'] === 'child' then
+                    task_prio 0;
+
+                    local closeerrmess = call [closefun, []];
+                    if not isnull closeerrmess and neL [closeerrmess, ''] then
+                        Warning closeerrmess;
+                    endif
+
+                    exit [];
                 endif
-                break;
 
             elseif vals.panel === 'Save' then
-                local simgkey = DrawMap [data, numrows, numcols, 1, 0, mincut, 
-                    maxcut, colors, vals.nticks];
-                gr_export simgkey;
-                gr_destroy simgkey;
+
+                if second task_fork [statics:'share'] === 'child' then
+                    task_prio 0;
+
+                    local simgkey = DrawMap [data, numrows, numcols, 1, 0, mincut, 
+                        maxcut, colors, vals.nticks];
+                    gr_export simgkey;
+                    gr_destroy simgkey;
+                    exit [];
+                endif
 
             elseif vals.panel === 'Print' then
-                local pimgkey = DrawMap [data, numrows, numcols, 1, 0, mincut, 
-                    maxcut, colors, vals.nticks];
-                gr_print pimgkey;
-                gr_destroy pimgkey;
+
+                if second task_fork [statics:'share'] === 'child' then
+                    task_prio 0;
+
+                    local pimgkey = DrawMap [data, numrows, numcols, 1, 0, mincut, 
+                        maxcut, colors, vals.nticks];
+                    gr_print pimgkey;
+                    gr_destroy pimgkey;
+                    exit [];
+                endif
 
             elseif vals.panel === 'Animate' then
-                WindowShow [wkey, 0];
-                Animate ['row', data, numrows, numcols, selfun, vals.radius,
-                    mincut, maxcut, colors];
-                WindowShow [wkey, 1];
 
-                //  Show previous selection after animation
-                [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows,
-                    numcols];
-                selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
-                    mincut, maxcut, colors]];
-                if not isnull selerrmess and neL [selerrmess, ''] then
-                    Warning selerrmess;
-                    break;
+                if second task_fork [statics:'share'] === 'child' then
+                    task_prio 0;
+
+                    WindowShow [wkey, 0];
+                    Animate ['row', data, numrows, numcols, selfun, vals.radius,
+                        mincut, maxcut, colors];
+                    WindowShow [wkey, 1];
+
+                    //  Show previous selection after animation
+                    [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows,
+                        numcols];
+                    selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
+                        mincut, maxcut, colors]];
+                    if not isnull selerrmess and neL [selerrmess, ''] then
+                        Warning selerrmess;
+                    endif
+
+                    exit [];
                 endif
 
             elseif vals.panel === 'Apply' then
-                [bgraphics, scalekey, mincut, maxcut, colors]
-                    = RedrawMapScale [data, vals, numsignifcols, mincut,
-                    maxcut, colors, 0];
 
-                if not isnull bgraphics then
-                     WindowSetAttr [wkey, [mapradio: [graphics: bgraphics]]];
-                endif
+                if second task_fork [statics:'share'] === 'child' then
+                    task_prio 0;
 
-                if not isnull scalekey then
-                     WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
-                endif
+                    [bgraphics, scalekey, mincut, maxcut, colors]
+                        = RedrawMapScale [data, vals, numsignifcols, mincut,
+                        maxcut, colors, 0];
 
-                selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
-                    mincut, maxcut, colors]];
-                if not isnull selerrmess and neL [selerrmess, ''] then
-                    Warning selerrmess;
-                    break;
+                    if not isnull bgraphics then
+                         WindowSetAttr [wkey, [mapradio: [graphics: bgraphics]]];
+                    endif
+
+                    if not isnull scalekey then
+                         WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
+                    endif
+
+                    selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
+                        mincut, maxcut, colors]];
+                    if not isnull selerrmess and neL [selerrmess, ''] then
+                        Warning selerrmess;
+                    endif
+
+                    exit [];
                 endif
             endif
 
@@ -1384,12 +1414,18 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
             UpdateCutoff [wkey, vals.cutoff];
 
         elseif trig === 'mapradio' then
-            [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows, numcols];
-            selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
-                mincut, maxcut, colors]];
-            if not isnull selerrmess and neL [selerrmess, ''] then
-                Warning selerrmess;
-                break;
+
+            if second task_fork [statics:'share'] === 'child' then
+                task_prio 0;
+
+                [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows, numcols];
+                selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
+                    mincut, maxcut, colors]];
+                if not isnull selerrmess and neL [selerrmess, ''] then
+                    Warning selerrmess;
+                endif
+
+                exit [];
             endif
         endif
     endloop
