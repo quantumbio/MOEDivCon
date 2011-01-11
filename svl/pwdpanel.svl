@@ -2,7 +2,7 @@
 #if 0
  // BEGIN COPYRIGHT
  /***********************************************************************
-    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    Copyright (c) 1998-2011 QuantumBio Inc. and/or its affiliates.
     
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
@@ -26,7 +26,7 @@
 
 #set title   'QuantumBio PWD Panel'
 #set class   'QuantumBio'
-#set version '2010.02'
+#set version '2011.03'
 #set main    'qb_QBPWDSetupPanel'
 
 function grid_isoidx_emit;
@@ -57,6 +57,7 @@ const PWD_EXPACT_HDR = 'Exp Act';
 const RMSD_MAX = 0.1;
 const MAT_TRANS_MIN = 0x80;
 const INITDIST = 7.5;
+const INITLIG = 1;
 
 const QBPWD_OPT_DEFAULTS =
     [
@@ -351,6 +352,7 @@ const PANEL =
 //  Global Variables
 
     global G_surface;                     // Callback function needs access
+    global G_origview;
 
 //  Local Functions
 
@@ -498,9 +500,6 @@ local function CreateSurfaceMap [radius, ligtok, pwdfilename]
         molidx   : 0,
         ligmols  : [],
         lignames : [],
-        origvw   : 7,
-        orignuk  : '',
-        origbnd  : '',
         restok   : '',
         resatms  : [],
         dist     : 0.0,
@@ -533,13 +532,21 @@ local function CreateSurfaceMap [radius, ligtok, pwdfilename]
     GSetMaterial [G_surface.gobj, mat];
     UpdateSurfaceMap [radius, 1, []];
 
-    ViewSave G_surface.origvw;
-    G_surface.orignuc = aNucleusLook G_surface.lig (1);
-    G_surface.origbnd = aBondLook G_surface.lig (1);
+    if isnull G_origview then
+        G_origview =
+            [
+            view : 7,
+            nuc  : aNucleusLook G_surface.lig (INITLIG),
+            bnd  : aBondLook G_surface.lig (INITLIG)
+            ];
 
-    aSetNucleusLook [G_surface.lig, 'sphere'];
-    aSetBondLook [G_surface.lig, 'none'];
-    View G_surface.lig;
+        ViewSave G_origview.view;
+        aSetNucleusLook [G_surface.lig, 'sphere'];
+        aSetBondLook [G_surface.lig, 'none'];
+        View G_surface.lig;
+    endif
+
+
 
 endfunction
 
@@ -1050,13 +1057,17 @@ local function UpdateComplex [ligtok]
         local currheavy = G_surface.rec | aElement G_surface.rec <> 'H';
         local curpos = cat aPos currheavy;
         local nextrec = G_surface.recmols (molidx);
-        local nextheavy = nextrec(4) | nextrec(4)(MOL_ATOM_EL) <> 'H';
-        local nextpos = cat [nextrec(4)(MOL_ATOM_X), nextrec(4)(MOL_ATOM_Y),
-            nextrec(4)(MOL_ATOM_Z)];
+        local nextheavymap = nextrec(4)(MOL_ATOM_EL) <> 'H';
+        local nextpos = cat [nextrec(4)(MOL_ATOM_X) | nextheavymap,
+            nextrec(4)(MOL_ATOM_Y) | nextheavymap,
+            nextrec(4)(MOL_ATOM_Z) | nextheavymap];
         local rmsd = qb_RMSD [curpos, nextpos];
 write ['RMSD for recs {} and {}:  {}\n', G_surface.molidx, molidx, rmsd];//DEBUG
         redosurf = rmsd > RMSD_MAX;
-        
+        if not redosurf and isnull G_surface.grids(molidx) then
+            G_surface.grids = poke [G_surface.grids, molidx, G_surface.molidx];
+        endif
+
         oDestroy uniq oChains G_surface.rec;
         local recchn = mol_Create nextrec;
         G_surface.rec = cat cAtoms recchn;
@@ -1070,8 +1081,8 @@ write ['RMSD for recs {} and {}:  {}\n', G_surface.molidx, molidx, rmsd];//DEBUG
 
     oDestroy uniq oChains G_surface.lig;
     local ligchn = mol_Create G_surface.ligmols (molidx);
-
     G_surface.lig = cat cAtoms ligchn;
+
     G_surface.molidx = molidx;
 
     oSetCollection ['QB_LIGAND', G_surface.lig];
@@ -1136,8 +1147,22 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
     if isnull G_surface then return; endif
 
     GClearVertexData G_surface.gobj;
+
+/*
     local gvtx = G_surface.grids(select [1, G_surface.molidx, 
         G_surface.numgrids === 1]);
+*/
+    local gvtx = [];
+    if G_surface.numgrids === 1 then
+        gvtx = G_surface.grids(1);
+    else
+        gvtx = G_surface.grids(G_surface.molidx);
+        while isscalarnum gvtx loop
+print gvtx;//DEBUG
+            gvtx = G_surface.grids(gvtx);
+        endloop
+    endif
+
     local [s_idx, s_color, s_vpt, s_vnorm] = gvtx;
 
     if neL [radius, G_surface.dist] or (redogrid and isnull gvtx) then
@@ -1156,6 +1181,10 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
 
         G_surface.grids = poke [G_surface.grids, 
             select [1, G_surface.molidx, G_surface.numgrids === 1], gvtx];
+    endif
+
+    if isnull gvtx then
+        Warning 'Unable to generate surface.';
     endif
 
     local vcolor;
@@ -1184,12 +1213,17 @@ global function qb_QBPWDCloseHandler []
     if not isnull G_surface then
         GDestroy G_surface.gobj;
         aSetLabelRes [(G_surface.resatms | oValid G_surface.resatms), 0];
-        aSetNucleusLook [(G_surface.lig | oValid G_surface.lig), 
-            G_surface.orignuc];
-        aSetBondLook [(G_surface.lig | oValid G_surface.lig), 
-            G_surface.origbnd];
-        ViewLoad G_surface.origvw;
         G_surface = [];
+
+    endif
+
+    if not isnull G_origview then
+        ViewLoad G_origview.view;
+        aSetNucleusLook [(G_surface.lig | oValid G_surface.lig), 
+            G_origview.nuc];
+        aSetBondLook [(G_surface.lig | oValid G_surface.lig), 
+            G_origview.bnd];
+        G_origview = [];
     endif
 
 endfunction
@@ -1263,7 +1297,6 @@ endfunction
  ****************************************************************************/
 global function qb_QBPWDSetupPanel []
 
-    const INITLIG = 1;
     const SHOWHELP = 1;
     const SIGNIFRES = 5;
 
@@ -1278,12 +1311,14 @@ global function qb_QBPWDSetupPanel []
     pwddata = [[], [], [], [], []];
     heatmaptask = 0;
 
-    local msgkey;
+    local msgkey, heatmapkey;
     local appdflts = tag tr QBPWD_OPT_DEFAULTS;
     local pwdopts = [];
     local wkey = WindowCreate cat [HEADER, PANEL];
 
     G_surface = [];
+    G_origview = [];
+
     WindowSetData [wkey, appdflts];
     WindowSetAttr [wkey, [analbox: [sensitive: 0], selbox: [sensitive: 0],
         panel: [sensitive: [0,1,1]]]];
@@ -1326,7 +1361,7 @@ global function qb_QBPWDSetupPanel []
                 endif
 
                 //  Destroy current surface if necessary
-                local heatmapkey = WindowKey 'QB Heat Map';
+                heatmapkey = WindowKey 'QB Heat Map';
                 if heatmapkey > 0 then
                     GDestroy G_surface.gobj;
                     G_surface = [];
@@ -1419,7 +1454,7 @@ print task_info heatmaptask;//DEBUG
                     task_settitle [-1, 'MOEDivCon PWD Analysis'];
 
                 //  Destroy current surface  and reset view if necessary
-                local heatmapkey = WindowKey 'QB Heat Map';
+                heatmapkey = WindowKey 'QB Heat Map';
                 if heatmapkey > 0 then
                    qb_QBPWDCloseHandler [];
                    WindowDestroy heatmapkey;

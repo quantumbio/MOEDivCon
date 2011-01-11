@@ -2,7 +2,7 @@
 #if 0
  // BEGIN COPYRIGHT
  /***********************************************************************
-    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    Copyright (c) 1998-2011 QuantumBio Inc. and/or its affiliates.
 	
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
@@ -26,7 +26,7 @@
 
 #set title   'QuantumBio Heat Map'
 #set class   'QuantumBio'
-#set version '2010.01'
+#set version '2011.02'
 
 function gr_export;
 function gr_print;
