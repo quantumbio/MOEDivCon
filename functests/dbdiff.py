@@ -31,8 +31,7 @@ for basefile in glob(basedir + '/*.mdb'):
     if not os.path.exists(newfile):
         raise Exception('Fatal: "' + newfile + '" does not exist')
     if testpwd:
-        # run('moebatch -exec "run [\'pwdbatch.svl\', [\'' + newfile + '\', \'QMScore\', 15]]" -exit')
-        run('rscriptor 9090')
+        run('moebatch -exec "run [\'pwdbatch.svl\', [\'' + newfile + '\', \'QMScore\', 15]]" -exit')
     run('moebatch -exec "run [\'qbmdbdiff.svl\', [\'qbmdbdiff-error.log\', \'' + basefile + '\', \'' + newfile + '\', \'all\', 0.5, ' + testpwd + ']]" -exit')
 output_file = "qbmdbdiff-error.log"
 if not os.path.exists(output_file):
