@@ -21,4 +21,5 @@ fi
 
 export R_HOME=$QBHOME/lib/R
 
+rscriptor 9090
 moedivconanalysis.bin $@ - 
