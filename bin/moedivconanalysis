@@ -21,7 +21,10 @@ fi
 
 export R_HOME=$QBHOME/lib/R
 
-rscriptor 9090
+pwd
 which rscriptor
-ldd bin/rscriptor
+echo "QBHOME=" $QBHOME
+echo "LD_LIBRARY_PATH=" $LD_LIBRARY_PATH
+rscriptor 9090
+ldd ../../DivConDiscoverySuit/bin/rscriptor
 #moedivconanalysis.bin $@ - 
