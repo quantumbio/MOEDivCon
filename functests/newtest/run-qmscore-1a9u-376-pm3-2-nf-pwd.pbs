@@ -1,7 +1,8 @@
 #!/bin/bash
 #PBS -S /bin/bash
-#PBS -l nodes=7:ppn=3
-#PBS -l pmem=750mb
+#PBS -q developer
+#PBS -l procs=21
+#PBS -l pmem=500mb
 #PBS -l walltime=1:00:00
 #PBS -j oe
 #PBS -v MOE_SVL_LOAD,MOE_SVL_RUNPATH
