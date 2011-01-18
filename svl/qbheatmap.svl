@@ -1337,6 +1337,8 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                     exit [];
                 endif
 
+                break;
+
             elseif vals.panel === 'Save' then
 
                 if second task_fork [statics:'share'] === 'child' then

@@ -356,41 +356,6 @@ const PANEL =
 
 //  Local Functions
 
-function MatchResidue;
-
-//DEBUG -- Remove (first try max of min)
-/****************************************************************************
- *
- *                          CalcDist
- *
- *  Determine a distance that include all residues in heat map.
- *
- ****************************************************************************/
-local function CalcDist [restokens, recatoms, ligatoms]
-
-    local res, atom, dist = 5.0;
-    local residues = uniq aResidue recatoms;
-    for res in residues loop
-        local restok = twrite ['{}{}', rName res, rUID res];
-        local idx = MatchResidue [restok, restokens];
-        if idx > 0 then
-            local rdist = 100.0;
-            local ratoms = first rAtoms res;
-            for atom in ratoms loop
-                local rmin = min aDist [atom, ligatoms];
-
-                rdist = min [rmin, rdist];
-            endloop
-write ['{t:8}: {n:7.2f}\n', restok, rdist];//DEBUG
-            dist = max [rdist, dist];
-        endif
-    endloop
-
-write ['Dist:  {}\n', dist];//DEBUG
-    return dist;
-
-endfunction
-
 function FindResidue;
 
 /****************************************************************************
@@ -416,6 +381,8 @@ local function CheckResidues [restoks]
     return missing;
 
 endfunction
+
+function MatchResidue;
 
 /****************************************************************************
  *
@@ -555,7 +522,7 @@ endfunction
  *                          FindResidue
  *
  *  Find the residue with the given name and number in the receptor 
- *  in the MOE Window.  Check to make sure  MOE or bio3d didn't rename it.
+ *  in the MOE Window.  Check to make sure MOE or bio3d didn't rename it.
  *
  *  Returns the index of the residue and its atom set.
  *
@@ -1364,7 +1331,6 @@ global function qb_QBPWDSetupPanel []
 
                     //  What about child task?
                     if heatmaptask > 0 then
-print task_info heatmaptask;//DEBUG
                         task_kill heatmaptask;
                         heatmaptask = 0;
                     endif
@@ -1456,7 +1422,6 @@ print task_info heatmaptask;//DEBUG
 
                     //  What about child task?
                     if heatmaptask > 0 then
-print task_info heatmaptask;//DEBUG
                         task_kill heatmaptask;
                         heatmaptask = 0;
                     endif
