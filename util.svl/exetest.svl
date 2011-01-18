@@ -1,0 +1,80 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information,
+ including trade secrets, belonging to QuantumBio Inc. and/or its
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly
+ prohibited without prior written authorization by the management of
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif
+
+#set title   'QuantumBio Exe Interface Test'
+#set class   'QuantumBio'
+#set version '2010.02'
+#set main    'ExeTest'
+
+
+local function ExeTest []
+
+    //  exe_open child process inherits parent's environment.
+    local process_key = exe_open ['exetest.sh', '.', [], 1];
+    local process_keys = [process_key];
+    local status = exe_status process_keys;
+
+    local prios = exe_getpriority process_keys;
+    exe_setpriority [process_keys, prios];
+
+    local stdin = exe_stdin process_keys;
+    local stdout = exe_stdout process_keys;
+    local stderr = exe_stderr process_keys;
+
+    local return_statement;
+    local sleep_time = -1;
+    while exe_status process_key loop
+        if not MOE_BATCH then
+            sleep sleep_time;
+        endif
+
+        [[return_statement]] = fread [stdout, '{c:*}'];
+
+        write ['ExeTest: {}\n', return_statement];//DEBUG
+
+        if return_statement === "Done" then
+            fwrite [stdin, '{c:}\n', 'Ok'];
+            break;
+        endif
+    endloop
+
+    //  Look for error messages from stderr.
+    local [[newerror]] = fread [stderr, '{c:*}'];
+    while length newerror > 0 loop
+        write ['ExeTest: {}\n', newerror];//DEBUG
+        errmess = cat [newerror, errmess];
+        [[newerror]] = fread [stderr, '{c:*}'];
+    endloop
+
+    exe_kill  [process_key, 0];
+    exe_kill  process_key;
+    exe_close process_keys;
+
+    if success === 0 and isnull errmess then
+        errmess = "Unknown error!";
+    endif
+
+    return errmess;
+endfunction
+
