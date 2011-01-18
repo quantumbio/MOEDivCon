@@ -1572,8 +1572,8 @@ local function UpdateMode [wkey, vals, status]
             recbox: [sensitive: 0], recdb: [allowBlank: 1], 
             posebox: [sensitive: 0], posedb: [allowBlank: 1], 
             panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
-            chgbox: [sensitive: 1], colchg: [allowBlank: 0],
-            recchg: [allowBlank: 1],
+            chgbox: [sensitive: 1], ckdbchg: [sensitive: 0],
+            colchg: [allowBlank: 0], recchg: [allowBlank: 1],
             ligchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
         SetChargeStatus [wkey, 1, status];
     elseif vals.mode === 'One-to-One' then
@@ -1581,8 +1581,8 @@ local function UpdateMode [wkey, vals, status]
             recbox: [sensitive: 0], recdb: [allowBlank: 1], 
             posebox: [sensitive: 0], posedb: [allowBlank: 1], 
             panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
-            chgbox: [sensitive: 1],  colchg: [allowBlank: 1],
-            recchg: [allowBlank: 0],
+            chgbox: [sensitive: 1],  ckdbchg: [sensitive: 0],
+            colchg: [allowBlank: 1], recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0], poseschg: [sensitive: 0]]];
             local las;
             [vals, las] = qb_ResetLigand [wkey, vals];
@@ -1592,8 +1592,8 @@ local function UpdateMode [wkey, vals, status]
             recbox: [sensitive: 0], recdb: [allowBlank: 1],
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
             panel:[sensitive: [1,1,1,1,1]], calcchg: [sensitive: 1],
-            chgbox: [sensitive: 1],  colchg: [allowBlank: 1],
-            recchg: [allowBlank: 0],
+            chgbox: [sensitive: 1],  ckdbchg: [sensitive: 1],
+            colchg: [allowBlank: 1], recchg: [allowBlank: 0],
             ligchg: [allowBlank: 0], poseschg: [sensitive: 1]]];
         SetChargeStatus [wkey, 0, status];
     elseif vals.mode === 'Many-to-Many' then
@@ -1601,8 +1601,8 @@ local function UpdateMode [wkey, vals, status]
             recbox: [sensitive: 1], recdb: [allowBlank: 0],
             posebox: [sensitive: 1], posedb: [allowBlank: 0],
             panel:[sensitive: [0,1,1,1,1]], calcchg: [sensitive: 0],
-            chgbox: [sensitive: 0],  colchg: [allowBlank: 1],
-            recchg: [allowBlank: 1],
+            chgbox: [sensitive: 0],  ckdbchg: [sensitive: 1],
+            colchg: [allowBlank: 1], recchg: [allowBlank: 1],
             ligchg: [allowBlank: 1], poseschg: [sensitive: 0]]];
         ClearChargeStatus [wkey];
     endif
