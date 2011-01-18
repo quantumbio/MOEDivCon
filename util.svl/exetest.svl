@@ -42,7 +42,7 @@ local function ExeTest []
     local stdout = exe_stdout process_keys;
     local stderr = exe_stderr process_keys;
 
-    local return_statement;
+    local return_statement = "", errmess = "";
     local sleep_time = -1;
     while exe_status process_key loop
         if not MOE_BATCH then
