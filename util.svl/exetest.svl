@@ -27,20 +27,20 @@
 #set version '2010.02'
 #set main    'ExeTest'
 
+const PRIOR = -0.5;
 
 local function ExeTest []
 
     //  exe_open child process inherits parent's environment.
     local process_key = exe_open ['exetest.sh', '.', [], 1];
-    local process_keys = [process_key];
-    local status = exe_status process_keys;
 
-    local prios = exe_getpriority process_keys;
-    exe_setpriority [process_keys, prios];
+    local prios = exe_getpriority [process_key];
+print prios;//DEBUG
+    exe_setpriority [[process_key], PRIOR];
 
-    local stdin = exe_stdin process_keys;
-    local stdout = exe_stdout process_keys;
-    local stderr = exe_stderr process_keys;
+    local stdin = exe_stdin [process_key];
+    local stdout = exe_stdout [process_key];
+    local stderr = exe_stderr [process_key];
 
     local return_statement = "", errmess = "";
     local sleep_time = -1;
@@ -67,11 +67,15 @@ local function ExeTest []
         [[newerror]] = fread [stderr, '{c:*}'];
     endloop
 
-    exe_kill  [process_key, 0];
-    exe_kill  process_key;
-    exe_close process_keys;
+    if exe_status [process_key] then
+        exe_kill  [process_key, 0];
+        for 10 while exe_status [process_key] loop sleep 0.1; endloop
+        exe_kill  [process_key, 1];
+    endif
 
-    if success === 0 and isnull errmess then
+    exe_close [process_key];
+
+    if isnull errmess then
         errmess = "Unknown error!";
     endif
 
