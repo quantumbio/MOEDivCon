@@ -352,7 +352,6 @@ const PANEL =
 //  Global Variables
 
     global G_surface;                     // Callback function needs access
-    global G_origview;
 
 //  Local Functions
 
@@ -440,15 +439,8 @@ function UpdateSurfaceMap;
  *  Acknowledgement:  borrowed heavily from surfmap.svl.
  *
  ****************************************************************************/
-local function CreateSurfaceMap [radius, ligtok, pwdfilename]
+local function CreateSurfaceMap [radius, ligtok, restoks, pwdfilename]
 
-    local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
-    if recatoms === [] or ligatoms === [] then
-        Warning errmess;
-        return [];
-    endif
-
-    local [vdwR, vdwE] = pboltz_AtomParameters recatoms;
     local gridopt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
         clipmode: 0];
 
@@ -460,9 +452,9 @@ local function CreateSurfaceMap [radius, ligtok, pwdfilename]
         surfdim  : 3,
         trans_f  : 96,
         trans_b  : 96,
-        rec      : recatoms,
+        rec      : [],
         recmols  : [],
-        lig      : ligatoms,
+        lig      : [],
         numgrids : 0,
         molidx   : 0,
         ligmols  : [],
@@ -470,25 +462,22 @@ local function CreateSurfaceMap [radius, ligtok, pwdfilename]
         restok   : '',
         resatms  : [],
         dist     : 0.0,
-        rad      : vdwR,
-        eps      : vdwE,
+        rad      : [],
+        eps      : [],
         gridopt  : gridopt,
-		fix      : 0,
         grids    : [],
         gobj     : []
         ];
 
-
-
-    //  Make sure first receptor/ligand is in MOE Window
+    //  Make sure initial receptor/ligand is in MOE Window
     LoadMols [pwdfilename];
-    G_surface.molidx = indexof [ligtok, G_surface.lignames];
     UpdateComplex ligtok;
 
-    if isnull G_surface.recmols then
-        G_surface.numgrids = 1;
-    else
-        G_surface.numgrids = length G_surface.recmols;
+    local missing = CheckResidues [restoks];
+    if length missing > 0 then
+        Warning twrite ['The following residues are not \n'
+            'present in the receptor in the MOE Window:\n{v}\n',
+            missing];
     endif
 
     G_surface.grids = rep [[], G_surface.numgrids];
@@ -498,22 +487,6 @@ local function CreateSurfaceMap [radius, ligtok, pwdfilename]
     local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
     GSetMaterial [G_surface.gobj, mat];
     UpdateSurfaceMap [radius, 1, []];
-
-    if isnull G_origview then
-        G_origview =
-            [
-            view : 7,
-            nuc  : aNucleusLook G_surface.lig (INITLIG),
-            bnd  : aBondLook G_surface.lig (INITLIG)
-            ];
-
-        ViewSave G_origview.view;
-        aSetNucleusLook [G_surface.lig | oValid G_surface.lig, 'sphere'];
-        aSetBondLook [G_surface.lig | oValid G_surface.lig, 'none'];
-        View (G_surface.lig | oValid G_surface.lig);
-    endif
-
-
 
 endfunction
 
@@ -552,6 +525,48 @@ local function FindResidue [restok]
     endif
 
     return [residx, resatms];
+endfunction
+
+/****************************************************************************
+ *
+ *                          FindSurface
+ *
+ *  Find the index of an existing surface that matches the current receptor
+ *  in G_surface.
+ *
+ *  Returns true if a match was found; false, otherwise.
+ *
+ ****************************************************************************/
+local function FindSurface []
+
+    if isnull G_surface then return 0; endif
+
+    local recheavy = G_surface.rec | aElement G_surface.rec <> 'H';
+    local recpos = cat aPos recheavy;
+
+    local m = not (app isscalarnum G_surface.grids 
+        or app isnull G_surface.grids);
+    local indices = igen length G_surface.grids | m;
+    local molidx, found = 0;
+    for molidx in indices loop
+        local nextrec = G_surface.recmols (molidx);
+        local nextheavymap = nextrec(4)(MOL_ATOM_EL) <> 'H';
+        local nextpos = cat [nextrec(4)(MOL_ATOM_X) | nextheavymap,
+            nextrec(4)(MOL_ATOM_Y) | nextheavymap,
+            nextrec(4)(MOL_ATOM_Z) | nextheavymap];
+        local rmsd = qb_RMSD [recpos, nextpos];
+        found = ltL [rmsd, RMSD_MAX];
+        if found then
+write ['RMSD for recs {} and {}:  {}\n', G_surface.molidx, molidx, rmsd];//DEBUG
+             break;
+         endif
+    endloop
+
+    if found then
+        G_surface.grids = poke [G_surface.grids, G_surface.molidx, molidx];
+    endif
+
+    return found;
 endfunction
 
 /****************************************************************************
@@ -699,6 +714,7 @@ local function LoadMols [pwdfilename]
     local recmols = [];
     local ligmols = [];
     local lignames = [];
+    local numgrids = 1;         //  Only one receptor
     local rowkey = 0;
     local ligflds = qb_GetPoseFields [];
 
@@ -711,11 +727,14 @@ local function LoadMols [pwdfilename]
     if qb_IsModeManyToMany [coreopts] then
         local recflds = qb_GetRecFields [];
         recmols = db_ReadColumn [dbkey, first recflds];
+        numgrids = length recmols;
     endif
 
     G_surface.recmols = recmols;
     G_surface.ligmols = ligmols;
     G_surface.lignames = lignames;
+    G_surface.numgrids = numgrids;
+
     db_Close dbkey;
 
 endfunction
@@ -1007,54 +1026,72 @@ endfunction
  *
  *                          UpdateComplex
  *
- *  Replace the ligand in the MOE window with the given ligand.
+ *  Replace the ligand/receptor in the MOE window with those corresponding
+ *  to the given ligand name.  Returns true if the surface needs to be
+ *  created.
  *
  ****************************************************************************/
 local function UpdateComplex [ligtok]
 
-    local redosurf = 0;
+    if isnull G_surface then return 0; endif
+    if isnull G_surface.ligmols then return 0; endif
+
+    local initsurf = G_surface.molidx === 0;
     local molidx = indexof [ligtok, G_surface.lignames];
+    if G_surface.molidx === molidx then return 0; endif
 
-    if G_surface.molidx === molidx then return redosurf; endif
-    if length G_surface.lig === 0 then return redosurf; endif
-    if length G_surface.rec === 0 then return redosurf; endif
+    G_surface.molidx = molidx;
 
-    //  If Many-to-Many, check to see whether to replace surface.
+    if initsurf then
+        Close [force:1];
+    endif
+
+    local redosurf = 0, vdwR = [], vdwE = [];
     if not isnull G_surface.recmols then
-        local currheavy = G_surface.rec | aElement G_surface.rec <> 'H';
-        local curpos = cat aPos currheavy;
-        local nextrec = G_surface.recmols (molidx);
-        local nextheavymap = nextrec(4)(MOL_ATOM_EL) <> 'H';
-        local nextpos = cat [nextrec(4)(MOL_ATOM_X) | nextheavymap,
-            nextrec(4)(MOL_ATOM_Y) | nextheavymap,
-            nextrec(4)(MOL_ATOM_Z) | nextheavymap];
-        local rmsd = qb_RMSD [curpos, nextpos];
-write ['RMSD for recs {} and {}:  {}\n', G_surface.molidx, molidx, rmsd];//DEBUG
-        redosurf = rmsd > RMSD_MAX;
-        if not redosurf and isnull G_surface.grids(molidx) then
-            G_surface.grids = poke [G_surface.grids, molidx, G_surface.molidx];
+        oDestroy uniq oChains G_surface.rec;
+        local recchn = mol_Create G_surface.recmols (G_surface.molidx);
+        G_surface.rec = cat cAtoms recchn;
+        [vdwR, vdwE] = pboltz_AtomParameters G_surface.rec;
+        G_surface.rad = vdwR;
+        G_surface.eps = vdwE;
+
+        if isnull G_surface.grids (G_surface.molidx) then
+            redosurf = not FindSurface [];
         endif
 
-        oDestroy uniq oChains G_surface.rec;
-        local recchn = mol_Create nextrec;
-        G_surface.rec = cat cAtoms recchn;
-        local [vdwR, vdwE] = pboltz_AtomParameters G_surface.rec;
+    elseif initsurf then
+        local [recatoms, l, errmess] = qb_SplitComplex [0];
+        if recatoms === [] then
+            Warning errmess;
+            return [];
+        endif
+
+        [vdwR, vdwE] = pboltz_AtomParameters recatoms;
+        G_surface.rec = recatoms;
         G_surface.rad = vdwR;
         G_surface.eps = vdwE;
     endif
 
-    local lignuc = aNucleusLook G_surface.lig (1);
-    local ligbnd = aBondLook G_surface.lig (1);
+    local lignuc, ligbnd;
+    if isnull G_surface.lig then
+        lignuc = 'small-sphere';
+        ligbnd = 'cylinder';
+    else
+        lignuc = aNucleusLook G_surface.lig (1);
+        ligbnd = aBondLook G_surface.lig (1);
+        oDestroy uniq oChains G_surface.lig;
+    endif
 
-    oDestroy uniq oChains G_surface.lig;
-    local ligchn = mol_Create G_surface.ligmols (molidx);
+    local ligchn = mol_Create G_surface.ligmols (G_surface.molidx);
     G_surface.lig = cat cAtoms ligchn;
-
-    G_surface.molidx = molidx;
-
     oSetCollection ['QB_LIGAND', G_surface.lig];
-    aSetNucleusLook [G_surface.lig | oValid G_surface.lig, lignuc];
-    aSetBondLook [G_surface.lig | oValid G_surface.lig, ligbnd];
+    aSetNucleusLook [G_surface.lig, lignuc];
+    aSetBondLook [G_surface.lig, ligbnd];
+
+    if initsurf then
+        View G_surface.lig;
+    endif
+
 
     return redosurf;
 endfunction
@@ -1128,6 +1165,7 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
     local [s_idx, s_color, s_vpt, s_vnorm] = gvtx;
 
     if neL [radius, G_surface.dist] or (redogrid and isnull gvtx) then
+        local msgkey = Message [0, 'Calculating surface ...'];
         if neL [radius, G_surface.dist] then
             local grids = rep [[], G_surface.numgrids];
             G_surface.grids = grids;
@@ -1143,6 +1181,7 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
 
         G_surface.grids = poke [G_surface.grids, 
             select [1, G_surface.molidx, G_surface.numgrids === 1], gvtx];
+        Message [msgkey, ''];
     endif
 
     if isnull gvtx then
@@ -1177,15 +1216,6 @@ global function qb_QBPWDCloseHandler []
         aSetLabelRes [(G_surface.resatms | oValid G_surface.resatms), 0];
         G_surface = [];
 
-    endif
-
-    if not isnull G_origview then
-        ViewLoad G_origview.view;
-        aSetNucleusLook [(G_surface.lig | oValid G_surface.lig), 
-            G_origview.nuc];
-        aSetBondLook [(G_surface.lig | oValid G_surface.lig), 
-            G_origview.bnd];
-        G_origview = [];
     endif
 
 endfunction
@@ -1234,21 +1264,8 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
     local redosurf = UpdateComplex ligtok;
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
         mincut, maxcut, colors];
-
-    if redosurf then
-        local msgkey = Message [0, 'Calculating surface ...'];
-        UpdateSurfaceMap [radius, 1, atomcolors];
-        Message [msgkey, ''];
-    else
-        UpdateSurfaceMap [radius, 0, atomcolors];
-    endif
-
+    UpdateSurfaceMap [radius, redosurf, atomcolors];
     UpdateResidue [restok, selrow, selcol, 0];
-
-    if not G_surface.fix then
-        View G_surface.lig;
-        G_surface.fix = 1;
-    endif
 
 endfunction
 
@@ -1279,7 +1296,6 @@ global function qb_QBPWDSetupPanel []
     local wkey = WindowCreate cat [HEADER, PANEL];
 
     G_surface = [];
-    G_origview = [];
 
     WindowSetData [wkey, appdflts];
     WindowSetAttr [wkey, [analbox: [sensitive: 0], selbox: [sensitive: 0],
@@ -1313,15 +1329,7 @@ global function qb_QBPWDSetupPanel []
                     exit [];
                 endif
 
-                //  Otherwise, Heat Map - check residue names
-                local missing = CheckResidues [second data];
-                if length missing > 0 then
-                    Warning twrite ['The following residues are not \n'
-                        'present in the receptor in the MOE Window:\n{v}\n',
-                        missing];
-                    exit [];
-                endif
-
+                //  Otherwise, Heat Map
                 //  Destroy current surface if necessary
                 heatmapkey = WindowKey 'QB Heat Map';
                 if heatmapkey > 0 then
@@ -1329,7 +1337,7 @@ global function qb_QBPWDSetupPanel []
                     G_surface = [];
                     WindowDestroy heatmapkey;
 
-                    //  What about child task?
+                    //  And child task.
                     if heatmaptask > 0 then
                         task_kill heatmaptask;
                         heatmaptask = 0;
@@ -1339,7 +1347,7 @@ global function qb_QBPWDSetupPanel []
                 local rowdata = last data;
                 msgkey = Message [0, 'Calculating surface ...'];
                 CreateSurfaceMap [INITDIST, first rowdata (INITLIG), 
-                    pwdfilename];
+                    second data, pwdfilename];
                 msgkey = Message [msgkey, ''];
 
                 heatmaptask = task_key -1;
@@ -1414,13 +1422,13 @@ global function qb_QBPWDSetupPanel []
                     task_prio 3;
                     task_settitle [-1, 'MOEDivCon PWD Analysis'];
 
-                //  Destroy current surface  and reset view if necessary
+                //  Destroy current surface
                 heatmapkey = WindowKey 'QB Heat Map';
                 if heatmapkey > 0 then
                    qb_QBPWDCloseHandler [];
                    WindowDestroy heatmapkey;
 
-                    //  What about child task?
+                    //  Kill child task.
                     if heatmaptask > 0 then
                         task_kill heatmaptask;
                         heatmaptask = 0;
