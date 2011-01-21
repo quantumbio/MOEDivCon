@@ -1232,16 +1232,16 @@ endfunction
  ****************************************************************************/
 global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
         initrad, help, closefun]
-    static selrow, selcol;
+    static selrow, selcol, mincut, maxcut, colors;
 
     if MOE_BATCH then return; endif
     if WindowShow ['QB Heat Map', 1] then return; endif
 
-    local bgraphics = [], scalekey = [], mincut = [], maxcut = [], colors = [];
+    local bgraphics = [], scalekey = [];
     local optdflts = tag tr OPT_DEFAULTS;
     optdflts.mapradio = initsel;
     optdflts.radius = initrad;
-    selrow = initsel; selcol = 0;
+    selrow = initsel; selcol = 0; mincut = []; maxcut = []; colors = [];
 
     //  Currently, only MAX_COLS columns and MAX_ROWS rows are allowed.
     local warning = '';
@@ -1395,12 +1395,14 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                         maxcut, colors, 0];
 
                     if not isnull bgraphics then
-                         WindowSetAttr [wkey, [mapradio: [graphics: bgraphics]]];
+                        WindowSetAttr [wkey, [mapradio: [graphics: bgraphics]]];
+                        app gr_destroy bgraphics; //DEBUG
                     endif
 
                     if not isnull scalekey then
-                         WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
-                    endif
+                        WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
+                        gr_destroy scalekey; //DEBUG
+                   endif
 
                     selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
                         mincut, maxcut, colors]];
