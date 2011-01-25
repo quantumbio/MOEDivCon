@@ -27,58 +27,46 @@
 #set version '2010.02'
 #set main    'ExeTest'
 
-const PRIOR = -0.5;
+const PRIORITY = -1.0;
 
 local function ExeTest []
 
-    //  exe_open child process inherits parent's environment.
-    local process_key = exe_open ['exetest.sh', '.', [], 1];
+    if second task_fork [] === 'child' then
+        task_prio 3;
+        task_settitle [-1, 'Exe Test'];
 
-    local prios = exe_getpriority [process_key];
-print prios;//DEBUG
-    exe_setpriority [[process_key], PRIOR];
+        //  exe_open child process inherits parent's environment.
+        local process_key = exe_open ['exetest.sh', '.', [], 1];
+        exe_setpriority [[process_key], PRIORITY];
 
-    local stdin = exe_stdin [process_key];
-    local stdout = exe_stdout [process_key];
-    local stderr = exe_stderr [process_key];
+        local stdin = exe_stdin [process_key];
+        local stdout = exe_stdout [process_key];
+        local stderr = exe_stderr [process_key];
 
-    local return_statement = "", errmess = "";
-    local sleep_time = -1;
-    while exe_status process_key loop
-        if not MOE_BATCH then
-            sleep sleep_time;
+        local return_statement = "";
+        local sleep_time = -1;
+        while exe_status process_key loop
+            if not MOE_BATCH then
+                sleep sleep_time;  //  Yield to MOE for limited user interactivity
+            endif
+
+            [[return_statement]] = fread [stdout, '{c:*}'];
+
+            write ['ExeTest: {}\n', return_statement];//DEBUG
+
+            if return_statement === "Done" then
+                fwrite [stdin, '{c:}\n', 'Ok'];
+                break;
+            endif
+        endloop
+
+        if exe_status [process_key] then
+            exe_kill  [process_key, 0];
+            for 10 while exe_status [process_key] loop sleep 0.1; endloop
+            if exe_status [process_key] then exe_kill  [process_key, 1]; endif
         endif
 
-        [[return_statement]] = fread [stdout, '{c:*}'];
-
-        write ['ExeTest: {}\n', return_statement];//DEBUG
-
-        if return_statement === "Done" then
-            fwrite [stdin, '{c:}\n', 'Ok'];
-            break;
-        endif
-    endloop
-
-    //  Look for error messages from stderr.
-    local [[newerror]] = fread [stderr, '{c:*}'];
-    while length newerror > 0 loop
-        write ['ExeTest: {}\n', newerror];//DEBUG
-        errmess = cat [newerror, errmess];
-        [[newerror]] = fread [stderr, '{c:*}'];
-    endloop
-
-    if exe_status [process_key] then
-        exe_kill  [process_key, 0];
-        for 10 while exe_status [process_key] loop sleep 0.1; endloop
-        exe_kill  [process_key, 1];
+        exe_close [process_key];
     endif
-
-    exe_close [process_key];
-
-    if isnull errmess then
-        errmess = "Unknown error!";
-    endif
-
-    return errmess;
 endfunction
 
