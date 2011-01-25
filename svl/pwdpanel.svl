@@ -1042,25 +1042,28 @@ local function UpdateComplex [ligtok]
 
     G_surface.molidx = molidx;
 
-    if initsurf then
-        Close [force:1];
-    endif
-
     local redosurf = 0, vdwR = [], vdwE = [];
     if not isnull G_surface.recmols then
-        oDestroy uniq oChains G_surface.rec;
+        if initsurf then
+            Close [force:1];
+        else
+            oDestroy uniq oChains G_surface.rec;
+        endif
+
         local recchn = mol_Create G_surface.recmols (G_surface.molidx);
         G_surface.rec = cat cAtoms recchn;
         [vdwR, vdwE] = pboltz_AtomParameters G_surface.rec;
         G_surface.rad = vdwR;
         G_surface.eps = vdwE;
+        G_surface.resatms = [];
+        G_surface.restok = '';
 
         if isnull G_surface.grids (G_surface.molidx) then
             redosurf = not FindSurface [];
         endif
 
     elseif initsurf then
-        local [recatoms, l, errmess] = qb_SplitComplex [0];
+        local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
         if recatoms === [] then
             Warning errmess;
             return [];
@@ -1070,6 +1073,10 @@ local function UpdateComplex [ligtok]
         G_surface.rec = recatoms;
         G_surface.rad = vdwR;
         G_surface.eps = vdwE;
+        G_surface.resatms = [];
+        G_surface.restok = '';
+
+        G_surface.lig = ligatoms;
     endif
 
     local lignuc, ligbnd;
@@ -1120,7 +1127,11 @@ local function UpdateResidue [restok, row, col, zoom]
     aSetLabelRes [G_surface.resatms | oValid G_surface.resatms, 0];
 
     local [residx, resatms] = FindResidue restok;
-    if residx === 0 then return; endif
+    if residx === 0 then
+        G_surface.resatms = [];
+        G_surface.restok = '';
+        return;
+    endif
 
     G_surface.restok = restok;
     G_surface.resatms = resatms;
@@ -1345,10 +1356,8 @@ global function qb_QBPWDSetupPanel []
                 endif
 
                 local rowdata = last data;
-                msgkey = Message [0, 'Calculating surface ...'];
                 CreateSurfaceMap [INITDIST, first rowdata (INITLIG), 
                     second data, pwdfilename];
-                msgkey = Message [msgkey, ''];
 
                 heatmaptask = task_key -1;
                 qb_HeatMapSetupPanel [data,  SIGNIFRES, 
@@ -1422,18 +1431,18 @@ global function qb_QBPWDSetupPanel []
                     task_prio 3;
                     task_settitle [-1, 'MOEDivCon PWD Analysis'];
 
-                //  Destroy current surface
-                heatmapkey = WindowKey 'QB Heat Map';
-                if heatmapkey > 0 then
-                   qb_QBPWDCloseHandler [];
-                   WindowDestroy heatmapkey;
+                    //  Destroy current surface
+                    heatmapkey = WindowKey 'QB Heat Map';
+                    if heatmapkey > 0 then
+                       qb_QBPWDCloseHandler [];
+                       WindowDestroy heatmapkey;
 
-                    //  Kill child task.
-                    if heatmaptask > 0 then
-                        task_kill heatmaptask;
-                        heatmaptask = 0;
+                        //  Kill child task.
+                        if heatmaptask > 0 then
+                            task_kill heatmaptask;
+                            heatmaptask = 0;
+                        endif
                     endif
-                endif
 
                     if neL [ftype pwdfilename, 'file']
                             or neL [fext pwdfilename, 'mdb'] then
