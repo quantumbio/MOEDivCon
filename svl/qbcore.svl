@@ -518,7 +518,7 @@ const RESNAMESEQUIVSETS =
     E : ['GLU', '5HP', 'DGL', 'PCA'],
     F : ['PHE', 'DPN'],
     G : ['GLY', 'SAR'],
-    H : ['HIS', 'DHI', 'HIS', 'HIE', 'HIP'],
+    H : ['HIS', 'DHI', 'HID', 'HIE', 'HIP'],
     I : ['ILE', 'DIL'],
     K : ['LYS', 'DLY'],
     L : ['LEU', 'DLE', 'MLE', 'NLE'],
@@ -2636,7 +2636,7 @@ global function qb_ResNameCanonical [resname]
 
     local abbrev = Seq_NameToLetter resname;
 
-    return first RESNAMESEQUIVSETS.abbrev;
+    return first tagpeek [RESNAMESEQUIVSETS, abbrev];
 endfunction
 
 /****************************************************************************
@@ -2649,8 +2649,7 @@ endfunction
 global function qb_ResNameEquivSet [resname]
 
     local abbrev = Seq_NameToLetter resname;
-
-    return RESNAMESEQUIVSETS.abbrev;
+    return tagpeek [RESNAMESEQUIVSETS, abbrev];
 endfunction
 
 /****************************************************************************
