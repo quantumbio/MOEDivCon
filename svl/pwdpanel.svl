@@ -426,6 +426,39 @@ local function ColorAtoms [data, ligidx, residx, recatoms,
 
 endfunction
 
+/****************************************************************************
+ *
+ *                          CreatePockets
+ *
+ *  Create a pockets for each receptor/ligand pair using the given distance.
+ *
+ *  Returns the list of pocket mols with the heavy atoms only.
+ *
+ ****************************************************************************/
+local function CreatePockets [recmols, ligmols, dist]
+
+    G_surface.pockets = rep [[], length recmols];
+
+    if neL [length recmols, length ligmols] then return; endif
+ 
+    local ith;
+    for ith = 1, length recmols, 1 loop
+        local rec = mol_Heavy recmols (ith);
+        local lig = mol_Heavy ligmols (ith);
+        local recpos = mol_aPos rec;
+        local ligpos = mol_aPos lig;
+
+        local proxkey = prox_open [dist, ligpos, dist/2];
+        local recmap = first prox_find [proxkey, recpos, dist/2];
+        prox_close proxkey;
+
+        local pocket = mol_aMask [rec, recmap];
+write['Rec:  {},  Hvy:  {},  Poc:  {}\n', mol_aCount recmols (ith), 
+mol_aCount rec, mol_aCount pocket];//DEBUG
+        G_surface.pockets = poke [G_surface.pockets, ith, pocket];
+    endloop
+endfunction
+
 function LoadMols;
 function UpdateComplex;
 function UpdateSurfaceMap;
@@ -452,8 +485,10 @@ local function CreateSurfaceMap [radius, ligtok, restoks, pwdfilename]
         surfdim  : 3,
         trans_f  : 96,
         trans_b  : 96,
+        init     : 1,
         rec      : [],
         recmols  : [],
+        pockets  : [],
         lig      : [],
         numgrids : 0,
         molidx   : 0,
@@ -461,7 +496,7 @@ local function CreateSurfaceMap [radius, ligtok, restoks, pwdfilename]
         lignames : [],
         restok   : '',
         resatms  : [],
-        dist     : 0.0,
+        dist     : radius,
         rad      : [],
         eps      : [],
         gridopt  : gridopt,
@@ -487,6 +522,7 @@ local function CreateSurfaceMap [radius, ligtok, restoks, pwdfilename]
     local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
     GSetMaterial [G_surface.gobj, mat];
     UpdateSurfaceMap [radius, 1, []];
+    G_surface.init = 0;
 
 endfunction
 
@@ -531,8 +567,8 @@ endfunction
  *
  *                          FindSurface
  *
- *  Find the index of an existing surface that matches the current receptor
- *  in G_surface.
+ *  Find the index of an existing surface that matches the pocket of the 
+ *  current receptor in G_surface.
  *
  *  Returns true if a match was found; false, otherwise.
  *
@@ -541,20 +577,17 @@ local function FindSurface []
 
     if isnull G_surface then return 0; endif
 
-    local recheavy = G_surface.rec | aElement G_surface.rec <> 'H';
-    local recpos = cat aPos recheavy;
+    local pocketpos = cat mol_aPos G_surface.pockets (G_surface.molidx);
 
     local m = not (app isscalarnum G_surface.grids 
         or app isnull G_surface.grids);
     local indices = igen length G_surface.grids | m;
     local molidx, found = 0;
     for molidx in indices loop
-        local nextrec = G_surface.recmols (molidx);
-        local nextheavymap = nextrec(4)(MOL_ATOM_EL) <> 'H';
-        local nextpos = cat [nextrec(4)(MOL_ATOM_X) | nextheavymap,
-            nextrec(4)(MOL_ATOM_Y) | nextheavymap,
-            nextrec(4)(MOL_ATOM_Z) | nextheavymap];
-        local rmsd = qb_RMSD [recpos, nextpos];
+        if molidx === G_surface.molidx then continue; endif
+
+        local nextpos = cat mol_aPos G_surface.pockets (molidx);
+        local rmsd = qb_RMSD [pocketpos, nextpos];
         found = ltL [rmsd, RMSD_MAX];
         if found then
 write ['RMSD for recs {} and {}:  {}\n', G_surface.molidx, molidx, rmsd];//DEBUG
@@ -1036,15 +1069,18 @@ local function UpdateComplex [ligtok]
     if isnull G_surface then return 0; endif
     if isnull G_surface.ligmols then return 0; endif
 
-    local initsurf = G_surface.molidx === 0;
     local molidx = indexof [ligtok, G_surface.lignames];
     if G_surface.molidx === molidx then return 0; endif
 
     G_surface.molidx = molidx;
 
+    if G_surface.init and length G_surface.ligmols > 0 then
+        CreatePockets [G_surface.recmols, G_surface.ligmols, G_surface.dist];
+    endif
+
     local redosurf = 0, vdwR = [], vdwE = [];
     if not isnull G_surface.recmols then
-        if initsurf then
+        if G_surface.init then
             Close [force:1];
         else
             oDestroy uniq oChains G_surface.rec;
@@ -1062,7 +1098,7 @@ local function UpdateComplex [ligtok]
             redosurf = not FindSurface [];
         endif
 
-    elseif initsurf then
+    elseif G_surface.init then
         local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
         if recatoms === [] then
             Warning errmess;
@@ -1095,10 +1131,9 @@ local function UpdateComplex [ligtok]
     aSetNucleusLook [G_surface.lig, lignuc];
     aSetBondLook [G_surface.lig, ligbnd];
 
-    if initsurf then
+    if G_surface.init then
         View G_surface.lig;
     endif
-
 
     return redosurf;
 endfunction
@@ -1175,9 +1210,10 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
 
     local [s_idx, s_color, s_vpt, s_vnorm] = gvtx;
 
-    if neL [radius, G_surface.dist] or (redogrid and isnull gvtx) then
+    if G_surface.init or neL [radius, G_surface.dist]
+            or (redogrid and isnull gvtx) then
         local msgkey = Message [0, 'Calculating surface ...'];
-        if neL [radius, G_surface.dist] then
+        if G_surface.init or neL [radius, G_surface.dist] then
             local grids = rep [[], G_surface.numgrids];
             G_surface.grids = grids;
             G_surface.dist = radius;
@@ -1255,8 +1291,8 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
     if allfalse eqE [G_surface.gobj, GKeyList []] then return; endif
     if isnull Atoms [] then return; endif
 
-    local [titles, resnames, resabbrevs, rowdata] = data;
-    local restok = '', ligtok = '', ligabbrev = '', ligdata = [];
+    local [t, resnames, ra, rowdata] = data;
+    local restok = '', ligtok = '', la = '', ld = [];
     if selrow === 0 and selcol === 0 then
         return;
     elseif selrow === 0 then
@@ -1266,10 +1302,10 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
             return;
         endif
     elseif selcol === 0 then
-        [ligtok, ligabbrev, ligdata] = rowdata (selrow);
+        [ligtok, la, ld] = rowdata (selrow);
     else
         restok = resnames (selcol);
-        [ligtok, ligabbrev, ligdata] = rowdata (selrow);
+        [ligtok, la, ld] = rowdata (selrow);
     endif
 
     local redosurf = UpdateComplex ligtok;
