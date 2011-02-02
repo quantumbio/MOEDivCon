@@ -452,7 +452,19 @@ local function CreatePockets [recmols, ligmols, dist]
         local recmap = first prox_find [proxkey, recpos, dist/2];
         prox_close proxkey;
 
-        local pocket = mol_aMask [rec, recmap];
+        //  Expand pocket atoms to residue - Needs testing
+        local reslens = rec(3)(MOL_RES_NATOMS);
+        local resmaps = split [recmap, reslens];
+        local rith;
+        for rith = 1, length resmaps, 1 loop
+            local rmap = resmaps (rith);
+            if anytrue rmap then
+                rmap = one rmap;
+                resmaps = poke [resmaps, rith, rmap];
+            endif
+        endloop
+
+        local pocket = mol_aMask [rec, cat resmaps];
 write['Rec:  {},  Hvy:  {},  Poc:  {}\n', mol_aCount recmols (ith), 
 mol_aCount rec, mol_aCount pocket];//DEBUG
         G_surface.pockets = poke [G_surface.pockets, ith, pocket];
