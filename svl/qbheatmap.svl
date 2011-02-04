@@ -52,6 +52,7 @@ const CELL_HT = 10;
 const MOE_PAD_W = 3.7;
 const MOE_PAD_H = 3.0;
 
+const MIN_PAGE_HT = 100;
 const MAX_ROWS = 60;            //  Used for truncation of table data
 const MAX_COLS = 30;            //  Used for truncation of table data
 
@@ -1032,6 +1033,7 @@ local function RedrawMapScale [data, opts, numsignifcols, mincut, maxcut,
     local numrows = length rowdata;
     local page_w = (numcols + 1) * (CELL_WD + MOE_PAD_W) + MOE_PAD_W;
     local page_h = (numrows + 1) * (CELL_HT + MOE_PAD_H) + MOE_PAD_H;
+    page_h = max [MIN_PAGE_HT, page_h];
     local errmess;
 
     if drawmap then
@@ -1266,6 +1268,7 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
     local numrows = length rowdata;
     local page_w = (numcols + 1) * (CELL_WD + MOE_PAD_W) + MOE_PAD_W;
     local page_h = (numrows + 1) * (CELL_HT + MOE_PAD_H) + MOE_PAD_H;
+    page_h = max [MIN_PAGE_HT, page_h];
 
     [bgraphics, scalekey, mincut, maxcut, colors]
         = RedrawMapScale [data, optdflts, numsignifcols, mincut, maxcut,
@@ -1396,12 +1399,12 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
 
                     if not isnull bgraphics then
                         WindowSetAttr [wkey, [mapradio: [graphics: bgraphics]]];
-                        app gr_destroy bgraphics; //DEBUG
+                        app gr_destroy bgraphics;
                     endif
 
                     if not isnull scalekey then
                         WindowSetAttr [wkey, [colorscale: [graphics: scalekey]]];
-                        gr_destroy scalekey; //DEBUG
+                        gr_destroy scalekey;
                    endif
 
                     selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
