@@ -1,60 +1,26 @@
 #svl
-#if 0
- // BEGIN COPYRIGHT
- /***********************************************************************
-    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
-
- This source code is the property of QuantumBio Inc. and/or its affiliates
- and is considered secret.
-
- This source code contains proprietary and Confidential Information,
- including trade secrets, belonging to QuantumBio Inc. and/or its
- affiliates.
-
- Use, duplication, or disclosure of this source code is strictly
- prohibited without prior written authorization by the management of
- QuantumBio Inc. At no time are you authorized to repurpose the source
- code for use with software other then that which it was intended.
-
- Please see http://www.quantumbioinc.com/ for more information.
-
- ***********************************************************************/
- // END COPYRIGHT
-#endif
-
 #set title   'QuantumBio Exe Interface Test'
 #set class   'QuantumBio'
-#set version '2010.02'
+#set version '2011.01'
 #set main    'ExeTest'
 
-const PRIORITY = -1.0;
-
 local function ExeTest []
-
     if second task_fork [] === 'child' then
         task_prio 3;
         task_settitle [-1, 'Exe Test'];
-
-        //  exe_open child process inherits parent's environment.
         local process_key = exe_open ['exetest.sh', '.', [], 1];
-        exe_setpriority [[process_key], PRIORITY];
-
+        exe_setpriority [[process_key], -1.0];
         local stdin = exe_stdin [process_key];
         local stdout = exe_stdout [process_key];
-        local stderr = exe_stderr [process_key];
-
-        local return_statement = "";
-        local sleep_time = -1;
+        local message = "";
         while exe_status process_key loop
             if not MOE_BATCH then
-                sleep sleep_time;  //  Yield to MOE for limited user interactivity
+                sleep -1;  //  Yield to MOE for limited user interactivity
             endif
 
-            [[return_statement]] = fread [stdout, '{c:*}'];
-
-            write ['ExeTest: {}\n', return_statement];//DEBUG
-
-            if return_statement === "Done" then
+            [[message]] = fread [stdout, '{c:*}'];
+            write ['ExeTest: {}\n', message];
+            if message === "Done" then
                 fwrite [stdin, '{c:}\n', 'Ok'];
                 break;
             endif
