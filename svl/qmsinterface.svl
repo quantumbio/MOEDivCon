@@ -207,7 +207,7 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
     //  Look for error messages from stderr.
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
-        // Hack!  Skip openmpi ignored error messages //DEBUG
+        // Hack!  Skip openmpi ignored error messages
         local errstrs = wordsplit [newerror, "()"];
         local errtoks = app token errstrs;
         local idx = indexof ['ignored', errtoks];

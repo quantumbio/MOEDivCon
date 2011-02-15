@@ -404,7 +404,7 @@ global function qb_NMRPerturbSetupPanel []
 
                     qb_SaveOptions [coreopts, perturbsopts];
                     qb_SaveAnalysisData [coreopts.scoredb, 'perturb', 'sel',
-                        [indices, atomnames]];//DEBUG-core
+                        [indices, atomnames]];
 
                     Message [0, 'MOEDivCon NMR Perturbation update is done.'];
                     sleep 2;

@@ -322,7 +322,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
     errmess = "";
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
-        // Hack!  Skip openmpi ignored error messages //DEBUG
+        // Hack!  Skip openmpi ignored error messages
         local errstrs = wordsplit [newerror, "()"];
         local errtoks = app token errstrs;
         local idx = indexof ['ignored', errtoks];

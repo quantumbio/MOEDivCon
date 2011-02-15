@@ -170,6 +170,7 @@ QuantumBio Homepage
         <li><a href="#heatmap-setup-numcolors">Number of Colors</a>
         <li><a href="#heatmap-setup-mono">Monochromatic</a>
         <li><a href="#heatmap-setup-numticks">Number of Ticks</a>
+        <li><a href="#heatmap-setup-radius">Radius</a>
       </ol>
   </ol>
 
@@ -1404,14 +1405,18 @@ There are several post analysis datasets that you can select:
       <li>SDEP_Ext: standard deviation of error of prediction, external data set 
       <li>R2_Ext:  correlation coefficient, external data set
     </ul>
+  <li>Activities Table:  a table that shows the experimental activities,
+      calculated activities, and percent error.
   <li>Interaction Heat Map:  a heat map that makes it easy to
       identify the residues that have the largest absolute effect on ligand
       binding.
   <li>SAR Heat Map:  a heat map that highlights residues that are most 
       critical to discriminating between more and less potent ligands.
 </ul>
-
-More will become available in the near future.
+<p>
+The analysis data is stored in the QMScore/PWD database.  When you load the
+database from the PWD Panel, the list of available datasets will appear in the
+<w>Analysis</w> options.
 
 <h4><a name="pwd-analysis-view"></a>View</h4>
 <p>
@@ -1419,6 +1424,11 @@ Click on the <w>View</w> button to view the selected dataset.  If the
 Interaction or SAR dataset is selected, the surface of the protein pocket
 is shown in the MOE Window and a QB Heat Map is created to present the data. 
 Otherwise, a table of the selected dataset is shown.
+<p>
+During the PLS analysis, it is possible that some of the residue names may be
+changed when displayed in the Heat Map; for instance, <inline>HID</inline>, 
+<inline>HIE</inline> or <inline>HIP</inline> may be changed to 
+<inline>HIS</inline>.
 
 <h4><a name="pwd-analysis-save"></a>Save</h4>
 <p>
@@ -1505,7 +1515,8 @@ number of top scoring residues to keep, which depends on the nature and size
 of the protein pocket.
 <p>
 Note that the current implementation of QB Heat Map can show a maximum of
-30 residues.
+30 residues.  MOEDivcon warns you if it is necessary to truncate row data to
+fit into the Heat Map.
 
 <h4><a name="pwd-options-pls"></a>PLS</h4>
 <p>
@@ -1536,9 +1547,13 @@ created (see the MOE documentation).
 The <w>QB Heat Map</w> is used to implement the interaction energy map and the
 structure-activity relationship (SAR) map.  The <w>QB Heat Map</w> is 
 interactive.  When first invoked, a Connolly molecular
-surface of the pocket is generated.  Then, depending on the user selection, the
+surface of the pocket of the first receptor/ligand pair is generated and the
 corresponding residues along the molecular surface are colored 
-according to their interaction values in the heap map.
+according to their interaction values in the heap map.  Then, depending on
+the user selection, either the current surface is recolored, or a new
+surface is created and colored.  The surface calculations are saved and reused
+when possible.
+
 <p>
 The interaction energy map is based
 on the absolute <em>E</em><sub>AB</sub> terms from PWD, which  makes it
@@ -1656,6 +1671,12 @@ above.
 <p>
 The number of ticks to display on the color scale showing the values
 represented by the colors.
+
+<h4><a name="heatmap-setup-radius"></a>Radius</h4>
+<p>
+The radius (in angstroms) used to generate the surface.  A smaller radius often
+creates a cleaner surface with the most relevant information, but the surface
+associated with some of the residues in the heat map may not be shown.
 
 <h2><a name="trouble"></a>Troubleshooting</h2>
 
