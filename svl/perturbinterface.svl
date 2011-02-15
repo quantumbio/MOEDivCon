@@ -172,7 +172,7 @@ global function qb_NMRPerturb [colmol, perfile, coreopts, appopts, errortests,
 
         [[return_statement]] = fread [stdout, '{c:*}'];
 
-write ['DivCon: {}\n', return_statement];//DEBUG
+        write ['DivCon: {}\n', return_statement];//DEBUG
 
         if return_statement === "success" then
             results = rep [0.0, length divconindices];
@@ -180,7 +180,6 @@ write ['DivCon: {}\n', return_statement];//DEBUG
             for numvals loop
                 local [[cspidx]] = fread [stdout, '{n:}'];
                 local [[cspval]] = fread [stdout, '{n:}'];
-print [cspidx, cspval];//DEBUG
                 local idxidx = indexof [cspidx, divconindices];
                 if idxidx === 0 then
                     errmess = cat [swrite ['Error! Atom index not found:\n'
@@ -212,7 +211,7 @@ print [cspidx, cspval];//DEBUG
     //  Look for error messages from stderr.
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
-        // Hack!  Skip openmpi ignored error messages //DEBUG
+        // Hack!  Skip openmpi ignored error messages
         local errstrs = wordsplit [newerror, "()"];
         local errtoks = app token errstrs;
         local idx = indexof ['ignored', errtoks];

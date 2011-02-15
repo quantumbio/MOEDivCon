@@ -213,7 +213,7 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
 
         [[return_statement]] = fread [stdout, '{c:*}'];
 
-write ['DivCon: {}\n', return_statement];//DEBUG
+        write ['DivCon: {}\n', return_statement];//DEBUG
 
         if return_statement === "success" then
             local atomindices = [], atomvalues = [];
@@ -221,7 +221,6 @@ write ['DivCon: {}\n', return_statement];//DEBUG
             for numvals loop
                 local [[cspidx]] = fread [stdout, '{n:}'];
                 local [[cspval]] = fread [stdout, '{n:}'];
-print [cspidx, cspval];//DEBUG
                 atomindices = append [atomindices, cspidx];
                 atomvalues = append [atomvalues, cspval];
             endloop
@@ -244,7 +243,6 @@ print [cspidx, cspval];//DEBUG
             endif
 
             local score = qb_RMSD [atomvalues, free - bound];
-print [score];//DEBUG
             results = [score, atomvalues];
             success = 1;
             fwrite [stdin, '{c:}\n', 'Ok'];
@@ -266,7 +264,7 @@ print [score];//DEBUG
     //  Look for error messages from stderr.
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
-        // Hack!  Skip openmpi ignored error messages //DEBUG
+        // Hack!  Skip openmpi ignored error messages
         local errstrs = wordsplit [newerror, "()"];
         local errtoks = app token errstrs;
         local idx = indexof ['ignored', errtoks];

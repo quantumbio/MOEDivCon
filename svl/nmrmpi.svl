@@ -264,12 +264,11 @@ global function qb_NMRScoreMPI [dbpath, jobid]
             for numvals loop
                 local [[cspidx]] = fread [stdout, '{n:}'];
                 local [[cspval]] = fread [stdout, '{n:}'];
-print [cspidx, cspval];//DEBUG
                 atomindices = append [atomindices, cspidx];
                 atomvalues = append [atomvalues, cspval];
             endloop
 
-            //  DivCon doesn't always retain index order //DEBUG
+            //  DivCon doesn't always retain index order
             local sidx = x_sort atomindices;
             atomindices = atomindices [sidx];
             atomvalues = atomvalues [sidx];
@@ -278,7 +277,7 @@ print [cspidx, cspval];//DEBUG
                 errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
                     '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
                     errmess];
-                write errmess;//DEBUG
+                write errmess;
                 if not isnull warnings (rowcnt) then
                     errmess = cat [errmess, string warnings (rowcnt)];
                 endif
@@ -289,7 +288,7 @@ print [cspidx, cspval];//DEBUG
                 errmess = cat [swrite ['Error! Atom indices are inconsistent:\n'
                     '    Orig: {v}\n    DivCon: {v}\n', indices, atomindices],
                     errmess];
-                write errmess;//DEBUG
+                write errmess;
                 if not isnull warnings (rowcnt) then
                     errmess = cat [errmess, string warnings (rowcnt)];
                 endif
@@ -298,7 +297,6 @@ print [cspidx, cspval];//DEBUG
 
             else
                 local score = qb_RMSD [atomvalues, free - bound];
-print [score];//DEBUG
                 results = [score, atomvalues];
 
                 fwrite [stdin, '{c:}\n', 'Ok'];
@@ -378,12 +376,12 @@ print [score];//DEBUG
     errmess = "";
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
-        // Hack!  Skip openmpi ignored error messages //DEBUG
+        // Hack!  Skip openmpi ignored error messages
         local errstrs = wordsplit [newerror, "()"];
         local errtoks = app token errstrs;
         local idx = indexof ['ignored', errtoks];
         if idx === 0 then
-            write ['MOEDivCon: {}\n', newerror];//DEBUG
+            write ['MOEDivCon: {}\n', newerror];
             errmess = cat [newerror, errmess];
         endif
 

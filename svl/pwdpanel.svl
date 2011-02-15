@@ -57,7 +57,7 @@ const PWD_EXPACT_HDR = 'Exp Act';
 const RMSD_MAX = 0.1;
 const MAT_TRANS_MIN = 0x80;
 const INITDIST = 7.5;
-const INITLIG = 1;
+const INITSEL = 1;
 
 const QBPWD_OPT_DEFAULTS =
     [
@@ -615,7 +615,6 @@ local function FindSurface []
         local rmsd = qb_RMSD [pocketpos, nextpos];
         found = ltL [rmsd, RMSD_MAX];
         if found then
-write ['RMSD for recs {} and {}:  {}\n', G_surface.molidx, molidx, rmsd];//DEBUG
              break;
          endif
     endloop
@@ -1319,7 +1318,7 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
     local [t, resnames, ra, rowdata] = data;
     local restok = '', ligtok = '', la = '', ld = [];
     if selrow === 0 and selcol === 0 then
-//        return;
+        return;
     elseif selrow === 0 then
         restok = resnames (selcol);
         if selcol > 0 then
@@ -1417,12 +1416,12 @@ global function qb_QBPWDSetupPanel []
                 endif
 
                 local rowdata = last data;
-                CreateSurfaceMap [INITDIST, first rowdata (INITLIG), 
+                CreateSurfaceMap [INITDIST, first rowdata (INITSEL), 
                     second data, pwdfilename];
 
                 heatmaptask = task_key -1;
                 qb_HeatMapSetupPanel [data,  SIGNIFRES, 
-                    'qb_QBPWDSelectHandler', INITLIG, INITDIST, SHOWHELP,
+                    'qb_QBPWDSelectHandler', INITDIST, SHOWHELP,
                     'qb_QBPWDCloseHandler'];
                 exit [];
             endif

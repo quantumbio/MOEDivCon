@@ -1190,6 +1190,17 @@ endfunction
 
 /****************************************************************************
  *
+ *                          qb_HeatMapPrevSel
+ *
+ *  Reset the Heat Map Radio Button to the previous selection.
+ *
+ ****************************************************************************/
+global function qb_HeatMapPrevSel []
+
+endfunction
+
+/****************************************************************************
+ *
  *                          qb_HeatMapSetupPanel
  *
  *  Parameters:
@@ -1220,9 +1231,6 @@ endfunction
  *          selected columns have selrow = 0.  If the function returns an
  *          error message (token), it is displayed using Warning [].
  *
- *    initsel : int : the initial selection.  It is the index into the
- *          radio buttons generated using the above data.
- *
  *    help : boolean : if true, show in the bubble help for each button
  *          the full row label, full column label and cell value.
  *
@@ -1232,8 +1240,9 @@ endfunction
  *  ToDo:  add controls for using abbreviated or full row/cal label names.
  *
  ****************************************************************************/
-global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
-        initrad, help, closefun]
+global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initrad, 
+        help, closefun]
+
     static selrow, selcol, mincut, maxcut, colors;
 
     if MOE_BATCH then return; endif
@@ -1241,9 +1250,8 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
 
     local bgraphics = [], scalekey = [];
     local optdflts = tag tr OPT_DEFAULTS;
-    optdflts.mapradio = initsel;
     optdflts.radius = initrad;
-    selrow = initsel; selcol = 0; mincut = []; maxcut = []; colors = [];
+    selrow = 0; selcol = 0; mincut = []; maxcut = []; colors = [];
 
     //  Currently, only MAX_COLS columns and MAX_ROWS rows are allowed.
     local warning = '';
@@ -1309,13 +1317,15 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
         rowlbl: [graphics: rowkey], collbl: [graphics: colkey]]];
     WindowShow [wkey, 1];
 
+
     gr_destroy mapkey;
     gr_destroy rowkey;
     gr_destroy colkey;
     gr_destroy scalekey;
     app gr_destroy bgraphics;
 
-    [selrow, selcol] = IndexToRowCol [initsel, numrows, numcols];
+    [selrow, selcol] = IndexToRowCol [optdflts.mapradio, numrows, 
+        numcols];
     local selerrmess = call [selfun, [data, selrow, selcol, optdflts.radius, 
         mincut, maxcut, colors]];
     if not isnull selerrmess and neL [selerrmess, ''] then
@@ -1347,8 +1357,8 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
 
-                    local simgkey = DrawMap [data, numrows, numcols, 1, 0, mincut, 
-                        maxcut, colors, vals.nticks];
+                    local simgkey = DrawMap [data, numrows, numcols, 1, 0, 
+                        mincut, maxcut, colors, vals.nticks];
                     gr_export simgkey;
                     gr_destroy simgkey;
                     exit [];
@@ -1359,8 +1369,8 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
 
-                    local pimgkey = DrawMap [data, numrows, numcols, 1, 0, mincut, 
-                        maxcut, colors, vals.nticks];
+                    local pimgkey = DrawMap [data, numrows, numcols, 1, 0, 
+                        mincut, maxcut, colors, vals.nticks];
                     gr_print pimgkey;
                     gr_destroy pimgkey;
                     exit [];
@@ -1379,8 +1389,8 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                     //  Show previous selection after animation
                     [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows,
                         numcols];
-                    selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
-                        mincut, maxcut, colors]];
+                    selerrmess = call [selfun, [data, selrow, selcol, 
+                        vals.radius, mincut, maxcut, colors]];
                     if not isnull selerrmess and neL [selerrmess, ''] then
                         Warning selerrmess;
                     endif
@@ -1407,8 +1417,8 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
                         gr_destroy scalekey;
                    endif
 
-                    selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
-                        mincut, maxcut, colors]];
+                    selerrmess = call [selfun, [data, selrow, selcol, 
+                        vals.radius, mincut, maxcut, colors]];
                     if not isnull selerrmess and neL [selerrmess, ''] then
                         Warning selerrmess;
                     endif
@@ -1425,7 +1435,8 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initsel,
             if second task_fork [statics:'share'] === 'child' then
                 task_prio 0;
 
-                [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows, numcols];
+                [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows, 
+                    numcols];
                 selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
                     mincut, maxcut, colors]];
                 if not isnull selerrmess and neL [selerrmess, ''] then

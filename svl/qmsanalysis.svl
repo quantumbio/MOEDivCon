@@ -224,7 +224,7 @@ global function qb_PWDAnalysis [qmsfilename]
     //  Look for error messages from stderr.
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
-        write ['MOEDivCon: {}\n', newerror];//DEBUG
+        write ['MOEDivCon: {}\n', newerror];
         errmess = cat [newerror, errmess];
         [[newerror]] = fread [stderr, '{c:*}'];
     endloop

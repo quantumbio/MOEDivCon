@@ -246,12 +246,10 @@ local function RunCalc [dbkey]
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
-    local start = clock [];//DEBUG
-
+    local start = clock [];
     local [results, errmess] = qb_QMScore [receptor, ligand, perfile, 
         coreopts, qmsopts, status.notforced];
-
-    local finish = clock [];//DEBUG
+    local finish = clock [];
     local secs = round (finish - start);
     local hours = floor (secs / 3600);
     secs = secs - (hours * 3600);
