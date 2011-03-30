@@ -2570,12 +2570,12 @@ endfunction
  *
  ****************************************************************************/
 global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
-
+    
     local recatoms = cat oAtoms cat recressets;
     local [recvdw_r,recvdw_e] = get [pot_Parm_vdw [recatoms, recatoms], [2,3]];
-
-    local handshake, resset, residue, atom, xyz, idx;
-    xyz = tr aPos recatoms;
+    local handshake, resset, residue, atom, atmCount;
+    
+    atmCount = 0;
     fwrite [outpipe, '{n:}\n', length recressets];
     for resset in recressets loop
         fwrite [outpipe, '{n:}\n', length resset];
@@ -2583,13 +2583,12 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
             fwrite [outpipe, '{c:} {n:} {n:}\n', 
                 rName residue, rUID residue, rAtomCount residue];
             for atom in cat rAtoms residue loop
-                idx = aNumber atom;
+                atmCount = atmCount + 1;
                 fwrite [outpipe, '{c:} {c:} {c:}\n',
                     aName atom, aElement atom, aMMType atom];
-                fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n',
-                    xyz(idx)(1), xyz(idx)(2), xyz(idx)(3)];
+                fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
                 fwrite [outpipe, '{n:.4f} {n:.4f}\n',
-                    recvdw_r (idx),recvdw_e (idx)];
+                    recvdw_r (atmCount),recvdw_e (atmCount)];
             endloop
         endloop
     endloop
@@ -2603,7 +2602,7 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     local ligatoms = cat oAtoms cat ligressets;
     local [ligvdw_r,ligvdw_e] = get [pot_Parm_vdw [ligatoms, ligatoms], [2,3]];
 
-    xyz = tr aPos ligatoms;
+    atmCount = 0;
     fwrite [outpipe, '{n:}\n', length ligressets];
     for resset in ligressets loop
         fwrite [outpipe, '{n:}\n', length resset];
@@ -2611,13 +2610,12 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
             fwrite [outpipe, '{c:} {n:} {n:}\n', 
                 rName residue, rUID residue, rAtomCount residue];
             for atom in cat rAtoms residue loop
-                idx = aNumber atom - length recatoms;
+                atmCount = atmCount + 1;
                 fwrite [outpipe, '{c:} {c:} {c:}\n',
                     aName atom, aElement atom, aMMType atom];
-                fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n',
-                    xyz(idx)(1), xyz(idx)(2), xyz(idx)(3)];
+                fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
                 fwrite [outpipe, '{n:.4f} {n:.4f}\n',
-                    ligvdw_r (idx),ligvdw_e (idx)];
+                    ligvdw_r (atmCount),ligvdw_e (atmCount)];
             endloop
         endloop
     endloop
