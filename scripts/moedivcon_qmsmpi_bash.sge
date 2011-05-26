@@ -1,0 +1,15 @@
+#!/bin/sh
+#$ -N pbbtest
+#$ -S /bin/sh
+
+WORKDIR=/path/to/wherever
+
+cd $WORKDIR
+
+# Change the path and name for the MOE database.
+USER_DATADB="$WORKDIR/qmscore.mdb"
+
+NUM=`echo ${SGE_STDOUT_PATH} | awk -F ".o" '{print $NF}'`
+
+qbmoebatch -exec "run ['qmsmpi.svl', ['$USER_DATADB', '$NUM']]" -exit
+
