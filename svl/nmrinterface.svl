@@ -220,7 +220,6 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
             for numvals loop
                 local [[cspidx]] = fread [stdout, '{n:}'];
                 local [[cspval]] = fread [stdout, '{n:}'];
-print [cspidx, cspval];//DEBUG
                 atomindices = append [atomindices, cspidx];
                 atomvalues = append [atomvalues, cspval];
             endloop
@@ -243,7 +242,6 @@ print [cspidx, cspval];//DEBUG
             endif
 
             local score = qb_RMSD [atomvalues, free - bound];
-print [score];//DEBUG
             results = [score, atomvalues];
             success = 1;
             fwrite [stdin, '{c:}\n', 'Ok'];
