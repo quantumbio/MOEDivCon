@@ -204,16 +204,15 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
 
     //    results has the format:  [nmrscore, [V1, V2, ... , Vn]]
     local results = [], return_statement;
-    local sleep_time = -1;
+    local sleep_time = 0.1;
     local divconerrmess = "";
     while exe_status process_key loop
-        if not MOE_BATCH then
-            sleep sleep_time;
-        endif
-
+        fwrite [stdin, '{c:}\n', 'status'];
         [[return_statement]] = fread [stdout, '{c:*}'];
 
-        write ['DivCon: {}\n', return_statement];//DEBUG
+        if not (return_statement === "noupdate") then
+            write ['DivCon: {}\n', return_statement];//DEBUG
+        endif
 
         if return_statement === "success" then
             local atomindices = [], atomvalues = [];
@@ -221,6 +220,7 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
             for numvals loop
                 local [[cspidx]] = fread [stdout, '{n:}'];
                 local [[cspval]] = fread [stdout, '{n:}'];
+print [cspidx, cspval];//DEBUG
                 atomindices = append [atomindices, cspidx];
                 atomvalues = append [atomvalues, cspval];
             endloop
@@ -243,6 +243,7 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
             endif
 
             local score = qb_RMSD [atomvalues, free - bound];
+print [score];//DEBUG
             results = [score, atomvalues];
             success = 1;
             fwrite [stdin, '{c:}\n', 'Ok'];
@@ -259,12 +260,15 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
             endloop;
             fwrite [stdin, '{c:}\n', 'Ok'];
         endif
+        if not MOE_BATCH then
+            sleep sleep_time;
+        endif
     endloop
 
     //  Look for error messages from stderr.
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
-        // Hack!  Skip openmpi ignored error messages
+        // Hack!  Skip openmpi ignored error messages //DEBUG
         local errstrs = wordsplit [newerror, "()"];
         local errtoks = app token errstrs;
         local idx = indexof ['ignored', errtoks];
