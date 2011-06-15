@@ -165,16 +165,15 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
 
     const NUMRESULTS = 11;
     local results, return_statement;
-    local sleep_time = -1;
+    local sleep_time = 0.1;
     local divconerrmess = "";
     while exe_status process_key loop
-        if not MOE_BATCH then
-            sleep sleep_time;
-        endif
-
+        fwrite [stdin, '{c:}\n', 'status'];
         [[return_statement]] = fread [stdout, '{c:*}'];
 
-        write ['DivCon: {}\n', return_statement];//DEBUG
+        if not (return_statement === "noupdate") then
+            write ['DivCon: {}\n', return_statement];//DEBUG
+        endif
 
         if return_statement === "success" then
             local name, nameValue;
@@ -201,6 +200,10 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
                 [[return_statement]] = fread [stdout, '{c:*}'];
             endloop;
             fwrite [stdin, '{c:}\n', 'Ok'];
+        endif
+        
+        if not MOE_BATCH then
+            sleep sleep_time;
         endif
     endloop
 
