@@ -206,15 +206,19 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
     local results = [], return_statement;
     local sleep_time = 0.1;
     local divconerrmess = "";
+    local status_length=0;
     while exe_status process_key loop
         fwrite [stdin, '{c:}\n', 'status'];
         [[return_statement]] = fread [stdout, '{c:*}'];
 
-        if not (return_statement === "noupdate") then
-            write ['DivCon: {}\n', return_statement];//DEBUG
-        endif
-
-        if return_statement === "success" then
+        if return_statement === "noupdate" then
+        elseif return_statement === "running" then
+	    [[status_length]] = fread [stdout, '{n:}'];
+            for status_length loop
+                [[return_statement]] = fread [stdout, '{c:*}'];
+                print ['running', return_statement];
+            endloop
+        elseif return_statement === "success" then
             local atomindices = [], atomvalues = [];
             local [[numvals]] = fread [stdout, '{n:}'];
             for numvals loop
