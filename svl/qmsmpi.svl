@@ -222,7 +222,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
 
     //  Collect and store results
     const NUMRESULTS = 11;
-    local result_ith = 1;
+    local result_ith = 0;
     while exe_status process_key and result_ith <= numokay loop
         local results = [], return_statement = [];
         local divconerrmess = "";
@@ -309,6 +309,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
             result_ith = result_ith + 1;
 
         elseif return_statement === "DivCon done." then
+            print ['return_statement at DivCon done. Sending Ok '];
             fwrite [stdin, '{c:}\n', 'Ok'];
             break;
 
