@@ -246,7 +246,7 @@ global function qb_NMRScoreMPI [dbpath, jobid]
     endif
 
     //  Collect and store results
-    local result_ith = 1;
+    local result_ith = 0;
     while exe_status process_key and result_ith <= numokay loop
         local results = [], return_statement = [];
         local divconerrmess = "";
