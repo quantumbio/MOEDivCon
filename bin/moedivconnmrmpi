@@ -19,4 +19,4 @@ if [ -z "$QBENVSET" ]; then
     . $QBHOME/etc/qbenv.sh
 fi
 
-${QBHOME}/bin/mpirun -x OPAL_PREFIX -x QBHOME -x PATH -x LD_LIBRARY_PATH -x MKL_NUM_THREADS -x MKL_DYNAMIC -machinefile $PBS_NODEFILE ${QBHOME}/bin/moedivconnmrmpi.bin $@ - 
+${QBHOME}/bin/${PLTFM_VER}/mpirun -x OPAL_PREFIX -x OPAL_BINDIR -x OPAL_LIBDIR -x QBHOME -x PATH -x LD_LIBRARY_PATH -x MKL_NUM_THREADS -x MKL_DYNAMIC -machinefile $PBS_NODEFILE ${QBHOME}/bin/moedivconnmrmpi.bin $@ - 

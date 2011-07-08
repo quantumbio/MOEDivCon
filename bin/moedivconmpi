@@ -42,10 +42,8 @@ elif [ ! -z "${PE_HOSTFILE}" ]; then
 else
 # We need an empty QBMACHINEFILE variable for the mpirun below so we don't need to maintain two calls.
     QBMACHINEFILE=""
-#    echo "ERROR: machinefile must be provided (e.g. qbmachinefile.txt) or PBS or PE SGE must be used."
-#    exit 1
 fi
 
-${QBHOME}/bin/mpirun -x OPAL_PREFIX -x QBHOME -x PATH -x LD_LIBRARY_PATH -x MKL_NUM_THREADS -x MKL_DYNAMIC ${QBMACHINEFILE} ${QBHOME}/bin/moedivconmpi.bin $@ - 
+${QBHOME}/bin/${PLTFM_VER}/mpirun -x OPAL_PREFIX -x OPAL_BINDIR -x OPAL_LIBDIR -x QBHOME -x PATH -x LD_LIBRARY_PATH -x MKL_NUM_THREADS -x MKL_DYNAMIC ${QBMACHINEFILE} ${QBHOME}/bin/moedivconmpi.bin $@ - 
 
 
