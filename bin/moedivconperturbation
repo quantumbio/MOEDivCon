@@ -19,4 +19,8 @@ if [ -z "$QBENVSET" ]; then
     . $QBHOME/etc/qbenv.sh
 fi
 
-moedivconperturbation.bin $@ - 
+if [ -e $QBHOME/${PLTFM_VER}/bin/moedivconperturbation.bin ]; then
+    exec "$QBHOME/${PLTFM_VER}/bin/moedivconperturbation.bin" "$@" "-" 
+fi
+
+exit $?
