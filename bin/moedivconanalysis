@@ -19,4 +19,9 @@ if [ -z "$QBENVSET" ]; then
     . $QBHOME/etc/qbenv.sh
 fi
 
-moedivconanalysis.bin $@ - 
+if [ -e $QBHOME/${PLTFM_VER}/bin/moedivconanalysis.bin ]; then
+    exec "$QBHOME/${PLTFM_VER}/bin/moedivconanalysis.bin" "$@" "-" 
+fi
+
+exit $?
+ 
