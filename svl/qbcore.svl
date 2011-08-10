@@ -2576,21 +2576,21 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     local handshake, resset, residue, atom, atmCount;
     
     atmCount = 0;
-    fwrite [outpipe, '{n:}\n', length recressets];
-    for resset in recressets loop
-        fwrite [outpipe, '{n:}\n', length resset];
-        for residue in resset loop
-            fwrite [outpipe, '{c:} {n:} {n:}\n', 
-                rName residue, rUID residue, rAtomCount residue];
-            for atom in cat rAtoms residue loop
-                atmCount = atmCount + 1;
-                fwrite [outpipe, '{c:} {c:} {c:}\n',
-                    aName atom, aElement atom, aMMType atom];
-                fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
-                fwrite [outpipe, '{n:.4f} {n:.4f}\n',
-                    recvdw_r (atmCount),recvdw_e (atmCount)];
-            endloop
-        endloop
+//    fwrite [outpipe, '{n:}\n', length recressets];
+    fwrite [outpipe, '{n:}\n', 1];  // @todo: update moedivconscoring to no longer require this line.
+    resset = recressets;
+    fwrite [outpipe, '{n:}\n', length resset];
+    for residue in resset loop
+       fwrite [outpipe, '{c:} {n:} {n:}\n', 
+           rName residue, rUID residue, rAtomCount residue];
+       for atom in cat rAtoms residue loop
+           atmCount = atmCount + 1;
+           fwrite [outpipe, '{c:} {c:} {c:}\n',
+               aName atom, aElement atom, aMMType atom];
+           fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
+           fwrite [outpipe, '{n:.4f} {n:.4f}\n',
+               recvdw_r (atmCount),recvdw_e (atmCount)];
+       endloop
     endloop
 
     [handshake] = fread [inpipe, '{n:}\n'];
@@ -2603,20 +2603,20 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     local [ligvdw_r,ligvdw_e] = get [pot_Parm_vdw [ligatoms, ligatoms], [2,3]];
 
     atmCount = 0;
-    fwrite [outpipe, '{n:}\n', length ligressets];
-    for resset in ligressets loop
-        fwrite [outpipe, '{n:}\n', length resset];
-        for residue in resset loop
-            fwrite [outpipe, '{c:} {n:} {n:}\n', 
-                rName residue, rUID residue, rAtomCount residue];
-            for atom in cat rAtoms residue loop
-                atmCount = atmCount + 1;
-                fwrite [outpipe, '{c:} {c:} {c:}\n',
-                    aName atom, aElement atom, aMMType atom];
-                fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
-                fwrite [outpipe, '{n:.4f} {n:.4f}\n',
-                    ligvdw_r (atmCount),ligvdw_e (atmCount)];
-            endloop
+//    fwrite [outpipe, '{n:}\n', length ligressets];
+    fwrite [outpipe, '{n:}\n', 1];
+    resset = ligressets;
+    fwrite [outpipe, '{n:}\n', length resset];
+    for residue in resset loop
+        fwrite [outpipe, '{c:} {n:} {n:}\n', 
+            rName residue, rUID residue, rAtomCount residue];
+        for atom in cat rAtoms residue loop
+            atmCount = atmCount + 1;
+            fwrite [outpipe, '{c:} {c:} {c:}\n',
+                aName atom, aElement atom, aMMType atom];
+            fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
+            fwrite [outpipe, '{n:.4f} {n:.4f}\n',
+                ligvdw_r (atmCount),ligvdw_e (atmCount)];
         endloop
     endloop
 
@@ -3135,9 +3135,21 @@ global function qb_SplitComplex [testsingle]
         return [[], [], 'No molecular complex loaded in MOE Window.'];
     endif
 
+    local recatoms, ligatoms, col, x;
+
+    // $$ligand and $$receptor should be used for this.
+    // need to readd in the items below that sort and so on.
+    recatoms = cat [_Atoms '$$solvent', _Atoms '$$receptor'];
+    ligatoms = _Atoms '$$ligand';
+//    col = diff [complexatoms, ligatoms];
+//    x = x_sort aNumber col;
+//    recatoms  = col [x];
+    return [recatoms,ligatoms, ''];
+//    return [cat [_Atoms '$$solvent', _Atoms '$$receptor'], _Atoms '$$ligand', ''];
+    // not sure why we need the rest:
+
     const COLLECTNAMES = ['QB_LIGAND', 'LIGX_LIGAND'];
-    local recatoms, ligatoms;
-    local cname, col, x;
+    local cname;
 
     local colnames = oCollections [];
     for cname in COLLECTNAMES loop
