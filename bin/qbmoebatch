@@ -11,6 +11,9 @@ if [ ! "$QBHOME" ]; then
     PRG=$0
     
     progdir=`dirname "$PRG"`
+    if [ "$progdir" = "." ]; then
+	    progdir=`pwd`
+    fi
     
     if [ "`echo "$progdir" | grep -s '^/'`" ]; then
         progdir=$progdir
@@ -18,7 +21,6 @@ if [ ! "$QBHOME" ]; then
         progdir=`pwd`/"$progdir"
     fi
     
-    progdir=`echo $progdir | sed 's:/.$::'`
     QBHOME=`echo "$progdir" | sed 's:/bin$::'`
     export QBHOME
 fi
