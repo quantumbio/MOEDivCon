@@ -1,9 +1,10 @@
 #moe 2001.01
-#system 8 tag t value *
-ViewOrientationY r* 3 -0.342402 0.8842955 0.3174625 ViewOrientationZ r*
-3 0.8391109 0.4398169 -0.3200845 ViewLookAt r* 3 -5.4873857 -11.1845856
--14.3227167 ViewScale r 25.1763325 ViewDepthCueFront r 0.45
-ViewDepthCueStrength r 0.75 ViewZFront i 0 ViewZWidth i 1
+#system 10 tag t value *
+ViewOrientationY r* 3 -0.583804 0.8013996 -0.1301214 ViewOrientationZ r*
+3 0.7890784 0.5977911 0.1414253 ViewLookAt r* 3 -6.1592598 -11.0667048
+-14.4653187 ViewScale r 25.1763325 ViewDepthCueFront r 0.45
+ViewDepthCueStrength r 0.75 ViewZFront i 0 ViewZWidth i 1 ViewZSFront i
+0 ViewZSWidth i 1
 #molecule 3 tag t value *
 atoms i 73 residues i 4 chains i 2
 #bond 64 a i b i o i=1
@@ -136,6 +137,7 @@ none
 -8.15799999237061 -7.30800008773804 -15.875 10 0 0.25 55
 -8.45400047302246 -6.14799976348877 -15.5270004272461 10 0 0.25 56
 -8.06799983978271 -8.29300022125244 -15.1049995422363 10 0 0.25
-#collection 1 name t objects i*
+#collection 2 name t objects i*
 LIGX_LIGAND 17 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73
+Receptor 3 76 74 75
 #endsystem
