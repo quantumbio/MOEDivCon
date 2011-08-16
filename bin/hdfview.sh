@@ -32,6 +32,8 @@ fi
 HDFVIEW_HOME=$QBHOME
 export HDFVIEW_HOME
 
+JAVAVERSIONREQ=1.6
+
 # where Java is installed (requires jdk1.4.x or above), e.g. /usr/jdk1.4.2/bin
 java_bin=`which java`
 if [ ! -n "$java_bin" ]; then
@@ -39,7 +41,7 @@ if [ ! -n "$java_bin" ]; then
     exit 1
 fi
 java_version=`java -version 2>&1 | head -1 | awk -F "\"" '{print $2}' | awk -F "." '{print $1"."$2}'`
-if [ $java_version -lt $JAVAVERSIONREQ ]; then
+if [ "$(echo "${java_version} < ${JAVAVERSIONREQ}"|bc)" -eq 1 ]; then
     echo "ERROR! Java $JAVAVERSIONREQ required."
     exit 1
 fi
