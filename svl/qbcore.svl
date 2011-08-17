@@ -2580,12 +2580,12 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     fwrite [outpipe, '{n:}\n', 1];  // @todo: update moedivconscoring to no longer require this line.
     resset = recressets;
     fwrite [outpipe, '{n:}\n', length resset];
-    write ['target length: {n:}\n', length resset];
+//    write ['target length: {n:}\n', length resset];
     for residue in resset loop
        fwrite [outpipe, '{c:} {n:} {n:}\n', 
            rName residue, rUID residue, rAtomCount residue];
-       write ['{c:} {n:} {n:}\n', 
-           rName residue, rUID residue, rAtomCount residue];
+//       write ['{c:} {n:} {n:}\n', 
+//           rName residue, rUID residue, rAtomCount residue];
        for atom in cat rAtoms residue loop
            atmCount = atmCount + 1;
            fwrite [outpipe, '{c:} {c:} {c:}\n',
@@ -2609,7 +2609,7 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
 //    fwrite [outpipe, '{n:}\n', length ligressets];
     fwrite [outpipe, '{n:}\n', 1];
     resset = ligressets;
-    write ['ligand length: {n:}\n', length resset];
+//    write ['ligand length: {n:}\n', length resset];
     fwrite [outpipe, '{n:}\n', length resset];
     for residue in resset loop
         fwrite [outpipe, '{c:} {n:} {n:}\n', 
@@ -2619,7 +2619,7 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
             fwrite [outpipe, '{c:} {c:} {c:}\n',
                 aName atom, aElement atom, aMMType atom];
             fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
-            write ['{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
+//            write ['{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
             fwrite [outpipe, '{n:.4f} {n:.4f}\n',
                 ligvdw_r (atmCount),ligvdw_e (atmCount)];
         endloop
