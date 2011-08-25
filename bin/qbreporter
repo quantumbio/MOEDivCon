@@ -1,0 +1,63 @@
+#!/bin/sh
+
+# Terminate the script if any simple command fails.
+#set -e
+
+function pause(){
+   read -n 1 -p "Press any key to continue..."
+}
+export JAVA_HOME=/usr/java/jre1.6.0_18
+export MKLROOT=/share/apps/intel/mkl/10.2.5.035
+
+if [ ! "$QBHOME" ]; then
+    PRG=$0
+    
+    progdir=`dirname "$PRG"`
+    if [ "$progdir" = "." ]; then
+	    progdir=`pwd`
+    fi
+    
+    if [ "`echo "$progdir" | grep -s '^/'`" ]; then
+        progdir=$progdir
+    else
+        progdir=`pwd`/"$progdir"
+    fi
+    
+    QBHOME=`echo "$progdir" | sed 's:/bin$::'`
+    export QBHOME
+fi
+
+if [ -z "$QBENVSET" ]; then
+    . ${QBHOME}/etc/qbenv.sh
+fi
+
+export PATH=$JAVA_HOME/bin:$PATH
+
+soffice "-accept=socket,host=localhost,port=2083;urp;StarOffice.ServiceManager" &
+
+export LD_LIBRARYPATH=$QBHOME/linux-i686/lib:$LD_LIBRARYPATH
+pause
+sd_prog=/home/testusr/ooo/opt/openoffice.org3/program
+# extend the ld_library_path for java: javaldx checks the sofficerc for us
+if [ -x "$sd_prog/../basis-link/ure-link/bin/javaldx" ] ; then
+    my_path=`"$sd_prog/../basis-link/ure-link/bin/javaldx" $BOOTSTRAPVARS \
+        "-env:INIFILENAME=vnd.sun.star.pathname:$sd_prog/redirectrc"`
+echo $my_path
+    if [ -n "$my_path" ] ; then
+        LD_LIBRARY_PATH=$my_path${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+        export LD_LIBRARY_PATH
+    fi
+fi
+export CLASSPATH=$QBHOME/linux-i686/HDFView.jar:$QBHOME/linux-i686/lib/args4j-2.0.17-SNAPSHOT.jar:$sd_prog/../basis-link/ure-link/share/java/java_uno.jar:$sd_prog/../basis-link/ure-link/share/java/unoloader.jar:$sd_prog/../basis-link/ure-link/share/java/juh.jar:$sd_prog/../basis-link/ure-link/share/java/jurt.jar:$sd_prog/../basis-link/ure-link/share/java/ridl.jar:$QBHOME/linux-i686/QBReporter.jar
+echo "CLASSPATH"$CLASSPATH
+echo "LD_LIBRARY_PATH"$LD_LIBRARY_PATH
+
+which java
+
+java -DQBHOME=$QB_PATH -Djava.library.path=$LD_LIBRARY_PATH -classpath $CLASSPATH com.quantumbioinc.reporter.Main -i tricommol2.h5
+
+
+#java -DQBHOME=$QB_PATH -Djava.library.path=$LD_LIBRARY_PATH -classpath $CLASSPATH com.quantumbioinc.reporter.Main -c 'Benchmarks' -i /home/josh/testing-grounds/tests/AM1/final_files
+
+
+pause
