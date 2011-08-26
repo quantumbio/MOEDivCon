@@ -46,6 +46,7 @@ function qb_ResNameEquivSet;
 function qb_RMSD;
 function qb_SaveEnvAnal;
 function qb_SplitComplex;
+function qb_GetCoreEnv;
 
 function qb_HeatMapSetupPanel;
 
@@ -817,16 +818,17 @@ local function LoadMols [pwdfilename]
     endif
 
     local dbkey = db_Open [pwdfilename, 'read'];
-    local coreopts = qb_GetCoreOpts dbkey;
+    local [recmol, ligmol, s, coreopts, c] = qb_GetCoreEnv [dbkey];
 
     local recmols = [];
     local ligmols = [];
     local lignames = [];
     local rowkey = 0;
     local ligflds = qb_GetPoseFields [];
+    local lc;
 
     while rowkey = db_NextEntry [dbkey, rowkey] loop
-        local [ligmol, lc] = db_ReadFields [dbkey, rowkey, ligflds];
+        [ligmol, lc] = db_ReadFields [dbkey, rowkey, ligflds];
         ligmols = append [ligmols, ligmol];
         lignames = append [lignames, ligmol(1)(MOL_NAME)];
     endloop
@@ -834,6 +836,8 @@ local function LoadMols [pwdfilename]
     if qb_IsModeManyToMany [coreopts] then
         local recflds = qb_GetRecFields [];
         recmols = db_ReadColumn [dbkey, first recflds];
+    else
+        recmols = append [recmols,recmol];
     endif
 
     G_surface.recmols = recmols;
@@ -871,7 +875,7 @@ local function LoadMols [pwdfilename]
         chainsList = chainsList | app allfalse apt m_join [cAtoms chainsList, nest oGetCollection 'QB_LIGAND'];
         tmpRecMols(idx) = mol_Extract [chainsList];
         ldlig = G_surface.ligmols(idx);
-        chainsList = Chains[] | cTag Chains[] == ldrec(2)(MOL_CHAIN_TAG)(1);
+        chainsList = Chains[] | cTag Chains[] == ldlig(2)(MOL_CHAIN_TAG)(1);
         chainsList = chainsList | app alltrue apt m_join [cAtoms chainsList, nest oGetCollection 'QB_LIGAND'];
         tmpLigMols(idx) = mol_Extract [chainsList];
     endloop
@@ -1605,7 +1609,6 @@ global function qb_QBPWDSetupPanel []
                             pwdfilename];
                         exit [];
                     endif
-write ['vals.expact_hdr: {}\n',vals.expact_hdr];
                     local acts = db_ReadColumn [pwdfilename, vals.expact_hdr];
                     if isnull acts then
                         Warning twrite ['Missing activities in database: {}.',
@@ -1676,15 +1679,9 @@ write ['vals.expact_hdr: {}\n',vals.expact_hdr];
                                 mol_Create ldrec;
                                 local chainsList = Chains[] | cTag Chains[] == ldrec(2)(MOL_CHAIN_TAG)(1);
                                 pro_Join chainsList;
-//                                local ligName = ldlig(1)(MOL_NAME);
-//                                write ['This Name IS: {}\n', ligName];
                                 local ldligatoms = cat cAtoms mol_Create ldlig;
-//                                oSetCollection ['QB_LIGAND', ldligatoms];
                                 aSetNucleusLook [ldligatoms, 'small-sphere'];
                                 aSetBondLook [ldligatoms, 'cylinder'];
-//                                mol_Create ldrec;
-//                                local recName = ldrec(1)(MOL_NAME);
-//                                write ['This Name IS: {}\n', recName];
                                 allLigAtms = cat [allLigAtms, ldligatoms];
                                 oSetCollection ['QB_LIGAND', allLigAtms];
                             endif
