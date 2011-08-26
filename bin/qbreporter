@@ -35,7 +35,7 @@ export PATH=$JAVA_HOME/bin:$PATH
 
 soffice "-accept=socket,host=localhost,port=2083;urp;StarOffice.ServiceManager" &
 
-export LD_LIBRARYPATH=$QBHOME/linux-i686/lib:$LD_LIBRARYPATH
+export LD_LIBRARY_PATH=$QBHOME/${PLTFM_VER}/lib:$LD_LIBRARY_PATH
 pause
 sd_prog=/home/testusr/ooo/opt/openoffice.org3/program
 # extend the ld_library_path for java: javaldx checks the sofficerc for us
@@ -48,7 +48,7 @@ echo $my_path
         export LD_LIBRARY_PATH
     fi
 fi
-export CLASSPATH=$QBHOME/linux-i686/HDFView.jar:$QBHOME/linux-i686/lib/args4j-2.0.17-SNAPSHOT.jar:$sd_prog/../basis-link/ure-link/share/java/java_uno.jar:$sd_prog/../basis-link/ure-link/share/java/unoloader.jar:$sd_prog/../basis-link/ure-link/share/java/juh.jar:$sd_prog/../basis-link/ure-link/share/java/jurt.jar:$sd_prog/../basis-link/ure-link/share/java/ridl.jar:$QBHOME/linux-i686/QBReporter.jar
+export CLASSPATH=$QBHOME/${PLTFM_VER}/HDFView.jar:$QBHOME/linux-x86_64/lib/args4j-2.0.17-SNAPSHOT.jar:$sd_prog/../basis-link/ure-link/share/java/java_uno.jar:$sd_prog/../basis-link/ure-link/share/java/unoloader.jar:$sd_prog/../basis-link/ure-link/share/java/juh.jar:$sd_prog/../basis-link/ure-link/share/java/jurt.jar:$sd_prog/../basis-link/ure-link/share/java/ridl.jar:$QBHOME/linux-x86_64/QBReporter.jar
 echo "CLASSPATH"$CLASSPATH
 echo "LD_LIBRARY_PATH"$LD_LIBRARY_PATH
 
