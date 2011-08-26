@@ -342,15 +342,14 @@ function StandardDeviation;
  *
  ****************************************************************************/
 local function CalculateCuts [data, numsigma, cols, num]
-
     local rowdata = data (DATA_ROWDATA);
     local row, numbers = [];
-    for row in rowdata loop
-        numbers = cat [numbers, keep [third row, cols]];
-    endloop
 
-    local minnum = min numbers;
-    local maxnum = max numbers;
+    numbers = cat app third rowdata;
+
+    local minnum = minR numbers;
+    local maxnum = maxR numbers;
+    
     local [avg, sigma] = StandardDeviation [numbers];
 
     local mincut, maxcut;
@@ -431,18 +430,23 @@ endfunction
 local function DrawCell [colors, width, height, mincut, maxcut, value]
 
     local cidx;
-    if value <= mincut then
-        cidx = 1;
-    elseif value >= maxcut then
-        cidx = length colors;
-    else
-        local step = (maxcut - mincut) / (length colors);
-        cidx = ceil ((value - mincut) / step);
-    endif
-
     local key = gr_create [size: [width, height], units: 'pt'];
-    gr_box [key, [0, [0, 0], [width , height],
-        colors (cidx), 1, colors (cidx)]];
+    if value === null[] then
+        gr_box [key, [0, [0, 0], [width , height],
+            icolor'black', 1, icolor'black']];
+    else
+        if value <= mincut then
+            cidx = 1;
+        elseif value >= maxcut then
+            cidx = length colors;
+        else
+            local step = (maxcut - mincut) / (length colors);
+            cidx = ceil ((value - mincut) / step);
+        endif
+    
+        gr_box [key, [0, [0, 0], [width , height],
+            colors (cidx), 1, colors (cidx)]];
+    endif        
 
     return key;
 
@@ -523,8 +527,12 @@ local function DrawMap [data, numrows, numcols, abbrrow, abbrcol,
     const LETWD = 5;		//  trial-and-error guess!
     const LETPAD = 2;
 
-    local [titles, colnames, colabbrevs, rowdata] = data;
-
+    local [titles, sequence, colabbrevs, rowdata] = data;
+    local idx, colnames;
+    for idx = 1, length sequence, 1 loop
+        colnames(idx) = twrite ['{}',sequence(idx)];
+        colabbrevs(idx) = twrite ['{}',sequence(idx)];
+    endloop
     local colnmlen, rownmlen;
     if abbrcol then
         colnmlen = (max app tok_length colabbrevs) * LETWD + 3 * LETPAD;
@@ -723,17 +731,17 @@ local function GetHelp [data]
 
     local row_i, col_i, maphelp = [];
     for row_i = 1, numrows, 1 loop
-        local [rowname, ra, rowvals] = rowdata (row_i);
+        local [rowname, ra, rowvals, resname] = rowdata (row_i);
         maphelp = append [maphelp, twrite ['row:  {}', rowname]];
         for col_i = 1, numcols, 1 loop
             maphelp = append [maphelp, twrite ['cell [{}, {}] = {}',
-                rowname, colnames (col_i), rowvals (col_i)]];
+                rowname, resname (col_i), rowvals (col_i)]];
         endloop
     endloop
 
     maphelp = append [maphelp, 'empty cell'];
     for col_i = 1, numcols, 1 loop
-        maphelp = append [maphelp, twrite ['col:  {}', colnames (col_i)]];
+        maphelp = append [maphelp, twrite ['Sequence#:  {}', colnames (col_i)]];
     endloop
 
     return maphelp;
@@ -1057,7 +1065,7 @@ local function RedrawMapScale [data, opts, numsignifcols, mincut, maxcut,
         else
             [colors, errmess] = GetColors [mincut, maxcut, opts.ncolors];
         endif
-
+        
         if colors === [] then
             Warning errmess;
             return [newmap, newscale, mincut, maxcut, colors];
@@ -1066,12 +1074,18 @@ local function RedrawMapScale [data, opts, numsignifcols, mincut, maxcut,
         //  Color map cells and store row labels
         local row_i, col_i, bgraphics = [];
         for row_i = 1, numrows, 1 loop
-            local [rowname, rowabbrev, rowvals] = rowdata (row_i);
+            local [rowname, rowabbrev, rowvals, rownames] = rowdata (row_i);
             bgraphics = append [bgraphics, 
                 DrawCellLabel [tok_keep [rowabbrev, 3], CELL_WD, CELL_HT]];
             for col_i = 1, numcols, 1 loop
+                local tmpValue;
+                if rownames(col_i) === 'GAP' then
+                    tmpValue = null[];
+                else
+                    tmpValue = rowvals (col_i);
+                endif
                 bgraphics = append [bgraphics, DrawCell [colors, 
-                    CELL_WD, CELL_HT, mincut, maxcut, rowvals (col_i)]];
+                    CELL_WD, CELL_HT, mincut, maxcut, tmpValue]];
             endloop
         endloop
 
@@ -1081,7 +1095,7 @@ local function RedrawMapScale [data, opts, numsignifcols, mincut, maxcut,
         //  Column labels
         for col_i = 1, numcols, 1 loop
             bgraphics = append [bgraphics, 
-                DrawCellLabel [tok_keep [colabbrevs (col_i), 3],
+                DrawCellLabel [twrite ['{}',colabbrevs (col_i)],
                     CELL_WD, CELL_HT]];
         endloop
 
@@ -1267,9 +1281,9 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initrad,
     if tok_length warning > 0 then
         Warning warning;
     endif
-
-    data = TruncateCols [data];
-    data = TruncateRows [data];
+// @todo: readd truncation (however, data is processed to MAX_COLS
+//    data = TruncateCols [data];
+//    data = TruncateRows [data];
     [titles, colnames, colabbrevs, rowdata] = data;
     local numcols = length colnames;
     numsignifcols = select [numcols, numsignifcols, numcols < numsignifcols];

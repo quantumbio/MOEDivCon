@@ -195,10 +195,6 @@ global function qb_NMRScoreMPI [dbpath, jobid]
             fwrite [stdin, '{n:}\n', recchg];
             fwrite [stdin, '{n:}\n', posechg];
 
-            // we already did the work of figuring out which is receptor and which is ligand.
-            // @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
-            recressets = cat oResidues mol_Create recmol;
-            ligressets = cat oResidues mol_Create posemol; 
             qb_PassBackbone [stdout, stdin, recressets, ligressets];
 
             warnings (rowcnt) = ckmsg;
@@ -251,6 +247,7 @@ global function qb_NMRScoreMPI [dbpath, jobid]
 
     //  Collect and store results
     local result_ith = 0;
+ print ['begin result loop',result_ith,numokay, exe_status process_key];//DEBUG
     while exe_status process_key and result_ith <= numokay loop
         local results = [], return_statement = [];
         local divconerrmess = "";
@@ -367,6 +364,7 @@ global function qb_NMRScoreMPI [dbpath, jobid]
             result_ith = result_ith + 1;
 
         elseif return_statement === "DivCon done." then
+            write ['done: {}\n', return_statement];  //  done?
             fwrite [stdin, '{c:}\n', 'Ok'];
             break;
 
@@ -376,7 +374,8 @@ global function qb_NMRScoreMPI [dbpath, jobid]
 
     endloop
 
-    //  Look for error messages from stderr.
+ print ['look for err',result_ith,numokay, return_statement, exe_status process_key];//DEBUG
+   //  Look for error messages from stderr.
     errmess = "";
     local [[newerror]] = fread [stderr, '{c:*}'];
     while length newerror > 0 loop
