@@ -18,8 +18,6 @@ if [ ! "$QBHOME" ]; then
     export QBHOME
 fi
 
-if [ -z "$QBENVSET" ]; then
-    . $QBHOME/etc/qbenv.sh
-fi
+. $QBHOME/etc/qbenv.sh
 
 $QBHOME/${PLTFM_VER}/bin/mpirun -x OPAL_PREFIX -x QBHOME -x PATH -x LD_LIBRARY_PATH -x MKL_NUM_THREADS -x MKL_DYNAMIC -machinefile $PBS_NODEFILE $QBHOME/${PLTFM_VER}/bin/moedivconnmrmpi.bin $@ - 

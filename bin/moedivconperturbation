@@ -18,9 +18,7 @@ if [ ! "$QBHOME" ]; then
     export QBHOME
 fi
 
-if [ -z "$QBENVSET" ]; then
-    . $QBHOME/etc/qbenv.sh
-fi
+. $QBHOME/etc/qbenv.sh
 
 if [ -e $QBHOME/${PLTFM_VER}/bin/moedivconperturbation.bin ]; then
     exec "$QBHOME/${PLTFM_VER}/bin/moedivconperturbation.bin" "$@" "-" 
