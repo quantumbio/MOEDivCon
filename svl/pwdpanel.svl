@@ -51,6 +51,8 @@ function qb_HeatMapSetupPanel;
 
 function qb_PWDAnalysis;
 
+function pro_Join;
+function pro_Align;
 
 const PWD_EXPACT_HDR = 'Exp Act';
 
@@ -399,8 +401,9 @@ local function ColorAtoms [data, ligidx, residx, recatoms,
     endif
 
     local step = (maxcut - mincut) / (length colors);
-    local [titles, restokens, resabbrevs, rowdata] = data;
+    local [titles, sequence, resabbrevs, rowdata] = data;
     local rowvals = third rowdata (ligidx);
+    local restokens = last rowdata (ligidx);
     local atom, atomcolors = [];
     for atom in recatoms loop
         local residue = aResidue atom;
@@ -627,6 +630,50 @@ local function FindSurface []
 endfunction
 
 /****************************************************************************
+ *                          TruncateAnalData
+ *
+ *  Data provided by MOE/DivCon includes all data (even less significant data).
+ *    Need to cut this down to only the most significant data using the following criteria:
+ *
+ *      (1) If max and min are equal (probably zero) the residue is not interesting.
+ *      (2) After this, only the top 30 residues with the greatest max/min will be shown.
+ *          (the assumption here is that the user is less interested when the data
+ *              is less varied.)
+ *          @todo: add others perhaps but certainly provide some options to the user.
+ *
+ ****************************************************************************/
+local function TruncateAnalData [ligvals, resnames, sequence]
+    local idx;
+    local mask;
+    local differenceVector;
+        
+//      (1) If max and min are equal (probably zero) the residue is not interesting.
+    for idx = 1, length ligvals(1), 1 loop
+        differenceVector(idx) = maxE apt peek [ligvals, idx] - minE apt peek [ligvals, idx];
+    endloop
+    local tmpSorted = sortuniq differenceVector;
+    idx = 0;
+    loop
+        idx = idx + 1;
+        mask = differenceVector >= tmpSorted(idx);
+        until (length ( differenceVector | mask ) <= 30 ) 
+    endloop
+    
+    local outVals, outNames;
+    local tmpVals, tmpNames;
+    for tmpVals in ligvals loop
+        outVals = append [outVals, tmpVals | mask];
+    endloop
+    for tmpNames in resnames loop
+        outNames = append [outNames, tmpNames | mask];
+    endloop
+    
+    return [outVals, outNames, sequence | mask];
+    
+endfunction
+
+
+/****************************************************************************
  *                          GetAnalData
  *
  *  Get the analysis data and repackage the tables for heat map.
@@ -641,7 +688,6 @@ local function GetAnalData [dbpath, title]
         local i = indexof ["=", string t];
         if i > 0 then return tok_keep [t, i - 1]; else return t; endif
    endfunction
-
     local function where [r]
         local rnidx = indexof ["1234567890", string r];
         rnidx = rnidx | rnidx <> 0;
@@ -679,16 +725,21 @@ local function GetAnalData [dbpath, title]
     local lvdata = qb_GetAnalysisData [dbkey, 'pwd', 'optlv'];
     db_Close dbkey;
 
-    local fulltitle, resnames, resabbrevs;
+    local fulltitle, resnames, sequence, resabbrevs;
     local ligdata, lignames, ligabbrevs, ligvals;
     if not isnull interdata then
         fulltitle = twrite ['{} Interaction Map', title];
-        [resnames, ligdata] = interdata;
+        [sequence, ligdata] = interdata;
         lignames = app first ligdata;
         ligvals = app second ligdata;
+        resnames = app third ligdata;
+        [ligvals,resnames,sequence]=TruncateAnalData [ligvals, resnames, sequence];
         [resabbrevs, ligabbrevs] = abbreviate [resnames, lignames];
-        interdata = [[fulltitle, 'Ligands', 'Residues'], resnames, resabbrevs,
-            tr [lignames, ligabbrevs, ligvals]];
+// @todo: remove the double reference to sequence. This will require structural change to 'data' and therefore
+//          should come when we change to tagged vectors (or XML).
+//        interdata = [[fulltitle, 'Ligands', 'Residues'], sequence, resabbrevs,
+        interdata = [[fulltitle, 'Ligands', 'Residues'], sequence, sequence,
+            tr [lignames, ligabbrevs, ligvals, resnames]];
     endif
 
     if not isnull sardata then
@@ -779,7 +830,7 @@ local function LoadMols [pwdfilename]
         ligmols = append [ligmols, ligmol];
         lignames = append [lignames, ligmol(1)(MOL_NAME)];
     endloop
-
+    
     if qb_IsModeManyToMany [coreopts] then
         local recflds = qb_GetRecFields [];
         recmols = db_ReadColumn [dbkey, first recflds];
@@ -791,7 +842,41 @@ local function LoadMols [pwdfilename]
     G_surface.numgrids = length ligmols;
 
     db_Close dbkey;
+    
+    oDestroy Chains[];
 
+// The following two loops will go through and make sure that the new G_surface has the aligned proteins.   
+    local idx;
+    local ldrec,ldlig, chainsList;
+    local ldligatoms = [], allLigAtms = [];
+    for idx = 1, length G_surface.recmols, 1 loop
+        ldrec = G_surface.recmols(idx);
+        mol_Create ldrec;
+        chainsList = Chains[] | cTag Chains[] == ldrec(2)(MOL_CHAIN_TAG)(1);
+        pro_Join chainsList;
+        ldlig = G_surface.ligmols(idx);
+        ldligatoms = cat cAtoms mol_Create ldlig;
+        allLigAtms = cat [allLigAtms, ldligatoms];
+        oSetCollection ['QB_LIGAND', allLigAtms];
+    endloop
+    if length Chains [] > 0 then
+        pro_Align [Chains []];
+    endif
+    View [];
+    local tmpRecMols = [];
+    local tmpLigMols = [];
+    for idx = 1, length G_surface.recmols, 1 loop
+        ldrec = G_surface.recmols(idx);
+        chainsList = Chains[] | cTag Chains[] == ldrec(2)(MOL_CHAIN_TAG)(1);
+        chainsList = chainsList | app allfalse apt m_join [cAtoms chainsList, nest oGetCollection 'QB_LIGAND'];
+        tmpRecMols(idx) = mol_Extract [chainsList];
+        ldlig = G_surface.ligmols(idx);
+        chainsList = Chains[] | cTag Chains[] == ldrec(2)(MOL_CHAIN_TAG)(1);
+        chainsList = chainsList | app alltrue apt m_join [cAtoms chainsList, nest oGetCollection 'QB_LIGAND'];
+        tmpLigMols(idx) = mol_Extract [chainsList];
+    endloop
+    G_surface.recmols = tmpRecMols;
+    G_surface.ligmols = tmpLigMols;    
 endfunction
 
 /****************************************************************************
@@ -1315,21 +1400,30 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
     if allfalse eqE [G_surface.gobj, GKeyList []] then return; endif
     if isnull Atoms [] then return; endif
 
-    local [t, resnames, ra, rowdata] = data;
-    local restok = '', ligtok = '', la = '', ld = [];
+// lmw: the selection of the sequence no longer makes sense.
+//      @todo: make it so that the sequence is no longer selectable.
+    if selrow === 0 then
+        return;
+    endif
+
+    local [t, sequence, ra, rowdata] = data;
+    local [ligtok, la, ld, resnames] = rowdata (selrow);
+    local restok = '';
+// lmw : DEL THESE COMMENTS!
+//    local restok = '', ligtok = '', la = '', ld = [];
     if selrow === 0 and selcol === 0 then
         return;
-    elseif selrow === 0 then
+//    elseif selrow === 0 then
+//        restok = resnames (selcol);
+//        if selcol > 0 then
+//            UpdateResidue [restok, selrow, selcol, 1];
+//            return;
+//        endif
+//    elseif selcol === 0 then
+//        [ligtok, la, ld, resnames] = rowdata (selrow);
+    elseif selcol > 0 then
         restok = resnames (selcol);
-        if selcol > 0 then
-            UpdateResidue [restok, selrow, selcol, 1];
-            return;
-        endif
-    elseif selcol === 0 then
-        [ligtok, la, ld] = rowdata (selrow);
-    else
-        restok = resnames (selcol);
-        [ligtok, la, ld] = rowdata (selrow);
+//        [ligtok, la, ld, resnames] = rowdata (selrow);
     endif
 
     local redosurf = UpdateComplex [ligtok, radius];
@@ -1417,7 +1511,7 @@ global function qb_QBPWDSetupPanel []
 
                 local rowdata = last data;
                 CreateSurfaceMap [INITDIST, first rowdata (INITSEL), 
-                    second data, pwdfilename];
+                    last rowdata(INITSEL), pwdfilename];
 
                 heatmaptask = task_key -1;
                 qb_HeatMapSetupPanel [data,  SIGNIFRES, 
@@ -1511,7 +1605,7 @@ global function qb_QBPWDSetupPanel []
                             pwdfilename];
                         exit [];
                     endif
-
+write ['vals.expact_hdr: {}\n',vals.expact_hdr];
                     local acts = db_ReadColumn [pwdfilename, vals.expact_hdr];
                     if isnull acts then
                         Warning twrite ['Missing activities in database: {}.',
@@ -1538,7 +1632,6 @@ global function qb_QBPWDSetupPanel []
                     endif
 
                     Message [msgkey, []];
-
                     pwddata = GetAnalData [pwdfilename, vals.title];
                     local dmap = app isnull pwddata;
                     if alltrue dmap then
@@ -1569,22 +1662,36 @@ global function qb_QBPWDSetupPanel []
                                 tempfile];
                             exit [];
                         endif
-
                         pwdfilename = tempfile;
-                        local [ldkey, ldrec, ldlig, ldcoreopts, ldpwdopts]
+                        local [ldkey, ldrecs, ldligs, ldcoreopts, ldpwdopts]
                             = LoadDB [pwdfilename];
-
                         Close [force:1];
-                        if neL [ldrec, []] and neL [ldlig, []] then
-                            local ldligatoms = cat cAtoms mol_Create ldlig;
-                            oSetCollection ['QB_LIGAND', ldligatoms];
-                            aSetNucleusLook [ldligatoms, 'small-sphere'];
-                            aSetBondLook [ldligatoms, 'cylinder'];
-                            mol_Create ldrec;
-                            View [];
-                        endif
-
+                        local idx = 1;
+                        for idx = 1, length ldrecs, 1 loop
+                            local ldrec = ldrecs(idx);
+                            local ldlig = ldligs(idx);
+                            local allLigAtms;
+                            if neL [ldrec, []] and neL [ldlig, []] then
+                 // Only open the receptor for further work. We don't care about the ligand at this stage.
+                                mol_Create ldrec;
+                                local chainsList = Chains[] | cTag Chains[] == ldrec(2)(MOL_CHAIN_TAG)(1);
+                                pro_Join chainsList;
+//                                local ligName = ldlig(1)(MOL_NAME);
+//                                write ['This Name IS: {}\n', ligName];
+                                local ldligatoms = cat cAtoms mol_Create ldlig;
+//                                oSetCollection ['QB_LIGAND', ldligatoms];
+                                aSetNucleusLook [ldligatoms, 'small-sphere'];
+                                aSetBondLook [ldligatoms, 'cylinder'];
+//                                mol_Create ldrec;
+//                                local recName = ldrec(1)(MOL_NAME);
+//                                write ['This Name IS: {}\n', recName];
+                                allLigAtms = cat [allLigAtms, ldligatoms];
+                                oSetCollection ['QB_LIGAND', allLigAtms];
+                            endif
+                        endloop
                         db_Close ldkey;
+                        pro_Align [Chains []];
+                        View [];
                         WindowSetData [wkey, ldpwdopts];
                         pwddata = GetAnalData [pwdfilename, vals.title];
                         local datam = app isnull pwddata;

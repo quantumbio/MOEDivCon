@@ -53,6 +53,8 @@ function qb_VerifyDivConComplex;
 function qb_QMScore;
 function qb_QMScoreBatch;
 
+function pro_Join;
+
 //  Data tags are in the order in which they are returned by DivCon.
 
 const QMS_DATA_TAGS =
@@ -458,20 +460,26 @@ global function qb_QMScoreSetupPanel []
                             exit [];
                         endif
 
-                        local [ldkey, ldrec, ldlig, ldsts, ldcoreopts,
+                        local [ldkey, ldrecs, ldligs, ldsts, ldcoreopts,
                             ldqmsopts] = LoadDB [dbpath];
-
+                            
     	                Close [force:1];
-                        if neL [ldrec, []] and neL [ldlig, []] then
-							origligmol = ldlig;
-                            mol_Create ldrec;
-                            ligatoms = cat oAtoms mol_Create origligmol;
-                            oSetCollection ['QB_LIGAND', ligatoms];
-                            aSetNucleusLook [ligatoms, 'small-sphere'];
-                            aSetBondLook [ligatoms, 'cylinder'];
-        	                View [];
-                        endif
-
+                        local idx = 1;
+                        for idx = 1, length ldrecs, 1 loop
+                            local ldrec = ldrecs(idx);
+                            local ldlig = ldligs(idx);
+                            if neL [ldrec, []] and neL [ldlig, []] then
+                                origligmol = ldlig;
+                                mol_Create ldrec;
+                                local chainsList = Chains[] | cTag Chains[] == ldrec(2)(MOL_CHAIN_TAG)(1);
+                                pro_Join chainsList;
+                                ligatoms = cat oAtoms mol_Create origligmol;
+                                oSetCollection ['QB_LIGAND', ligatoms];
+                                aSetNucleusLook [ligatoms, 'small-sphere'];
+                                aSetBondLook [ligatoms, 'cylinder'];
+                                View [];
+                            endif
+                        endloop
                         dbv_Open db_Filename ldkey;
                         db_Close ldkey;
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];

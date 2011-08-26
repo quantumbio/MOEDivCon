@@ -2449,6 +2449,9 @@ endfunction
 /****************************************************************************
  *                          qb_LoadCoreScoreDB
  *
+ *      Reads through all of the receptors and ligands within the mdb file
+ *          and returns them all in corresponding 2X vectors.
+ *
  ****************************************************************************/
 global function qb_LoadCoreScoreDB [dbpath, type]
 
@@ -2494,22 +2497,37 @@ global function qb_LoadCoreScoreDB [dbpath, type]
         return [0, [], [], [], [], [],
             twrite ['{}\nis not a NMR Perturbation Database.', dbpath]];
     endif
+    
+    local recmols = [];
+    local ligmols = [];
 
-    local [rec, lig, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
-
+    local [recmol, ligmol, status, coreopts, complex] = qb_GetCoreEnv [dbkey];
+    
+    recmols = append [recmols, recmol];
+    ligmols = append [ligmols, ligmol];
+    
     if coreopts.mode === 'Many-to-Many' then
-        local recchg, ligchg;
-        local rowkey = db_NextEntry [dbkey, 0];
-        [rec, recchg] = db_ReadFields [dbkey, rowkey,
-            [REC_FIELD, RECCHG_FIELD]];
-        [lig, ligchg] = db_ReadFields [dbkey, rowkey,
-            [LIG_FIELD, LIGCHG_FIELD]];
-
-        coreopts.recchg = recchg;
-        coreopts.ligchg = ligchg;
+        local count = 0;
+        local rowkey = 0;
+        recmols = [];
+        ligmols = [];
+        while rowkey = db_NextEntry [dbkey, rowkey] loop
+            count = count + 1;
+            local recchg;
+            local ligchg;
+            [recmol, recchg] = db_ReadFields [dbkey, rowkey,
+                [REC_FIELD, RECCHG_FIELD]];
+            [ligmol, ligchg] = db_ReadFields [dbkey, rowkey,
+                [LIG_FIELD, LIGCHG_FIELD]];
+            recmols = append [recmols, recmol];
+            ligmols = append [ligmols, ligmol];
+    
+            coreopts.recchg = recchg;
+            coreopts.ligchg = ligchg;
+        endloop
     endif
 
-    return [dbkey, rec, lig, status, coreopts, complex, ''];
+    return [dbkey, recmols, ligmols, status, coreopts, complex, ''];
 endfunction
 
 /****************************************************************************
@@ -2580,12 +2598,9 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     fwrite [outpipe, '{n:}\n', 1];  // @todo: update moedivconscoring to no longer require this line.
     resset = recressets;
     fwrite [outpipe, '{n:}\n', length resset];
-//    write ['target length: {n:}\n', length resset];
     for residue in resset loop
        fwrite [outpipe, '{c:} {n:} {n:}\n', 
            rName residue, rUID residue, rAtomCount residue];
-//       write ['{c:} {n:} {n:}\n', 
-//           rName residue, rUID residue, rAtomCount residue];
        for atom in cat rAtoms residue loop
            atmCount = atmCount + 1;
            fwrite [outpipe, '{c:} {c:} {c:}\n',
@@ -2609,7 +2624,6 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
 //    fwrite [outpipe, '{n:}\n', length ligressets];
     fwrite [outpipe, '{n:}\n', 1];
     resset = ligressets;
-//    write ['ligand length: {n:}\n', length resset];
     fwrite [outpipe, '{n:}\n', length resset];
     for residue in resset loop
         fwrite [outpipe, '{c:} {n:} {n:}\n', 
@@ -2619,7 +2633,6 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
             fwrite [outpipe, '{c:} {c:} {c:}\n',
                 aName atom, aElement atom, aMMType atom];
             fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
-//            write ['{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
             fwrite [outpipe, '{n:.4f} {n:.4f}\n',
                 ligvdw_r (atmCount),ligvdw_e (atmCount)];
         endloop
@@ -3590,3 +3603,4 @@ global function qb_VerifyDivConComplex [wkey, status, vals]
 
     return status;
 endfunction
+

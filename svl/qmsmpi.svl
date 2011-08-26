@@ -176,10 +176,6 @@ global function qb_QMScoreMPI [dbpath, jobid]
             fwrite [stdin, '{n:}\n', recchg];
             fwrite [stdin, '{n:}\n', posechg];
 
-            // we already did the work of figuring out which is receptor and which is ligand.
-            // @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
-            recressets = cat oResidues mol_Create recmol;
-            ligressets = cat oResidues mol_Create posemol; 
             qb_PassBackbone [stdout, stdin, recressets, ligressets];
 
             warnings (rowcnt) = ckmsg;
