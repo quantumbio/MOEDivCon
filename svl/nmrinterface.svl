@@ -193,7 +193,10 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
 
     fwrite [stdin, '{n:}\n', coreopts.recchg];
     fwrite [stdin, '{n:}\n', coreopts.ligchg];
-
+    // we already did the work of figuring out which is receptor and which is ligand. 
+    // @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent. 
+    recressets = cat oResidues mol_Create recmol; 
+    ligressets = cat oResidues mol_Create ligmol;  
     qb_PassBackbone [stdout, stdin, recressets, ligressets];
 
     oDestroy uniq cat oChains cat recressets;
