@@ -25,9 +25,7 @@ if [ ! "$QBHOME" ]; then
     export QBHOME
 fi
 
-if [ -z "$QBENVSET" ]; then
-    . ${QBHOME}/etc/qbenv.sh
-fi
+. ${QBHOME}/etc/qbenv.sh
 
 # setup the MOE environment
 if [ -z "${MOE_SVL_RUNPATH}" ]; then

@@ -18,9 +18,7 @@ if [ ! "$QBHOME" ]; then
     export QBHOME
 fi
 
-if [ -z "$QBENVSET" ]; then
-    . $QBHOME/etc/qbenv.sh
-fi
+. $QBHOME/etc/qbenv.sh
     
 # below we will set to hard-coded machine file if the user does not provide a machine file on the comand line.
 if [ -e "qbmachinefile.txt" ] ; then
