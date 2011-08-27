@@ -36,7 +36,7 @@ export PATH=$JAVA_HOME/bin:$PATH
 soffice "-accept=socket,host=localhost,port=2083;urp;StarOffice.ServiceManager" &
 
 export LD_LIBRARY_PATH=$QBHOME/${PLTFM_VER}/lib:$LD_LIBRARY_PATH
-pause
+sleep 2
 sd_prog=/home/testusr/ooo/opt/openoffice.org3/program
 # extend the ld_library_path for java: javaldx checks the sofficerc for us
 if [ -x "$sd_prog/../basis-link/ure-link/bin/javaldx" ] ; then
@@ -52,12 +52,6 @@ export CLASSPATH=$QBHOME/${PLTFM_VER}/HDFView.jar:$QBHOME/linux-x86_64/lib/args4
 echo "CLASSPATH"$CLASSPATH
 echo "LD_LIBRARY_PATH"$LD_LIBRARY_PATH
 
-which java
-
-java -DQBHOME=$QB_PATH -Djava.library.path=$LD_LIBRARY_PATH -classpath $CLASSPATH com.quantumbioinc.reporter.Main -i tricommol2.h5
-
-
-#java -DQBHOME=$QB_PATH -Djava.library.path=$LD_LIBRARY_PATH -classpath $CLASSPATH com.quantumbioinc.reporter.Main -c 'Benchmarks' -i /home/josh/testing-grounds/tests/AM1/final_files
-
+java -DQBHOME=$QB_PATH -Djava.library.path=$LD_LIBRARY_PATH -classpath $CLASSPATH com.quantumbioinc.reporter.Main -i $1
 
 pause
