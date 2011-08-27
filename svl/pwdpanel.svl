@@ -1676,8 +1676,7 @@ global function qb_QBPWDSetupPanel []
                             local allLigAtms;
                             if neL [ldrec, []] and neL [ldlig, []] then
                  // Only open the receptor for further work. We don't care about the ligand at this stage.
-                                mol_Create ldrec;
-                                local chainsList = Chains[] | cTag Chains[] == ldrec(2)(MOL_CHAIN_TAG)(1);
+                                local chainsList = mol_Create ldrec;
                                 pro_Join chainsList;
                                 local ldligatoms = cat cAtoms mol_Create ldlig;
                                 aSetNucleusLook [ldligatoms, 'small-sphere'];
