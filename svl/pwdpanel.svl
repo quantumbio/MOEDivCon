@@ -1197,6 +1197,11 @@ local function UpdateComplex [ligtok, radius]
     if G_surface.molidx === molidx then return 0; endif
 
     G_surface.molidx = molidx;
+    
+    if isnull G_surface.molidx then
+//    @todo: this fixes an error when empty, however we should provide an improved error.
+        return;
+    endif
 
     local redosurf = 0, vdwR = [], vdwE = [];
     if not isnull G_surface.recmols then
@@ -1205,7 +1210,7 @@ local function UpdateComplex [ligtok, radius]
         else
             oDestroy uniq oChains G_surface.rec;
         endif
-
+write ['length G_surface.recmols: {} | {} |\n', length G_surface.recmols, G_surface.molidx];
         local recchn = mol_Create G_surface.recmols (G_surface.molidx);
         G_surface.rec = cat cAtoms recchn;
         [vdwR, vdwE] = pboltz_AtomParameters G_surface.rec;
