@@ -181,9 +181,9 @@ global function qb_PWDAnalysis [qmsfilename]
             write ['IN IF\n'];
     
     // Go through and create a new set based on the new values
-//            chainsList = Chains[] | cTag Chains[] == recmol(2)(MOL_CHAIN_TAG)(1);
+            chainsList = Chains[] | cTag Chains[] == recmol(2)(MOL_CHAIN_TAG)(1);
 //            chainsList = Chains[] | cTag Chains[] == recmol(1)(MOL_NAME);
-            chainsList = recmol;
+//            chainsList = recmol;
             if length chainsList then
                 chainsList = chainsList | app allfalse apt m_join [cAtoms chainsList, nest oGetCollection 'QB_LIGAND'];
             endif
