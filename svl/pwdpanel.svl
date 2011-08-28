@@ -647,6 +647,14 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     local idx;
     local mask;
     local differenceVector;
+
+    write ['length ligvals: {}\n', length ligvals];
+    write ['length resnames: {}\n', length resnames];
+    write ['length sequence: {}\n', length sequence];
+    
+    if length ligvals == 0 then
+        return;
+    endif
         
 //      (1) If max and min are equal (probably zero) the residue is not interesting.
     for idx = 1, length ligvals(1), 1 loop
@@ -668,6 +676,10 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     for tmpNames in resnames loop
         outNames = append [outNames, tmpNames | mask];
     endloop
+    
+    write ['length outVals: {}\n', length outVals];
+    write ['length outNames: {}\n', length outNames];
+    write ['length mask: {}\n', length mask];
     
     return [outVals, outNames, sequence | mask];
     
