@@ -133,7 +133,6 @@ global function qb_PWDAnalysis [qmsfilename]
 
         fwrite [stdin, '{c:}\n', ligmols(idx)(1)(MOL_NAME)];
         write ['{c:}\n', ligmols(idx)(1)(MOL_NAME)];
-        fwrite [stdin, '{n:}\n', activities[idx]];
     endloop
 
     sysResidueCount = maxE cat cAlignmentPositions Chains [];
