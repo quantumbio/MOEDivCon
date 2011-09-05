@@ -648,10 +648,6 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     local mask;
     local differenceVector;
 
-    write ['length ligvals: {}\n', length ligvals];
-    write ['length resnames: {}\n', length resnames];
-    write ['length sequence: {}\n', length sequence];
-    
     if length ligvals == 0 then
         return;
     endif
@@ -676,10 +672,6 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     for tmpNames in resnames loop
         outNames = append [outNames, tmpNames | mask];
     endloop
-    
-    write ['length outVals: {}\n', length outVals];
-    write ['length outNames: {}\n', length outNames];
-    write ['length mask: {}\n', length mask];
     
     return [outVals, outNames, sequence | mask];
     
@@ -863,15 +855,18 @@ local function LoadMols [pwdfilename]
 
 // The following two loops will go through and make sure that the new G_surface has the aligned proteins.   
     local idx;
-    local ldrec,ldlig, chainsList;
+    local ldrec,ldlig, targ_chainsList = [], lig_chainsList = [];
     local ldligatoms = [], allLigAtms = [];
     for idx = 1, length G_surface.recmols, 1 loop
         ldrec = G_surface.recmols(idx);
-        mol_Create ldrec;
-        chainsList = Chains[] | cTag Chains[] == ldrec(2)(MOL_CHAIN_TAG)(1);
-        pro_Join chainsList;
+        targ_chainsList(idx) = mol_Create ldrec;
+        pro_Join targ_chainsList(idx);
+        targ_chainsList(idx) = targ_chainsList(idx)(1);
+    endloop
+    for idx = 1, length G_surface.ligmols, 1 loop
         ldlig = G_surface.ligmols(idx);
-        ldligatoms = cat cAtoms mol_Create ldlig;
+        lig_chainsList(idx) = mol_Create ldlig;
+        ldligatoms = cat cAtoms lig_chainsList(idx);
         allLigAtms = cat [allLigAtms, ldligatoms];
         oSetCollection ['QB_LIGAND', allLigAtms];
     endloop
@@ -883,13 +878,11 @@ local function LoadMols [pwdfilename]
     local tmpLigMols = [];
     for idx = 1, length G_surface.recmols, 1 loop
         ldrec = G_surface.recmols(idx);
-        chainsList = Chains[] | cTag Chains[] == ldrec(2)(MOL_CHAIN_TAG)(1);
-        chainsList = chainsList | app allfalse apt m_join [cAtoms chainsList, nest oGetCollection 'QB_LIGAND'];
-        tmpRecMols(idx) = mol_Extract [chainsList];
+        tmpRecMols(idx) = mol_Extract [targ_chainsList(idx)];
+    endloop
+    for idx = 1, length G_surface.ligmols, 1 loop
         ldlig = G_surface.ligmols(idx);
-        chainsList = Chains[] | cTag Chains[] == ldlig(2)(MOL_CHAIN_TAG)(1);
-        chainsList = chainsList | app alltrue apt m_join [cAtoms chainsList, nest oGetCollection 'QB_LIGAND'];
-        tmpLigMols(idx) = mol_Extract [chainsList];
+        tmpLigMols(idx) = mol_Extract [lig_chainsList(idx)];
     endloop
     G_surface.recmols = tmpRecMols;
     G_surface.ligmols = tmpLigMols;    
@@ -1210,8 +1203,11 @@ local function UpdateComplex [ligtok, radius]
         else
             oDestroy uniq oChains G_surface.rec;
         endif
-write ['length G_surface.recmols: {} | {} |\n', length G_surface.recmols, G_surface.molidx];
-        local recchn = mol_Create G_surface.recmols (G_surface.molidx);
+        local recidx = G_surface.molidx;
+        if length G_surface.recmols === 1 then
+            recidx = 1;
+        endif
+        local recchn = mol_Create G_surface.recmols (recidx);
         G_surface.rec = cat cAtoms recchn;
         [vdwR, vdwE] = pboltz_AtomParameters G_surface.rec;
         G_surface.rad = vdwR;
@@ -1416,7 +1412,6 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
         mincut, maxcut, colors]
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
-
     if isnull G_surface then return; endif
     if allfalse eqE [G_surface.gobj, GKeyList []] then return; endif
     if isnull Atoms [] then return; endif
@@ -1430,21 +1425,11 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
     local [t, sequence, ra, rowdata] = data;
     local [ligtok, la, ld, resnames] = rowdata (selrow);
     local restok = '';
-// lmw : DEL THESE COMMENTS!
-//    local restok = '', ligtok = '', la = '', ld = [];
+
     if selrow === 0 and selcol === 0 then
         return;
-//    elseif selrow === 0 then
-//        restok = resnames (selcol);
-//        if selcol > 0 then
-//            UpdateResidue [restok, selrow, selcol, 1];
-//            return;
-//        endif
-//    elseif selcol === 0 then
-//        [ligtok, la, ld, resnames] = rowdata (selrow);
     elseif selcol > 0 then
         restok = resnames (selcol);
-//        [ligtok, la, ld, resnames] = rowdata (selrow);
     endif
 
     local redosurf = UpdateComplex [ligtok, radius];

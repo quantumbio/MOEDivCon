@@ -251,7 +251,7 @@ global function qb_NMRScoreMPI [dbpath, jobid]
 
     //  Collect and store results
     local result_ith = 0;
- print ['begin result loop',result_ith,numokay, exe_status process_key];//DEBUG
+// print ['begin result loop',result_ith,numokay, exe_status process_key];//DEBUG
     while exe_status process_key and result_ith <= numokay loop
         local results = [], return_statement = [];
         local divconerrmess = "";
@@ -378,7 +378,7 @@ global function qb_NMRScoreMPI [dbpath, jobid]
 
     endloop
 
- print ['look for err',result_ith,numokay, return_statement, exe_status process_key];//DEBUG
+// print ['look for err',result_ith,numokay, return_statement, exe_status process_key];//DEBUG
    //  Look for error messages from stderr.
     errmess = "";
     local [[newerror]] = fread [stderr, '{c:*}'];
