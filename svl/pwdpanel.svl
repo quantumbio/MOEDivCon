@@ -855,19 +855,16 @@ local function LoadMols [pwdfilename]
 
 // The following two loops will go through and make sure that the new G_surface has the aligned proteins.   
     local idx;
-    local ldrec,ldlig, targ_chainsList = [], lig_chainsList = [];
-    local ldligatoms = [], allLigAtms = [];
+    local targ_chainsList = [], lig_chainsList = [];
+    local allLigAtms = [];
     for idx = 1, length G_surface.recmols, 1 loop
-        ldrec = G_surface.recmols(idx);
-        targ_chainsList(idx) = mol_Create ldrec;
+        targ_chainsList(idx) = mol_Create G_surface.recmols(idx);
         pro_Join targ_chainsList(idx);
         targ_chainsList(idx) = targ_chainsList(idx)(1);
     endloop
     for idx = 1, length G_surface.ligmols, 1 loop
-        ldlig = G_surface.ligmols(idx);
-        lig_chainsList(idx) = mol_Create ldlig;
-        ldligatoms = cat cAtoms lig_chainsList(idx);
-        allLigAtms = cat [allLigAtms, ldligatoms];
+        lig_chainsList(idx) = mol_Create G_surface.ligmols(idx);
+        allLigAtms = cat [allLigAtms, cat cAtoms lig_chainsList(idx)];
         oSetCollection ['QB_LIGAND', allLigAtms];
     endloop
     if length Chains [] > 0 then
@@ -877,15 +874,13 @@ local function LoadMols [pwdfilename]
     local tmpRecMols = [];
     local tmpLigMols = [];
     for idx = 1, length G_surface.recmols, 1 loop
-        ldrec = G_surface.recmols(idx);
         tmpRecMols(idx) = mol_Extract [targ_chainsList(idx)];
     endloop
     for idx = 1, length G_surface.ligmols, 1 loop
-        ldlig = G_surface.ligmols(idx);
         tmpLigMols(idx) = mol_Extract [lig_chainsList(idx)];
     endloop
     G_surface.recmols = tmpRecMols;
-    G_surface.ligmols = tmpLigMols;    
+    G_surface.ligmols = tmpLigMols; 
 endfunction
 
 /****************************************************************************
