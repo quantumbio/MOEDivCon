@@ -55,7 +55,7 @@ function qb_PWDAnalysis;
 function pro_Join;
 function pro_Align;
 
-const PWD_EXPACT_HDR = 'Exp Act';
+const PWD_EXPACT_HDR = 'QMScore';
 
 const RMSD_MAX = 0.1;
 const MAT_TRANS_MIN = 0x80;

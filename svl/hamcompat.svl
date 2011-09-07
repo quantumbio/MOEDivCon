@@ -45,10 +45,6 @@ G_hamsets =
             'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si',
             'P', 'S', 'Cl', 'Zn', 'Br', 'Cd', 'I', 'Hg'
             ],
-        pddgpm3:
-            [
-            'H', 'C', 'N', 'O', 'F', 'S', 'Cl', 'Br', 'I'
-            ],
         pm3:
             [
             'H', 'Be', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si', 'P', 'S',
