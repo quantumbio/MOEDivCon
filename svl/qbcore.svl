@@ -72,6 +72,8 @@ const ANALNMREXP = 'qb_nmrexperimental';
 const ANALNMRPER = 'qb_nmrperturb';
 const ANALNMRPERSEL = 'qb_nmrperturbselection';
 
+
+
 //  Charge status color
 const CHGWHITE = 1;
 const CHGGREEN = 2;
@@ -88,7 +90,7 @@ const STATUS_DEFAULTS =
     [
     ['appname',      ''            ],
     ['allowmode',    [0,1,1,1]     ],
-    ['allowham',     [1,1,1,1,1]   ],
+    ['allowham',     [1,1,1,1,1,1] ],
     ['prevwd',       ''            ],
     ['calcchg',      0             ],
     ['verified',     0             ],
@@ -121,7 +123,7 @@ const CORE_OPT_DEFAULTS =
     ['ligchg',       0             ],
     ['colchg',       0             ],
     ['poseschg',     0             ],
-    ['ham',          4             ],
+    ['ham',          5             ],
     ['scaling',      1             ]
     ];
 
@@ -137,12 +139,12 @@ const RUN_MODES =
     'Many-to-Many'
     ];
 
-// NOTE: if the list of HAMILTONIANS are changed, then STATUS_DEFAULTS allowham must be edited as well.
 const HAMILTONIANS =
     [
     'AM1',
     'MNDO',
     'MNDO/d',
+    'PDDG-PM3',
     'PM3',
     'PM6'
     ];
@@ -152,6 +154,7 @@ const HAM_KEYS =
     'am1',
     'mndo',
     'mndod',
+    'pddgpm3',
     'pm3',
     'pm6'
     ];
