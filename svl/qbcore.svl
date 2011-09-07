@@ -144,7 +144,6 @@ const HAMILTONIANS =
     'AM1',
     'MNDO',
     'MNDO/d',
-    'PDDG-PM3',
     'PM3',
     'PM6'
     ];
