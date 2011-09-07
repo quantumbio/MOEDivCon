@@ -42,6 +42,7 @@ const HAM_KEYS =
     'am1',
     'mndo',
     'mndod',
+    'pddgpm3',
     'pm3',
     'pm6'
     ];
