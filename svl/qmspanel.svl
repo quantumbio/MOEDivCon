@@ -465,21 +465,20 @@ global function qb_QMScoreSetupPanel []
                             
     	                Close [force:1];
                         local idx = 1;
-                        for idx = 1, length ldrecs, 1 loop
+                        if length ldrecs >= 1 then
                             local ldrec = ldrecs(idx);
                             local ldlig = ldligs(idx);
                             if neL [ldrec, []] and neL [ldlig, []] then
                                 origligmol = ldlig;
-                                mol_Create ldrec;
-                                local chainsList = Chains[] | cTag Chains[] == ldrec(2)(MOL_CHAIN_TAG)(1);
+                                local chainsList = mol_Create ldrec;
                                 pro_Join chainsList;
                                 ligatoms = cat oAtoms mol_Create origligmol;
                                 oSetCollection ['QB_LIGAND', ligatoms];
                                 aSetNucleusLook [ligatoms, 'small-sphere'];
                                 aSetBondLook [ligatoms, 'cylinder'];
-                                View [];
                             endif
-                        endloop
+                        endif
+                        View [];
                         dbv_Open db_Filename ldkey;
                         db_Close ldkey;
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
