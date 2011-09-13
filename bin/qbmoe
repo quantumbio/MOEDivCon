@@ -36,7 +36,7 @@ fi
 if [ -z "${MOE_SVL_LOAD}" ]; then
     MOE_SVL_LOAD="${QBHOME}/svl"; export MOE_SVL_LOAD
 else
-    MOE_SVL_LOAD="${QBHOME}/svl:$MOE_SVL_LOAD"; export MOE_SVL_LOAD
+    MOE_SVL_LOAD="${QBHOME}/svl"; export MOE_SVL_LOAD
 fi
 
 exec "$MOEBIN" "$@"
