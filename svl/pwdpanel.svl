@@ -648,22 +648,26 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     local mask;
     local differenceVector;
 
-    if length ligvals == 0 then
+    if length ligvals < 1 then
         return;
     endif
-        
+
 //      (1) If max and min are equal (probably zero) the residue is not interesting.
-    for idx = 1, length ligvals(1), 1 loop
-        differenceVector(idx) = maxE apt peek [ligvals, idx] - minE apt peek [ligvals, idx];
-    endloop
+    if length ligvals > 1 then
+        for idx = 1, length ligvals(1), 1 loop
+            differenceVector(idx) = maxE apt peek [ligvals, idx] - minE apt peek [ligvals, idx];
+        endloop
+    else
+        differenceVector = app abs ligvals(1);
+    endif
     local tmpSorted = sortuniq differenceVector;
     idx = 0;
     loop
         idx = idx + 1;
-        mask = differenceVector >= tmpSorted(idx);
-        until (length ( differenceVector | mask ) <= 30 ) 
+            mask = differenceVector >= tmpSorted(idx);
+        until (length ( differenceVector | mask ) <= min [length differenceVector, 30] or
+            length tmpSorted == idx) 
     endloop
-    
     local outVals, outNames;
     local tmpVals, tmpNames;
     for tmpVals in ligvals loop
