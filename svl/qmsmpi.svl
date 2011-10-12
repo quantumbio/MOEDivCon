@@ -227,6 +227,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
     //  Collect and store results
     const NUMRESULTS = 11;
     local result_ith = 0;
+    local status_length=0;
     while exe_status process_key and result_ith <= numokay loop
         local results = [], return_statement = [];
         local divconerrmess = "";
@@ -235,7 +236,17 @@ global function qb_QMScoreMPI [dbpath, jobid]
 
         write ['DivCon: {}\n', return_statement];//DEBUG
 
-        if return_statement === "success" then
+        if return_statement === "status" then
+            [[rowcnt]] = fread [stdout, '{n:}'];
+            write ['Getting status for pose {} ({} of {})\n', rowcnt, 
+                result_ith, numokay];
+	    [[status_length]] = fread [stdout, '{n:}'];
+            for status_length loop
+                [[return_statement]] = fread [stdout, '{c:*}'];
+                print ['running', return_statement];
+            endloop
+            fwrite [stdin, '{c:}\n', 'Ok'];
+        elseif return_statement === "success" then
 
             [[rowcnt]] = fread [stdout, '{n:}'];
             write ['Getting results for pose {} ({} of {})\n', rowcnt, 
