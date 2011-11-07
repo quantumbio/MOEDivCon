@@ -651,7 +651,7 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     if length ligvals < 1 then
         return;
     endif
-
+write ['length ligvals: {}|{}|\n', length ligvals,ligvals];
 //      (1) If max and min are equal (probably zero) the residue is not interesting.
     if length ligvals > 1 then
         for idx = 1, length ligvals(1), 1 loop
@@ -661,6 +661,8 @@ local function TruncateAnalData [ligvals, resnames, sequence]
         differenceVector = app abs ligvals(1);
     endif
     local tmpSorted = sortuniq differenceVector;
+write ['length differenceVector: {}|{}|\n', length differenceVector,differenceVector];
+write ['length tmpSorted: {}|{}|\n', length tmpSorted,tmpSorted];
     idx = 0;
     loop
         idx = idx + 1;

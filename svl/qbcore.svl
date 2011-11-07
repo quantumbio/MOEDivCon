@@ -72,8 +72,6 @@ const ANALNMREXP = 'qb_nmrexperimental';
 const ANALNMRPER = 'qb_nmrperturb';
 const ANALNMRPERSEL = 'qb_nmrperturbselection';
 
-
-
 //  Charge status color
 const CHGWHITE = 1;
 const CHGGREEN = 2;
@@ -107,7 +105,8 @@ const STATUS_DEFAULTS =
 const CORE_OPT_DEFAULTS =
     [
     ['task',         0             ],
-    ['mode',         'One-to-One'  ],
+//    ['mode',         'One-to-One'  ],
+    ['mode',         'Many-to-Many'  ],
     ['allposes',     0             ],
     ['cwd',          1             ],
     ['workdir',      ''            ],
@@ -820,14 +819,17 @@ endfunction
  *
  ****************************************************************************/
 local function CheckComplexCharge [recchg, ligchg]
+write ['testD.1\n'];
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
-    if recatoms === [] or ligatoms === [] then
-        return  [[], [], errmess];
-    endif
+//    if recatoms === [] or ligatoms === [] then
+//        return  [[], [], errmess];
+//    endif
+write ['testD.2\n'];
 
     local recok = ChargeOK [recatoms, recchg];
     local ligok = ChargeOK [ligatoms, ligchg];
+write ['testD.3 | {} | {} |\n',recok,ligok];
 
     return [recok, ligok, ''];
 
@@ -1495,6 +1497,7 @@ endfunction
 local function UpdateComplexChargeStatus [wkey, status, recchg, ligchg, warn]
 
     local [recok, ligok, errmess] = CheckComplexCharge [recchg, ligchg];
+write ['testC.1\n'];
     if recok === [] or ligok === [] then
         if warn then
             Warning errmess;
@@ -1506,6 +1509,7 @@ local function UpdateComplexChargeStatus [wkey, status, recchg, ligchg, warn]
 
         return status;
     endif
+write ['testC.2\n'];
 
     if recok then
         if status.calcchg and recchg === status.moerecchg then
@@ -1517,6 +1521,7 @@ local function UpdateComplexChargeStatus [wkey, status, recchg, ligchg, warn]
     else
         status.recchg = CHGRED;
     endif
+write ['testC.3\n'];
 
     if ligok then
         if status.calcchg and ligchg === status.moeligchg then
@@ -1531,6 +1536,7 @@ local function UpdateComplexChargeStatus [wkey, status, recchg, ligchg, warn]
     if wkey > 0 then
         SetChargeStatus [wkey, 0, status];
     endif
+write ['testC.4\n'];
 
     return status;
 endfunction
@@ -1634,9 +1640,9 @@ global function qb_AtomsToMols []
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
 
-    if recatoms === [] or ligatoms === [] then
-        return [[], [], errmess];
-    endif
+//    if recatoms === [] or ligatoms === [] then
+//        return [[], [], errmess];
+//    endif
 
     local ligmol = mol_Extract ligatoms;
     local recmol = mol_Extract recatoms;
@@ -1692,7 +1698,6 @@ global function qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,
         lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname];
     mess = tok_cat [mess, recmess];
     local recchgok = ChargeOK [recatms, recchg];
-
     local ligatms = cat oAtoms mol_Create ligmol;
     local ligsingle = SingleMol [ligatms];
     if not ligsingle then
@@ -2592,7 +2597,6 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     local recatoms = cat oAtoms cat recressets;
     local [recvdw_r,recvdw_e] = get [pot_Parm_vdw [recatoms, recatoms], [2,3]];
     local handshake, resset, residue, atom, atmCount;
-    
     atmCount = 0;
 //    fwrite [outpipe, '{n:}\n', length recressets];
     fwrite [outpipe, '{n:}\n', 1];  // @todo: update moedivconscoring to no longer require this line.
@@ -2639,7 +2643,6 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     endloop
 
     [handshake] = fread [inpipe, '{n:}\n'];
-
 endfunction
 
 /****************************************************************************
@@ -2947,7 +2950,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         [receptor, ligand, errmess] = qb_AtomsToMols [];
         if receptor === [] or ligand === [] then
             Warning errmess;
-            exit [];
+//            exit [];
         endif
 
         local ligname = tok_cat ['lig', totok 1];
@@ -2956,6 +2959,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         endif
 
         ligand(1)(MOL_NAME) = ligname;
+write ['testE.3 {}\n',ligname];
 
         local recname = tok_cat ['rec', totok 1];
         if tok_length receptor(1)(MOL_NAME) > 0 then
@@ -2963,9 +2967,11 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         endif
 
         receptor(1)(MOL_NAME) = recname;
+write ['testE.4 {}\n',recname];
 
         SaveEnv [dbkey, receptor, ligand, status, coreopts, appopts, complex, 
             dbtype];
+write ['testE.5\n'];
 
         if dotests then
             recstsmess = GetStatusMessage ['Receptor', neL [status.recchg,
@@ -2975,10 +2981,12 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
                 coreopts.testH, coreopts.testMM, status.appname,
                 (HAM_KEYS | status.allowham)(coreopts.ham)];
         endif
+write ['testE.6\n'];
 
         if tok_length recmess > 0 then
             recstsmess = cat [recstsmess, string recmess];
         endif
+write ['testE.7\n'];
 
         if coreopts.mode === 'One-to-One' then
             if dotests then
@@ -3010,7 +3018,8 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
     endif
 
     if neL [coreopts.mode, 'Single Point'] 
-            and neL [coreopts.mode, 'One-to-One'] then
+            and neL [coreopts.mode, 'One-to-One'] 
+            and coreopts.posedb <> '' then
         if neL [fext coreopts.posedb, 'mdb'] then
             Warning twrite ['{}\nis not a MOE database.', coreopts.posedb];
             exit [];
@@ -3041,7 +3050,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
                 Warning pmess;
                 exit [];
             endif
-        else
+        elseif not null coreopts.recdb then
             if neL [fext coreopts.recdb, 'mdb'] then
                 Warning twrite ['{}\nis not a MOE database.', coreopts.recdb];
                 exit [];
@@ -3073,10 +3082,8 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
 
             db_Close reckey;
         endif
-
         db_Close posekey;
     endif
-
     return dbkey;
 endfunction
 
@@ -3162,6 +3169,15 @@ global function qb_SplitComplex [testsingle]
 //    col = diff [complexatoms, ligatoms];
 //    x = x_sort aNumber col;
 //    recatoms  = col [x];
+
+//    if length ligatoms === 0 or length ligatoms >= length complexatoms then
+//        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
+//    endif
+
+//    if testsingle and not SingleMol [ligatoms] then
+//        return [[], [], 'Ligand must to be a single molecule.'];
+//    endif
+
     return [recatoms,ligatoms, ''];
 //    return [cat [_Atoms '$$solvent', _Atoms '$$receptor'], _Atoms '$$ligand', ''];
     // not sure why we need the rest:
@@ -3245,7 +3261,7 @@ global function qb_TagCoreVals [vals]
         vals.recchg, vals.ligchg, vals.colchg, vals.poseschg,
         vals.ham, vals.scaling]];
 
-    return coreopts;
+    return tagcat [coreopts,tag tr CORE_OPT_DEFAULTS];
 endfunction
 
 /****************************************************************************
@@ -3555,22 +3571,27 @@ endfunction
 global function qb_VerifyDivConComplex [wkey, status, vals]
 
     if MOE_BATCH then exit ['Should only be run from MOE Window.']; endif
+write ['testB.1\n'];
 
     if vals.mode === 'Many-to-Many' then
         status.verified = 1;
         status.notforced = 1;
         return status;
     endif
+write ['testB.2\n'];
 
     local msgkey = Message [0, 'Testing ...'];
 
     local ynmess = '';
+write ['testB.2.3\n'];
     status = UpdateComplexChargeStatus [wkey, status, vals.recchg, vals.ligchg,
         neL [vals.mode, 'Many-to-Many']];
+write ['testB.2.6\n'];
     local recchgok = neL [status.recchg, CHGRED];
     local ligchgok = neL [status.ligchg, CHGRED];
     local [recok, rm, ligok, lm] = TestComplex [1, 1, 1, 0, 0, status.appname,
         (HAM_KEYS | status.allowham)(vals.ham)];
+write ['testB.3\n'];
 
     if not alltrue [recok, recchgok, ligok, ligchgok] then
         if not alltrue [recok, ligok] then
@@ -3578,12 +3599,16 @@ global function qb_VerifyDivConComplex [wkey, status, vals]
                 twrite ['Problematic molecule in {}!\n',
                 qb_GetWhich [not recok, not ligok]]];
         endif
+write ['testB.4\n'];
 
         if not alltrue [recchgok, ligchgok] then
+write ['testB.4.1\n'];
             ynmess =  tok_cat [ynmess, 
                 twrite ['Problematic charge for {}!\n', 
                 qb_GetWhich [not recchgok, not ligchgok]]];
+write ['testB.4.2\n'];
         endif
+write ['testB.4.3\n'];
 
         ynmess = tok_cat [ynmess, 'Continue anyway?'];
         if YesNo ynmess then
@@ -3598,6 +3623,7 @@ global function qb_VerifyDivConComplex [wkey, status, vals]
         status.verified = 1;
         status.notforced = 1;
     endif
+write ['testB.5\n'];
 
     Message [msgkey, []];
 

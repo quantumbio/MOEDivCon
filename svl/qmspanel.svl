@@ -407,10 +407,48 @@ endfunction
 global function qb_SaveQMScore [mdbkey, rowkey, scoredata]
 
     if alltrue (QMS_DATA_TAGS === app first scoredata) then
-        db_Write [mdbkey, rowkey, tag [QMS_NUM_FIELDS, 
+        return db_Write [mdbkey, rowkey, tag [QMS_NUM_FIELDS, 
             dropfirst app second scoredata]];
     endif
 
+    return 0;
+endfunction
+
+/****************************************************************************
+ *                          qb_CreateQMScoreDB
+ *
+ *  Create the QMScore DB as required and return the dbkey.
+ *
+ *  SVL API Purpose: to wrap the creation process with QMS_NUM_FIELDS et al so
+ *      that other functions can create this DB (even if called from outside
+ *      qmspanel.svl file).
+ *
+ * lmw TODO: need to call this function instead of qb_SetUpScoreDB 
+ *      directly in qb_QMScoreSetupPanel;
+ *
+ ****************************************************************************/
+global function qb_CreateQMScoreDB [status,coreopts,qmsopts]
+    return qb_SetUpScoreDB [status, coreopts, qmsopts,
+        [], QMS_NUM_FIELDS, 'qmscore', status.notforced];
+endfunction
+
+/****************************************************************************
+ *                          qb_TagQMSVals
+ *
+ *  Tag values for QMScore options from the panel window.
+ *
+ *  SVI API Purpose: to wrap the creation process with QMSCORE_OPT_DEFAULTS et al so
+ *      that other functions can process these options.
+ *
+ * lmw TODO: need to call this function instead of tag et al 
+ *      directly in qb_QMScoreSetupPanel;
+ *
+ ****************************************************************************/
+global function qb_TagQMSVals [vals]
+    local qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
+                        vals.freq, vals.opt, vals.shift,
+                        vals.analpwd]];
+    return tagcat [qmsopts,tag tr QMSCORE_OPT_DEFAULTS];
 endfunction
 
 /****************************************************************************
@@ -524,24 +562,29 @@ global function qb_QMScoreSetupPanel []
 
             elseif vals.panel === 'Create' then
 
+write ['test1\n'];
                 if qb_IsShowingAllPoses [vals] then
                     [vals, ligatoms] = qb_ResetLigand [wkey, vals];
                 endif
 
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
+write ['test2\n'];
 
                     status = qb_VerifyDivConComplex [wkey, status, vals];
                     if not status.verified then exit []; endif
+write ['test3\n'];
 
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS,
                         [vals.freq, vals.opt, vals.shift,
                         vals.analpwd]];
+write ['test4\n'];
 
                     dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', status.notforced];
                     dbv_Open db_Filename dbkey;
+write ['test5\n'];
                     db_Close dbkey;
                     exit [];
                 endif

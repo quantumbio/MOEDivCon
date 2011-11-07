@@ -70,7 +70,6 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
             coreopts.ligchg, errortests, errortests, errortests,
             coreopts.testH, coreopts.testMM,
             'qms', HAM_KEYS (coreopts.ham)];
-
     if not alltrue [recok, recchgok, ligok, ligchgok] then
         if not alltrue [recok, ligok] then
             if tok_length ckmsg > 0 then
@@ -145,8 +144,8 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
     fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
     fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
     fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', appopts.analpwd]];
-    fwrite [stdin, '{c:}\n', select ['COMPRESSION', 'NOCOMPRESSION', 1]];
-    fwrite [stdin, '{c:}\n', select ['PERSISTCOMPLEXDENSITY', 'NOPERSISTCOMPLEXDENSITY', 0]];
+//    fwrite [stdin, '{c:}\n', select ['COMPRESSION', 'NOCOMPRESSION', 1]];
+//    fwrite [stdin, '{c:}\n', select ['PERSISTCOMPLEXDENSITY', 'NOPERSISTCOMPLEXDENSITY', 0]];
     fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
     fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
         coreopts.scaling === 1]];
@@ -182,7 +181,7 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
 	    [[status_length]] = fread [stdout, '{n:}'];
             for status_length loop
                 [[return_statement]] = fread [stdout, '{c:*}'];
-                print ['running', return_statement];
+                write ['    running | {}\n', return_statement];
             endloop
         elseif return_statement === "success" then
             local name, nameValue;
