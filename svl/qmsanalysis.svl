@@ -126,13 +126,13 @@ global function qb_PWDAnalysis [qmsfilename]
     for idx = 1, numpairs, 1 loop
         if qb_IsModeManyToMany [coreopts] then
             fwrite [stdin, '{c:}\n', recmols(idx)(1)(MOL_NAME)];
-//            write ['{c:}\n', recmols(idx)(1)(MOL_NAME)];
+write ['{c:}\n', recmols(idx)(1)(MOL_NAME)];
         else
             fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
         endif
 
         fwrite [stdin, '{c:}\n', ligmols(idx)(1)(MOL_NAME)];
-//        write ['{c:}\n', ligmols(idx)(1)(MOL_NAME)];
+write ['{c:}\n', ligmols(idx)(1)(MOL_NAME)];
     endloop
 
     sysResidueCount = maxE cat cAlignmentPositions Chains [];
@@ -173,6 +173,7 @@ global function qb_PWDAnalysis [qmsfilename]
         for numcols loop
              [[val]] = fread [stdout, '{n:}'];
              values = append [values, val];
+write ['val: {}\n', val];
         endloop
         
         if length values > 0 then
@@ -197,7 +198,7 @@ global function qb_PWDAnalysis [qmsfilename]
     endloop
 
     interdata = [sequence, rowdata];
-    
+write [' interdata: {}\n', interdata];
     // @todo: there is currently no way to capture errors.
     success = 1;
 

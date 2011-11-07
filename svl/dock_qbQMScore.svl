@@ -1,0 +1,274 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2011 QuantumBio Inc. and/or its affiliates.
+    
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif      
+
+//    qbcore.svl    Core user-interface and utilities used by QB panels
+
+#set class   'QuantumBio'
+#set version '2011.03'
+#set main    'dock_score_qbQMScore'
+
+function qb_TagCoreVals;
+function qb_TagQMSVals;
+function qb_CreateQMScoreDB;
+function qb_QMScore;
+function qb_GetDefaultsStatus;
+function qb_SaveQMScore;
+function qb_GetRecFields;
+function qb_GetPoseFields;
+function qb_SaveDivConStatus;
+
+global function dock_score_qbQMScore [cmd, arg, opt]
+
+    static wascalled, dbkey, posecount;
+
+    const QMSCORE_OPT_DEFAULTS =
+        [
+        ['freq',         0             ],
+        ['opt',          1             ],
+        ['shift',        9.0           ],
+        ['analpwd',      1             ],       //  Generate PWD row data
+        ['ham',          5          ],
+        ['scoredb',      'qbscore.mdb' ]
+        ];
+    
+    const LIG_OPTS =
+        [
+        'none',
+        'free',
+        'bound'
+        ];
+    
+    const HAMILTONIANS =
+        [
+        'AM1',
+        'MNDO',
+        'MNDO/d',
+        'PDDG-PM3',
+        'PM3',
+        'PM6'
+        ];
+    
+    const ALG_OPTS =
+        [
+        'Linear Scaling',
+        'Cubic Scaling'
+        ];
+        
+    const PANEL =
+        [
+        Vbox:
+            [
+            Hbox :
+                [
+                name: 'dbbox', extendH: 1,
+                FSBText :
+                    [
+                    name: 'scoredb', len: 40, extendH: 1, title: 'Output DB:',
+                    mode: 'saveAs', allowBlank: 0,
+                    bubbleHelp:
+                        'The name of the output database that will hold\n'
+                        'the run paramaters and scoring results.'
+                    ],
+                Button : [ name: 'browse_scoredb', text: 'Browse...' ]
+                ],
+            Separator : [flushLeft:1, extendH:1, margin:1],
+                  Mbox : 
+                    [ 	    columns: 2, columnMajor:1,
+                    name: 'calcbox', extendH: 1,
+                    Option :
+                        [
+                        name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
+                        type: 'int', minWidth: 8,
+                        bubbleHelp:
+                            ''
+                        ],
+                    Option :
+                        [
+                        name: 'scaling', title: 'Calculation:', text: ALG_OPTS,
+                        type: 'int', minWidth: 8,
+                        bubbleHelp:
+                            'Linear vs. Cubic refers to the scaling factor of the\n'
+                            'calculation where Linear scales accordingly to O(n)\n'
+                            'and Cubic scaling is the more conventional variety\n'
+                            '(e.g. O(n^3) or worse) where n corresponds to the number\n'
+                            'of electrons in the system. The cross over point is at\n'
+                            'approximately 450 atoms.'
+                        ],
+                    Option :
+                        [
+                        name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
+                        type: 'int', minWidth: 5, extendH: 1,
+                        bubbleHelp:
+                            'A QM-based ligand optimization can be performed\n'
+                            'prior to scoring. This optimization may occur\n'
+                            'either while the ligand is docked within the target\n'
+                            'or while the ligand is separate from the target.\n'
+                            'Warning: this optional step will significantly\n'
+                            'increase the CPU cost of the calculation.'
+                        ],
+                    Text :
+                        [
+                        name: 'shift', title: 'Shift:', len: 10, extendH: 1, 
+                        type: 'real', allowBlank: 0,
+                        shortcut: ['0.0', '2.0', '4.0', '8.0', '16.0'],
+                        bubbleHelp:
+                            'Initial dynamic level shift (eV).'
+                        ]
+                    ],
+            Separator : [flushLeft:1, extendH:1, margin:1],
+                Hbox:   
+                    [
+                    name: 'analbox', extendH: 1,
+                    Checkbox :
+                        [
+                        name: 'freq', text: 'Frequency',title: 'Generate:',
+                        bubbleHelp:
+                            'Perform frequency calculation to determine ligand\n'
+                            'entropy in score function.  Warning: may increase\n'
+                            'CPU cost of the calculation.'
+                        ],
+                    Checkbox :
+                        [
+                        name: 'analpwd', text: 'PWD', 
+                        bubbleHelp:
+                            'Generate pair-wise decomposition data\n'
+                            'after the QMScore calculations.'
+                        ] 
+                    ]
+           ]
+        ];
+
+    if cmd === 'ID' then
+        wascalled = 0;
+//        rowkey = 0;
+        dbkey = 0;
+        posecount = 0;
+	return 'QMScore [QuantumBio]';
+	
+    elseif cmd === 'configpanelwidgets' then
+	return PANEL;
+
+    elseif cmd === 'configpanelevent' then	// arg = [val,trig]
+        local [val,trig,wkey] = arg;
+        if trig === 'browse_scoredb' then
+                local tmp = run ['fbrowse.svl', [trig, wkey, 'Select QMScore DB File', 
+                    'none', '*.mdb', 'scoredb']];
+        endif
+	return 0;
+
+    elseif cmd === 'configvalues' then		// arg = val
+	    arg = tagcat [arg, tag tr QMSCORE_OPT_DEFAULTS ];
+	return arg;
+
+// Should also address the following cmd's currently skipped because we don't need anything
+    elseif cmd === 'openReceptor' then		// arg = rec
+	    dock_score_qbQMScore ['closeReceptor', arg, opt];
+	return;
+
+    elseif cmd === 'closeReceptor' then		// arg = rec
+	return;
+
+    elseif cmd === 'openLigand' then		// arg = lig
+	    dock_score_qbQMScore ['closeLigand', arg, opt];
+	return;
+
+    elseif cmd === 'closeLigand' then		// arg = lig
+	return;
+
+    elseif not (cmd === 'score') then		// arg = [ligpos,lig,rec]
+	return;
+    endif
+    
+    posecount = posecount + 1;
+    
+    write ['QMScore Starting Pose {}\n', posecount];
+
+    local [ligpos, lig, rec] = arg;
+
+    local [osys, nsys] = SystemPush [];
+    local errortests = 1;
+    
+    local coreopts = qb_TagCoreVals[opt];
+    local qmsopts = qb_TagQMSVals[opt];
+    local status = qb_GetDefaultsStatus[];
+    
+    local rowkey;
+
+    oDestroy Chains [];
+    coreopts.recchg = add aFCharge cat oAtoms mol_Create *rec.mol;
+    coreopts.ligchg = add aFCharge cat oAtoms mol_Create *lig.mol;
+    local ligMolNew = mol_aSetPos [*lig.mol,ligpos];
+    local recMolNew = *rec.mol;
+//    *rec.mol(1)(MOL_NAME) = twrite['{}_{}',*rec.mol(1)(MOL_NAME),posecount];
+    recMolNew(1)(MOL_NAME) = twrite['{}_{}',*rec.mol(1)(MOL_NAME),posecount];
+    ligMolNew(1)(MOL_NAME) = twrite['{}_{}',ligMolNew(1)(MOL_NAME),posecount];
+    oDestroy Chains [];
+    
+    if wascalled === 0 then
+        dbkey = qb_CreateQMScoreDB [status,coreopts,qmsopts];
+        wascalled = 1;
+    endif
+    dbv_Open db_Filename dbkey;
+    rowkey = db_Write [dbkey,0,tagcat [tag [qb_GetRecFields[],[recMolNew,coreopts.recchg]], 
+        tag[qb_GetPoseFields [], [ligMolNew,coreopts.ligchg]]]];
+    local perfile = twrite ['{}/{}.h5', fpath fabsname db_Filename dbkey, 
+        fbase ftail fabsname db_Filename dbkey];
+    local start = clock [];
+    local [results, errmess] = qb_QMScore [recMolNew, ligMolNew, perfile, coreopts, qmsopts, errortests];
+    local finish = clock [];
+    local secs = round (finish - start);
+    local hours = floor (secs / 3600);
+    secs = secs - (hours * 3600);
+    local minutes = floor (secs / 60);
+    secs = secs - (minutes * 60);
+
+    if results === [] then
+        if errmess === [] or errmess === '' then
+            qb_SaveDivConStatus [dbkey, rowkey, "Error:  Unknown error!\n"];
+            write ['QMScore Error:  Unknown error!\n'];
+        else
+            qb_SaveDivConStatus [dbkey, rowkey, 
+                swrite ['Error:  {}\n', errmess]];
+            write ['QMScore Error:  {}\n', errmess];
+        endif
+    else
+        qb_SaveQMScore [dbkey, rowkey, results];
+        local sucmess = "Success";
+        if not isnull errmess then
+            sucmess = cat [sucmess, "-warnings!\n", errmess];
+        else
+            sucmess = cat [sucmess, "\n"];
+        endif
+
+        qb_SaveDivConStatus [dbkey, rowkey, sucmess];
+    endif
+
+    local timemess = twrite ['QMScore for pose {} is done (Score: {})\nTotal clock time {}:{}:{}.', 
+        posecount,results(2)(2), hours, minutes, secs];
+    write ['{}\n', timemess];
+
+    SystemPop [osys, nsys];
+    return results(2)(2);
+    
+endfunction
