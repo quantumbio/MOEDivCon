@@ -561,29 +561,24 @@ global function qb_QMScoreSetupPanel []
 
             elseif vals.panel === 'Create' then
 
-write ['test1\n'];
                 if qb_IsShowingAllPoses [vals] then
                     [vals, ligatoms] = qb_ResetLigand [wkey, vals];
                 endif
 
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
-write ['test2\n'];
 
                     status = qb_VerifyDivConComplex [wkey, status, vals];
                     if not status.verified then exit []; endif
-write ['test3\n'];
 
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS,
                         [vals.freq, vals.opt, vals.shift,
                         vals.analpwd]];
-write ['test4\n'];
 
                     dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', status.notforced];
                     dbv_Open db_Filename dbkey;
-write ['test5\n'];
                     db_Close dbkey;
                     exit [];
                 endif
