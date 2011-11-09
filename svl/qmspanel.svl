@@ -22,7 +22,7 @@
  // END COPYRIGHT
 #endif      
 
-//    qmspanel.svl    User-interface entrypoint to QMScore calculations
+	//    qmspanel.svl    User-interface entrypoint to QMScore calculations
 
 #set title   'QuantumBio QMScore Panel'
 #set class   'QuantumBio'
@@ -55,7 +55,7 @@ function qb_QMScoreBatch;
 
 function pro_Join;
 
-//  Data tags are in the order in which they are returned by DivCon.
+	//  Data tags are in the order in which they are returned by DivCon.
 
 const QMS_DATA_TAGS =
     [
@@ -190,7 +190,7 @@ const PANEL =
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
-//  Local Functions
+	//  Local Functions
 
 /****************************************************************************
  *                          LoadDB
@@ -380,7 +380,7 @@ local function RunOneToManyCalc [oldkey]
 endfunction
 
 
-//  Global Functions
+	//  Global Functions
 
 /****************************************************************************
  *                          qb_GetQMSEnv
@@ -539,9 +539,6 @@ global function qb_QMScoreSetupPanel []
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
-//                    qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
-//                        vals.freq, vals.opt, vals.shift,
-//                        vals.analpwd]];	
 					qmsopts = qb_TagQMSVals[vals];
                     dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
                         [], QMS_NUM_FIELDS, 'qmscore', status.notforced];

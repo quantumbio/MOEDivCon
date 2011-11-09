@@ -22,8 +22,6 @@
  // END COPYRIGHT
 #endif      
 
-//    qbcore.svl    Core user-interface and utilities used by QB panels
-
 #set class   'QuantumBio'
 #set version '2011.03'
 #set main    'dock_score_qbQMScore'
@@ -161,7 +159,6 @@ global function dock_score_qbQMScore [cmd, arg, opt]
 
     if cmd === 'ID' then
         wascalled = 0;
-//        rowkey = 0;
         dbkey = 0;
         posecount = 0;
 	return 'QMScore [QuantumBio]';
@@ -181,7 +178,7 @@ global function dock_score_qbQMScore [cmd, arg, opt]
 	    arg = tagcat [arg, tag tr QMSCORE_OPT_DEFAULTS ];
 	return arg;
 
-// Should also address the following cmd's currently skipped because we don't need anything
+	// Should also address the following cmd's currently skipped because we don't need anything
     elseif cmd === 'openReceptor' then		// arg = rec
 	    dock_score_qbQMScore ['closeReceptor', arg, opt];
 	return;
@@ -220,7 +217,6 @@ global function dock_score_qbQMScore [cmd, arg, opt]
     coreopts.ligchg = add aFCharge cat oAtoms mol_Create *lig.mol;
     local ligMolNew = mol_aSetPos [*lig.mol,ligpos];
     local recMolNew = *rec.mol;
-//    *rec.mol(1)(MOL_NAME) = twrite['{}_{}',*rec.mol(1)(MOL_NAME),posecount];
     recMolNew(1)(MOL_NAME) = twrite['{}_{}',*rec.mol(1)(MOL_NAME),posecount];
     ligMolNew(1)(MOL_NAME) = twrite['{}_{}',ligMolNew(1)(MOL_NAME),posecount];
     oDestroy Chains [];

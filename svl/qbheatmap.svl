@@ -22,7 +22,7 @@
  // END COPYRIGHT
 #endif      
 
-//    qbheatmap.svl    Interactive Heap Map
+	//    qbheatmap.svl    Interactive Heap Map
 
 #set title   'QuantumBio Heat Map'
 #set class   'QuantumBio'
@@ -31,21 +31,21 @@
 function gr_export;
 function gr_print;
 
-//  Colors
+	//  Colors
 const NEG_RANGE_MAX = 896;
 const POS_RANGE_MAX = 704;
 const MONO_RANGE_MAX = 384;
 const G_FACTOR = 256;
 const R_FACTOR = 256 * 256;
 
-//  Scale
+	//  Scale
 const SCALE_BOX = 2;
 const SCALE_PAD = 10;
 const SCALE_CELL_WD = 10;
 const SCALE_TICK_LEN = 5;
 const SCALE_VAL_LEN = 40;
 
-//  Cells
+	//  Cells
 const CELL_WD = 20;
 const CELL_HT = 10;
 
@@ -56,13 +56,13 @@ const MIN_PAGE_HT = 100;
 const MAX_ROWS = 60;            //  Used for truncation of table data
 const MAX_COLS = 30;            //  Used for truncation of table data
 
-//  Data
+	//  Data
 const DATA_TITLES = 1;
 const DATA_COLNAMES = 2;
 const DATA_COLABBR = 3;
 const DATA_ROWDATA = 4;
 
-//  Titles
+	//  Titles
 const PAGETITLE_H = 16;
 const PAGEFONT_H = 12;
 const ROWCOLTITLE_H = 14;
@@ -108,7 +108,7 @@ const NUM_TICKS  = ['5', '9', '13', '17', '25', '33'];
 const RADII = ['5.0', '6.0', '7.0', '8.0', '9.0', '10.0'];
 const NUM_COLORS = ['4', '8', '12', '16', '24', '32'];
 
-//  Window GUI
+	//  Window GUI
 const HEADER = 
     [
     name: 'panel', 
@@ -278,7 +278,7 @@ const PANEL =
         ]
     ];
 
-//  Local Functions
+	//  Local Functions
 
 /****************************************************************************
  *
@@ -1200,7 +1200,7 @@ local function UpdateCutoff [wkey, cutoff]
 endfunction
 
 
-//  Global Functions
+	//  Global Functions
 
 /****************************************************************************
  *
@@ -1281,9 +1281,9 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initrad,
     if tok_length warning > 0 then
         Warning warning;
     endif
-// @todo: readd truncation (however, data is processed to MAX_COLS
-//    data = TruncateCols [data];
-//    data = TruncateRows [data];
+	// @todo: readd truncation (however, data is processed to MAX_COLS
+	//    data = TruncateCols [data];
+	//    data = TruncateRows [data];
     [titles, colnames, colabbrevs, rowdata] = data;
     local numcols = length colnames;
     numsignifcols = select [numcols, numsignifcols, numcols < numsignifcols];
