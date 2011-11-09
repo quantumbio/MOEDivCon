@@ -819,17 +819,14 @@ endfunction
  *
  ****************************************************************************/
 local function CheckComplexCharge [recchg, ligchg]
-write ['testD.1\n'];
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
 //    if recatoms === [] or ligatoms === [] then
 //        return  [[], [], errmess];
 //    endif
-write ['testD.2\n'];
 
     local recok = ChargeOK [recatoms, recchg];
     local ligok = ChargeOK [ligatoms, ligchg];
-write ['testD.3 | {} | {} |\n',recok,ligok];
 
     return [recok, ligok, ''];
 
@@ -1497,7 +1494,6 @@ endfunction
 local function UpdateComplexChargeStatus [wkey, status, recchg, ligchg, warn]
 
     local [recok, ligok, errmess] = CheckComplexCharge [recchg, ligchg];
-write ['testC.1\n'];
     if recok === [] or ligok === [] then
         if warn then
             Warning errmess;
@@ -1509,7 +1505,6 @@ write ['testC.1\n'];
 
         return status;
     endif
-write ['testC.2\n'];
 
     if recok then
         if status.calcchg and recchg === status.moerecchg then
@@ -1521,7 +1516,6 @@ write ['testC.2\n'];
     else
         status.recchg = CHGRED;
     endif
-write ['testC.3\n'];
 
     if ligok then
         if status.calcchg and ligchg === status.moeligchg then
@@ -1536,7 +1530,6 @@ write ['testC.3\n'];
     if wkey > 0 then
         SetChargeStatus [wkey, 0, status];
     endif
-write ['testC.4\n'];
 
     return status;
 endfunction
@@ -2959,7 +2952,6 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         endif
 
         ligand(1)(MOL_NAME) = ligname;
-write ['testE.3 {}\n',ligname];
 
         local recname = tok_cat ['rec', totok 1];
         if tok_length receptor(1)(MOL_NAME) > 0 then
@@ -2967,11 +2959,9 @@ write ['testE.3 {}\n',ligname];
         endif
 
         receptor(1)(MOL_NAME) = recname;
-write ['testE.4 {}\n',recname];
 
         SaveEnv [dbkey, receptor, ligand, status, coreopts, appopts, complex, 
             dbtype];
-write ['testE.5\n'];
 
         if dotests then
             recstsmess = GetStatusMessage ['Receptor', neL [status.recchg,
@@ -2981,12 +2971,10 @@ write ['testE.5\n'];
                 coreopts.testH, coreopts.testMM, status.appname,
                 (HAM_KEYS | status.allowham)(coreopts.ham)];
         endif
-write ['testE.6\n'];
 
         if tok_length recmess > 0 then
             recstsmess = cat [recstsmess, string recmess];
         endif
-write ['testE.7\n'];
 
         if coreopts.mode === 'One-to-One' then
             if dotests then
@@ -3571,27 +3559,22 @@ endfunction
 global function qb_VerifyDivConComplex [wkey, status, vals]
 
     if MOE_BATCH then exit ['Should only be run from MOE Window.']; endif
-write ['testB.1\n'];
 
     if vals.mode === 'Many-to-Many' then
         status.verified = 1;
         status.notforced = 1;
         return status;
     endif
-write ['testB.2\n'];
 
     local msgkey = Message [0, 'Testing ...'];
 
     local ynmess = '';
-write ['testB.2.3\n'];
     status = UpdateComplexChargeStatus [wkey, status, vals.recchg, vals.ligchg,
         neL [vals.mode, 'Many-to-Many']];
-write ['testB.2.6\n'];
     local recchgok = neL [status.recchg, CHGRED];
     local ligchgok = neL [status.ligchg, CHGRED];
     local [recok, rm, ligok, lm] = TestComplex [1, 1, 1, 0, 0, status.appname,
         (HAM_KEYS | status.allowham)(vals.ham)];
-write ['testB.3\n'];
 
     if not alltrue [recok, recchgok, ligok, ligchgok] then
         if not alltrue [recok, ligok] then
@@ -3599,16 +3582,12 @@ write ['testB.3\n'];
                 twrite ['Problematic molecule in {}!\n',
                 qb_GetWhich [not recok, not ligok]]];
         endif
-write ['testB.4\n'];
 
         if not alltrue [recchgok, ligchgok] then
-write ['testB.4.1\n'];
             ynmess =  tok_cat [ynmess, 
                 twrite ['Problematic charge for {}!\n', 
                 qb_GetWhich [not recchgok, not ligchgok]]];
-write ['testB.4.2\n'];
         endif
-write ['testB.4.3\n'];
 
         ynmess = tok_cat [ynmess, 'Continue anyway?'];
         if YesNo ynmess then
@@ -3623,7 +3602,6 @@ write ['testB.4.3\n'];
         status.verified = 1;
         status.notforced = 1;
     endif
-write ['testB.5\n'];
 
     Message [msgkey, []];
 

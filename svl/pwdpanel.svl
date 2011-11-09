@@ -547,9 +547,7 @@ endfunction
  *
  ****************************************************************************/
 local function CreateSurfaceMap [radius, ligtok, restoks, pwdfilename]
-write ['IN CreateSurfaceMap\n']; //DELME
 	if isnull G_surface then
-write ['if isnull G_surface then\n']; //DELME
 		InitG_surface [];
 		LoadMols [pwdfilename];
 	endif
@@ -672,7 +670,6 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     if length ligvals < 1 then
         return;
     endif
-write ['length ligvals: {}|{}|\n', length ligvals,ligvals];
 //      (1) If max and min are equal (probably zero) the residue is not interesting.
     if length ligvals > 1 then
         for idx = 1, length ligvals(1), 1 loop
@@ -682,8 +679,6 @@ write ['length ligvals: {}|{}|\n', length ligvals,ligvals];
         differenceVector = app abs ligvals(1);
     endif
     local tmpSorted = sortuniq differenceVector;
-write ['length differenceVector: {}|{}|\n', length differenceVector,differenceVector];
-write ['length tmpSorted: {}|{}|\n', length tmpSorted,tmpSorted];
     idx = 0;
     loop
         idx = idx + 1;
@@ -756,7 +751,6 @@ local function GetAnalData [dbpath, title]
     local plsdata = qb_GetAnalysisData [dbkey, 'pwd', 'pls'];
     local lvdata = qb_GetAnalysisData [dbkey, 'pwd', 'optlv'];
     db_Close dbkey;
-write ['interdata: {}|{}|\n', length interdata, interdata];
     local fulltitle, resnames, sequence, resabbrevs;
     local ligdata, lignames, ligabbrevs, ligvals;
     if not isnull interdata then
@@ -765,10 +759,6 @@ write ['interdata: {}|{}|\n', length interdata, interdata];
         lignames = app first ligdata;
         ligvals = app second ligdata;
         resnames = app third ligdata;
-write ['sequence: {}|{}|\n', length sequence, sequence];
-write ['lignames: {}|{}|\n', length lignames, lignames];
-write ['ligvals: {}|{}|\n', length ligvals, ligvals];
-write ['resnames: {}|{}|\n', length resnames, resnames];
         [ligvals,resnames,sequence]=TruncateAnalData [ligvals, resnames, sequence];
         [resabbrevs, ligabbrevs] = abbreviate [resnames, lignames];
 // @todo: remove the double reference to sequence. This will require structural change to 'data' and therefore
@@ -1224,16 +1214,11 @@ endfunction
  *
  ****************************************************************************/
 local function UpdateComplex [ligtok, radius]
-write ['IN UpdateComplex\n']; //DELME
     if ligtok === '' then return 0; endif
     if isnull G_surface then return 0; endif
     if isnull G_surface.ligmols then return 0; endif
     local molidx = indexof [ligtok, G_surface.lignames];
-write [' molidx: {}\n', molidx];	//DELME
-write [' indexof [ligtok, G_surface.lignames]: {}\n', indexof [ligtok, G_surface.lignames]];	//DELME
-write [' ligtok: {}\n', ligtok];	//DELME
     if G_surface.molidx === molidx then return 0; endif
-write [' AFTERIF: {}\n', molidx];	//DELME
 
     G_surface.molidx = molidx;
     
@@ -1369,8 +1354,6 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
     if isnull G_surface then return; endif
 
     GClearVertexData G_surface.gobj;
-write ['length G_surface.grids: {}\n', length G_surface.grids]; //DELME
-write ['G_surface.molidx: {}\n', G_surface.molidx]; //DELME
     local gvtx = [];
     if G_surface.numgrids === 1 then
         gvtx = G_surface.grids(1);
@@ -1523,9 +1506,7 @@ global function qb_QBPWDSetupPanel []
 
     loop
         local [vals, trig] = WindowWait wkey;
-write ['trig : {}\n', trig];
         if trig === 'analview' then
-write ['vals.analysis: {}\n', vals.analysis];	//DELME
             if second task_fork [statics:'share', 
                 master:'parent'] === 'child' then
 
@@ -1675,8 +1656,7 @@ write ['vals.analysis: {}\n', vals.analysis];	//DELME
                     SaveOptions [pwdfilename, pwdopts];
 
                     msgkey = Message [0, 'PWD Analysis is running ...'];
-//                    local errmess = qb_PWDAnalysis [pwdfilename];
-                    local errmess = qb_PWDAnalysisTmp [pwdfilename, G_surface];
+                    local errmess = qb_PWDAnalysis [pwdfilename, G_surface];
                     Message [msgkey, 'PWD Analysis is done.'];
                     if length errmess > 0 then
                         qb_CreateMessWin [errmess, 10, 160];
