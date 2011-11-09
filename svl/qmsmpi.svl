@@ -22,7 +22,7 @@
  // END COPYRIGHT
 #endif
 
-//    qmsmpi.svl    Executes QMScore calculations in parallel
+	//    qmsmpi.svl    Executes QMScore calculations in parallel
 
 #set title   'QuantumBio QMScore MPI'
 #set class   'QuantumBio'

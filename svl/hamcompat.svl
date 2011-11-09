@@ -1,8 +1,8 @@
 #svl
-//    hamcompat.svl    
-//
-//    Atoms that are compatible with each Hamiltonian implemented
-//    by QuantumBio DivCon.
+	//    hamcompat.svl    
+	//
+	//    Atoms that are compatible with each Hamiltonian implemented
+	//    by QuantumBio DivCon.
 
 #set title   'QuantumBio Hamiltonian Compatibility'
 #set class   'QuantumBio'

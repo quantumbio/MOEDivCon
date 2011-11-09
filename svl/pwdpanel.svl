@@ -22,7 +22,7 @@
  // END COPYRIGHT
 #endif      
 
-//    pwdpanel.svl    User-interface entrypoint to QB-PWD calculations
+	//    pwdpanel.svl    User-interface entrypoint to QB-PWD calculations
 
 #set title   'QuantumBio PWD Panel'
 #set class   'QuantumBio'
@@ -354,11 +354,11 @@ const PANEL =
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
-//  Global Variables
+	//  Global Variables
 
     global G_surface;                     // Callback function needs access
 
-//  Local Functions
+	//  Local Functions
 
 function FindResidue;
 
@@ -670,7 +670,7 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     if length ligvals < 1 then
         return;
     endif
-//      (1) If max and min are equal (probably zero) the residue is not interesting.
+	//      (1) If max and min are equal (probably zero) the residue is not interesting.
     if length ligvals > 1 then
         for idx = 1, length ligvals(1), 1 loop
             differenceVector(idx) = maxE apt peek [ligvals, idx] - minE apt peek [ligvals, idx];
@@ -761,9 +761,8 @@ local function GetAnalData [dbpath, title]
         resnames = app third ligdata;
         [ligvals,resnames,sequence]=TruncateAnalData [ligvals, resnames, sequence];
         [resabbrevs, ligabbrevs] = abbreviate [resnames, lignames];
-// @todo: remove the double reference to sequence. This will require structural change to 'data' and therefore
-//          should come when we change to tagged vectors (or XML).
-//        interdata = [[fulltitle, 'Ligands', 'Residues'], sequence, resabbrevs,
+	// @todo: remove the double reference to sequence. This will require structural change to 'data' and therefore
+	//          should come when we change to tagged vectors (or XML).
         interdata = [[fulltitle, 'Ligands', 'Residues'], sequence, sequence,
             tr [lignames, ligabbrevs, ligvals, resnames]];
     endif
@@ -872,7 +871,7 @@ local function LoadMols [pwdfilename]
     
     oDestroy Chains[];
 
-// The following two loops will go through and make sure that the new G_surface has the aligned proteins.   
+	// The following two loops will go through and make sure that the new G_surface has the aligned proteins.   
     local idx;
     local targ_chainsList = [], lig_chainsList = [];
     local allLigAtms = [];
@@ -1100,8 +1099,6 @@ local function SaveMatrixData [filename, matrixdata, type]
 	filter:	'*.csv',
 	name  :	filename,
 	multi :	0,
-//	list  :	['file','file', ...],
-//	recentDirs: ['dir','dir', ...],
 	allowEmptyList : 0,
 	allowDuplicates: 0
     ];
@@ -1223,7 +1220,7 @@ local function UpdateComplex [ligtok, radius]
     G_surface.molidx = molidx;
     
     if isnull G_surface.molidx then
-//    @todo: this fixes an error when empty, however we should provide an improved error.
+	//    @todo: this fixes an error when empty, however we should provide an improved error.
         return;
     endif
 
@@ -1405,7 +1402,7 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
 endfunction
 
 
-//  Global Functions
+	//  Global Functions
 
 /****************************************************************************
  *
@@ -1446,8 +1443,8 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
     if allfalse eqE [G_surface.gobj, GKeyList []] then return; endif
     if isnull Atoms [] then return; endif
 
-// lmw: the selection of the sequence no longer makes sense.
-//      @todo: make it so that the sequence is no longer selectable.
+	// lmw: the selection of the sequence no longer makes sense.
+	//      @todo: make it so that the sequence is no longer selectable.
     if selrow === 0 then
         return;
     endif
@@ -1706,26 +1703,9 @@ global function qb_QBPWDSetupPanel []
     //  Make sure initial receptor/ligand is in MOE Window
     LoadMols [pwdfilename];
                         
-//                        for idx = 1, length ldrecs, 1 loop
-//                            local ldrec = ldrecs(idx);
-//                            local ldlig = ldligs(idx);
-//                            local allLigAtms;
-//                            if neL [ldrec, []] and neL [ldlig, []] then
-//                 // Only open the receptor for further work. We don't care about the ligand at this stage.
-//                                local chainsList = mol_Create ldrec;
-//                                pro_Join chainsList;
-//                                local ldligatoms = cat cAtoms mol_Create ldlig;
-//                                aSetNucleusLook [ldligatoms, 'small-sphere'];
-//                                aSetBondLook [ldligatoms, 'cylinder'];
-//                                allLigAtms = cat [allLigAtms, ldligatoms];
-//                                oSetCollection ['QB_LIGAND', allLigAtms];
                                 aSetNucleusLook [cat cAtoms G_surface.ligChains, 'small-sphere'];
                                 aSetBondLook [cat cAtoms G_surface.ligChains, 'cylinder'];
-//                                allLigAtms = cat [allLigAtms, ldligatoms];
                                 oSetCollection ['QB_LIGAND', cat cAtoms G_surface.ligChains];
-//                            endif
-//                        endloop
-//                        db_Close ldkey;
                         pro_Align [Chains []];
                         View [];
                         WindowSetData [wkey, ldpwdopts];

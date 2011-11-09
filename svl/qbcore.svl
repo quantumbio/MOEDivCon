@@ -22,7 +22,7 @@
  // END COPYRIGHT
 #endif      
 
-//    qbcore.svl    Core user-interface and utilities used by QB panels
+	//    qbcore.svl    Core user-interface and utilities used by QB panels
 
 #set title   'QuantumBio Core'
 #set class   'QuantumBio'
@@ -32,7 +32,7 @@ function _Atoms;
 function pro_HydrogenBonds;
 function Seq_NameToLetter;
 
-//  Database Fields
+	//  Database Fields
 const LIG_FIELD = 'Ligand/Pose';
 const LIGCHG_FIELD = 'Lig Chg';
 
@@ -44,7 +44,7 @@ const COLCHG_FIELD = 'Col Chg';
 
 const STATUS_FIELD = 'Status';
 
-// Environment tags
+	// Environment tags
 const COMPLEX = 'complex';
 const RECEPTOR = 'receptor';
 const LIGAND = 'ligand';
@@ -72,7 +72,7 @@ const ANALNMREXP = 'qb_nmrexperimental';
 const ANALNMRPER = 'qb_nmrperturb';
 const ANALNMRPERSEL = 'qb_nmrperturbselection';
 
-//  Charge status color
+	//  Charge status color
 const CHGWHITE = 1;
 const CHGGREEN = 2;
 const CHGRED = 3;
@@ -105,7 +105,7 @@ const STATUS_DEFAULTS =
 const CORE_OPT_DEFAULTS =
     [
     ['task',         0             ],
-//    ['mode',         'One-to-One'  ],
+	//    ['mode',         'One-to-One'  ],
     ['mode',         'Many-to-Many'  ],
     ['allposes',     0             ],
     ['cwd',          1             ],
@@ -505,8 +505,8 @@ const MESS_WINDOW =
         ]
     ];
 
-//  Based on the table found in the MOE documentation for Seq_NameToLetter
-//  and Seq_LetterToName
+	//  Based on the table found in the MOE documentation for Seq_NameToLetter
+	//  and Seq_LetterToName
 
 const RESNAMESEQUIVSETS =
     [
@@ -536,7 +536,7 @@ const RESNAMESEQUIVSETS =
 
 
 
-//***********************  Local Functions  *********************************
+	//***********************  Local Functions  *********************************
 
 /****************************************************************************
  *                          AtomOverlap
@@ -821,9 +821,6 @@ endfunction
 local function CheckComplexCharge [recchg, ligchg]
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
-//    if recatoms === [] or ligatoms === [] then
-//        return  [[], [], errmess];
-//    endif
 
     local recok = ChargeOK [recatoms, recchg];
     local ligok = ChargeOK [ligatoms, ligchg];
@@ -1608,7 +1605,7 @@ local function UpdateMode [wkey, vals, status]
 
 endfunction
 
-//************************  Global Functions  *******************************
+	//************************  Global Functions  *******************************
 
 /****************************************************************************
  *                          qb_AllPosesEnable
@@ -1633,9 +1630,6 @@ global function qb_AtomsToMols []
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
 
-//    if recatoms === [] or ligatoms === [] then
-//        return [[], [], errmess];
-//    endif
 
     local ligmol = mol_Extract ligatoms;
     local recmol = mol_Extract recatoms;
@@ -2177,7 +2171,6 @@ global function qb_GetElemIndices [mol, which]
     elseif which === 2 then
         atomindices = cat indicesof ['C', mol(4)(MOL_ATOM_EL)];
     else
-//        atomindices = igen add mol(3)(MOL_RES_NATOMS);
         atomindices = igen mol_aCount mol;
     endif
 
@@ -2591,7 +2584,6 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     local [recvdw_r,recvdw_e] = get [pot_Parm_vdw [recatoms, recatoms], [2,3]];
     local handshake, resset, residue, atom, atmCount;
     atmCount = 0;
-//    fwrite [outpipe, '{n:}\n', length recressets];
     fwrite [outpipe, '{n:}\n', 1];  // @todo: update moedivconscoring to no longer require this line.
     resset = recressets;
     fwrite [outpipe, '{n:}\n', length resset];
@@ -2618,7 +2610,6 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
     local [ligvdw_r,ligvdw_e] = get [pot_Parm_vdw [ligatoms, ligatoms], [2,3]];
 
     atmCount = 0;
-//    fwrite [outpipe, '{n:}\n', length ligressets];
     fwrite [outpipe, '{n:}\n', 1];
     resset = ligressets;
     fwrite [outpipe, '{n:}\n', length resset];
@@ -2943,7 +2934,6 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         [receptor, ligand, errmess] = qb_AtomsToMols [];
         if receptor === [] or ligand === [] then
             Warning errmess;
-//            exit [];
         endif
 
         local ligname = tok_cat ['lig', totok 1];
@@ -3154,20 +3144,10 @@ global function qb_SplitComplex [testsingle]
     // need to readd in the items below that sort and so on.
     recatoms = cat [_Atoms '$$solvent', _Atoms '$$receptor'];
     ligatoms = _Atoms '$$ligand';
-//    col = diff [complexatoms, ligatoms];
-//    x = x_sort aNumber col;
-//    recatoms  = col [x];
 
-//    if length ligatoms === 0 or length ligatoms >= length complexatoms then
-//        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
-//    endif
 
-//    if testsingle and not SingleMol [ligatoms] then
-//        return [[], [], 'Ligand must to be a single molecule.'];
-//    endif
 
     return [recatoms,ligatoms, ''];
-//    return [cat [_Atoms '$$solvent', _Atoms '$$receptor'], _Atoms '$$ligand', ''];
     // not sure why we need the rest:
 
     const COLLECTNAMES = ['QB_LIGAND', 'LIGX_LIGAND'];
