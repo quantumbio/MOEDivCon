@@ -3254,12 +3254,12 @@ global function qb_TagCoreVals [vals]
 
     local coreopts = tag [first tr CORE_OPT_DEFAULTS, [
         second first CORE_OPT_DEFAULTS,
-        vals.mode, vals.allposes, vals.cwd, vals.workdir,
-        vals.scoredb,  vals.recdb, vals.posedb,
+        vals.mode, vals.allposes, vals.cwd, vals.workdir, vals.scoredb,
+        vals.recdb, vals.posedb,
         vals.testLP, vals.testOverlap, vals.testHam,
         vals.testH, vals.testMM,
-        vals.recchg, vals.ligchg, vals.colchg, vals.poseschg,
-        vals.ham, vals.scaling]];
+        vals.recchg, vals.ligchg, vals.colchg, vals.poseschg, vals.ham,
+        vals.scaling]];
 
     return tagcat [coreopts,tag tr CORE_OPT_DEFAULTS];
 endfunction

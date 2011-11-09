@@ -52,6 +52,8 @@ function qb_HeatMapSetupPanel;
 
 function qb_PWDAnalysis;
 
+function qb_PWDAnalysisTmp;   // DELME
+
 function pro_Join;
 function pro_Align;
 
@@ -493,14 +495,12 @@ function UpdateSurfaceMap;
 
 /****************************************************************************
  *
- *                          CreateSurfaceMap
+ *                          InitG_surface
  *
- *  Create a surface map of the pocket.
- *
- *  Acknowledgement:  borrowed heavily from surfmap.svl.
+ *  Initialize G_surface object.
  *
  ****************************************************************************/
-local function CreateSurfaceMap [radius, ligtok, restoks, pwdfilename]
+local function InitG_surface []
 
     local gridopt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
         clipmode: 0];
@@ -523,6 +523,8 @@ local function CreateSurfaceMap [radius, ligtok, restoks, pwdfilename]
         molidx   : 0,
         recmols  : [],
         ligmols  : [],
+        recChains: [],
+        ligChains: [],
         lignames : [],
         pockets  : [],
         prevrow  : 0,
@@ -533,25 +535,44 @@ local function CreateSurfaceMap [radius, ligtok, restoks, pwdfilename]
         resatms  : []
         ];
 
-    //  Make sure initial receptor/ligand is in MOE Window
-    LoadMols [pwdfilename];
-    UpdateComplex [ligtok, radius];
+endfunction
 
-    local missing = CheckResidues [restoks];
-    if length missing > 0 then
-        Warning twrite ['The following residues are not \n'
-            'present in the receptor in the MOE Window:\n{v}\n',
-            missing];
+/****************************************************************************
+ *
+ *                          CreateSurfaceMap
+ *
+ *  Create a surface map of the pocket.
+ *
+ *  Acknowledgement:  borrowed heavily from surfmap.svl.
+ *
+ ****************************************************************************/
+local function CreateSurfaceMap [radius, ligtok, restoks, pwdfilename]
+write ['IN CreateSurfaceMap\n']; //DELME
+	if isnull G_surface then
+write ['if isnull G_surface then\n']; //DELME
+		InitG_surface [];
+		LoadMols [pwdfilename];
+	endif
+	
+	if G_surface.init === 1 then
+		UpdateComplex [ligtok, radius];
+	
+		local missing = CheckResidues [restoks];
+		if length missing > 0 then
+			Warning twrite ['The following residues are not \n'
+				'present in the receptor in the MOE Window:\n{v}\n',
+				missing];
+		endif
+	
+		G_surface.grids = rep [[], G_surface.numgrids];
+		G_surface.gobj = GCreateUnique G_surface.title;
+		local trans = [G_surface.trans_f, G_surface.trans_b];
+		GSetTransparency [G_surface.gobj, trans];
+		local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
+		GSetMaterial [G_surface.gobj, mat];
+		UpdateSurfaceMap [radius, 1, []];
+		G_surface.init = 0;
     endif
-
-    G_surface.grids = rep [[], G_surface.numgrids];
-    G_surface.gobj = GCreateUnique G_surface.title;
-    local trans = [G_surface.trans_f, G_surface.trans_b];
-    GSetTransparency [G_surface.gobj, trans];
-    local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
-    GSetMaterial [G_surface.gobj, mat];
-    UpdateSurfaceMap [radius, 1, []];
-    G_surface.init = 0;
 
 endfunction
 
@@ -735,7 +756,7 @@ local function GetAnalData [dbpath, title]
     local plsdata = qb_GetAnalysisData [dbkey, 'pwd', 'pls'];
     local lvdata = qb_GetAnalysisData [dbkey, 'pwd', 'optlv'];
     db_Close dbkey;
-
+write ['interdata: {}|{}|\n', length interdata, interdata];
     local fulltitle, resnames, sequence, resabbrevs;
     local ligdata, lignames, ligabbrevs, ligvals;
     if not isnull interdata then
@@ -744,6 +765,10 @@ local function GetAnalData [dbpath, title]
         lignames = app first ligdata;
         ligvals = app second ligdata;
         resnames = app third ligdata;
+write ['sequence: {}|{}|\n', length sequence, sequence];
+write ['lignames: {}|{}|\n', length lignames, lignames];
+write ['ligvals: {}|{}|\n', length ligvals, ligvals];
+write ['resnames: {}|{}|\n', length resnames, resnames];
         [ligvals,resnames,sequence]=TruncateAnalData [ligvals, resnames, sequence];
         [resabbrevs, ligabbrevs] = abbreviate [resnames, lignames];
 // @todo: remove the double reference to sequence. This will require structural change to 'data' and therefore
@@ -797,8 +822,6 @@ local function LoadDB [dbpath]
 
     local pwdopts = qb_GetEnvAnal [dbkey];
     pwdopts = tagcat [pwdopts, tag tr QBPWD_OPT_DEFAULTS];
-
-
 
     return [dbkey, receptor, ligand, coreopts, pwdopts];
 endfunction
@@ -867,11 +890,13 @@ local function LoadMols [pwdfilename]
         targ_chainsList(idx) = mol_Create G_surface.recmols(idx);
         pro_Join targ_chainsList(idx);
         targ_chainsList(idx) = targ_chainsList(idx)(1);
+		cSetName [targ_chainsList(idx), G_surface.recmols(idx)(1)(MOL_NAME)];
     endloop
     for idx = 1, length G_surface.ligmols, 1 loop
         lig_chainsList(idx) = mol_Create G_surface.ligmols(idx);
         allLigAtms = cat [allLigAtms, cat cAtoms lig_chainsList(idx)];
         oSetCollection ['QB_LIGAND', allLigAtms];
+		cSetName [lig_chainsList(idx), G_surface.ligmols(idx)(1)(MOL_NAME)];
     endloop
     if length Chains [] > 0 then
         pro_Align [Chains []];
@@ -887,6 +912,9 @@ local function LoadMols [pwdfilename]
     endloop
     G_surface.recmols = tmpRecMols;
     G_surface.ligmols = tmpLigMols; 
+
+    G_surface.recChains = targ_chainsList;
+    G_surface.ligChains = lig_chainsList; 
 endfunction
 
 /****************************************************************************
@@ -1075,35 +1103,49 @@ local function SaveMatrixData [filename, matrixdata, type]
         return [];
     endif
 
-    local f = fopenw filename;
+    filename = FilePrompt [
+	title :	'title',
+	mode  :	'saveAs',
+	path  :	'directory',
+	filter:	'*.csv',
+	name  :	filename,
+	multi :	0,
+//	list  :	['file','file', ...],
+//	recentDirs: ['dir','dir', ...],
+	allowEmptyList : 0,
+	allowDuplicates: 0
+    ];
 
-    local cname;
-    for cname in colnames loop
-        fwrite [f, ',{t:}', cname];          // first column name empty
-    endloop
-
-    fwrite [f, '\n'];
-
-    local row;
-    for row in rowdata loop
-        local rowname, rowabbrev, rowvals;
-        if type === 'sar' or type === 'inter' then
-            [rowname, rowabbrev, rowvals] = row;
-        elseif type === 'act' or type === 'pls' then
-            [rowname, rowvals] = row;
-        endif
-
-        fwrite [f, '{t:}', rowname];
-        local val;
-        for val in rowvals loop
-            fwrite [f, ',{n:f}', val];
-        endloop
-
-        fwrite [f, '\n'];
-    endloop
-
-    fclose f;
-
+	if not isnull filename then
+		local f = fopenw filename;
+	
+		local cname;
+		for cname in colnames loop
+			fwrite [f, ',{t:}', cname];          // first column name empty
+		endloop
+	
+		fwrite [f, '\n'];
+	
+		local row;
+		for row in rowdata loop
+			local rowname, rowabbrev, rowvals;
+			if type === 'sar' or type === 'inter' then
+				[rowname, rowabbrev, rowvals] = row;
+			elseif type === 'act' or type === 'pls' then
+				[rowname, rowvals] = row;
+			endif
+	
+			fwrite [f, '{t:}', rowname];
+			local val;
+			for val in rowvals loop
+				fwrite [f, ',{n:f}', val];
+			endloop
+	
+			fwrite [f, '\n'];
+		endloop
+	
+		fclose f;
+	endif
     return;
 endfunction
 
@@ -1182,13 +1224,16 @@ endfunction
  *
  ****************************************************************************/
 local function UpdateComplex [ligtok, radius]
-
+write ['IN UpdateComplex\n']; //DELME
     if ligtok === '' then return 0; endif
     if isnull G_surface then return 0; endif
     if isnull G_surface.ligmols then return 0; endif
-
     local molidx = indexof [ligtok, G_surface.lignames];
+write [' molidx: {}\n', molidx];	//DELME
+write [' indexof [ligtok, G_surface.lignames]: {}\n', indexof [ligtok, G_surface.lignames]];	//DELME
+write [' ligtok: {}\n', ligtok];	//DELME
     if G_surface.molidx === molidx then return 0; endif
+write [' AFTERIF: {}\n', molidx];	//DELME
 
     G_surface.molidx = molidx;
     
@@ -1324,7 +1369,8 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
     if isnull G_surface then return; endif
 
     GClearVertexData G_surface.gobj;
-
+write ['length G_surface.grids: {}\n', length G_surface.grids]; //DELME
+write ['G_surface.molidx: {}\n', G_surface.molidx]; //DELME
     local gvtx = [];
     if G_surface.numgrids === 1 then
         gvtx = G_surface.grids(1);
@@ -1477,9 +1523,9 @@ global function qb_QBPWDSetupPanel []
 
     loop
         local [vals, trig] = WindowWait wkey;
-
+write ['trig : {}\n', trig];
         if trig === 'analview' then
-
+write ['vals.analysis: {}\n', vals.analysis];	//DELME
             if second task_fork [statics:'share', 
                 master:'parent'] === 'child' then
 
@@ -1629,7 +1675,8 @@ global function qb_QBPWDSetupPanel []
                     SaveOptions [pwdfilename, pwdopts];
 
                     msgkey = Message [0, 'PWD Analysis is running ...'];
-                    local errmess = qb_PWDAnalysis [pwdfilename];
+//                    local errmess = qb_PWDAnalysis [pwdfilename];
+                    local errmess = qb_PWDAnalysisTmp [pwdfilename, G_surface];
                     Message [msgkey, 'PWD Analysis is done.'];
                     if length errmess > 0 then
                         qb_CreateMessWin [errmess, 10, 160];
@@ -1671,24 +1718,34 @@ global function qb_QBPWDSetupPanel []
                         pwdfilename = tempfile;
                         local [ldkey, ldrecs, ldligs, ldcoreopts, ldpwdopts]
                             = LoadDB [pwdfilename];
+                        db_Close ldkey;
                         Close [force:1];
                         local idx = 1;
-                        for idx = 1, length ldrecs, 1 loop
-                            local ldrec = ldrecs(idx);
-                            local ldlig = ldligs(idx);
-                            local allLigAtms;
-                            if neL [ldrec, []] and neL [ldlig, []] then
-                 // Only open the receptor for further work. We don't care about the ligand at this stage.
-                                local chainsList = mol_Create ldrec;
-                                pro_Join chainsList;
-                                local ldligatoms = cat cAtoms mol_Create ldlig;
-                                aSetNucleusLook [ldligatoms, 'small-sphere'];
-                                aSetBondLook [ldligatoms, 'cylinder'];
-                                allLigAtms = cat [allLigAtms, ldligatoms];
-                                oSetCollection ['QB_LIGAND', allLigAtms];
-                            endif
-                        endloop
-                        db_Close ldkey;
+                        
+	InitG_surface [];
+    //  Make sure initial receptor/ligand is in MOE Window
+    LoadMols [pwdfilename];
+                        
+//                        for idx = 1, length ldrecs, 1 loop
+//                            local ldrec = ldrecs(idx);
+//                            local ldlig = ldligs(idx);
+//                            local allLigAtms;
+//                            if neL [ldrec, []] and neL [ldlig, []] then
+//                 // Only open the receptor for further work. We don't care about the ligand at this stage.
+//                                local chainsList = mol_Create ldrec;
+//                                pro_Join chainsList;
+//                                local ldligatoms = cat cAtoms mol_Create ldlig;
+//                                aSetNucleusLook [ldligatoms, 'small-sphere'];
+//                                aSetBondLook [ldligatoms, 'cylinder'];
+//                                allLigAtms = cat [allLigAtms, ldligatoms];
+//                                oSetCollection ['QB_LIGAND', allLigAtms];
+                                aSetNucleusLook [cat cAtoms G_surface.ligChains, 'small-sphere'];
+                                aSetBondLook [cat cAtoms G_surface.ligChains, 'cylinder'];
+//                                allLigAtms = cat [allLigAtms, ldligatoms];
+                                oSetCollection ['QB_LIGAND', cat cAtoms G_surface.ligChains];
+//                            endif
+//                        endloop
+//                        db_Close ldkey;
                         pro_Align [Chains []];
                         View [];
                         WindowSetData [wkey, ldpwdopts];
