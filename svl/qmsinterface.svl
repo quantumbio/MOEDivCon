@@ -157,12 +157,13 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
 
     // we already did the work of figuring out which is receptor and which is ligand.
     // @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
-    recressets = cat oResidues mol_Create recmol;
-    ligressets = cat oResidues mol_Create ligmol; 
-    qb_PassBackbone [stdout, stdin, recressets, ligressets];
+    recressets = mol_Create recmol;
+    ligressets = mol_Create ligmol; 
+    qb_PassBackbone [stdout, stdin, recressets];
+    qb_PassBackbone [stdout, stdin, ligressets];
 
-    oDestroy uniq cat oChains cat recressets;
-    oDestroy uniq cat oChains cat ligressets;
+    oDestroy uniq cat oChains recressets;
+    oDestroy uniq cat oChains ligressets;
     if not MOE_BATCH then
         SystemPop [osys, nsys];
     endif
