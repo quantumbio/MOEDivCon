@@ -155,7 +155,8 @@ global function qb_NMRPerturb [colmol, perfile, coreopts, appopts, errortests,
     endloop
 
     fwrite [stdin, '{n:}\n', coreopts.colchg];
-    qb_PassBackbone [stdout, stdin, colressets, []];
+
+    qb_PassBackbone [stdout, stdin, colressets];
     oDestroy uniq cat oChains cat colressets;
     if not MOE_BATCH then
         SystemPop [osys, nsys];

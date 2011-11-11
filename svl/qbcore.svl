@@ -2572,20 +2572,22 @@ endfunction
 /****************************************************************************
  *                          qb_PassBackbone
  *
- *  Pass the receptor and ligand, split into separate molecules, down to
- *  divcon through the given outpipe.
+ *  Pass the MOE backbone to DivCon. One MOE backbone corresponds to one DivCon
+ *		collection. 
  *
- *  Assumption:  recressets was created before ligressets in the current system.
+ *		In addition to sending the elements and XYZs, the VDW terms will also be
+ *		sent in order to compensate for whatever MM terms the user has chosen
+ *		on his side.
  *
  ****************************************************************************/
-global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
+global function qb_PassBackbone [inpipe, outpipe, curChains]
     
-    local recatoms = cat oAtoms cat recressets;
+    local recatoms = cat oAtoms cat curChains;
     local [recvdw_r,recvdw_e] = get [pot_Parm_vdw [recatoms, recatoms], [2,3]];
     local handshake, resset, residue, atom, atmCount;
     atmCount = 0;
     fwrite [outpipe, '{n:}\n', 1];  // @todo: update moedivconscoring to no longer require this line.
-    resset = recressets;
+    resset = cat oResidues curChains;
     fwrite [outpipe, '{n:}\n', length resset];
     for residue in resset loop
        fwrite [outpipe, '{c:} {n:} {n:}\n', 
@@ -2602,31 +2604,6 @@ global function qb_PassBackbone [inpipe, outpipe, recressets, ligressets]
 
     [handshake] = fread [inpipe, '{n:}\n'];
 
-    if isnull ligressets then return; endif
-
-    //  There should be only one molecule (residue set) in the ligand/pose
-    //  collection, but we treat all collections similarly.
-    local ligatoms = cat oAtoms cat ligressets;
-    local [ligvdw_r,ligvdw_e] = get [pot_Parm_vdw [ligatoms, ligatoms], [2,3]];
-
-    atmCount = 0;
-    fwrite [outpipe, '{n:}\n', 1];
-    resset = ligressets;
-    fwrite [outpipe, '{n:}\n', length resset];
-    for residue in resset loop
-        fwrite [outpipe, '{c:} {n:} {n:}\n', 
-            rName residue, rUID residue, rAtomCount residue];
-        for atom in cat rAtoms residue loop
-            atmCount = atmCount + 1;
-            fwrite [outpipe, '{c:} {c:} {c:}\n',
-                aName atom, aElement atom, aMMType atom];
-            fwrite [outpipe, '{n:.4f} {n:.4f} {n:.4f}\n', aPos atom];
-            fwrite [outpipe, '{n:.4f} {n:.4f}\n',
-                ligvdw_r (atmCount),ligvdw_e (atmCount)];
-        endloop
-    endloop
-
-    [handshake] = fread [inpipe, '{n:}\n'];
 endfunction
 
 /****************************************************************************
