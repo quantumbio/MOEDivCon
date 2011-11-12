@@ -53,6 +53,9 @@ function qb_VerifyDivConComplex;
 function qb_QMScore;
 function qb_QMScoreBatch;
 
+function qb_GetCoreFields;
+function qb_GetQMS_dbFields;
+
 function pro_Join;
 
 	//  Data tags are in the order in which they are returned by DivCon.
@@ -339,6 +342,12 @@ local function RunOneToManyCalc [oldkey]
     local nrows = db_nEntries dbkey;
     local rowkey = 0, rowcnt = 0;
     local poseflds = qb_GetPoseFields [dbkey];
+    
+    // process the fields in the QMScore mdb file and strip out the stuff we added
+//    local QMStokens = totok cat [qb_GetCoreFields[], qb_GetQMS_dbFields[]];
+    local [fields, field_types] = db_Fields dbkey;  
+    local nonQBfields = fields | (field_types <> 'molecule');
+    nonQBfields = diff [nonQBfields,totok cat [qb_GetCoreFields[], qb_GetQMS_dbFields[]] ];
 
     while rowkey = db_NextEntry [dbkey, rowkey] loop
         rowcnt = rowcnt + 1;
@@ -347,9 +356,10 @@ local function RunOneToManyCalc [oldkey]
 
         coreopts.task = rowcnt;
         local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
+        local nonQBtagged = tag [nonQBfields, db_ReadFields [dbkey,rowkey,nonQBfields]];
         coreopts.ligchg = posechg;
         local [results, errmess] = qb_QMScore [recmols, posemol, perfile,
-            coreopts, qmsopts, status.notforced];
+            coreopts, qmsopts, status.notforced, nonQBtagged];
 
         if results === [] then
             if errmess === [] or errmess === '' then
@@ -381,6 +391,10 @@ endfunction
 
 
 	//  Global Functions
+
+global function qb_GetQMS_dbFields []
+	return QMS_NUM_FIELDS;
+endfunction
 
 /****************************************************************************
  *                          qb_GetQMSEnv
