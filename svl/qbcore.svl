@@ -2618,12 +2618,8 @@ endfunction
 /****************************************************************************
  *                          qb_PassBackbone
  *
- *  Pass the MOE backbone to DivCon. One MOE backbone corresponds to one DivCon
- *		collection. 
- *
- *		In addition to sending the elements and XYZs, the VDW terms will also be
- *		sent in order to compensate for whatever MM terms the user has chosen
- *		on his side.
+ *  Pass the MOE data (other then the backboone) to DivCon. This data could
+ *		include affinity data and the like.
  *
  ****************************************************************************/
 global function qb_PassValues [inpipe, outpipe, nonQBtagged]
@@ -2632,8 +2628,6 @@ global function qb_PassValues [inpipe, outpipe, nonQBtagged]
 		fwrite [outpipe, '{c:}\n', 0];
 	else
 		local [attributes, values] = untag nonQBtagged;
-		write ['	length nonQBtagged: {c:}\n', length nonQBtagged];
-		apt write ['	attributes, values: {c:}\n{c:}\n', attributes, values];
 		fwrite [outpipe, '{c:}\n', length nonQBtagged];
 		apt fwrite [outpipe, '{c:}\n{c:}\n', attributes, values];
 	endif
