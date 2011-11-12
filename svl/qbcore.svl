@@ -2218,7 +2218,6 @@ global function qb_GetLigandAtoms []
     return [ligatms, errmess];
 endfunction
 
-
 /****************************************************************************
  *                          qb_GetPoseFields
  *
@@ -2274,6 +2273,16 @@ global function qb_GetRecFields []
 
     return [REC_FIELD, RECCHG_FIELD];
 endfunction
+
+/****************************************************************************
+ *                          qb_GetCoreFields
+ *
+ ****************************************************************************/
+global function qb_GetCoreFields []
+
+    return cat [qb_GetRecFields[], qb_GetPoseFields[], qb_GetColFields[], STATUS_FIELD];
+endfunction
+
 
 /****************************************************************************
  *                          qb_GetWhich
@@ -2606,6 +2615,30 @@ global function qb_PassBackbone [inpipe, outpipe, curChains]
 
 endfunction
 
+/****************************************************************************
+ *                          qb_PassBackbone
+ *
+ *  Pass the MOE backbone to DivCon. One MOE backbone corresponds to one DivCon
+ *		collection. 
+ *
+ *		In addition to sending the elements and XYZs, the VDW terms will also be
+ *		sent in order to compensate for whatever MM terms the user has chosen
+ *		on his side.
+ *
+ ****************************************************************************/
+global function qb_PassValues [inpipe, outpipe, nonQBtagged]
+
+	if isnull nonQBtagged then
+		fwrite [outpipe, '{c:}\n', 0];
+	else
+		local [attributes, values] = untag nonQBtagged;
+		write ['	length nonQBtagged: {c:}\n', length nonQBtagged];
+		apt write ['	attributes, values: {c:}\n{c:}\n', attributes, values];
+		fwrite [outpipe, '{c:}\n', length nonQBtagged];
+		apt fwrite [outpipe, '{c:}\n{c:}\n', attributes, values];
+	endif
+
+endfunction
 /****************************************************************************
  *                          qb_ResNameCanonical
  *

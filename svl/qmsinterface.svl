@@ -31,6 +31,7 @@ function qb_CheckChgTestDivConComplex;
 function qb_GetWhich;
 function qb_HamSetsInit;
 function qb_PassBackbone;
+function qb_PassValues;
 
 /*  NOTE:  If you change the key lists here, you need to update the
  *         option lists and default indices in qbcore.svl and qmspanel.svl.
@@ -55,7 +56,7 @@ const LIG_KEYS =
     ];
 
 global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
-        errortests]
+        errortests,nonQBtagged]
 
     local osys, nsys, errmess = "";
     if not MOE_BATCH then
@@ -159,7 +160,10 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
     // @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
     recressets = mol_Create recmol;
     ligressets = mol_Create ligmol; 
+    
+    qb_PassValues [stdout, stdin, [] ];
     qb_PassBackbone [stdout, stdin, recressets];
+    qb_PassValues [stdout, stdin, nonQBtagged ];
     qb_PassBackbone [stdout, stdin, ligressets];
 
     oDestroy uniq cat oChains recressets;
