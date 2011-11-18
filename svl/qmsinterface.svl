@@ -142,29 +142,30 @@ global function qb_QMScore [recmol, ligmol, perfile, coreopts, appopts,
     //  in the receptor collection.
     local success = 0;
     fwrite [stdin, '{c:}\n', perfile];
-    fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
-    fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
     fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', appopts.analpwd]];
-//    fwrite [stdin, '{c:}\n', select ['COMPRESSION', 'NOCOMPRESSION', 1]];
-//    fwrite [stdin, '{c:}\n', select ['PERSISTCOMPLEXDENSITY', 'NOPERSISTCOMPLEXDENSITY', 0]];
+    fwrite [stdin, '{c:}\n', select ['COMPRESSION', 'NOCOMPRESSION', 1]];
+    fwrite [stdin, '{c:}\n', select ['PERSISTCOMPLEXDENSITY', 'NOPERSISTCOMPLEXDENSITY', 0]];
     fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
     fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
         coreopts.scaling === 1]];
     fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', appopts.freq]];
     fwrite [stdin, '{c:}\n', LIG_KEYS(appopts.opt)];
     fwrite [stdin, '{n:}\n', appopts.shift];
-    fwrite [stdin, '{n:}\n', coreopts.recchg];
-    fwrite [stdin, '{n:}\n', coreopts.ligchg];
 
     // we already did the work of figuring out which is receptor and which is ligand.
     // @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
     recressets = mol_Create recmol;
     ligressets = mol_Create ligmol; 
     
-    qb_PassValues [stdout, stdin, [] ];
+    fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
+    fwrite [stdin, '{n:}\n', coreopts.recchg];
     qb_PassBackbone [stdout, stdin, recressets];
-    qb_PassValues [stdout, stdin, nonQBtagged ];
+    qb_PassValues [stdout, stdin, [] ];
+
+    fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
+    fwrite [stdin, '{n:}\n', coreopts.ligchg];
     qb_PassBackbone [stdout, stdin, ligressets];
+    qb_PassValues [stdout, stdin, nonQBtagged ];
 
     oDestroy uniq cat oChains recressets;
     oDestroy uniq cat oChains ligressets;
