@@ -74,7 +74,7 @@ const LIG_KEYS =
 ****************************************************************************/
 global function qb_QMScoreMPI [dbpath, jobid]
 
-    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
+//    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
 
     //  Extract molecules and run options from the database environment
     if neL [fext dbpath, 'mdb'] then
@@ -171,17 +171,21 @@ global function qb_QMScoreMPI [dbpath, jobid]
             //  Pass the two backbones to QuantumBio's DivCon QMScore
             write ['Sending pose {} of {}\n', rowcnt, nrows];
             fwrite [stdin, '{n:}\n', rowcnt];
-            fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
-            fwrite [stdin, '{c:}\n', posemol(1)(MOL_NAME)];
-            fwrite [stdin, '{n:}\n', recchg];
-            fwrite [stdin, '{n:}\n', posechg];
 
 			// we already did the work of figuring out which is receptor and which is ligand.
 			// @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
 			recressets = mol_Create recmol;
 			ligressets = mol_Create ligmol; 
+
+            fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
+            fwrite [stdin, '{n:}\n', recchg];
 			qb_PassBackbone [stdout, stdin, recressets];
+            qb_PassValues [stdout, stdin, [] ];
+
+            fwrite [stdin, '{c:}\n', posemol(1)(MOL_NAME)];
+            fwrite [stdin, '{n:}\n', posechg];
 			qb_PassBackbone [stdout, stdin, ligressets];
+            qb_PassValues [stdout, stdin, nonQBtagged ];
 
             warnings (rowcnt) = ckmsg;
 
