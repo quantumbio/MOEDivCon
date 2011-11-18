@@ -2590,7 +2590,8 @@ endfunction
  *
  ****************************************************************************/
 global function qb_PassBackbone [inpipe, outpipe, curChains]
-    
+write ['in qb_PassBackbone\n'];
+
     local recatoms = cat oAtoms cat curChains;
     local [recvdw_r,recvdw_e] = get [pot_Parm_vdw [recatoms, recatoms], [2,3]];
     local handshake, resset, residue, atom, atmCount;
@@ -2616,20 +2617,28 @@ global function qb_PassBackbone [inpipe, outpipe, curChains]
 endfunction
 
 /****************************************************************************
- *                          qb_PassBackbone
+ *                          qb_PassValues
  *
  *  Pass the MOE data (other then the backboone) to DivCon. This data could
  *		include affinity data and the like.
  *
  ****************************************************************************/
 global function qb_PassValues [inpipe, outpipe, nonQBtagged]
-
+write ['in qb_PassValues\n'];
 	if isnull nonQBtagged then
 		fwrite [outpipe, '{c:}\n', 0];
 	else
 		local [attributes, values] = untag nonQBtagged;
 		fwrite [outpipe, '{c:}\n', length nonQBtagged];
-		apt fwrite [outpipe, '{c:}\n{c:}\n', attributes, values];
+		apt fwrite [outpipe, '{c:}\n{n:}\n{c:}\n', attributes, 1, values];
+//		write ['{c:}\n', length nonQBtagged];
+//		apt write ['dog: {c:}\n{n:}\n{c:}\n', attributes, length values, values];
+//		local value, valueCount = 0;
+//		for value in values loop
+//		    valueCount = valueCount + 1;
+//		    write ['cat: {c:}\n{n:}\n{c:}\n', attributes(valueCount), length values(valueCount), values(valueCount)];
+//		endloop
+		
 	endif
 
 endfunction
