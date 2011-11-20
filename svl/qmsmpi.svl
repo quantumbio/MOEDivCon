@@ -41,6 +41,11 @@ function qb_PassBackbone;
 function qb_SaveDivConStatus;
 function qb_SaveQMScore;
 
+function qb_PassValues;
+function qb_GetCoreFields;
+function qb_GetQMS_dbFields;
+
+
 
 /*  NOTE:  If you change the key lists here, you need to update the
  *         option lists and default indices in qbcore.svl and qmspanel.svl.
@@ -96,8 +101,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
     local perpath = fpath dbpath;
     local pertail = fbase ftail dbpath;
     local perfile = twrite ['{}/{}.h5', perpath, pertail];
-    local workdir = select [currdir, fabsname coreopts.workdir, 
-        coreopts.cwd];
+    local workdir = select [currdir, fabsname coreopts.workdir, coreopts.cwd];
 
     if not isnull jobid then
         workdir = twrite ['{}/{}', workdir, jobid];
@@ -109,6 +113,11 @@ global function qb_QMScoreMPI [dbpath, jobid]
 
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
+
+    // process the fields in the QMScore mdb file and strip out the stuff we added
+    local [fields, field_types] = db_Fields dbkey;  
+    local nonQBfields = fields | (field_types <> 'molecule');
+    nonQBfields = diff [nonQBfields,totok cat [qb_GetCoreFields[], qb_GetQMS_dbFields[]] ];
 
     //  exe_open child process inherits parent's environment.
     local process_key = exe_open ['moedivconmpi', workdir, [], 1];
@@ -151,6 +160,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
 
         coreopts.task = rowcnt;
         local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
+        local nonQBtagged = tag [nonQBfields, db_ReadFields [dbkey,rowkey,nonQBfields]];
 
         if qb_IsModeManyToMany [coreopts] then
             [recmol, recchg] = db_ReadFields [dbkey, rowkey, recflds];
@@ -175,7 +185,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
 			// we already did the work of figuring out which is receptor and which is ligand.
 			// @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
 			recressets = mol_Create recmol;
-			ligressets = mol_Create ligmol; 
+			ligressets = mol_Create ligmol;
 
             fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
             fwrite [stdin, '{n:}\n', recchg];
