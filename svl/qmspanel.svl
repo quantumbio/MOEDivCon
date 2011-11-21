@@ -52,6 +52,7 @@ function qb_VerifyDivConComplex;
 
 function qb_QMScore;
 function qb_QMScoreBatch;
+function qb_QMScoreMPI;
 
 function qb_GetCoreFields;
 function qb_GetQMS_dbFields;
