@@ -134,9 +134,10 @@ global function qb_QMScoreMPI [dbpath, jobid]
     //  Pass down the dirs, options and number of possible jobs.
     fwrite [stdin, '{c:}\n', perfile];
     fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', qmsopts.analpwd]];
+    fwrite [stdin, '{c:}\n', select ['COMPRESSION', 'NOCOMPRESSION', 1]];
+    fwrite [stdin, '{c:}\n', select ['PERSISTCOMPLEXDENSITY', 'NOPERSISTCOMPLEXDENSITY', 0]];
     fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
-    fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD',
-        coreopts.scaling === 1]];
+    fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD', coreopts.scaling === 1]];
     fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', qmsopts.freq]];
     fwrite [stdin, '{c:}\n', LIG_KEYS(qmsopts.opt)];
     fwrite [stdin, '{n:}\n', qmsopts.shift];
