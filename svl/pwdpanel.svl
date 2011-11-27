@@ -682,7 +682,7 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     idx = 0;
     loop
         idx = idx + 1;
-            mask = differenceVector >= tmpSorted(idx);
+        mask = differenceVector >= tmpSorted(idx);
         until (length ( differenceVector | mask ) <= min [length differenceVector, 30] or
             length tmpSorted == idx) 
     endloop
@@ -879,14 +879,18 @@ local function LoadMols [pwdfilename]
         targ_chainsList(idx) = mol_Create G_surface.recmols(idx);
         pro_Join targ_chainsList(idx);
         targ_chainsList(idx) = targ_chainsList(idx)(1);
+        aSetHidden [oAtoms targ_chainsList(idx),1];
 		cSetName [targ_chainsList(idx), G_surface.recmols(idx)(1)(MOL_NAME)];
     endloop
+    aSetHidden [oAtoms targ_chainsList(1), 0];
     for idx = 1, length G_surface.ligmols, 1 loop
         lig_chainsList(idx) = mol_Create G_surface.ligmols(idx);
         allLigAtms = cat [allLigAtms, cat cAtoms lig_chainsList(idx)];
         oSetCollection ['QB_LIGAND', allLigAtms];
+        aSetHidden [oAtoms lig_chainsList(idx),1];
 		cSetName [lig_chainsList(idx), G_surface.ligmols(idx)(1)(MOL_NAME)];
     endloop
+    aSetHidden [oAtoms lig_chainsList(1), 0];
     if length Chains [] > 0 then
         pro_Align [Chains []];
     endif
