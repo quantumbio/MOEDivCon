@@ -36,7 +36,6 @@ function qb_GetRecFields;
 function qb_GetQMSEnv;
 function qb_GetWhich;
 function qb_HamSetsInit;
-function qb_IsModeManyToMany;
 function qb_PassBackbone;
 function qb_SaveDivConStatus;
 function qb_SaveQMScore;
@@ -92,7 +91,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
 
     local dbkey = db_Open [dbpath, 'read-write'];
     local [recmol, ligmol, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
-    local poseflds = qb_GetPoseFields [dbkey];
+    local ligflds = qb_GetPoseFields [dbkey];
     local recflds = qb_GetRecFields [dbkey];
     local dbrowkeys = db_Entries dbkey;
     local nrows = db_nEntries dbkey;
@@ -147,9 +146,10 @@ global function qb_QMScoreMPI [dbpath, jobid]
     //  to moedivconmpi
     qb_HamSetsInit [];
     local rowkey = 0, rowcnt = 0, numokay = 0, warnings = [];
+    local recchg = coreopts.recchg;
+    local ligchg = coreopts.ligchg;
     for rowkey in dbrowkeys loop
         local errmess = "", success = 0;
-        local recchg;
         rowcnt = rowcnt + 1;
 
         local oldstatus = qb_GetDivConStatus [dbkey, rowkey];
@@ -160,18 +160,20 @@ global function qb_QMScoreMPI [dbpath, jobid]
         endif
 
         coreopts.task = rowcnt;
-        local [posemol, posechg] = db_ReadFields [dbkey, rowkey, poseflds];
-        local nonQBtagged = tag [nonQBfields, db_ReadFields [dbkey,rowkey,nonQBfields]];
-
-        if qb_IsModeManyToMany [coreopts] then
+        [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
+        
+        if indexof [fields, recflds(1)] then
             [recmol, recchg] = db_ReadFields [dbkey, rowkey, recflds];
-        else
-            recchg = coreopts.recchg;
         endif
-
+        
+        coreopts.recchg = recchg;
+        coreopts.ligchg = ligchg;
+        
+        local nonQBtagged = tag [nonQBfields, db_ReadFields [dbkey,rowkey,nonQBfields]];
+        
         //  Run all error tests unless forced not to do so by user.
         local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
-            = qb_CheckChgTestDivConComplex [recmol, recchg, posemol, posechg,
+            = qb_CheckChgTestDivConComplex [recmol, coreopts.recchg, ligmol, coreopts.ligchg,
                 status.notforced, status.notforced, status.notforced,
                 coreopts.testH, coreopts.testMM, 'qms',
                 HAM_KEYS (coreopts.ham)];
@@ -193,8 +195,8 @@ global function qb_QMScoreMPI [dbpath, jobid]
 			qb_PassBackbone [stdout, stdin, recressets];
             qb_PassValues [stdout, stdin, [] ];
 
-            fwrite [stdin, '{c:}\n', posemol(1)(MOL_NAME)];
-            fwrite [stdin, '{n:}\n', posechg];
+            fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
+            fwrite [stdin, '{n:}\n', ligchg];
 			qb_PassBackbone [stdout, stdin, ligressets];
             qb_PassValues [stdout, stdin, nonQBtagged ];
 
