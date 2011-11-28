@@ -68,187 +68,17 @@ const LIG_KEYS =
     'COMPLEXOPT'
     ];
 
-/****************************************************************************
- *                          qb_QMScoreMPI
- *
- *  Pass all of the jobs in the database down to moedivconmpi, then collect
- *  all of the results.
- *
- *
-****************************************************************************/
-global function qb_QMScoreMPI [dbpath, jobid]
+local function ManageMOEDivConMPI[stdout,stdin,warnings,dbkey,result_ith,numokay]
 
-//    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
-
-    //  Extract molecules and run options from the database environment
-    if neL [fext dbpath, 'mdb'] then
-        exit twrite ['{}\nis not a MOE database.', dbpath];
-    endif
-
-    if neL [ftype dbpath, 'file'] then
-        exit twrite ['Unable to find the database:\n    {}', dbpath];
-    endif
-
-    local dbkey = db_Open [dbpath, 'read-write'];
-    local [recmol, ligmol, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
-    local ligflds = qb_GetPoseFields [dbkey];
-    local recflds = qb_GetRecFields [dbkey];
-    local dbrowkeys = db_Entries dbkey;
-    local nrows = db_nEntries dbkey;
-
-    local currdir = getenv 'PWD';
-    local perpath = fpath dbpath;
-    local pertail = fbase ftail dbpath;
-    local perfile = twrite ['{}/{}.h5', perpath, pertail];
-    local workdir = select [currdir, fabsname coreopts.workdir, coreopts.cwd];
-
-    if not isnull jobid then
-        workdir = twrite ['{}/{}', workdir, jobid];
-        local okay = _fmkdir workdir;
-        if okay === -1 then
-            exit twrite ['Unable to create subdirectory:  {}\n',  workdir];
-        endif
-    endif
-
-    write ['Persistent File:  {}\n', perfile];
-    write ['Work Dir:  {}\n', workdir];
-
-    // process the fields in the QMScore mdb file and strip out the stuff we added
-    local [fields, field_types] = db_Fields dbkey;  
-    local nonQBfields = fields | (field_types <> 'molecule');
-    nonQBfields = diff [nonQBfields,totok cat [qb_GetCoreFields[], qb_GetQMS_dbFields[]] ];
-
-    //  exe_open child process inherits parent's environment.
-    local process_key = exe_open ['moedivconmpi', workdir, [], 1];
-    local process_keys = [process_key];
-    local exestatus = exe_status process_keys;
-
-    local prios = exe_getpriority process_keys;
-    exe_setpriority [process_keys, prios];
-
-    local stdin = exe_stdin process_keys;
-    local stdout = exe_stdout process_keys;
-    local stderr = exe_stderr process_keys;
-
-    //  Pass down the dirs, options and number of possible jobs.
-    fwrite [stdin, '{c:}\n', perfile];
-    fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', qmsopts.analpwd]];
-    fwrite [stdin, '{c:}\n', select ['COMPRESSION', 'NOCOMPRESSION', 1]];
-    fwrite [stdin, '{c:}\n', select ['PERSISTCOMPLEXDENSITY', 'NOPERSISTCOMPLEXDENSITY', 0]];
-    fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
-    fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD', coreopts.scaling === 1]];
-    fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', qmsopts.freq]];
-    fwrite [stdin, '{c:}\n', LIG_KEYS(qmsopts.opt)];
-    fwrite [stdin, '{n:}\n', qmsopts.shift];
-    fwrite [stdin, '{n:}\n', nrows];
-
-    //  For each receptor/pose in the database, check tests, then send down
-    //  to moedivconmpi
-    qb_HamSetsInit [];
-    local rowkey = 0, rowcnt = 0, numokay = 0, warnings = [];
-    local recchg = coreopts.recchg;
-    local ligchg = coreopts.ligchg;
-    for rowkey in dbrowkeys loop
-        local errmess = "", success = 0;
-        rowcnt = rowcnt + 1;
-
-        local oldstatus = qb_GetDivConStatus [dbkey, rowkey];
-        if  eqL ["Success", keep [oldstatus, 7]] then
-            write ['Skipping on success pose {} of {}\n', rowcnt, nrows];
-            fwrite [stdin, '{n:}\n', 0];            //  skipping
-            continue;
-        endif
-
-        coreopts.task = rowcnt;
-        [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
-        
-        if indexof [fields, recflds(1)] then
-            [recmol, recchg] = db_ReadFields [dbkey, rowkey, recflds];
-        endif
-        
-        coreopts.recchg = recchg;
-        coreopts.ligchg = ligchg;
-        
-        local nonQBtagged = tag [nonQBfields, db_ReadFields [dbkey,rowkey,nonQBfields]];
-        
-        //  Run all error tests unless forced not to do so by user.
-        local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
-            = qb_CheckChgTestDivConComplex [recmol, coreopts.recchg, ligmol, coreopts.ligchg,
-                status.notforced, status.notforced, status.notforced,
-                coreopts.testH, coreopts.testMM, 'qms',
-                HAM_KEYS (coreopts.ham)];
-
-        if alltrue [recok, recchgok, ligok, ligchgok] then
-            numokay = numokay + 1;
-
-            //  Pass the two backbones to QuantumBio's DivCon QMScore
-            write ['Sending pose {} of {}\n', rowcnt, nrows];
-            fwrite [stdin, '{n:}\n', rowcnt];
-
-			// we already did the work of figuring out which is receptor and which is ligand.
-			// @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
-			recressets = mol_Create recmol;
-			ligressets = mol_Create ligmol;
-
-            fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
-            fwrite [stdin, '{n:}\n', recchg];
-			qb_PassBackbone [stdout, stdin, recressets];
-            qb_PassValues [stdout, stdin, [] ];
-
-            fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
-            fwrite [stdin, '{n:}\n', ligchg];
-			qb_PassBackbone [stdout, stdin, ligressets];
-            qb_PassValues [stdout, stdin, nonQBtagged ];
-
-            warnings (rowcnt) = ckmsg;
-
-        else
-            if not alltrue [recok, ligok] then
-                if tok_length ckmsg > 0 then
-                    errmess = cat [errmess, swrite ['Skipping!\n{}', ckmsg]];
-                    errmess = droplast errmess;  //drop the extra newline
-                else
-                    errmess = cat [errmess, 
-                        swrite ['Problematic molecule in {}, skipping!\n',
-                        qb_GetWhich [not recok, not ligok]]];
-                endif
-            endif
-
-            if not alltrue [recchgok, ligchgok] then
-                errmess =  cat [errmess, 
-                    swrite ['Problematic charge for {}, skipping!', 
-                    qb_GetWhich [not recchgok, not ligchgok]]];
-            endif
-
-            qb_SaveDivConStatus [dbkey, rowkey, 
-                swrite ['Error:  {}\n', errmess]];
-            write ['Skipping pose {} of {}\n', rowcnt, nrows];
-            write ['QMScore Error:  {}\n', errmess];
-
-            fwrite [stdin, '{n:}\n', 0];            //  skipping
-        endif
-
-        oDestroy uniq cat oChains cat recressets;
-        oDestroy uniq cat oChains cat ligressets;
-    endloop
-
-    //  Abort if there are no results to collect
-    if numokay === 0 then
-        fwrite [stdin, '{c:}\n', 'Ok'];
-        exe_kill  [process_key, 0];
-        exe_kill  process_key;
-        exe_close process_keys;
-        db_Close dbkey;
-        exit [];
-    endif
-
-    //  Collect and store results
-    const NUMRESULTS = 11;
-    local result_ith = 0;
-    local status_length=0;
-    while exe_status process_key and result_ith <= numokay loop
-        local results = [], return_statement = [];
+        local results = [];
+        local return_statement = [];
         local divconerrmess = "";
+        
+        const NUMRESULTS = 11;
+        local status_length=0;
+        local rowcnt;
+        
+        local dbrowkeys = db_Entries [dbkey];
 
         [[return_statement]] = fread [stdout, '{c:*}'];
 
@@ -344,12 +174,213 @@ global function qb_QMScoreMPI [dbpath, jobid]
         elseif return_statement === "DivCon done." then
             print ['return_statement at DivCon done. Sending Ok '];
             fwrite [stdin, '{c:}\n', 'Ok'];
-            break;
+            return;
 
         else
             write ['what is: {}\n', return_statement];  //  abort?
         endif
 
+endfunction
+
+
+/****************************************************************************
+ *                          qb_QMScoreMPI
+ *
+ *  Pass all of the jobs in the database down to moedivconmpi, then collect
+ *  all of the results.
+ *
+ *
+****************************************************************************/
+global function qb_QMScoreMPI [dbpath, jobid]
+
+//    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
+
+// NEED MAC VERSION
+local qboldversion = 1;
+
+    //  Extract molecules and run options from the database environment
+    if neL [fext dbpath, 'mdb'] then
+        exit twrite ['{}\nis not a MOE database.', dbpath];
+    endif
+
+    if neL [ftype dbpath, 'file'] then
+        exit twrite ['Unable to find the database:\n    {}', dbpath];
+    endif
+
+    local dbkey = db_Open [dbpath, 'read-write'];
+    local [recmol, ligmol, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
+    local ligflds = qb_GetPoseFields [];
+    local recflds = qb_GetRecFields [];
+    local dbrowkeys = db_Entries [dbkey];
+    local nrows = db_nEntries [dbkey];
+
+    local currdir = getenv 'PWD';
+    local perpath = fpath dbpath;
+    local pertail = fbase ftail dbpath;
+    local perfile = twrite ['{}/{}.h5', perpath, pertail];
+    local workdir = select [currdir, fabsname coreopts.workdir, coreopts.cwd];
+
+    if not isnull jobid then
+        workdir = twrite ['{}/{}', workdir, jobid];
+        local okay = _fmkdir workdir;
+        if okay === -1 then
+            exit twrite ['Unable to create subdirectory:  {}\n',  workdir];
+        endif
+    endif
+
+    write ['Persistent File:  {}\n', perfile];
+    write ['Work Dir:  {}\n', workdir];
+
+    // process the fields in the QMScore mdb file and strip out the stuff we added
+    local [fields, field_types] = db_Fields dbkey;  
+    local nonQBfields = fields | (field_types <> 'molecule');
+    nonQBfields = diff [nonQBfields,totok cat [qb_GetCoreFields[], qb_GetQMS_dbFields[]] ];
+
+    //  exe_open child process inherits parent's environment.
+    local process_key = exe_open ['moedivconmpi', workdir, [], 1];
+    local process_keys = [process_key];
+    local exestatus = exe_status process_keys;
+
+    local prios = exe_getpriority process_keys;
+    exe_setpriority [process_keys, prios];
+
+    local stdin = exe_stdin process_keys;
+    local stdout = exe_stdout process_keys;
+    local stderr = exe_stderr process_keys;
+
+    //  Pass down the dirs, options and number of possible jobs.
+    fwrite [stdin, '{c:}\n', perfile];
+    fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', qmsopts.analpwd]];
+if not qboldversion then
+    fwrite [stdin, '{c:}\n', select ['COMPRESSION', 'NOCOMPRESSION', 1]];
+    fwrite [stdin, '{c:}\n', select ['PERSISTCOMPLEXDENSITY', 'NOPERSISTCOMPLEXDENSITY', 0]];
+endif
+    fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
+    fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD', coreopts.scaling === 1]];
+    fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', qmsopts.freq]];
+    fwrite [stdin, '{c:}\n', LIG_KEYS(qmsopts.opt)];
+    fwrite [stdin, '{n:}\n', qmsopts.shift];
+    fwrite [stdin, '{n:}\n', nrows];
+
+    //  For each receptor/pose in the database, check tests, then send down
+    //  to moedivconmpi
+    qb_HamSetsInit [];
+    local rowkey = 0, rowcnt = 0, numokay = 0, warnings = [];
+    local recchg = coreopts.recchg;
+    local ligchg = coreopts.ligchg;
+    for rowkey in dbrowkeys loop
+        local errmess = "", success = 0;
+        rowcnt = rowcnt + 1;
+
+        local oldstatus = qb_GetDivConStatus [dbkey, rowkey];
+        if  eqL ["Success", keep [oldstatus, 7]] then
+            write ['Skipping on success pose {} of {}\n', rowcnt, nrows];
+            fwrite [stdin, '{n:}\n', 0];            //  skipping
+            continue;
+        endif
+
+        coreopts.task = rowcnt;
+        [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
+        
+        if indexof [recflds(1), fields] then
+            [recmol, recchg] = db_ReadFields [dbkey, rowkey, recflds];
+        endif
+        
+        coreopts.recchg = recchg;
+        coreopts.ligchg = ligchg;
+        
+        local nonQBtagged = tag [nonQBfields, db_ReadFields [dbkey,rowkey,nonQBfields]];
+        
+        //  Run all error tests unless forced not to do so by user.
+        local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
+            = qb_CheckChgTestDivConComplex [recmol, coreopts.recchg, ligmol, coreopts.ligchg,
+                status.notforced, status.notforced, status.notforced,
+                coreopts.testH, coreopts.testMM, 'qms',
+                HAM_KEYS (coreopts.ham)];
+
+        if alltrue [recok, recchgok, ligok, ligchgok] then
+            numokay = numokay + 1;
+
+            //  Pass the two backbones to QuantumBio's DivCon QMScore
+            write ['Sending pose {} of {}\n', rowcnt, nrows];
+            fwrite [stdin, '{n:}\n', rowcnt];
+
+if qboldversion then
+    fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
+    fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
+    fwrite [stdin, '{n:}\n', recchg];
+    fwrite [stdin, '{n:}\n', ligchg];
+endif
+
+			// we already did the work of figuring out which is receptor and which is ligand.
+			// @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
+			recressets = mol_Create recmol;
+			ligressets = mol_Create ligmol;
+
+if not qboldversion then
+            fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
+            fwrite [stdin, '{n:}\n', recchg];
+endif
+			qb_PassBackbone [stdout, stdin, recressets];
+if not qboldversion then
+            qb_PassValues [stdout, stdin, [] ];
+
+            fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
+            fwrite [stdin, '{n:}\n', ligchg];
+endif
+			qb_PassBackbone [stdout, stdin, ligressets];
+if not qboldversion then
+            qb_PassValues [stdout, stdin, nonQBtagged ];
+endif
+
+            warnings (rowcnt) = ckmsg;
+
+        else
+            if not alltrue [recok, ligok] then
+                if tok_length ckmsg > 0 then
+                    errmess = cat [errmess, swrite ['Skipping!\n{}', ckmsg]];
+                    errmess = droplast errmess;  //drop the extra newline
+                else
+                    errmess = cat [errmess, 
+                        swrite ['Problematic molecule in {}, skipping!\n',
+                        qb_GetWhich [not recok, not ligok]]];
+                endif
+            endif
+
+            if not alltrue [recchgok, ligchgok] then
+                errmess =  cat [errmess, 
+                    swrite ['Problematic charge for {}, skipping!', 
+                    qb_GetWhich [not recchgok, not ligchgok]]];
+            endif
+
+            qb_SaveDivConStatus [dbkey, rowkey, 
+                swrite ['Error:  {}\n', errmess]];
+            write ['Skipping pose {} of {}\n', rowcnt, nrows];
+            write ['QMScore Error:  {}\n', errmess];
+
+            fwrite [stdin, '{n:}\n', 0];            //  skipping
+        endif
+
+        oDestroy uniq cat oChains cat recressets;
+        oDestroy uniq cat oChains cat ligressets;
+    endloop
+
+    //  Abort if there are no results to collect
+    if numokay === 0 then
+        fwrite [stdin, '{c:}\n', 'Ok'];
+        exe_kill  [process_key, 0];
+        exe_kill  process_key;
+        exe_close process_keys;
+        db_Close dbkey;
+        exit [];
+    endif
+
+    //  Collect and store results
+    local result_ith = 0;
+    while exe_status process_key and result_ith <= numokay loop
+
+        ManageMOEDivConMPI[stdout,stdin,warnings,dbkey,result_ith,numokay];
+        
     endloop
 
     //  Look for error messages from stderr.
