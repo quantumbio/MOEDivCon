@@ -196,7 +196,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
 //    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
 
 // NEED MAC VERSION
-local qboldversion = 1;
+local qboldversion = 0;
 
     //  Extract molecules and run options from the database environment
     if neL [fext dbpath, 'mdb'] then
