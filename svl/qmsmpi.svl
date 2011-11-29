@@ -380,7 +380,7 @@ endfunction
  *
 ****************************************************************************/
 global function qb_QMScoreMPI [dbpath, jobid]
-qboldversion = 1;
+qboldversion = 0;
 sleep 1;
     local [osys, nsys] = SystemPush [];
 //    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
