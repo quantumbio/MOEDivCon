@@ -288,16 +288,99 @@ local function ShutdownMOEDivConQMScore [process_keys]
     exe_close process_keys;
 endfunction
 
+local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,rowcnt,dbkey,rowkey,numokay,warnings]
+
+    local recchg = coreopts.recchg;
+    local ligchg = coreopts.ligchg;
+    local dbrowkeys = db_Entries [dbkey];
+    local nrows = length dbrowkeys;
+    local errmess = "";
+
+    //  Run all error tests unless forced not to do so by user.
+    local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
+        = qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,
+            status.notforced, status.notforced, status.notforced,
+            coreopts.testH, coreopts.testMM, 'qms',
+            HAM_KEYS (coreopts.ham)];
+
+    if alltrue [recok, recchgok, ligok, ligchgok] then
+        numokay = numokay + 1;
+
+        //  Pass the two backbones to QuantumBio's DivCon QMScore
+        write ['Sending pose {} of {}\n', rowcnt, nrows];
+        fwrite [stdin, '{n:}\n', rowcnt];
+
+if qboldversion then
+fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
+fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
+fwrite [stdin, '{n:}\n', recchg];
+fwrite [stdin, '{n:}\n', ligchg];
+endif
+
+        // we already did the work of figuring out which is receptor and which is ligand.
+        // @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
+        recressets = mol_Create recmol;
+        ligressets = mol_Create ligmol;
+
+if not qboldversion then
+        fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
+        fwrite [stdin, '{n:}\n', recchg];
+endif
+        qb_PassBackbone [stdout, stdin, recressets];
+if not qboldversion then
+        qb_PassValues [stdout, stdin, [] ];
+
+        fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
+        fwrite [stdin, '{n:}\n', ligchg];
+endif
+        qb_PassBackbone [stdout, stdin, ligressets];
+if not qboldversion then
+        qb_PassValues [stdout, stdin, nonQBtagged ];
+endif
+
+        warnings (rowcnt) = ckmsg;
+
+    else
+        if not alltrue [recok, ligok] then
+            if tok_length ckmsg > 0 then
+                errmess = cat [errmess, swrite ['Skipping!\n{}', ckmsg]];
+                errmess = droplast errmess;  //drop the extra newline
+            else
+                errmess = cat [errmess, 
+                    swrite ['Problematic molecule in {}, skipping!\n',
+                    qb_GetWhich [not recok, not ligok]]];
+            endif
+        endif
+
+        if not alltrue [recchgok, ligchgok] then
+            errmess =  cat [errmess, 
+                swrite ['Problematic charge for {}, skipping!', 
+                qb_GetWhich [not recchgok, not ligchgok]]];
+        endif
+
+        qb_SaveDivConStatus [dbkey, rowkey, swrite ['Error:  {}\n', errmess]];
+        write ['Skipping pose {} of {}\n', rowcnt, nrows];
+        write ['QMScore Error:  {}\n', errmess];
+
+        fwrite [stdin, '{n:}\n', 0];            //  skipping
+    endif
+
+    oDestroy uniq cat oChains cat recressets;
+    oDestroy uniq cat oChains cat ligressets;
+    
+    return [warnings,numokay];
+    
+endfunction
+
 /****************************************************************************
  *                          qb_QMScoreMPI
  *
  *  Pass all of the jobs in the database down to moedivconmpi, then collect
  *  all of the results.
  *
- *
 ****************************************************************************/
 global function qb_QMScoreMPI [dbpath, jobid]
-qboldversion = 0;
+qboldversion = 1;
 //    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
 
     //  Extract molecules and run options from the database environment
@@ -368,78 +451,8 @@ qboldversion = 0;
         
         local nonQBtagged = tag [nonQBfields, db_ReadFields [dbkey,rowkey,nonQBfields]];
         
-        //  Run all error tests unless forced not to do so by user.
-        local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
-            = qb_CheckChgTestDivConComplex [recmol, coreopts.recchg, ligmol, coreopts.ligchg,
-                status.notforced, status.notforced, status.notforced,
-                coreopts.testH, coreopts.testMM, 'qms',
-                HAM_KEYS (coreopts.ham)];
+        [warnings,numokay] = SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,rowcnt,dbkey,rowkey,numokay,warnings];
 
-        if alltrue [recok, recchgok, ligok, ligchgok] then
-            numokay = numokay + 1;
-
-            //  Pass the two backbones to QuantumBio's DivCon QMScore
-            write ['Sending pose {} of {}\n', rowcnt, nrows];
-            fwrite [stdin, '{n:}\n', rowcnt];
-
-if qboldversion then
-    fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
-    fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
-    fwrite [stdin, '{n:}\n', recchg];
-    fwrite [stdin, '{n:}\n', ligchg];
-endif
-
-			// we already did the work of figuring out which is receptor and which is ligand.
-			// @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
-			recressets = mol_Create recmol;
-			ligressets = mol_Create ligmol;
-
-if not qboldversion then
-            fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
-            fwrite [stdin, '{n:}\n', recchg];
-endif
-			qb_PassBackbone [stdout, stdin, recressets];
-if not qboldversion then
-            qb_PassValues [stdout, stdin, [] ];
-
-            fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
-            fwrite [stdin, '{n:}\n', ligchg];
-endif
-			qb_PassBackbone [stdout, stdin, ligressets];
-if not qboldversion then
-            qb_PassValues [stdout, stdin, nonQBtagged ];
-endif
-
-            warnings (rowcnt) = ckmsg;
-
-        else
-            if not alltrue [recok, ligok] then
-                if tok_length ckmsg > 0 then
-                    errmess = cat [errmess, swrite ['Skipping!\n{}', ckmsg]];
-                    errmess = droplast errmess;  //drop the extra newline
-                else
-                    errmess = cat [errmess, 
-                        swrite ['Problematic molecule in {}, skipping!\n',
-                        qb_GetWhich [not recok, not ligok]]];
-                endif
-            endif
-
-            if not alltrue [recchgok, ligchgok] then
-                errmess =  cat [errmess, 
-                    swrite ['Problematic charge for {}, skipping!', 
-                    qb_GetWhich [not recchgok, not ligchgok]]];
-            endif
-
-            qb_SaveDivConStatus [dbkey, rowkey, 
-                swrite ['Error:  {}\n', errmess]];
-            write ['Skipping pose {} of {}\n', rowcnt, nrows];
-            write ['QMScore Error:  {}\n', errmess];
-
-            fwrite [stdin, '{n:}\n', 0];            //  skipping
-        endif
-
-        oDestroy uniq cat oChains cat recressets;
-        oDestroy uniq cat oChains cat ligressets;
     endloop
 
     //  Abort if there are no results to collect
