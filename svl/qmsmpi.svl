@@ -249,7 +249,7 @@ local function InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts]
 
     //  exe_open child process inherits parent's environment.
     local process_key;
-    if not MOE_BATCH then
+    if MOE_BATCH then
         process_key = exe_open ['moedivconmpi', workdir, [], 1];
     else
         process_key = exe_open ['moedivconscoring', workdir, [], 0];
@@ -467,7 +467,7 @@ sleep 1;
 
     //  Collect and store results
 
-    if not MOE_BATCH then
+    if MOE_BATCH then
         ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numokay];
     else
         ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,numokay];
