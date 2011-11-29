@@ -249,7 +249,7 @@ local function InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts]
 
     //  exe_open child process inherits parent's environment.
     local process_key;
-    if MOE_BATCH then
+    if not MOE_BATCH then
         process_key = exe_open ['moedivconmpi', workdir, [], 1];
     else
         process_key = exe_open ['moedivconscoring', workdir, [], 0];
@@ -380,7 +380,7 @@ endfunction
  *
 ****************************************************************************/
 global function qb_QMScoreMPI [dbpath, jobid]
-qboldversion = 1;
+qboldversion = 0;
 //    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
 
     //  Extract molecules and run options from the database environment
@@ -465,7 +465,7 @@ qboldversion = 1;
 
     //  Collect and store results
 
-    if MOE_BATCH then
+    if not MOE_BATCH then
         ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numokay];
     else
         ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,numokay];
