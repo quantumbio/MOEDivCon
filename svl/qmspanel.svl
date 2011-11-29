@@ -569,9 +569,8 @@ global function qb_QMScoreSetupPanel []
 */
                     local dbFileName = db_Filename dbkey;
                     db_Close dbkey;
-                    qb_QMScoreMPI[dbFileName];
-
                     dbv_Open dbFileName;
+                    qb_QMScoreMPI[dbFileName];
 
                     exit [];
                 else

@@ -380,9 +380,10 @@ endfunction
  *
 ****************************************************************************/
 global function qb_QMScoreMPI [dbpath, jobid]
-qboldversion = 0;
+qboldversion = 1;
+sleep 1;
+    local [osys, nsys] = SystemPush [];
 //    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
-
     //  Extract molecules and run options from the database environment
     if neL [fext dbpath, 'mdb'] then
         exit twrite ['{}\nis not a MOE database.', dbpath];
@@ -392,7 +393,8 @@ qboldversion = 0;
         exit twrite ['Unable to find the database:\n    {}', dbpath];
     endif
 
-    local dbkey = db_Open [dbpath, 'read-write'];
+//    local dbkey = db_Open [dbpath, 'read-write'];
+    local dbkey = dbpath;
     local [recmol, ligmol, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
     local ligflds = qb_GetPoseFields [];
     local recflds = qb_GetRecFields [];
@@ -459,7 +461,7 @@ qboldversion = 0;
     if numokay === 0 then
         fwrite [stdin, '{c:}\n', 'Ok'];
         ShutdownMOEDivConQMScore[process_keys];
-        db_Close dbkey;
+//        db_Close dbkey;
         exit [];
     endif
 
@@ -489,7 +491,7 @@ qboldversion = 0;
 
     ShutdownMOEDivConQMScore[process_keys];
     
-    db_Close dbkey;
-
+//    db_Close dbkey;
+    SystemPop [osys, nsys];
 endfunction
 
