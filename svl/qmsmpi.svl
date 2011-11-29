@@ -297,7 +297,7 @@ endfunction
  *
 ****************************************************************************/
 global function qb_QMScoreMPI [dbpath, jobid]
-qboldversion = 1;
+qboldversion = 0;
 //    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
 
     //  Extract molecules and run options from the database environment
