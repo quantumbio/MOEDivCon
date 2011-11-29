@@ -70,18 +70,20 @@ const LIG_KEYS =
     'COMPLEXOPT'
     ];
 
-local function ManageMOEDivConMPI[stdout,stdin,warnings,dbkey,result_ith,numokay]
+local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numokay]
 
-        local results = [];
-        local return_statement = [];
-        local divconerrmess = "";
-        
-        const NUMRESULTS = 11;
-        local status_length=0;
-        local rowcnt;
-        
-        local dbrowkeys = db_Entries [dbkey];
+    local results = [];
+    local return_statement = [];
+    local divconerrmess = "";
+    
+    const NUMRESULTS = 11;
+    local status_length=0;
+    local rowcnt;
+    
+    local dbrowkeys = db_Entries [dbkey];
 
+    local result_ith = 0;
+    while exe_status process_keys(1) and result_ith <= numokay loop
         [[return_statement]] = fread [stdout, '{c:*}'];
 
         write ['DivCon: {}\n', return_statement];//DEBUG
@@ -181,7 +183,63 @@ local function ManageMOEDivConMPI[stdout,stdin,warnings,dbkey,result_ith,numokay
         else
             write ['what is: {}\n', return_statement];  //  abort?
         endif
+    endloop
+    
+endfunction
 
+local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,numokay]
+
+    local results = [];
+    local return_statement = [];
+    local divconerrmess = "";
+    
+    const NUMRESULTS = 11;
+    local status_length=0;
+    
+    local success = 0;
+    
+    local sleep_time = 0.1;
+
+    while exe_status process_keys(1) loop
+        fwrite [stdin, '{c:}\n', 'status'];
+        [[return_statement]] = fread [stdout, '{c:*}'];
+
+        if return_statement === "noupdate" then
+        elseif return_statement === "running" then
+	    [[status_length]] = fread [stdout, '{n:}'];
+            for status_length loop
+                [[return_statement]] = fread [stdout, '{c:*}'];
+                write ['    running | {}\n', return_statement];
+            endloop
+        elseif return_statement === "success" then
+            local name, nameValue;
+            local parameter, parameterValue;
+            [[name]] = fread [stdout, '{c:*}'];
+            [[nameValue]] = fread [stdout, '{c:*}'];
+            results = cat [results, [[name, nameValue]]];
+            for NUMRESULTS loop
+                [[parameter]] = fread [stdout, '{c:*}'];
+                [[parameterValue]] = fread [stdout, '{n:}'];
+                results = cat [results, [[parameter, parameterValue]]];
+            endloop
+            success = 1;
+            fwrite [stdin, '{c:}\n', 'Ok'];
+
+        elseif return_statement === "error" then
+            [[return_statement]] = fread [stdout, '{c:*}'];
+            if neL [return_statement, "DivCon done."] then
+                divconerrmess = cat [divconerrmess, return_statement];
+                [[return_statement]] = fread [stdout, '{c:*}'];
+            endif
+            while neL [return_statement, "DivCon done."] loop
+                divconerrmess = cat [divconerrmess, "\n", return_statement];
+                [[return_statement]] = fread [stdout, '{c:*}'];
+            endloop;
+            fwrite [stdin, '{c:}\n', 'Ok'];
+        endif
+        sleep sleep_time;
+    endloop
+    return success;
 endfunction
 
 local function InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts]
@@ -189,9 +247,14 @@ local function InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts]
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
-
     //  exe_open child process inherits parent's environment.
-    local process_key = exe_open ['moedivconmpi', workdir, [], 1];
+    local process_key;
+    if MOE_BATCH then
+        process_key = exe_open ['moedivconmpi', workdir, [], 1];
+    else
+        process_key = exe_open ['moedivconscoring', workdir, [], 0];
+    endif
+    
     local process_keys = [process_key];
     local exestatus = exe_status process_keys;
 
@@ -219,6 +282,11 @@ endif
     return [process_keys,stdin,stdout,stderr];
 endfunction
 
+local function ShutdownMOEDivConQMScore [process_keys]
+    exe_kill  [process_keys(1), 0];
+    exe_kill  process_keys(1);
+    exe_close process_keys;
+endfunction
 
 /****************************************************************************
  *                          qb_QMScoreMPI
@@ -229,7 +297,7 @@ endfunction
  *
 ****************************************************************************/
 global function qb_QMScoreMPI [dbpath, jobid]
-qboldversion = 0;
+qboldversion = 1;
 //    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
 
     //  Extract molecules and run options from the database environment
@@ -247,12 +315,14 @@ qboldversion = 0;
     local recflds = qb_GetRecFields [];
     local dbrowkeys = db_Entries [dbkey];
     local nrows = db_nEntries [dbkey];
-
-    local currdir = getenv 'PWD';
-    local perpath = fpath dbpath;
+    
+    local workdir = cd [];
     local pertail = fbase ftail dbpath;
-    local perfile = twrite ['{}/{}.h5', perpath, pertail];
-    local workdir = select [currdir, fabsname coreopts.workdir, coreopts.cwd];
+    local perfile = twrite ['{}/{}.h5', workdir, pertail];
+    
+//    local currdir = getenv 'PWD';
+//    local perpath = fpath dbpath;
+//    local workdir = select [currdir, fabsname coreopts.workdir, coreopts.cwd];
 
     if not isnull jobid then
         workdir = twrite ['{}/{}', workdir, jobid];
@@ -375,20 +445,18 @@ endif
     //  Abort if there are no results to collect
     if numokay === 0 then
         fwrite [stdin, '{c:}\n', 'Ok'];
-        exe_kill  [process_keys(1), 0];
-        exe_kill  process_keys(1);
-        exe_close process_keys;
+        ShutdownMOEDivConQMScore[process_keys];
         db_Close dbkey;
         exit [];
     endif
 
     //  Collect and store results
-    local result_ith = 0;
-    while exe_status process_keys(1) and result_ith <= numokay loop
 
-        ManageMOEDivConMPI[stdout,stdin,warnings,dbkey,result_ith,numokay];
-        
-    endloop
+    if MOE_BATCH then
+        ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numokay];
+    else
+        ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,numokay];
+    endif
 
     //  Look for error messages from stderr.
     errmess = "";
@@ -406,10 +474,8 @@ endif
         [[newerror]] = fread [stderr, '{c:*}'];
     endloop
 
-    exe_kill  [process_keys(1), 0];
-    exe_kill  process_keys(1);
-    exe_close process_keys;
-
+    ShutdownMOEDivConQMScore[process_keys];
+    
     db_Close dbkey;
 
 endfunction
