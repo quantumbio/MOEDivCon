@@ -84,6 +84,7 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
 
     local result_ith = 0;
     while exe_status process_keys(1) and result_ith <= numokay loop
+        results = [];
         [[return_statement]] = fread [stdout, '{c:*}'];
 
         write ['DivCon: {}\n', return_statement];//DEBUG
@@ -99,7 +100,6 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
             endloop
             fwrite [stdin, '{c:}\n', 'Ok'];
         elseif return_statement === "success" then
-
             [[rowcnt]] = fread [stdout, '{n:}'];
             write ['Getting results for pose {} ({} of {})\n', rowcnt, 
                 result_ith, numokay];
@@ -116,7 +116,7 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
             endloop
 
             fwrite [stdin, '{c:}\n', 'Ok'];
-
+write ['dbrowkeys(rowcnt): {}|{}\n',dbrowkeys(rowcnt),results];
             qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
             local sucmess = "Success";
             if not isnull  warnings (rowcnt)
@@ -199,8 +199,11 @@ local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,n
     local success = 0;
     
     local sleep_time = 0.1;
-
+write ['entering status loop\n'];
+local loop_cnt = 0;
     while exe_status process_keys(1) loop
+        results = [];
+loop_cnt = loop_cnt + 1;
         fwrite [stdin, '{c:}\n', 'status'];
         [[return_statement]] = fread [stdout, '{c:*}'];
 
@@ -238,6 +241,7 @@ local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,n
             fwrite [stdin, '{c:}\n', 'Ok'];
         endif
         sleep sleep_time;
+write ['current loopcnt: {}\n',loop_cnt];
     endloop
     return success;
 endfunction
@@ -337,7 +341,7 @@ endif
 if not qboldversion then
         qb_PassValues [stdout, stdin, nonQBtagged ];
 endif
-
+write ['everything passed ... moving on\n'];
         warnings (rowcnt) = ckmsg;
 
     else
