@@ -44,10 +44,6 @@ function qb_PassValues;
 function qb_GetCoreFields;
 function qb_GetQMS_dbFields;
 
-// NEED MAC VERSION
-global qboldversion;
-
-
 /*  NOTE:  If you change the key lists here, you need to update the
  *         option lists and default indices in qbcore.svl and qmspanel.svl.
            The unused Hamilitonians were masked when the core was created.
@@ -272,10 +268,8 @@ local function InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts]
     //  Pass down the dirs, options and number of possible jobs.
     fwrite [stdin, '{c:}\n', perfile];
     fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', qmsopts.analpwd]];
-if not qboldversion then
     fwrite [stdin, '{c:}\n', select ['COMPRESSION', 'NOCOMPRESSION', 1]];
     fwrite [stdin, '{c:}\n', select ['PERSISTCOMPLEXDENSITY', 'NOPERSISTCOMPLEXDENSITY', 0]];
-endif
     fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
     fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD', coreopts.scaling === 1]];
     fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', qmsopts.freq]];
@@ -314,33 +308,20 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
         write ['Sending pose {} of {}\n', rowcnt, nrows];
         fwrite [stdin, '{n:}\n', rowcnt];
 
-if qboldversion then
-fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
-fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
-fwrite [stdin, '{n:}\n', recchg];
-fwrite [stdin, '{n:}\n', ligchg];
-endif
-
         // we already did the work of figuring out which is receptor and which is ligand.
         // @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
         recressets = mol_Create recmol;
         ligressets = mol_Create ligmol;
 
-if not qboldversion then
         fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
         fwrite [stdin, '{n:}\n', recchg];
-endif
         qb_PassBackbone [stdout, stdin, recressets];
-if not qboldversion then
         qb_PassValues [stdout, stdin, [] ];
 
         fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
         fwrite [stdin, '{n:}\n', ligchg];
-endif
         qb_PassBackbone [stdout, stdin, ligressets];
-if not qboldversion then
         qb_PassValues [stdout, stdin, nonQBtagged ];
-endif
 write ['everything passed ... moving on\n'];
         warnings (rowcnt) = ckmsg;
 
@@ -384,8 +365,7 @@ endfunction
  *
 ****************************************************************************/
 global function qb_QMScoreMPI [dbpath, jobid]
-qboldversion = 0;
-sleep 1;
+    sleep 1;    // allows previous script to open the right mdb file for monitoring.
     local [osys, nsys] = SystemPush [];
 //    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
     //  Extract molecules and run options from the database environment
