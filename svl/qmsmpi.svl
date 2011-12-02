@@ -112,7 +112,6 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
             endloop
 
             fwrite [stdin, '{c:}\n', 'Ok'];
-write ['dbrowkeys(rowcnt): {}|{}\n',dbrowkeys(rowcnt),results];
             qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
             local sucmess = "Success";
             if not isnull  warnings (rowcnt)
@@ -183,7 +182,7 @@ write ['dbrowkeys(rowcnt): {}|{}\n',dbrowkeys(rowcnt),results];
     
 endfunction
 
-local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,numokay]
+local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,rowcnt]
 
     local results = [];
     local return_statement = [];
@@ -191,6 +190,9 @@ local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,n
     
     const NUMRESULTS = 11;
     local status_length=0;
+//    local rowcnt;
+    
+    local dbrowkeys = db_Entries [dbkey];
     
     local success = 0;
     
@@ -199,10 +201,11 @@ write ['entering status loop\n'];
 local loop_cnt = 0;
     while exe_status process_keys(1) loop
         results = [];
-loop_cnt = loop_cnt + 1;
+// loop_cnt = loop_cnt + 1;
         fwrite [stdin, '{c:}\n', 'status'];
         [[return_statement]] = fread [stdout, '{c:*}'];
 
+write ['return_statement: {}\n', return_statement];
         if return_statement === "noupdate" then
         elseif return_statement === "running" then
 	    [[status_length]] = fread [stdout, '{n:}'];
@@ -224,6 +227,20 @@ loop_cnt = loop_cnt + 1;
             success = 1;
             fwrite [stdin, '{c:}\n', 'Ok'];
 
+write ['about to send results to {} for row {} ... results: {}\n', dbkey, rowcnt, results];
+            qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
+            local sucmess = "Success";
+            if not isnull  warnings (rowcnt)
+                    and neL [warnings (rowcnt), '']
+                    and neL [warnings (rowcnt), '\n'] then
+
+                sucmess = cat [sucmess, "-warnings!\n", string warnings (rowcnt)];
+            else
+                sucmess = cat [sucmess, "\n"];
+            endif
+write ['about to send results to {} for row {} ... results: {}\n', dbkey, rowcnt, sucmess];
+            qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), sucmess];
+
         elseif return_statement === "error" then
             [[return_statement]] = fread [stdout, '{c:*}'];
             if neL [return_statement, "DivCon done."] then
@@ -237,7 +254,7 @@ loop_cnt = loop_cnt + 1;
             fwrite [stdin, '{c:}\n', 'Ok'];
         endif
         sleep sleep_time;
-write ['current loopcnt: {}\n',loop_cnt];
+// write ['current loopcnt: {}\n',loop_cnt];
     endloop
     return success;
 endfunction
@@ -439,6 +456,11 @@ global function qb_QMScoreMPI [dbpath, jobid]
         
         [warnings,numokay] = SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,rowcnt,dbkey,rowkey,numokay,warnings];
 
+        if not MOE_BATCH then
+//        numokay
+            ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,rowcnt];
+        endif
+
     endloop
 
     //  Abort if there are no results to collect
@@ -453,8 +475,8 @@ global function qb_QMScoreMPI [dbpath, jobid]
 
     if MOE_BATCH then
         ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numokay];
-    else
-        ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,numokay];
+//    else
+//        ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,numokay];
     endif
 
     //  Look for error messages from stderr.
