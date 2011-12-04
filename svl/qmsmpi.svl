@@ -27,7 +27,7 @@
 #set title   'QuantumBio QMScore MPI'
 #set class   'QuantumBio'
 #set version '2010.01'
-#set main    'qb_QMScoreMPI'
+#set main    'qb_QMScoreMDB'
 
 function qb_CheckChgTestDivConComplex;
 function qb_GetDivConStatus;
@@ -380,13 +380,13 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
 endfunction
 
 /****************************************************************************
- *                          qb_QMScoreMPI
+ *                          qb_QMScoreMDB
  *
  *  Pass all of the jobs in the database down to moedivconmpi, then collect
  *  all of the results.
  *
 ****************************************************************************/
-global function qb_QMScoreMPI [dbpath, jobid]
+global function qb_QMScoreMDB [dbpath, jobid]
     sleep 1;    // allows previous script to open the right mdb file for monitoring.
     local [osys, nsys] = SystemPush [];
     //  Extract molecules and run options from the database environment
