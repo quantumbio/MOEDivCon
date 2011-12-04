@@ -83,12 +83,10 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
         results = [];
         [[return_statement]] = fread [stdout, '{c:*}'];
 
-        write ['DivCon: {}\n', return_statement];//DEBUG
-
         if return_statement === "status" then
             [[rowcnt]] = fread [stdout, '{n:}'];
-            write ['Getting status for pose {} ({} of {})\n', rowcnt, 
-                result_ith, numokay];
+            write ['  Getting status for pose {} ({} of {})\n', rowcnt, 
+                result_ith+1, numokay];
 	    [[status_length]] = fread [stdout, '{n:}'];
             for status_length loop
                 [[return_statement]] = fread [stdout, '{c:*}'];
@@ -97,8 +95,8 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
             fwrite [stdin, '{c:}\n', 'Ok'];
         elseif return_statement === "success" then
             [[rowcnt]] = fread [stdout, '{n:}'];
-            write ['Getting results for pose {} ({} of {})\n', rowcnt, 
-                result_ith, numokay];
+            write ['  Getting results for pose {} ({} of {})\n', rowcnt, 
+                result_ith+1, numokay];
 
             local name, nameValue;
             local parameter, parameterValue;
@@ -139,8 +137,8 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
 
                 fwrite [stdin, '{c:}\n', 'Ok'];
             else
-                write ['Getting error message for pose {} ({} of {})\n', rowcnt, 
-                    result_ith, numokay];
+                write ['  Getting error message for pose {} ({} of {})\n', rowcnt, 
+                    result_ith+1, numokay];
 
                 [[return_statement]] = fread [stdout, '{c:*}'];
                 if neL [return_statement, "DivCon done."] then
@@ -171,12 +169,8 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
             result_ith = result_ith + 1;
 
         elseif return_statement === "DivCon done." then
-            print ['return_statement at DivCon done. Sending Ok '];
             fwrite [stdin, '{c:}\n', 'Ok'];
             return;
-
-        else
-            write ['what is: {}\n', return_statement];  //  abort?
         endif
     endloop
     
@@ -306,7 +300,7 @@ local function ShutdownMOEDivConQMScore [process_keys,start,results]
     local timemess;
     if isnull results then
         timemess = twrite ['QMScore complete at {}\nTotal clock time {}:{}:{}.', 
-            asctime [finish],results(2)(2), hours, minutes, secs];
+            asctime [finish], hours, minutes, secs];
     else
         timemess = twrite ['QMScore for pose is complete at {} (Score: {})\nTotal clock time {}:{}:{}.', 
             asctime [finish],results(2)(2), hours, minutes, secs];
@@ -501,7 +495,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
     //  Abort if there are no results to collect
     if numokay === 0 then
         fwrite [stdin, '{c:}\n', 'Ok'];
-        ShutdownMOEDivConQMScore[process_keys,start];
+        ShutdownMOEDivConQMScore[process_keys,start,[]];
         exit [];
     endif
 
@@ -526,7 +520,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
             [[newerror]] = fread [stderr, '{c:*}'];
         endloop
     
-        ShutdownMOEDivConQMScore[process_keys,start];
+        ShutdownMOEDivConQMScore[process_keys,start,[]];
 
 //    else
 //        ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,numokay];
