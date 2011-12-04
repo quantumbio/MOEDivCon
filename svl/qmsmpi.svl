@@ -190,22 +190,17 @@ local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,r
     
     const NUMRESULTS = 11;
     local status_length=0;
-//    local rowcnt;
     
     local dbrowkeys = db_Entries [dbkey];
     
     local success = 0;
-    
     local sleep_time = 0.1;
-write ['entering status loop\n'];
-local loop_cnt = 0;
+
     while exe_status process_keys(1) loop
         results = [];
-// loop_cnt = loop_cnt + 1;
         fwrite [stdin, '{c:}\n', 'status'];
         [[return_statement]] = fread [stdout, '{c:*}'];
 
-write ['return_statement: {}\n', return_statement];
         if return_statement === "noupdate" then
         elseif return_statement === "running" then
 	    [[status_length]] = fread [stdout, '{n:}'];
@@ -227,7 +222,6 @@ write ['return_statement: {}\n', return_statement];
             success = 1;
             fwrite [stdin, '{c:}\n', 'Ok'];
 
-write ['about to send results to {} for row {} ... results: {}\n', dbkey, rowcnt, results];
             qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
             local sucmess = "Success";
             if not isnull  warnings (rowcnt)
@@ -238,7 +232,6 @@ write ['about to send results to {} for row {} ... results: {}\n', dbkey, rowcnt
             else
                 sucmess = cat [sucmess, "\n"];
             endif
-write ['about to send results to {} for row {} ... results: {}\n', dbkey, rowcnt, sucmess];
             qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), sucmess];
 
         elseif return_statement === "error" then
@@ -254,15 +247,11 @@ write ['about to send results to {} for row {} ... results: {}\n', dbkey, rowcnt
             fwrite [stdin, '{c:}\n', 'Ok'];
         endif
         sleep sleep_time;
-// write ['current loopcnt: {}\n',loop_cnt];
     endloop
-    return success;
+    return results;
 endfunction
 
 local function InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts]
-
-    write ['Persistent File:  {}\n', perfile];
-    write ['Work Dir:  {}\n', workdir];
 
     //  exe_open child process inherits parent's environment.
     local process_key;
@@ -294,13 +283,36 @@ local function InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts]
     fwrite [stdin, '{n:}\n', qmsopts.shift];
     fwrite [stdin, '{n:}\n', nrows];
 
-    return [process_keys,stdin,stdout,stderr];
+    local start = clock[];
+    write ['\nQMScore beginning: {}\n',asctime [start]];
+//    write ['  Persistent File:  {}\n', perfile];
+//    write ['  Work Dir:  {}\n', workdir];
+
+    return [process_keys,stdin,stdout,stderr,start];
 endfunction
 
-local function ShutdownMOEDivConQMScore [process_keys]
+local function ShutdownMOEDivConQMScore [process_keys,start,results]
     exe_kill  [process_keys(1), 0];
     exe_kill  process_keys(1);
     exe_close process_keys;
+    
+    local finish = clock [];
+    local secs = round (finish - start);
+    local hours = floor (secs / 3600);
+    secs = secs - (hours * 3600);
+    local minutes = floor (secs / 60);
+    secs = secs - (minutes * 60);
+
+    local timemess;
+    if isnull results then
+        timemess = twrite ['QMScore complete at {}\nTotal clock time {}:{}:{}.', 
+            asctime [finish],results(2)(2), hours, minutes, secs];
+    else
+        timemess = twrite ['QMScore for pose is complete at {} (Score: {})\nTotal clock time {}:{}:{}.', 
+            asctime [finish],results(2)(2), hours, minutes, secs];
+    endif
+    write ['{}\n', timemess];
+
 endfunction
 
 local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,rowcnt,dbkey,rowkey,numokay,warnings]
@@ -339,7 +351,6 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
         fwrite [stdin, '{n:}\n', ligchg];
         qb_PassBackbone [stdout, stdin, ligressets];
         qb_PassValues [stdout, stdin, nonQBtagged ];
-write ['everything passed ... moving on\n'];
         warnings (rowcnt) = ckmsg;
 
     else
@@ -384,7 +395,6 @@ endfunction
 global function qb_QMScoreMPI [dbpath, jobid]
     sleep 1;    // allows previous script to open the right mdb file for monitoring.
     local [osys, nsys] = SystemPush [];
-//    if not MOE_BATCH then exit ['Should only be run from moebatch.']; endif
     //  Extract molecules and run options from the database environment
     if neL [fext dbpath, 'mdb'] then
         exit twrite ['{}\nis not a MOE database.', dbpath];
@@ -394,7 +404,6 @@ global function qb_QMScoreMPI [dbpath, jobid]
         exit twrite ['Unable to find the database:\n    {}', dbpath];
     endif
 
-//    local dbkey = db_Open [dbpath, 'read-write'];
     local dbkey = dbpath;
     local [recmol, ligmol, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
     local ligflds = qb_GetPoseFields [];
@@ -418,7 +427,10 @@ global function qb_QMScoreMPI [dbpath, jobid]
         endif
     endif
 
-    local [process_keys,stdin,stdout,stderr] = InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts];
+    local process_keys,stdin,stdout,stderr,start;
+    if MOE_BATCH then
+        [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts];
+    endif
 
     // process the fields in the QMScore mdb file and strip out the stuff we added
     local [fields, field_types] = db_Fields dbkey;  
@@ -432,6 +444,12 @@ global function qb_QMScoreMPI [dbpath, jobid]
     local recchg = coreopts.recchg;
     local ligchg = coreopts.ligchg;
     for rowkey in dbrowkeys loop
+
+        if not MOE_BATCH then
+            [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts];
+            qb_SaveDivConStatus [dbkey, rowkey, "Running....  "];
+        endif
+        
         local errmess = "", success = 0;
         rowcnt = rowcnt + 1;
 
@@ -457,8 +475,25 @@ global function qb_QMScoreMPI [dbpath, jobid]
         [warnings,numokay] = SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,rowcnt,dbkey,rowkey,numokay,warnings];
 
         if not MOE_BATCH then
-//        numokay
-            ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,rowcnt];
+            local results = ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,rowcnt];
+
+            //  Look for error messages from stderr.
+            errmess = "";
+            local [[newerror]] = fread [stderr, '{c:*}'];
+            while length newerror > 0 loop
+                // Hack!  Skip openmpi ignored error messages
+                local errstrs = wordsplit [newerror, "()"];
+                local errtoks = app token errstrs;
+                local idx = indexof ['ignored', errtoks];
+                if idx === 0 then
+                    write ['MOEDivCon: {}\n', newerror];
+                    errmess = cat [newerror, errmess];
+                endif
+        
+                [[newerror]] = fread [stderr, '{c:*}'];
+            endloop
+
+            ShutdownMOEDivConQMScore[process_keys,start,results];
         endif
 
     endloop
@@ -466,8 +501,7 @@ global function qb_QMScoreMPI [dbpath, jobid]
     //  Abort if there are no results to collect
     if numokay === 0 then
         fwrite [stdin, '{c:}\n', 'Ok'];
-        ShutdownMOEDivConQMScore[process_keys];
-//        db_Close dbkey;
+        ShutdownMOEDivConQMScore[process_keys,start];
         exit [];
     endif
 
@@ -475,27 +509,29 @@ global function qb_QMScoreMPI [dbpath, jobid]
 
     if MOE_BATCH then
         ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numokay];
+        
+        //  Look for error messages from stderr.
+        errmess = "";
+        [[newerror]] = fread [stderr, '{c:*}'];
+        while length newerror > 0 loop
+            // Hack!  Skip openmpi ignored error messages
+            errstrs = wordsplit [newerror, "()"];
+            errtoks = app token errstrs;
+            idx = indexof ['ignored', errtoks];
+            if idx === 0 then
+                write ['MOEDivCon: {}\n', newerror];
+                errmess = cat [newerror, errmess];
+            endif
+    
+            [[newerror]] = fread [stderr, '{c:*}'];
+        endloop
+    
+        ShutdownMOEDivConQMScore[process_keys,start];
+
 //    else
 //        ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,numokay];
     endif
 
-    //  Look for error messages from stderr.
-    errmess = "";
-    local [[newerror]] = fread [stderr, '{c:*}'];
-    while length newerror > 0 loop
-        // Hack!  Skip openmpi ignored error messages
-        local errstrs = wordsplit [newerror, "()"];
-        local errtoks = app token errstrs;
-        local idx = indexof ['ignored', errtoks];
-        if idx === 0 then
-            write ['MOEDivCon: {}\n', newerror];
-            errmess = cat [newerror, errmess];
-        endif
-
-        [[newerror]] = fread [stderr, '{c:*}'];
-    endloop
-
-    ShutdownMOEDivConQMScore[process_keys];
     
 //    db_Close dbkey;
     SystemPop [osys, nsys];
