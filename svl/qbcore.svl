@@ -2761,6 +2761,9 @@ endfunction
  ****************************************************************************/
 global function qb_SaveDivConStatus [dbkey, rowkey, message]
 
+    if isnull dbkey then
+        return [];
+    endif
     local sep = "-----------------------------------------------------------\n";
     local [status] = db_ReadFields [dbkey, rowkey, [STATUS_FIELD]];
     message = cat [message, asctime [], "\n", sep, status];
