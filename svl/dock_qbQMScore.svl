@@ -29,7 +29,7 @@
 function qb_TagCoreVals;
 function qb_TagQMSVals;
 function qb_CreateQMScoreDB;
-function qb_QMScore;
+function qb_QMScorePair;
 function qb_GetDefaultsStatus;
 function qb_SaveQMScore;
 function qb_GetRecFields;
@@ -230,14 +230,8 @@ global function dock_score_qbQMScore [cmd, arg, opt]
         tag[qb_GetPoseFields [], [ligMolNew,coreopts.ligchg]]]];
     local perfile = twrite ['{}/{}.h5', fpath fabsname db_Filename dbkey, 
         fbase ftail fabsname db_Filename dbkey];
-    local start = clock [];
-    local [results, errmess] = qb_QMScore [recMolNew, ligMolNew, perfile, coreopts, qmsopts, errortests];
-    local finish = clock [];
-    local secs = round (finish - start);
-    local hours = floor (secs / 3600);
-    secs = secs - (hours * 3600);
-    local minutes = floor (secs / 60);
-    secs = secs - (minutes * 60);
+
+    local [results, errmess] = qb_QMScorePair [recMolNew, ligMolNew, perfile, coreopts, qmsopts, status, errortests];
 
     if results === [] then
         if errmess === [] or errmess === '' then
@@ -259,10 +253,6 @@ global function dock_score_qbQMScore [cmd, arg, opt]
 
         qb_SaveDivConStatus [dbkey, rowkey, sucmess];
     endif
-
-    local timemess = twrite ['QMScore for pose {} is done (Score: {})\nTotal clock time {}:{}:{}.', 
-        posecount,results(2)(2), hours, minutes, secs];
-    write ['{}\n', timemess];
 
     SystemPop [osys, nsys];
     return results(2)(2);

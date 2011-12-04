@@ -218,7 +218,6 @@ local function LoadDB [dbpath]
 endfunction
 
 function qb_GetQMSEnv;
-function qb_SaveQMScore;
 
 	//  Global Functions
 
@@ -234,6 +233,9 @@ endfunction
  ****************************************************************************/
 global function qb_GetQMSEnv [dbkey]
 
+    if isnull dbkey then
+        return [];
+    endif
     local [receptor, ligand, status, coreopts, c] = qb_GetCoreEnv [dbkey];
     local qmsopts = qb_GetEnvApp [dbkey];
     qmsopts = tagcat [qmsopts, tag tr QMSCORE_OPT_DEFAULTS];
@@ -247,10 +249,13 @@ endfunction
  *  Save just the score data in the QMScore database.
  *
  ****************************************************************************/
-global function qb_SaveQMScore [mdbkey, rowkey, scoredata]
+global function qb_SaveQMScore [dbkey, rowkey, scoredata]
 
+    if isnull dbkey then
+        return [];
+    endif
     if alltrue (QMS_DATA_TAGS === app first scoredata) then
-        return db_Write [mdbkey, rowkey, tag [QMS_NUM_FIELDS, 
+        return db_Write [dbkey, rowkey, tag [QMS_NUM_FIELDS, 
             dropfirst app second scoredata]];
     endif
 

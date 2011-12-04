@@ -66,6 +66,8 @@ const LIG_KEYS =
     'COMPLEXOPT'
     ];
 
+global bRUN_MPI;
+
 local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numokay]
 
     local results = [];
@@ -176,7 +178,7 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
     
 endfunction
 
-local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,rowcnt]
+local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,rowcnt,dbkey]
 
     local results = [];
     local return_statement = [];
@@ -185,7 +187,16 @@ local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,r
     const NUMRESULTS = 11;
     local status_length=0;
     
-    local dbrowkeys = db_Entries [dbkey];
+    local nrows,dbrowkeys,dbrow;
+    if not isnull dbkey then
+        dbrowkeys = db_Entries [dbkey];
+        dbrow = dbrowkeys(rowcnt);
+        nrows = length db_Entries [dbkey];
+    else
+        dbrowkeys = [];
+        dbrow = [];
+        nrows = 1;
+    endif
     
     local success = 0;
     local sleep_time = 0.1;
@@ -216,7 +227,6 @@ local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,r
             success = 1;
             fwrite [stdin, '{c:}\n', 'Ok'];
 
-            qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
             local sucmess = "Success";
             if not isnull  warnings (rowcnt)
                     and neL [warnings (rowcnt), '']
@@ -226,8 +236,10 @@ local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,r
             else
                 sucmess = cat [sucmess, "\n"];
             endif
-            qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), sucmess];
-
+            if not isnull dbkey then
+                qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
+                qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), sucmess];
+            endif
         elseif return_statement === "error" then
             [[return_statement]] = fread [stdout, '{c:*}'];
             if neL [return_statement, "DivCon done."] then
@@ -249,7 +261,7 @@ local function InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts]
 
     //  exe_open child process inherits parent's environment.
     local process_key;
-    if MOE_BATCH then
+    if bRUN_MPI then
         process_key = exe_open ['moedivconmpi', workdir, [], 1];
     else
         process_key = exe_open ['moedivconscoring', workdir, [], 0];
@@ -309,14 +321,23 @@ local function ShutdownMOEDivConQMScore [process_keys,start,results]
 
 endfunction
 
-local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,rowcnt,dbkey,rowkey,numokay,warnings]
+local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,dbkey]
 
     local recchg = coreopts.recchg;
     local ligchg = coreopts.ligchg;
-    local dbrowkeys = db_Entries [dbkey];
-    local nrows = length dbrowkeys;
     local errmess = "";
 
+    local nrows,dbrowkeys,dbrow;
+    if not isnull dbkey then
+        dbrowkeys = db_Entries [dbkey];
+        dbrow = dbrowkeys(rowcnt);
+        nrows = length db_Entries [dbkey];
+    else
+        dbrowkeys = [];
+        dbrow = [];
+        nrows = 1;
+    endif
+    
     //  Run all error tests unless forced not to do so by user.
     local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
         = qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,
@@ -365,7 +386,8 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
                 qb_GetWhich [not recchgok, not ligchgok]]];
         endif
 
-        qb_SaveDivConStatus [dbkey, rowkey, swrite ['Error:  {}\n', errmess]];
+        qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), swrite ['Error:  {}\n', errmess]];
+
         write ['Skipping pose {} of {}\n', rowcnt, nrows];
         write ['QMScore Error:  {}\n', errmess];
 
@@ -379,6 +401,52 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
     
 endfunction
 
+global function qb_QMScorePair [recmol, ligmol, perfile, coreopts, qmsopts,
+        status,errortests,nonQBtagged] 
+    sleep 1;    // allows previous script to open the right mdb file for monitoring.
+    local [osys, nsys] = SystemPush [];
+    bRUN_MPI = 0;
+
+    //  If there are any errors, return immediately.  Run all error tests
+    //  unless forced not to by user.
+    qb_HamSetsInit [];
+
+    local rowkey = 0, rowcnt = 1, numokay = 0, warnings = [];
+    local errmess = "", success = 0;
+
+    //  exe_open child process inherits parent's environment.
+    local workdir = cd [];
+    local process_keys,stdin,stdout,stderr,start;
+    [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,rowcnt,qmsopts,coreopts];
+
+    //  Pass the two backbones to QuantumBio's DivCon QMScore
+    //
+    //  SplitReceptor ensures that there is only one chain per molecule
+    //  in the receptor collection.
+    [warnings,numokay] = SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,[]];
+    
+    local results = ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,rowcnt,[]];
+
+    //  Look for error messages from stderr.
+    local [[newerror]] = fread [stderr, '{c:*}'];
+    while length newerror > 0 loop
+       // Hack!  Skip openmpi ignored error messages
+        local errstrs = wordsplit [newerror, "()"];
+        local errtoks = app token errstrs;
+        local idx = indexof ['ignored', errtoks];
+        if idx === 0 then
+            write ['MOEDivCon: {}\n', newerror];
+            errmess = cat [newerror, errmess];
+        endif
+
+        [[newerror]] = fread [stderr, '{c:*}'];
+    endloop
+
+    ShutdownMOEDivConQMScore[process_keys,start,results];
+    return [results,errmess];
+    SystemPop [osys, nsys];
+endfunction
+
 /****************************************************************************
  *                          qb_QMScoreMDB
  *
@@ -386,19 +454,23 @@ endfunction
  *  all of the results.
  *
 ****************************************************************************/
-global function qb_QMScoreMDB [dbpath, jobid]
+global function qb_QMScoreMDB [dbkey, jobid]
     sleep 1;    // allows previous script to open the right mdb file for monitoring.
     local [osys, nsys] = SystemPush [];
+    if MOE_BATCH then
+        bRUN_MPI = 1;
+    else
+        bRUN_MPI = 0;
+    endif
     //  Extract molecules and run options from the database environment
-    if neL [fext dbpath, 'mdb'] then
-        exit twrite ['{}\nis not a MOE database.', dbpath];
+    if neL [fext dbkey, 'mdb'] then
+        exit twrite ['{}\nis not a MOE database.', dbkey];
     endif
 
-    if neL [ftype dbpath, 'file'] then
-        exit twrite ['Unable to find the database:\n    {}', dbpath];
+    if neL [ftype dbkey, 'file'] then
+        exit twrite ['Unable to find the database:\n    {}', dbkey];
     endif
 
-    local dbkey = dbpath;
     local [recmol, ligmol, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
     local ligflds = qb_GetPoseFields [];
     local recflds = qb_GetRecFields [];
@@ -406,12 +478,8 @@ global function qb_QMScoreMDB [dbpath, jobid]
     local nrows = db_nEntries [dbkey];
     
     local workdir = cd [];
-    local pertail = fbase ftail dbpath;
+    local pertail = fbase ftail dbkey;
     local perfile = twrite ['{}/{}.h5', workdir, pertail];
-    
-//    local currdir = getenv 'PWD';
-//    local perpath = fpath dbpath;
-//    local workdir = select [currdir, fabsname coreopts.workdir, coreopts.cwd];
 
     if not isnull jobid then
         workdir = twrite ['{}/{}', workdir, jobid];
@@ -422,7 +490,7 @@ global function qb_QMScoreMDB [dbpath, jobid]
     endif
 
     local process_keys,stdin,stdout,stderr,start;
-    if MOE_BATCH then
+    if bRUN_MPI then
         [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts];
     endif
 
@@ -439,7 +507,7 @@ global function qb_QMScoreMDB [dbpath, jobid]
     local ligchg = coreopts.ligchg;
     for rowkey in dbrowkeys loop
 
-        if not MOE_BATCH then
+        if not bRUN_MPI then
             [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts];
             qb_SaveDivConStatus [dbkey, rowkey, "Running....  "];
         endif
@@ -466,10 +534,10 @@ global function qb_QMScoreMDB [dbpath, jobid]
         
         local nonQBtagged = tag [nonQBfields, db_ReadFields [dbkey,rowkey,nonQBfields]];
         
-        [warnings,numokay] = SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,rowcnt,dbkey,rowkey,numokay,warnings];
+        [warnings,numokay] = SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,dbkey];
 
-        if not MOE_BATCH then
-            local results = ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,rowcnt];
+        if not bRUN_MPI then
+            local results = ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,rowcnt,dbkey];
 
             //  Look for error messages from stderr.
             errmess = "";
@@ -501,7 +569,7 @@ global function qb_QMScoreMDB [dbpath, jobid]
 
     //  Collect and store results
 
-    if MOE_BATCH then
+    if bRUN_MPI then
         ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numokay];
         
         //  Look for error messages from stderr.
@@ -521,13 +589,6 @@ global function qb_QMScoreMDB [dbpath, jobid]
         endloop
     
         ShutdownMOEDivConQMScore[process_keys,start,[]];
-
-//    else
-//        ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,dbkey,numokay];
     endif
-
-    
-//    db_Close dbkey;
-    SystemPop [osys, nsys];
 endfunction
 
