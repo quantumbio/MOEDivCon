@@ -1680,12 +1680,12 @@ global function qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,
         lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname]
 
     local mess = '';
-    local recatms = cat oAtoms mol_Create recmol;
+    local recatms = cat oAtoms recmol;
     local [recok, recmess] = qb_TestDivCon ['receptor', recatms, 
         lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname];
     mess = tok_cat [mess, recmess];
     local recchgok = ChargeOK [recatms, recchg];
-    local ligatms = cat oAtoms mol_Create ligmol;
+    local ligatms = cat oAtoms ligmol;
     local ligsingle = SingleMol [ligatms];
     if not ligsingle then
         mess = tok_cat [mess, 'Ligand must be a single molecule.'];
@@ -1709,13 +1709,7 @@ global function qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,
         endif
     endif
 
-    local recatmsets = SplitCollection [recatms];
-    local ligatmsets = SplitCollection [ligatms];
-
-    local recressets = app uniq app oResidues recatmsets;
-    local ligressets = app uniq app oResidues ligatmsets;
-
-    return [recressets, recok, recchgok, ligressets, ligok, ligchgok, mess];
+    return [recok, recchgok, ligok, ligchgok, mess];
 
 endfunction
 
@@ -2314,10 +2308,12 @@ endfunction
  *
  ****************************************************************************/
 global function qb_InterMoleculeOverlap [receptor, ligset]
-
+write ['in qb_InterMoleculeOverlap\n'];
     local mess = '';
     local pairs = AtomOverlap [receptor, ligset];
     if length pairs > 0 then
+        aSetSelected [pairs,1];
+        
         local residues = oParent pairs;
         local rnames = rName residues;
         local rnums = rNumber residues;
@@ -3289,6 +3285,7 @@ global function qb_TestDivCon [which, atoms, lonepair, overlap, hamcompat,
     if overlap then
         local pairs = AtomOverlap [atoms, atoms];
         if length pairs > 0 then
+            aSetSelected [pairs,1];
             residues = oParent pairs;
             rnames = rName residues;
             rnums = rNumber residues;
@@ -3298,8 +3295,8 @@ global function qb_TestDivCon [which, atoms, lonepair, overlap, hamcompat,
             local dists = app aDist pairs;
             mess = tok_cat [mess, '    Error!  Overlapping atoms:\n'];
             for ith = 1, length pairs, 1 loop
-                mess = tok_cat [mess, twrite ['        {}: {} in {}: {} {}'
-                     ' is {}A from {}: {} in {}: {} {}\n', 
+                mess = tok_cat [mess, twrite ['       [SELECTED] {}: {} in {}: {} {}'
+                     ' is {}A from {}: {} in {}: {} {} \n', 
                     indices(ith)(1), anames(ith)(1), rnums(ith)(1), 
                     rnames(ith)(1), ruids(ith)(1),  dists(ith), indices(ith)(2), 
                     anames(ith)(2), rnums(ith)(2), rnames(ith)(2),

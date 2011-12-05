@@ -337,9 +337,9 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
         dbrow = [];
         nrows = 1;
     endif
-    
+
     //  Run all error tests unless forced not to do so by user.
-    local [recressets, recok, recchgok, ligressets, ligok, ligchgok, ckmsg]
+    local [recok, recchgok, ligok, ligchgok, ckmsg]
         = qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,
             status.notforced, status.notforced, status.notforced,
             coreopts.testH, coreopts.testMM, 'qms',
@@ -352,19 +352,14 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
         write ['Sending pose {} of {}\n', rowcnt, nrows];
         fwrite [stdin, '{n:}\n', rowcnt];
 
-        // we already did the work of figuring out which is receptor and which is ligand.
-        // @todo: the divcon structure testing code changes the ressets. It is unclear if this was significant. Need to do some testing, but it seems redundent.
-        recressets = mol_Create recmol;
-        ligressets = mol_Create ligmol;
-
-        fwrite [stdin, '{c:}\n', recmol(1)(MOL_NAME)];
+        fwrite [stdin, '{c:}\n', cName [recmol]];
         fwrite [stdin, '{n:}\n', recchg];
-        qb_PassBackbone [stdout, stdin, recressets];
+        qb_PassBackbone [stdout, stdin, recmol];
         qb_PassValues [stdout, stdin, [] ];
 
-        fwrite [stdin, '{c:}\n', ligmol(1)(MOL_NAME)];
+        fwrite [stdin, '{c:}\n', cName [ligmol]];
         fwrite [stdin, '{n:}\n', ligchg];
-        qb_PassBackbone [stdout, stdin, ligressets];
+        qb_PassBackbone [stdout, stdin, ligmol];
         qb_PassValues [stdout, stdin, nonQBtagged ];
         warnings (rowcnt) = ckmsg;
 
@@ -393,9 +388,6 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
 
         fwrite [stdin, '{n:}\n', 0];            //  skipping
     endif
-
-    oDestroy uniq cat oChains cat recressets;
-    oDestroy uniq cat oChains cat ligressets;
     
     return [warnings,numokay];
     
@@ -417,13 +409,17 @@ global function qb_QMScorePair [recmol, ligmol, perfile, coreopts, qmsopts,
     //  exe_open child process inherits parent's environment.
     local workdir = cd [];
     local process_keys,stdin,stdout,stderr,start;
+    local recressets = mol_Create recmol;
+    cSetName [recressets,recmol(1)(MOL_NAME)];
+    local ligressets = mol_Create ligmol;
+    cSetName [ligressets,ligmol(1)(MOL_NAME)];
     [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,rowcnt,qmsopts,coreopts];
 
     //  Pass the two backbones to QuantumBio's DivCon QMScore
     //
     //  SplitReceptor ensures that there is only one chain per molecule
     //  in the receptor collection.
-    [warnings,numokay] = SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,[]];
+    [warnings,numokay] = SendPairForScore [stdin,stdout,recressets,ligressets,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,[]];
     
     local results = ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,rowcnt,[]];
 
@@ -443,8 +439,12 @@ global function qb_QMScorePair [recmol, ligmol, perfile, coreopts, qmsopts,
     endloop
 
     ShutdownMOEDivConQMScore[process_keys,start,results];
-    return [results,errmess];
+
+    oDestroy uniq cat oChains cat recressets;
+    oDestroy uniq cat oChains cat ligressets;
+
     SystemPop [osys, nsys];
+    return [results,errmess];
 endfunction
 
 /****************************************************************************
@@ -528,13 +528,18 @@ global function qb_QMScoreMDB [dbkey, jobid]
         if indexof [recflds(1), fields] then
             [recmol, recchg] = db_ReadFields [dbkey, rowkey, recflds];
         endif
+
+        local recressets = mol_Create recmol;
+        cSetName [recressets,recmol(1)(MOL_NAME)];
+        local ligressets = mol_Create ligmol;
+        cSetName [ligressets,ligmol(1)(MOL_NAME)];
         
         coreopts.recchg = recchg;
         coreopts.ligchg = ligchg;
         
         local nonQBtagged = tag [nonQBfields, db_ReadFields [dbkey,rowkey,nonQBfields]];
         
-        [warnings,numokay] = SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,dbkey];
+        [warnings,numokay] = SendPairForScore [stdin,stdout,recressets,ligressets,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,dbkey];
 
         if not bRUN_MPI then
             local results = ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,rowcnt,dbkey];
@@ -557,6 +562,9 @@ global function qb_QMScoreMDB [dbkey, jobid]
 
             ShutdownMOEDivConQMScore[process_keys,start,results];
         endif
+
+        oDestroy uniq cat oChains cat recressets;
+        oDestroy uniq cat oChains cat ligressets;
 
     endloop
 
@@ -590,5 +598,6 @@ global function qb_QMScoreMDB [dbkey, jobid]
     
         ShutdownMOEDivConQMScore[process_keys,start,[]];
     endif
+    SystemPop [osys, nsys];
 endfunction
 
