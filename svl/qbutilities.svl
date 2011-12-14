@@ -1,0 +1,227 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2011 QuantumBio Inc. and/or its affiliates.
+    
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif      
+
+	//    qbutilities.svl    General SVL utilities found useful.
+
+#set title   'QuantumBio SVL Utilities'
+#set class   'QuantumBio'
+#set version '2011.03'
+
+function Protonate3D;
+function _Atoms;
+function EditDelete;
+
+// this is from menu.svl
+// Nearby calculates those atoms of set A that are near to some atom in
+// set B where "near" is a specified distance
+
+local function Nearby [Aatoms, Batoms, dist]
+    local i, seg, idx, r2, prox;
+    local nmask = zero Aatoms;
+    const PACKET = 100;
+
+    if length Aatoms > length Batoms then
+	prox = prox_open [dist, aPos Aatoms, dist];
+
+	for i in split [x_id Batoms, PACKET] loop
+	    [seg, idx, r2] = prox_find [prox, aPos Batoms[i], 0];
+	    nmask[idx] = 1;
+	endloop
+
+	prox_close prox;
+    else
+	prox = prox_open [dist, aPos Batoms, dist];
+
+	for i in split [x_id Aatoms, PACKET] loop
+	    [seg, idx, r2] = prox_find [prox, aPos Aatoms[i], 0];
+	    nmask[i] = notnot seg;
+	endloop
+
+	prox_close prox;
+    endif
+
+    return Aatoms | nmask;
+endfunction
+
+// Function:    qb_SelectOnRadius 
+// Author:      Lance Westerhoff
+// Date Added:  12/9/2011
+//
+//  Function to create a selection based on the atoms provided in the
+//      first argument and the radius provided in the second arugment.
+//      Returns the list of atom objects so it can be used in scripts
+//      easily as well.
+//
+//      Can be used both in scripts and in the GUI. NOTE: the selection
+//          is NOT residue inclusive! Residue inclusiveness can be added
+//          in GUI (choose: Extend->Residue).
+//
+//      Example (select atoms 15.0A from ligand)
+//          qb_SelectOnRadius [_Atoms '$$ligand', 15.0]
+
+global function qb_SelectOnRadius [Batoms, radius]
+
+    local nearatms = Nearby [Atoms[], Batoms, radius];
+    
+    aSetSelected [nearatms, 1];
+
+    return nearatms;
+endfunction
+
+global function qb_File2PDB [file_patt]     // x is the function argument
+    local src = cd [];
+    local srcfilelist = flist [src, file_patt];
+    local fname_file;
+    local outpat;
+
+    pot_Load ['$MOE/lib/oplsaa.ff'];    // switch to OPLS-AA as this will do a better job.
+
+    oDestroy Chains [];
+
+    for fname_file in srcfilelist loop
+        write ['\nReading ... {} \n', fname_file];
+        ReadAuto fname_file;
+        
+        outpat = twrite ['{}.pdb',fbase ftail fname_file];
+        
+        WritePDB outpat;
+        
+        oDestroy Chains [];
+    endloop
+
+endfunction 
+
+local function countElectrons [atoms, charge]
+    return [charge + add aAtomicNumber atoms];
+endfunction 
+
+local function SaveCurrentPDB[baseName]
+
+    local pdboutpat = twrite ['{}.pdb',baseName];
+    WritePDB pdboutpat;
+
+// start    
+    local ligpdb = fopenr pdboutpat;
+    local tmppdboutpat = twrite ['{}-tmp.pdb',baseName];
+    local outligpdb = fopenw tmppdboutpat;
+    local ligchg = add aFCharge Atoms[];
+    write ['{}: REMARK CHARGE {}\n',baseName, ligchg];
+    write ['{}: Number of electrons (2): {}\n',baseName,countElectrons[Atoms[],ligchg]];
+    fwrite [outligpdb, 'REMARK CHARGE {}\n',ligchg];
+    fwrite [outligpdb, 'REMARK countElectrons {}\n',countElectrons[Atoms[],ligchg]];
+    fwrite [outligpdb, 'REMARK atmCnt {}\n',length Atoms[]];
+    local line;
+    while length (line = freadb [ligpdb, 'char', 80]) loop
+        fwrite [outligpdb, '{}',line];
+    endloop
+    
+    fclose outligpdb;
+    fclose ligpdb;
+    
+    fdelete pdboutpat;
+    frename [tmppdboutpat,pdboutpat];
+// end    
+
+endfunction
+
+global function qbMG []
+
+    return Atoms[] | aSelected Atoms[];
+endfunction
+
+global function qbASP [mgatms]
+
+    local asprec = Residues [] | rSelected Residues [];
+    
+    return oReparent [mgatms,asprec];
+endfunction
+
+global function qb_WriteCleanPDB[]
+
+    local recatms = cat [_Atoms '$$receptor', _Atoms '$$solvent'];
+    Protonate3D [recatms];
+
+    local ligatms = _Atoms '$$ligand';
+    recatms = cat [_Atoms '$$receptor', _Atoms '$$solvent'];
+    
+    local ligchg = add aFCharge ligatms;
+    local recchg = add aFCharge recatms;
+
+    local pdboutpat = twrite ['{}_clean.pdb',first fieldsplit [string first cName Chains[],"."]];
+    WritePDB pdboutpat;
+
+    local moeoutpat = twrite ['{}_clean.moe',first fieldsplit [string first cName Chains[],"."]];
+    WriteMOE moeoutpat;
+    
+    oDestroy recatms;
+    
+    SaveCurrentPDB[swrite ['{}_clean_lig',first fieldsplit [string first cName Chains[],"."]] ];
+
+    oDestroy Chains [];
+    
+    ReadMOE moeoutpat;
+    ligatms = _Atoms '$$ligand';
+    oDestroy ligatms;
+    SaveCurrentPDB[swrite ['{}_clean_rec',first fieldsplit [string first cName Chains[],"."]] ];
+    
+    oDestroy Chains [];
+
+    ReadMOE moeoutpat;
+    ligatms = _Atoms '$$ligand';
+    recatms = cat [_Atoms '$$receptor', _Atoms '$$solvent'];
+    // clear selection if one is in place.
+    rSetSelected [Residues [], 0];
+    qb_SelectOnRadius [ligatms,20.0];
+    // expand the selection to include residues (not only atoms)
+    aSetSelected [oAtoms cat [Residues [] | rSelected Residues[]],1];
+    local selected = rSelected Residues[];
+    // get inverse selection
+    local invsel = rSelected Residues [] == 0;
+    // clear selection
+    rSetSelected [Residues [],0];
+    // set inverse and ask to delete.
+    rSetSelected [Residues [] | invsel, 1];
+
+    selected = Residues [] | rSelected Residues[];
+    oDestroy selected;
+    local remaining = diff [Atoms[],ligatms];
+    Protonate3D [remaining];
+    
+    moeoutpat = twrite ['{}_clean20A.moe',first fieldsplit [string first cName Chains[],"."]];
+    WriteMOE moeoutpat;
+
+write ['length of atoms(before): {}\n', length Atoms[]];
+    oDestroy ligatms;
+write ['length of atoms(after): {}\n', length Atoms[]];
+    
+    recchg = add aFCharge Atoms[];
+    write ['receptor: REMARK CHARGE {}\n',recchg];
+    write ['receptor: Number of electrons: {}\n', countElectrons[Atoms[],recchg]];
+
+    SaveCurrentPDB[swrite ['{}_clean_rec20A',first fieldsplit [string first cName Chains[],"."]] ];
+
+//    oDestroy Chains [];
+    
+endfunction
+    
