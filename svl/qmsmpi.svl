@@ -291,8 +291,6 @@ local function InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts]
 
     local start = clock[];
     write ['\nQMScore beginning: {}\n',asctime [start]];
-//    write ['  Persistent File:  {}\n', perfile];
-//    write ['  Work Dir:  {}\n', workdir];
 
     return [process_keys,stdin,stdout,stderr,start];
 endfunction
