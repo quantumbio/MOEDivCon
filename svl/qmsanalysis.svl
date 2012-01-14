@@ -153,16 +153,16 @@ global function qb_PWDAnalysis [qmsfilename, G_surface]
             
         local tablename, numcols, numrows;
         local sequenceNumberForA = [], val, sequenceNumberForB = [], val2, values = [];
-        [[numcols]] = fread [stdout, '{n:}'];
+        [[numcols]] = fread [stdout, '{n:}\n'];
         local numcols7th=numcols/7;
         for numcols7th loop
-             [[val]] = fread [stdout, '{n:}'];
+             [[val]] = fread [stdout, '{n:}\n'];
              sequenceNumberForA = append [sequenceNumberForA, val];
-             [[val]] = fread [stdout, '{n:}'];
+             [[val]] = fread [stdout, '{n:}\n'];
              sequenceNumberForB = append [sequenceNumberForB, val];
         endloop
         for numcols loop
-             [[val]] = fread [stdout, '{n:}'];
+             [[val]] = fread [stdout, '{n:}\n'];
              values = append [values, val];
         endloop
         
