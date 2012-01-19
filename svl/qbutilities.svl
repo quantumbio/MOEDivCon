@@ -31,8 +31,9 @@
 function Protonate3D;
 function _Atoms;
 function EditDelete;
+function fwrite_TriposMOL2;
 
-// this is from menu.svl
+// function Nearby is from menu.svl
 // Nearby calculates those atoms of set A that are near to some atom in
 // set B where "near" is a specified distance
 
@@ -110,7 +111,28 @@ global function qb_File2PDB [file_patt]     // x is the function argument
         oDestroy Chains [];
     endloop
 
-endfunction 
+endfunction
+
+global function qb_ProcessModels []
+
+    local ligChainsList = uniq aChain _Atoms '$$ligand';
+    local modelTags = uniq cTag Chains[];
+    local singleTag, mol;
+    db_Open ['tmp-rec.mdb','create'];
+    db_CreateField ['tmp-rec.mdb','mol','molecule'];
+    db_Open ['tmp-lig.mdb','create'];
+    db_CreateField ['tmp-lig.mdb','mol','molecule'];
+    for singleTag in modelTags loop
+        write ['Processing .... {}\n', singleTag];
+        local chainList = Chains [] | cTag Chains[] == singleTag;
+        local recChain = diff [chainList,ligChainsList];
+        local ligChain = diff [chainList,recChain];
+        mol = mol_Extract cat recChain;
+        db_Write ['tmp-rec.mdb',0,tag ['mol',[mol]]];
+        mol = mol_Extract cat ligChain;
+        db_Write ['tmp-lig.mdb',0,tag ['mol',[mol]]];
+    endloop
+endfunction
 
 local function countElectrons [atoms, charge]
     return [charge + add aAtomicNumber atoms];
@@ -224,4 +246,33 @@ write ['length of atoms(after): {}\n', length Atoms[]];
 //    oDestroy Chains [];
     
 endfunction
+
+global function qb_WritePDB[suffix]
+
+    local pdboutpat;
     
+    if isnull suffix then
+        pdboutpat = twrite ['{}',first fieldsplit[string cTag first Chains[],"."]]; 
+    else
+        pdboutpat = twrite ['{}_{}',first fieldsplit[string cTag first Chains[],"."], suffix];        
+    endif
+    SaveCurrentPDB[pdboutpat];
+endfunction
+
+global function qb_SaveComplexes[]
+
+    local count = 0;
+    local lig;
+    for lig in uniq aChain _Atoms '$$ligand' loop
+        count = count + 1;
+        local rec_chains = uniq aChain cat [_Atoms '$$receptor', _Atoms '$$solvent'];
+
+        local moloutpat = twrite ['{}_{}.mol2',cTag lig, count];        
+        write ['output: {}\n', moloutpat];
+        fwrite_TriposMOL2 [moloutpat, cat [rec_chains,lig]];
+
+        moloutpat = twrite ['{}_lig_{}.mol2',cTag lig, count];        
+        write ['output: {}\n', moloutpat];
+        fwrite_TriposMOL2 [moloutpat, lig];
+    endloop
+endfunction
