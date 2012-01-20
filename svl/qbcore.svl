@@ -2,7 +2,7 @@
 #if 0
  // BEGIN COPYRIGHT
  /***********************************************************************
-    Copyright (c) 1998-2011 QuantumBio Inc. and/or its affiliates.
+    Copyright (c) 1998-2012 QuantumBio Inc. and/or its affiliates.
     
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
@@ -108,8 +108,8 @@ const CORE_OPT_DEFAULTS =
 	//    ['mode',         'One-to-One'  ],
     ['mode',         'Many-to-Many'  ],
     ['allposes',     0             ],
-    ['cwd',          1             ],
-    ['workdir',      ''            ],
+// DEL    ['cwd',          1             ],
+// DEL    ['workdir',      ''            ],
     ['scoredb',      'qbscore.mdb' ],
     ['recdb',        ''            ],
     ['posedb',       ''            ],
@@ -180,34 +180,34 @@ const CORE_PANEL =
         Button : [ name: 'browse_scoredb', text: 'Browse...' ]
         ],
 
-    Separator : [flushLeft:1, extendH:1, margin:1],
-
-    Hbox :
-        [
-        name: 'wdbox', extendH: 1,
-        Text :
-            [
-            name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
-            type: 'char', allowBlank: 0,
-            shortcut: ['/tmp', '.', '~', '~/tmp', '/scratch'],
-            bubbleHelp:
-                'The name of the working directory for storing\n'
-                'QB DivCon intermediate calculations and logs.\n'
-                'The absolute path to the specified directory\n'
-                'will be stored and used at execution time.'
-            ],
-        Separator : 
-            [
-            vertical:0, shadow:'noline', extendH: 0, margin:1
-            ],
-        Checkbox :
-            [
-            name: 'cwd', text: 'CWD', onTrigger: 'return', 
-            bubbleHelp:
-                'Set the current working directory using\n'
-                'the run time environment variable $PWD.'
-            ]
-        ],
+// DEL    Separator : [flushLeft:1, extendH:1, margin:1],
+// DEL
+// DEL    Hbox :
+// DEL        [
+// DEL        name: 'wdbox', extendH: 1,
+// DEL        Text :
+// DEL            [
+// DEL            name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
+// DEL            type: 'char', allowBlank: 0,
+// DEL            shortcut: ['/tmp', '.', '~', '~/tmp', '/scratch'],
+// DEL            bubbleHelp:
+// DEL                'The name of the working directory for storing\n'
+// DEL                'QB DivCon intermediate calculations and logs.\n'
+// DEL                'The absolute path to the specified directory\n'
+// DEL                'will be stored and used at execution time.'
+// DEL            ],
+// DEL        Separator : 
+// DEL            [
+// DEL            vertical:0, shadow:'noline', extendH: 0, margin:1
+// DEL            ],
+// DEL        Checkbox :
+// DEL            [
+// DEL            name: 'cwd', text: 'CWD', onTrigger: 'return', 
+// DEL            bubbleHelp:
+// DEL                'Set the current working directory using\n'
+// DEL                'the run time environment variable $PWD.'
+// DEL            ]
+// DEL        ],
 
     Separator : [flushLeft:1, extendH:1, margin:1],
 
@@ -1531,25 +1531,25 @@ local function UpdateComplexChargeStatus [wkey, status, recchg, ligchg, warn]
     return status;
 endfunction
 
-/****************************************************************************
- *                          UpdateCWD
- *
- *  Update the window based on new CWD value.
- *
- ****************************************************************************/
-local function UpdateCWD [wkey, cwd, wd, prev]
-
-    if cwd === 1 then
-        WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
-        WindowSetData [wkey, [workdir: '']];
-        return wd;
-    else
-        WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0]]];
-        WindowSetData [wkey, [workdir: prev]];
-        return prev;
-    endif
-
-endfunction
+// DEL/****************************************************************************
+// DEL *                          UpdateCWD
+// DEL *
+// DEL *  Update the window based on new CWD value.
+// DEL *
+// DEL ****************************************************************************/
+// DELlocal function UpdateCWD [wkey, cwd, wd, prev]
+// DEL
+// DEL    if cwd === 1 then
+// DEL        WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
+// DEL        WindowSetData [wkey, [workdir: '']];
+// DEL        return wd;
+// DEL    else
+// DEL        WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0]]];
+// DEL        WindowSetData [wkey, [workdir: prev]];
+// DEL        return prev;
+// DEL    endif
+// DEL
+// DELendfunction
 
 function qb_ResetLigand;
 
@@ -1747,11 +1747,12 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
 
     local btid;
 
-    if trig === 'cwd' then
-        status.prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir,
-            status.prevwd];
-
-    elseif trig === 'mode' then
+// DEL    if trig === 'cwd' then
+// DEL        status.prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir,
+// DEL            status.prevwd];
+// DEL
+// DEL    elseif trig === 'mode' then
+    if trig === 'mode' then
         UpdateMode [wkey, vals, status];
 
     elseif trig === 'allposes' then
@@ -2352,10 +2353,10 @@ global function qb_InitCorePanel [wkey, status, defaults]
 
     qb_HamSetsInit [];
 
-    status.prevwd = defaults.workdir;
+// DEL    status.prevwd = defaults.workdir;
     WindowSetData [wkey, dropfirst defaults];
-    WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1],
-        allposes: [sensitive: 0],
+// DEL    WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1],
+    WindowSetAttr [wkey, [allposes: [sensitive: 0],
         recbox: [sensitive: 0], recdb: [allowBlank: 1],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
         poseschg: [sensitive: 0],
@@ -3225,7 +3226,8 @@ global function qb_TagCoreVals [vals]
 
     local coreopts = tag [first tr CORE_OPT_DEFAULTS, [
         second first CORE_OPT_DEFAULTS,
-        vals.mode, vals.allposes, vals.cwd, vals.workdir, vals.scoredb,
+// DEL        vals.mode, vals.allposes, vals.cwd, vals.workdir, vals.scoredb,
+        vals.mode, vals.allposes, vals.scoredb,
         vals.recdb, vals.posedb,
         vals.testLP, vals.testOverlap, vals.testHam,
         vals.testH, vals.testMM,
@@ -3464,8 +3466,8 @@ global function qb_UpdateCorePanel [wkey, status, coreopts]
     endif
 
     UpdateMode [wkey, coreopts, status];
-    status.prevwd = UpdateCWD [wkey, coreopts.cwd, coreopts.workdir, 
-        coreopts.workdir];
+// DEL    status.prevwd = UpdateCWD [wkey, coreopts.cwd, coreopts.workdir, 
+// DEL        coreopts.workdir];
 
     return status;
 endfunction
