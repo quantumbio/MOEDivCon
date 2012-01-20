@@ -2,7 +2,7 @@
 #if 0
  // BEGIN COPYRIGHT
  /***********************************************************************
-    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    Copyright (c) 1998-2012 QuantumBio Inc. and/or its affiliates.
     
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
@@ -323,14 +323,13 @@ local function RunCalc [dbkey]
     local pertail = fbase ftail dbpath;
     local perfile = twrite ['{}/{}.h5', perpath, pertail];
 
-    local workdir;
-    if coreopts.cwd === 1 then
-        workdir = getenv 'PWD';
-    else
-        workdir = fabsname coreopts.workdir;
-    endif
-
-    coreopts.workdir = workdir;
+    local workdir = cd [];
+// DEL    if coreopts.cwd === 1 then
+// DEL        workdir = getenv 'PWD';
+// DEL    else
+// DEL        workdir = fabsname coreopts.workdir;
+// DEL    endif
+// DEL    coreopts.workdir = workdir;
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
@@ -401,14 +400,13 @@ local function RunOneToManyCalc [oldkey]
     local pertail = fbase ftail dbpath;
     local perfile = twrite ['{}/{}.h5', perpath, pertail];
 
-    local workdir;
-    if coreopts.cwd === 1 then
-        workdir = getenv 'PWD';
-    else
-        workdir = fabsname coreopts.workdir;
-    endif
-
-    coreopts.workdir = workdir;
+    local workdir = cd [];
+// DEL    if coreopts.cwd === 1 then
+// DEL        workdir = getenv 'PWD';
+// DEL    else
+// DEL        workdir = fabsname coreopts.workdir;
+// DEL    endif
+// DEL    coreopts.workdir = workdir;
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 

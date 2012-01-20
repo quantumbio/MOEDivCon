@@ -2,7 +2,7 @@
 #if 0
  // BEGIN COPYRIGHT
  /***********************************************************************
-    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    Copyright (c) 1998-2012 QuantumBio Inc. and/or its affiliates.
 	
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
@@ -116,10 +116,10 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
 
     local subdirname, delsubdir = 0;
     if coreopts.task === [] or coreopts.task === 0 then
-        subdirname = coreopts.workdir;
+        subdirname = cd [];
     else
         delsubdir = 1;
-        subdirname = twrite ['{}/qb_out{n:}', coreopts.workdir, coreopts.task];
+        subdirname = twrite ['{}/qb_out{n:}', cd [], coreopts.task];
         local okay = _fmkdir subdirname;
         if okay === -1 then
             errmess = cat [swrite ['Unable to create subdirectory:  {}',

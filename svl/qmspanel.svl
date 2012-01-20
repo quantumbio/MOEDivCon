@@ -2,7 +2,7 @@
 #if 0
  // BEGIN COPYRIGHT
  /***********************************************************************
-    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    Copyright (c) 1998-2012 QuantumBio Inc. and/or its affiliates.
 	
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
@@ -358,8 +358,10 @@ global function qb_QMScoreSetupPanel []
                                 origligmol = ldlig;
                                 local chainsList = mol_Create ldrec;
                                 pro_Join chainsList;
+                                oSetCollection ['Receptor', cat oAtoms chainsList];
                                 ligatoms = cat oAtoms mol_Create origligmol;
                                 oSetCollection ['QB_LIGAND', ligatoms];
+                                oSetCollection ['LIGX_LIGAND', ligatoms];
                                 aSetNucleusLook [ligatoms, 'small-sphere'];
                                 aSetBondLook [ligatoms, 'cylinder'];
                             endif
@@ -367,7 +369,9 @@ global function qb_QMScoreSetupPanel []
                         View [];
                         dbv_Open db_Filename ldkey;
                         db_Close ldkey;
+                        ldcoreopts.scoredb=dbpath;
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
+write ['test: {}\n',ldcoreopts.scoredb]; // DEL
                         WindowSetData [wkey, ldqmsopts];
                     endif
 
