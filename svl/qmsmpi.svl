@@ -392,7 +392,7 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
 endfunction
 
 global function qb_QMScorePair [recmol, ligmol, perfile, coreopts, qmsopts,
-        status,errortests,nonQBtagged] 
+        status,errortests,nonQBtagged,workdir] 
     sleep 1;    // allows previous script to open the right mdb file for monitoring.
     local [osys, nsys] = SystemPush [];
     bRUN_MPI = 0;
@@ -405,7 +405,6 @@ global function qb_QMScorePair [recmol, ligmol, perfile, coreopts, qmsopts,
     local errmess = "", success = 0;
 
     //  exe_open child process inherits parent's environment.
-    local workdir = cd [];
     local process_keys,stdin,stdout,stderr,start;
     local recressets = mol_Create recmol;
     cSetName [recressets,recmol(1)(MOL_NAME)];
@@ -475,7 +474,7 @@ global function qb_QMScoreMDB [dbkey, jobid]
     local dbrowkeys = db_Entries [dbkey];
     local nrows = db_nEntries [dbkey];
     
-    local workdir = cd [];
+    local workdir = fpath fabsname dbkey;
     local pertail = fbase ftail dbkey;
     local perfile = twrite ['{}/{}.h5', workdir, pertail];
 

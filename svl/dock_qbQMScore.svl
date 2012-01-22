@@ -231,7 +231,7 @@ global function dock_score_qbQMScore [cmd, arg, opt]
     local perfile = twrite ['{}/{}.h5', fpath fabsname db_Filename dbkey, 
         fbase ftail fabsname db_Filename dbkey];
 
-    local [results, errmess] = qb_QMScorePair [recMolNew, ligMolNew, perfile, coreopts, qmsopts, status, errortests];
+    local [results, errmess] = qb_QMScorePair [recMolNew, ligMolNew, perfile, coreopts, qmsopts, status, errortests,fpath fabsname db_Filename dbkey];
 
     if results === [] then
         if errmess === [] or errmess === '' then
