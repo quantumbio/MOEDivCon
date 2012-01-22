@@ -275,10 +275,18 @@ const CORE_PANEL =
         name: 'testbox',
         Vbox :
             [
-            extendH: 1, title: 'Molecule Tests:',
+            extendH: 1, title: 'Structure:',
             Button :
                 [
-                name: 'performtests', text: 'Perform', extendH:1, 
+                name: 'performtests', text: 'Tests', extendH:1, 
+                bubbleHelp:
+                    'Perform the selected tests on the molecules\n'
+                    'in the MOE Window and/or those stored in\n'
+                    'the opened corresponding QMScore database.'
+                ],
+            Button :
+                [
+                name: 'preparation', text: 'Preparation', extendH:1, 
                 bubbleHelp:
                     'Perform the selected tests on the molecules\n'
                     'in the MOE Window and/or those stored in\n'
@@ -1722,7 +1730,8 @@ endfunction
 global function qb_CoreEnable [wkey, which]
 
     WindowSetAttr [wkey, [dbbox: [sensitive: which],
-            wdbox: [sensitive: which], modebox: [sensitive: which], 
+// DEL            wdbox: [sensitive: which], 
+            modebox: [sensitive: which], 
             recbox: [sensitive: which], posebox: [sensitive: which], 
             chargebox: [sensitive: which], testbox: [sensitive: which],
             calcbox: [sensitive: which]]];

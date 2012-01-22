@@ -3,7 +3,7 @@
  // BEGIN COPYRIGHT
  /***********************************************************************
     Copyright (c) 1998-2012 QuantumBio Inc. and/or its affiliates.
-	
+    
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
 
@@ -22,7 +22,7 @@
  // END COPYRIGHT
 #endif      
 
-	//    qmspanel.svl    User-interface entrypoint to QMScore calculations
+    //    qmspanel.svl    User-interface entrypoint to QMScore calculations
 
 #set title   'QuantumBio QMScore Panel'
 #set class   'QuantumBio'
@@ -59,7 +59,7 @@ function qb_GetQMS_dbFields;
 
 function pro_Join;
 
-	//  Data tags are in the order in which they are returned by DivCon.
+    //  Data tags are in the order in which they are returned by DivCon.
 
 const QMS_DATA_TAGS =
     [
@@ -194,7 +194,7 @@ const PANEL =
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
-	//  Local Functions
+    //  Local Functions
 
 /****************************************************************************
  *                          LoadDB
@@ -217,12 +217,29 @@ local function LoadDB [dbpath]
     return [dbkey, receptor, ligand, status, coreopts, qmsopts];
 endfunction
 
+function qb_TagQMSVals;
+
+
+local function UpdateDB[vals]
+    local coreopts = qb_TagCoreVals [vals];
+// DEL    local qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
+// DEL        vals.freq, vals.opt, vals.shift,
+// DEL        vals.analpwd]];
+    local qmsopts = qb_TagQMSVals [vals];
+
+    qb_SaveOptions [coreopts, qmsopts];
+
+    local msg_key = Message [0, 'MOEDivCon QMScore update is done.'];
+    sleep 1;
+    Message [msg_key];
+endfunction
+
 function qb_GetQMSEnv;
 
-	//  Global Functions
+    //  Global Functions
 
 global function qb_GetQMS_dbFields []
-	return QMS_NUM_FIELDS;
+    return QMS_NUM_FIELDS;
 endfunction
 
 /****************************************************************************
@@ -314,6 +331,7 @@ global function qb_QMScoreSetupPanel []
     if WindowShow ['QMScorePanel', 1] then return; endif
 
     local coreopts = [], qmsopts = [], browsetasks = [], dbkey = 0;
+    static dbFileName = [];
     status = qb_GetDefaultsStatus [];
     status = qb_SetAppStatus [status, 'qms'];
     local coredflts = qb_GetDefaultsCore [];
@@ -346,10 +364,13 @@ global function qb_QMScoreSetupPanel []
                             exit [];
                         endif
 
-                        local [ldkey, ldrecs, ldligs, ldsts, ldcoreopts,
+                        local ldrecs, ldligs, ldsts,ldcoreopts,ldqmsopts;
+                        [dbkey, ldrecs, ldligs, ldsts, ldcoreopts,
                             ldqmsopts] = LoadDB [dbpath];
+// DEL                        local [ldkey, ldrecs, ldligs, ldsts, ldcoreopts,
+// DEL                            ldqmsopts] = LoadDB [dbpath];
                             
-    	                Close [force:1];
+                        Close [force:1];
                         local idx = 1;
                         if length ldrecs >= 1 then
                             local ldrec = ldrecs(idx);
@@ -367,11 +388,18 @@ global function qb_QMScoreSetupPanel []
                             endif
                         endif
                         View [];
-                        dbv_Open db_Filename ldkey;
-                        db_Close ldkey;
+                        dbFileName = db_Filename dbkey;
+                        dbv_Open dbFileName;
+                        db_Close dbkey;
                         ldcoreopts.scoredb=dbpath;
                         status = qb_UpdateCorePanel [wkey, ldsts, ldcoreopts];
-write ['test: {}\n',ldcoreopts.scoredb]; // DEL
+                        WindowSetAttr [wkey, [modebox:  [sensitive: 0]]]; // when updating, can't change mode.
+                        WindowSetAttr [wkey, [recbox:   [sensitive: 0]]]; // when updating, can't change mode.
+                        WindowSetAttr [wkey, [posebox:  [sensitive: 0]]]; // when updating, can't change mode.
+                        WindowSetAttr [wkey, [dbbox:    [sensitive: 0]]]; // when updating, can't change mode.
+                        WindowSetAttr [wkey, [panel:    [onTrigger: ['return', 'validate', 'return', 'return', 'return']]]];
+                        WindowSetAttr [wkey, [panel:    [sensitive: [1, 0, 1, 1, 1]]]];
+
                         WindowSetData [wkey, ldqmsopts];
                     endif
 
@@ -392,12 +420,15 @@ write ['test: {}\n',ldcoreopts.scoredb]; // DEL
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
-					qmsopts = qb_TagQMSVals[vals];
-                    dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
-                        [], QMS_NUM_FIELDS, 'qmscore', status.notforced];
-
-                    local dbFileName = db_Filename dbkey;
-                    db_Close dbkey;
+                    qmsopts = qb_TagQMSVals[vals];
+                    if dbFileName === [] then
+                        dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
+                            [], QMS_NUM_FIELDS, 'qmscore', status.notforced];
+                        dbFileName = db_Filename dbkey;
+                        db_Close dbkey;
+                    else
+                        UpdateDB [vals];
+                    endif
                     dbv_Open dbFileName;
                     qb_QMScoreMDB[dbFileName];
 
@@ -419,9 +450,10 @@ write ['test: {}\n',ldcoreopts.scoredb]; // DEL
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
-                    qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS,
-                        [vals.freq, vals.opt, vals.shift,
-                        vals.analpwd]];
+// DEL                    qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS,
+// DEL                        [vals.freq, vals.opt, vals.shift,
+// DEL                        vals.analpwd]];
+                    coreopts = qb_TagQMSVals [vals];
 
                     dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', status.notforced];
@@ -435,14 +467,17 @@ write ['test: {}\n',ldcoreopts.scoredb]; // DEL
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
 
-                    coreopts = qb_TagCoreVals [vals];
-                    qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
-                        vals.freq, vals.opt, vals.shift,
-                        vals.analpwd]];
-
-                    qb_SaveOptions [coreopts, qmsopts];
-
-                    Message [0, 'MOEDivCon QMScore update is done.'];
+                    UpdateDB [vals];
+// DEL                    
+// DEL                    coreopts = qb_TagCoreVals [vals];
+// DEL                    qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
+// DEL                        vals.freq, vals.opt, vals.shift,
+// DEL                        vals.analpwd]];
+// DEL
+// DEL                    qb_SaveOptions [coreopts, qmsopts];
+// DEL
+// DEL                    Message [0, 'MOEDivCon QMScore update is done.'];
+// DEL                    
                     sleep 2;
                     exit [];
                 endif
