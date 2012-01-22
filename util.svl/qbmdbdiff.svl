@@ -330,7 +330,7 @@ local function main [errlog, basemdb, testmdb, field, delta, pwd]
     endloop
 
     if pwd then
-        pwddiff [errf, basekey, testkey, delta];
+        //pwddiff [errf, basekey, testkey, delta];
     endif
 
     fclose errf;
