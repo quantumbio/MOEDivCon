@@ -436,6 +436,7 @@ global function qb_QMScoreSetupPanel []
     status = qb_GetDefaultsStatus [];
     status = qb_SetAppStatus [status, 'qms'];
     local coredflts = qb_GetDefaultsCore [];
+
     local appdflts = tag tr QMSCORE_OPT_DEFAULTS;
     coredflts = tagpoke [coredflts, 'scoredb', 'qmscore.mdb'];
 
