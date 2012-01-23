@@ -105,8 +105,8 @@ const STATUS_DEFAULTS =
 const CORE_OPT_DEFAULTS =
     [
     ['task',         0             ],
-	//    ['mode',         'One-to-One'  ],
-    ['mode',         'Many-to-Many'  ],
+    ['mode',         'One-to-One'  ],
+   // ['mode',         'Many-to-Many'  ],
     ['allposes',     0             ],
 // DEL    ['cwd',          1             ],
 // DEL    ['workdir',      ''            ],
@@ -122,7 +122,7 @@ const CORE_OPT_DEFAULTS =
     ['ligchg',       0             ],
     ['colchg',       0             ],
     ['poseschg',     0             ],
-    ['ham',          5             ],
+// DEL    ['ham',          5             ],
     ['scaling',      1             ]
     ];
 
@@ -138,15 +138,15 @@ const RUN_MODES =
     'Many-to-Many'
     ];
 
-const HAMILTONIANS =
-    [
-    'AM1',
-    'MNDO',
-    'MNDO/d',
-    'PDDG-PM3',
-    'PM3',
-    'PM6'
-    ];
+// DELconst HAMILTONIANS =
+// DEL    [
+// DEL    'AM1',
+// DEL    'MNDO',
+// DEL    'MNDO/d',
+// DEL    'PDDG-PM3',
+// DEL    'PM3',
+// DEL    'PM6'
+// DEL    ];
 
 const HAM_KEYS =
     [
@@ -158,10 +158,22 @@ const HAM_KEYS =
     'pm6'
     ];
 
-const ALG_OPTS =
+// DELconst ALG_OPTS =
+// DEL    [
+// DEL    'Linear Scaling',
+// DEL    'Cubic Scaling'
+// DEL    ];
+
+const REC_SETS =
     [
-    'Linear Scaling',
-    'Cubic Scaling'
+        'Receptor Atoms',
+        'MDB File'
+    ];
+
+const LIG_SETS =
+    [
+        'Ligand Atoms',
+        'MDB File'
     ];
 
 const CORE_PANEL =
@@ -171,7 +183,8 @@ const CORE_PANEL =
         name: 'dbbox', extendH: 1,
         FSBText :
             [
-            name: 'scoredb', len: 40, extendH: 1, title: 'Output DB:',
+// DEL            name: 'scoredb', len: 40, extendH: 1, title: 'Output DB:',
+            name: 'scoredb', extendH: 1, title: 'Output:',
             mode: 'saveAs', allowBlank: 0,
             bubbleHelp:
                 'The name of the output database that will hold\n'
@@ -211,67 +224,106 @@ const CORE_PANEL =
 
     Separator : [flushLeft:1, extendH:1, margin:1],
 
-    Hbox :
+    Vbox :
         [
-        name: 'modebox',
-        Radio :
+        name: 'modebox', extendH:1,
+// DEL        Radio :
+// DEL            [
+// DEL            name: 'mode', text: RUN_MODES, columns: 4,
+// DEL            extendH: 1, onTrigger: 'return', title: 'Mapping Mode:',
+// DEL            type: 'char',
+// DEL            bubbleHelp:
+// DEL                'The mapping mode of receptors to ligand/poses:\n'
+// DEL                '  SinglePoint:  The receptor only.\n'
+// DEL                '  One-to-One:  One ligand docked into one receptor.\n'
+// DEL                '  One-to-Many:  Many ligand poses docked into the same receptor.\n'
+// DEL                '  Many-to-Many:  Many ligand poses, each docked into its own receptor.'
+// DEL            ],
+// DEL        Separator : 
+// DEL            [
+// DEL            vertical:0, shadow:'noline', extendH: 0, margin:1
+// DEL            ],
+// DEL        Checkbox :
+// DEL            [
+// DEL            name: 'allposes', text: 'Show all poses?',
+// DEL            onTrigger: 'return',
+// DEL            bubbleHelp:
+// DEL                'Load all of the poses from the database\n'
+// DEL                'and show them in the MOE Window.'
+// DEL            ]
+
+    Hbox: 
+    [
+        Option :
             [
-            name: 'mode', text: RUN_MODES, columns: 4, minWidth: 12, 
-            extendH: 1, onTrigger: 'return', title: 'Mapping Mode:',
-            type: 'char',
+            name: 'receptorset', title: 'Receptor:', text: REC_SETS,
+            type: 'char', minWidth: 8, onTrigger: 'return',
             bubbleHelp:
-                'The mapping mode of receptors to ligand/poses:\n'
-                '  SinglePoint:  The receptor only.\n'
-                '  One-to-One:  One ligand docked into one receptor.\n'
-                '  One-to-Many:  Many ligand poses docked into the same receptor.\n'
-                '  Many-to-Many:  Many ligand poses, each docked into its own receptor.'
+                'The set of atoms (or file) that defines the entire receptor.\n'
             ],
-        Separator : 
+        Button : 
             [
-            vertical:0, shadow:'noline', extendH: 0, margin:1
-            ],
-        Checkbox :
-            [
-            name: 'allposes', text: 'Show all poses?',
-            onTrigger: 'return',
+            name: 'recshow', text: '?', font: 'mediumBold',
             bubbleHelp:
-                'Load all of the poses from the database\n'
-                'and show them in the MOE Window.'
+                'Show the receptor atoms.'
             ]
-        ],
+	],
 
     Hbox :
-        [
+    [
         name: 'recbox', extendH: 1,
         FSBText :
             [
-            name: 'recdb', len: 40, extendH: 1, title: 'Receptor DB:',
+// DEL            name: 'recdb', len: 40, extendH: 1, title: 'Receptor DB:',
+            name: 'recdb', extendH: 1,
             mode: 'open', allowBlank: 0,
             bubbleHelp:
                 'The name of the input database that holds\n'
                 'the receptors.'
             ],
         Button : [ name: 'browse_recdb', text: 'Browse...' ]
-        ],
+    ],
 
+    Hbox :
+    [
+        Option :
+        [
+            name: 'ligandset', title: 'Ligand:', text: LIG_SETS,
+            type: 'char', minWidth: 8, onTrigger: 'return',
+            bubbleHelp:
+                'The set of atoms (or file) that defines the ligand to score.\n'
+        ],
+	    Button : 
+	    [
+            name: 'ligshow', text: '?', font: 'mediumBold',
+            bubbleHelp:
+                'Show the ligand atoms.'
+	    ]
+	],
+                        
     Hbox :
         [
         name: 'posebox', extendH: 1,
         FSBText :
             [
-            name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
+// DEL            name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
+            name: 'posedb', extendH: 1,
             mode: 'open', allowBlank: 0,
             bubbleHelp:
                 'The name of the input database that holds\n'
                 'the ligand poses (and possibly scores).'
             ],
         Button : [ name: 'browse_posedb', text: 'Browse...' ]
+        ]
+
         ],
 
     Separator : [flushLeft:1, extendH:1, margin:1],
 
+    Mbox :
+        [   columns: 2, columnMajor: 1, extendH: 1,
     Hbox :
-        [
+        [  extendH: 1,
         name: 'testbox',
         Vbox :
             [
@@ -286,81 +338,81 @@ const CORE_PANEL =
                 ],
             Button :
                 [
-                name: 'preparation', text: 'Preparation', extendH:1, 
+                name: 'performprep', text: 'Preparation', extendH:1, 
                 bubbleHelp:
                     'Perform the selected tests on the molecules\n'
                     'in the MOE Window and/or those stored in\n'
                     'the opened corresponding QMScore database.'
                 ]
-            ],
-        Separator : 
-            [
-            vertical:0, shadow:'noline', extendH: 0, margin:1
-            ],
-        Mbox :
-            [
-            columns: 4, spacingH: 'medium',
-            extendH: 1, name: 'moltests',
-                Label :
-                    [
-                    font: 'mediumBold', text: 'Error:', 
-                    bubbleHelp:
-                        'These are tests for problems with the receptor(s)\n'
-                        'and ligand(s) that will cause DivCon to fail.'
-                    ],
-                Checkbox :
-                    [
-                    name: 'testLP', text: 'Lone Pairs',
-                    bubbleHelp:
-                        'Check to ensure that there are no lone pairs\n'
-                        '(often the result of MOE misparsing a PDB file).'
-                    ],
-                Checkbox :
-                    [
-                    name: 'testOverlap', text: 'Atom Overlap',
-                    bubbleHelp:
-                        'Check to ensure that there are no\n'
-                        'overlapping atoms (inter- and intramolecular).'
-                    ],
-                Checkbox :
-                    [
-                    name: 'testHam', text: 'Compatibility',
-                    bubbleHelp:
-                        'Check to ensure that all atoms are\n'
-                        'compatible with the chosen Hamiltonian.'
-                    ],
-                Label :
-                    [
-                    font: 'mediumBold', text: 'Warning:',
-                    bubbleHelp:
-                        'These are tests for problems with the receptor(s)\n'
-                        'and ligand(s) that may or may not cause DivCon to\n'
-                        ' fail, but the results will probably be questionable.'
-                    ],
-                Checkbox :
-                    [
-                    name: 'testH', text: 'Missing/Extra H',
-                    bubbleHelp:
-                        'Check to ensure that there are no missing or\n'
-                        'extra H (e.g., truncated residue, C=OH, etc.).'
-                    ],
-                Checkbox :
-                    [
-                    name: 'testMM', text: 'No MM Type',
-                    bubbleHelp:
-                        'Check to ensure that all atoms\n'
-                        'have a defined MM atom type.'
-                    ]
             ]
+// DEL        Separator : 
+// DEL            [
+// DEL            vertical:0, shadow:'noline', extendH: 0, margin:1
+// DEL            ],
+// DEL        Mbox :
+// DEL            [
+// DEL            columns: 4, spacingH: 'medium',
+// DEL            extendH: 1, name: 'moltests',
+// DEL                Label :
+// DEL                    [
+// DEL                    font: 'mediumBold', text: 'Error:', 
+// DEL                    bubbleHelp:
+// DEL                        'These are tests for problems with the receptor(s)\n'
+// DEL                        'and ligand(s) that will cause DivCon to fail.'
+// DEL                    ],
+// DEL                Checkbox :
+// DEL                    [
+// DEL                    name: 'testLP', text: 'Lone Pairs',
+// DEL                    bubbleHelp:
+// DEL                        'Check to ensure that there are no lone pairs\n'
+// DEL                        '(often the result of MOE misparsing a PDB file).'
+// DEL                    ],
+// DEL                Checkbox :
+// DEL                    [
+// DEL                    name: 'testOverlap', text: 'Atom Overlap',
+// DEL                    bubbleHelp:
+// DEL                        'Check to ensure that there are no\n'
+// DEL                        'overlapping atoms (inter- and intramolecular).'
+// DEL                    ],
+// DEL                Checkbox :
+// DEL                    [
+// DEL                    name: 'testHam', text: 'Compatibility',
+// DEL                    bubbleHelp:
+// DEL                        'Check to ensure that all atoms are\n'
+// DEL                        'compatible with the chosen Hamiltonian.'
+// DEL                    ],
+// DEL                Label :
+// DEL                    [
+// DEL                    font: 'mediumBold', text: 'Warning:',
+// DEL                    bubbleHelp:
+// DEL                        'These are tests for problems with the receptor(s)\n'
+// DEL                        'and ligand(s) that may or may not cause DivCon to\n'
+// DEL                        ' fail, but the results will probably be questionable.'
+// DEL                    ],
+// DEL                Checkbox :
+// DEL                    [
+// DEL                    name: 'testH', text: 'Missing/Extra H',
+// DEL                    bubbleHelp:
+// DEL                        'Check to ensure that there are no missing or\n'
+// DEL                        'extra H (e.g., truncated residue, C=OH, etc.).'
+// DEL                    ],
+// DEL                Checkbox :
+// DEL                    [
+// DEL                    name: 'testMM', text: 'No MM Type',
+// DEL                    bubbleHelp:
+// DEL                        'Check to ensure that all atoms\n'
+// DEL                        'have a defined MM atom type.'
+// DEL                    ]
+// DEL            ]
         ],
 
-    Separator : [flushLeft:1, extendH:1, margin:1],
+// DEL    Separator : [flushLeft:1, extendH:1, margin:1],
 
     Hbox :
         [
         name: 'chargebox', extendH: 1, title: 'Charges:',
         Vbox :
-            [
+            [ extendH:1,
             Button :
                 [
                 name: 'calcchg', text: 'Calculate', extendH:1, 
@@ -376,20 +428,20 @@ const CORE_PANEL =
                     'and "Lig Chg" fields of the QMScore database.'
                 ]
             ],
-        Separator : 
-            [
-            vertical:0, shadow:'noline', extendH: 0, margin:1
-            ],
+// DEL        Separator : 
+// DEL            [
+// DEL            vertical:0, shadow:'noline', extendH: 0, margin:1
+// DEL            ],
 
         Pager:
-            [
+            [ extendH:1,
             name: 'chgbox',
             Vbox :
                 [
                 Hbox :
                     [
                     name: 'recchgbox',
-                    extendH: 1,
+                    extendH:1,
                     Label :
                         [
                         name: 'recflg', title: 'Receptor:',
@@ -398,19 +450,19 @@ const CORE_PANEL =
                             '   White:   uncalculated or user-entered charge.\n'
                             '   Green:   charge calculated by MOE.\n'
                             '   Red:      charge problematic for DivCon.'
-                        ],
-                    Text :
-                        [
-                        name: 'recchg', allowBlank: 0,
-                        type: 'int', minWidth: 4,
-                        onTrigger: 'return',
-                        bubbleHelp:
-                            'Total charge of receptor.'
                         ]
+// DEL                    Text :
+// DEL                        [
+// DEL                        name: 'recchg', allowBlank: 0,
+// DEL                        type: 'int', minWidth: 4,
+// DEL                        onTrigger: 'return',
+// DEL                        bubbleHelp:
+// DEL                            'Total charge of receptor.'
+// DEL                        ]
                     ],
                 Hbox :
                     [
-                    extendH: 1,
+                    extendH:1,
                     Label :
                         [
                         name: 'ligflg', title: 'Ligand:',
@@ -421,22 +473,22 @@ const CORE_PANEL =
                             '   Yellow:  MOE\'s charge was adjusted.\n'
                             '   Red:      charge problematic for DivCon.'
 
-                        ],
-                    Text :
-                        [
-                        name: 'ligchg', allowBlank: 0,
-                        type: 'int', minWidth: 4, extendH: 1,
-                        onTrigger: 'return',
-                        bubbleHelp:
-                            'Total charge of ligand.'
-                        ],
-                    Checkbox :
-                        [
-                        name: 'poseschg', text: 'All Poses',
-                        bubbleHelp:
-                            'Use the ligand charge for all\n'
-                            'poses in the poses database.'
                         ]
+// DEL                    Text :
+// DEL                        [
+// DEL                        name: 'ligchg', allowBlank: 0,
+// DEL                        type: 'int', minWidth: 4, extendH: 1,
+// DEL                        onTrigger: 'return',
+// DEL                        bubbleHelp:
+// DEL                            'Total charge of ligand.'
+// DEL                        ]
+// DEL                    Checkbox :
+// DEL                        [
+// DEL                        name: 'poseschg', text: 'All Poses',
+// DEL                        bubbleHelp:
+// DEL                            'Use the ligand charge for all\n'
+// DEL                            'poses in the poses database.'
+// DEL                        ]
                     ]
                 ],
             Vbox :
@@ -463,39 +515,49 @@ const CORE_PANEL =
                             'Total charge of collection.'
                         ]
                     ]
-                ]
+                ] ]
             ]
         ],
+                Data :  [   name: 'testLP'  ],
+                Data :  [   name: 'testOverlap' ],
+                Data :  [   name: 'testHam' ],
+                Data :  [   name: 'testH'   ],
+                Data :  [   name: 'testMM'  ],
+                Data :  [   name: 'poseschg'  ],
+                Data :  [   name: 'mode'  ],
+                Data :  [   name: 'allposes'  ],
+                Data :  [   name: 'recchg'  ],
+                Data :  [   name: 'ligchg'  ],
 
-    Separator : [flushLeft:1, extendH:1, margin:1],
+// DEL    Separator : [flushLeft:1, extendH:1, margin:1],
 
-    Hbox :
-        [
-        name: 'calcbox', extendH: 1,
-        Option :
-            [
-            name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
-            type: 'int', minWidth: 8,
-            bubbleHelp:
-                ''
-            ],
-        Separator : 
-            [
-            vertical:0, shadow:'noline', extendH: 0, margin:1
-            ],
-        Option :
-            [
-            name: 'scaling', title: 'Calculation:', text: ALG_OPTS,
-            type: 'int', minWidth: 8,
-            bubbleHelp:
-                'Linear vs. Cubic refers to the scaling factor of the\n'
-                'calculation where Linear scales accordingly to O(n)\n'
-                'and Cubic scaling is the more conventional variety\n'
-                '(e.g. O(n^3) or worse) where n corresponds to the number\n'
-                'of electrons in the system. The cross over point is at\n'
-                'approximately 450 atoms.'
-            ]
-        ],
+// DEL    Hbox :
+// DEL        [
+// DEL        name: 'calcbox', extendH: 1,
+// DEL        Option :
+// DEL            [
+// DEL            name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
+// DEL            type: 'int', minWidth: 8,
+// DEL            bubbleHelp:
+// DEL                ''
+// DEL            ],
+// DEL        Separator : 
+// DEL            [
+// DEL            vertical:0, shadow:'noline', extendH: 0, margin:1
+// DEL            ],
+// DEL        Option :
+// DEL            [
+// DEL            name: 'scaling', title: 'Calculation:', text: ALG_OPTS,
+// DEL            type: 'int', minWidth: 8,
+// DEL            bubbleHelp:
+// DEL                'Linear vs. Cubic refers to the scaling factor of the\n'
+// DEL                'calculation where Linear scales accordingly to O(n)\n'
+// DEL                'and Cubic scaling is the more conventional variety\n'
+// DEL                '(e.g. O(n^3) or worse) where n corresponds to the number\n'
+// DEL                'of electrons in the system. The cross over point is at\n'
+// DEL                'approximately 450 atoms.'
+// DEL            ]
+// DEL        ],
 
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
@@ -545,6 +607,28 @@ const RESNAMESEQUIVSETS =
 
 
 	//***********************  Local Functions  *********************************
+
+function ShowSet name
+	local old_prio = task_prio 0;
+	local atoms = _Atoms name;
+	local all_atoms = Atoms[];
+	atoms = join [atoms, all_atoms];	// Is this necessary ??
+	if not length atoms then
+	    Warning 'Set contains no atoms.';
+	else
+	    local oldsel = aSelected all_atoms;
+//	    aSetSelected [all_atoms, indexof [all_atoms, atoms]];
+	    aSetSelected [all_atoms, 0];
+	    sleep 0.05;
+	    aSetSelected [atoms, 1];
+	    sleep 0.5;
+	    aSetSelected [atoms, 0];
+	    sleep 0.05;
+	    aSetSelected [all_atoms, oldsel];
+	endif
+	task_prio old_prio;
+endfunction
+
 
 /****************************************************************************
  *                          AtomOverlap
@@ -1159,7 +1243,6 @@ global G_hamsets;
 local function HamCompatability [appname, hamname, atoms]
 
     if appname === 'perturb' then appname = 'nmr'; endif
-
     local elems = uniq aElement atoms;
     local compatlist = tagpeek [G_hamsets, [appname, hamname]];
     local idx = indexof [elems, compatlist];
@@ -1222,7 +1305,6 @@ local function SetChargeStatus [wkey, iscollection, status]
         gr_destroy ligkey;
         gr_destroy reckey;
     endif
-
 endfunction
 
 /****************************************************************************
@@ -1755,6 +1837,7 @@ function qb_UpdateCharge;
 global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
 
     local btid;
+    local tmpSet;
 
 // DEL    if trig === 'cwd' then
 // DEL        status.prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir,
@@ -1764,6 +1847,45 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
     if trig === 'mode' then
         UpdateMode [wkey, vals, status];
 
+    elseif trig === 'receptorset' then
+        if vals.receptorset === 'MDB File' then
+            WindowSetAttr [wkey, [recdb: [sensitive: 1]]];
+            WindowSetAttr [wkey, [browse_recdb: [sensitive: 1]]];
+            WindowSetAttr [wkey, [posedb: [sensitive: 1]]];
+            WindowSetAttr [wkey, [browse_posedb: [sensitive: 1]]];
+            WindowSetAttr [wkey, [ligandset: [sensitive: 0]]];
+            WindowSetData [wkey, [ligandset: 'MDB File']];
+            WindowSetData [wkey, [mode: 'Many-to-Many']];
+        else
+            WindowSetAttr [wkey, [recdb: [sensitive: 0]]];
+            WindowSetAttr [wkey, [browse_recdb: [sensitive: 0]]];
+            WindowSetAttr [wkey, [ligandset: [sensitive: 1]]];
+            tmpSet = WindowGetData [wkey, 'ligandset'];
+            if tmpSet.ligandset === 'MDB File' then 
+                WindowSetData [wkey, [mode: 'One-to-Many']];
+            else
+                WindowSetData [wkey, [mode: 'One-to-One']];
+            endif
+        endif
+    elseif trig === 'ligandset' then
+        if vals.ligandset === 'MDB File' then
+            WindowSetAttr [wkey, [posedb: [sensitive: 1]]];
+            WindowSetAttr [wkey, [browse_posedb: [sensitive: 1]]];
+            tmpSet = WindowGetData [wkey, 'receptorset'];
+            if tmpSet.receptorset === 'MDB File' then 
+                WindowSetData [wkey, [mode: 'Many-to-Many']];
+            else
+                WindowSetData [wkey, [mode: 'One-to-Many']];
+            endif
+        else
+            WindowSetAttr [wkey, [posedb: [sensitive: 0]]];
+            WindowSetAttr [wkey, [browse_posedb: [sensitive: 0]]];
+            WindowSetData [wkey, [mode: 'One-to-One']];
+            WindowSetData [wkey, [receptorset: 'Receptor Atoms']];
+            WindowSetData [wkey, [recdb: '']];
+        endif
+	elseif trig == 'recshow'  then ShowSet '$$receptor';
+	elseif trig == 'ligshow'  then ShowSet '$$ligand';
     elseif trig === 'allposes' then
         if neL [vals.mode, 'One-to-Many'] then
             WindowSetData [wkey, [allposes: 0]];
@@ -1773,6 +1895,8 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
         [vals, ligatoms] = qb_ShowLigPoses [vals, ligatoms, 0];
         WindowSetData [wkey, [allposes: vals.allposes]];
 
+    elseif trig === 'performprep' then
+        run ['structprep_ui.svl'];
     elseif trig === 'performtests' then
         if allfalse [vals.testLP, vals.testOverlap, vals.testHam, vals.testH,
                 vals.testMM] then
@@ -2318,7 +2442,6 @@ endfunction
  *
  ****************************************************************************/
 global function qb_InterMoleculeOverlap [receptor, ligset]
-write ['in qb_InterMoleculeOverlap\n'];
     local mess = '';
     local pairs = AtomOverlap [receptor, ligset];
     if length pairs > 0 then
@@ -2369,7 +2492,7 @@ global function qb_InitCorePanel [wkey, status, defaults]
         recbox: [sensitive: 0], recdb: [allowBlank: 1],
         posebox: [sensitive: 0], posedb: [allowBlank: 1],
         poseschg: [sensitive: 0],
-        ham: [text: HAMILTONIANS | status.allowham],
+// DEL        ham: [text: HAMILTONIANS | status.allowham],
         mode: [text: RUN_MODES | status.allowmode],
         chgbox: [page: select [2, 1, defaults.mode === 'Single Point']],
         ckdbchg: [sensitive: defaults.mode === 'One-to-Many' 
@@ -2927,7 +3050,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
             [colok, colmess] = qb_TestDivCon ['collection', collection, 
                 coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
                 coreopts.testH, coreopts.testMM, status.appname,
-                (HAM_KEYS | status.allowham)(coreopts.ham)];
+                (HAM_KEYS | status.allowham)(appopts.ham)];
         endif
 
         if tok_length colmess > 0 then
@@ -2972,7 +3095,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
             [recok, recmess, ligok, ligmess] = TestComplex [
                 coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
                 coreopts.testH, coreopts.testMM, status.appname,
-                (HAM_KEYS | status.allowham)(coreopts.ham)];
+                (HAM_KEYS | status.allowham)(appopts.ham)];
         endif
 
         if tok_length recmess > 0 then
@@ -3033,7 +3156,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
             local pmess = CopyPoseDB [dbkey, posekey, coreopts.testLP,
                 coreopts.testOverlap, coreopts.testHam, coreopts.testH,
                 coreopts.testMM, status.appname,
-                (HAM_KEYS | status.allowham)(coreopts.ham),
+                (HAM_KEYS | status.allowham)(appopts.ham),
                 receptor, recstsmess];
             if neL [pmess, ''] then
                 db_Close posekey;
@@ -3041,7 +3164,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
                 Warning pmess;
                 exit [];
             endif
-        elseif not null coreopts.recdb then
+        elseif coreopts.mode === 'Many-to-Many' then
             if neL [fext coreopts.recdb, 'mdb'] then
                 Warning twrite ['{}\nis not a MOE database.', coreopts.recdb];
                 exit [];
@@ -3062,7 +3185,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
             local rmess = CopyRecPoseDB [dbkey, reckey, posekey, 
                 coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
                 coreopts.testH, coreopts.testMM, status.appname,
-                (HAM_KEYS | status.allowham)(coreopts.ham)];
+                (HAM_KEYS | status.allowham)(appopts.ham)];
             if neL [rmess, ''] then
                 db_Close reckey;
                 db_Close posekey;
@@ -3240,8 +3363,10 @@ global function qb_TagCoreVals [vals]
         vals.recdb, vals.posedb,
         vals.testLP, vals.testOverlap, vals.testHam,
         vals.testH, vals.testMM,
-        vals.recchg, vals.ligchg, vals.colchg, vals.poseschg, vals.ham,
-        vals.scaling]];
+        vals.recchg, vals.ligchg, vals.colchg, vals.poseschg
+// DEL        , vals.ham,
+        , vals.scaling
+        ]];
 
     return tagcat [coreopts,tag tr CORE_OPT_DEFAULTS];
 endfunction

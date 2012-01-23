@@ -257,7 +257,7 @@ local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,rowcnt,
     return results;
 endfunction
 
-local function InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts]
+local function InitMOEDivConQMScore[perfile,workdir,nrows,coreopts]
 
     //  exe_open child process inherits parent's environment.
     local process_key;
@@ -279,14 +279,14 @@ local function InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts]
 
     //  Pass down the dirs, options and number of possible jobs.
     fwrite [stdin, '{c:}\n', perfile];
-    fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', qmsopts.analpwd]];
+    fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', coreopts.analpwd]];
     fwrite [stdin, '{c:}\n', select ['COMPRESSION', 'NOCOMPRESSION', 1]];
     fwrite [stdin, '{c:}\n', select ['PERSISTCOMPLEXDENSITY', 'NOPERSISTCOMPLEXDENSITY', 0]];
     fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
     fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD', coreopts.scaling === 1]];
-    fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', qmsopts.freq]];
-    fwrite [stdin, '{c:}\n', LIG_KEYS(qmsopts.opt)];
-    fwrite [stdin, '{n:}\n', qmsopts.shift];
+    fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', coreopts.freq]];
+    fwrite [stdin, '{c:}\n', LIG_KEYS(coreopts.opt)];
+    fwrite [stdin, '{n:}\n', coreopts.shift];
     fwrite [stdin, '{n:}\n', nrows];
 
     local start = clock[];
@@ -391,7 +391,7 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
     
 endfunction
 
-global function qb_QMScorePair [recmol, ligmol, perfile, coreopts, qmsopts,
+global function qb_QMScorePair [recmol, ligmol, perfile, coreopts,
         status,errortests,nonQBtagged,workdir] 
     sleep 1;    // allows previous script to open the right mdb file for monitoring.
     local [osys, nsys] = SystemPush [];
@@ -410,7 +410,7 @@ global function qb_QMScorePair [recmol, ligmol, perfile, coreopts, qmsopts,
     cSetName [recressets,recmol(1)(MOL_NAME)];
     local ligressets = mol_Create ligmol;
     cSetName [ligressets,ligmol(1)(MOL_NAME)];
-    [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,rowcnt,qmsopts,coreopts];
+    [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,rowcnt,coreopts];
 
     //  Pass the two backbones to QuantumBio's DivCon QMScore
     //
@@ -469,6 +469,7 @@ global function qb_QMScoreMDB [dbkey, jobid]
     endif
 
     local [recmol, ligmol, status, coreopts, qmsopts] = qb_GetQMSEnv [dbkey];
+    coreopts = cat [coreopts,qmsopts];
     local ligflds = qb_GetPoseFields [];
     local recflds = qb_GetRecFields [];
     local dbrowkeys = db_Entries [dbkey];
@@ -488,7 +489,7 @@ global function qb_QMScoreMDB [dbkey, jobid]
 
     local process_keys,stdin,stdout,stderr,start;
     if bRUN_MPI then
-        [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts];
+        [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,coreopts];
     endif
 
     // process the fields in the QMScore mdb file and strip out the stuff we added
@@ -505,7 +506,7 @@ global function qb_QMScoreMDB [dbkey, jobid]
     for rowkey in dbrowkeys loop
 
         if not bRUN_MPI then
-            [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,qmsopts,coreopts];
+            [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,coreopts];
             qb_SaveDivConStatus [dbkey, rowkey, "Running....  "];
         endif
         
