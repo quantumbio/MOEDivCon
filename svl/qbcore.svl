@@ -1376,21 +1376,36 @@ endfunction
  ****************************************************************************/
 local function TestComplex [appname, hamname]
 
+    local recok = 0, recmess = '';
+    local ligok = 0, ligmess = '';
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
-    if recatoms === [] or ligatoms === [] then
-        return  [0, '', 0, errmess];
+// DEL    if recatoms === [] or ligatoms === [] then
+// DELwrite ['TestComplex IN IF |{}|\n',errmess];
+// DEL        return  [0, '', 0, errmess];
+// DEL    endif
+
+write ['length recatoms: {}\n', length recatoms]; // DEL
+    if not isnull recatoms then
+        [recok, recmess] = qb_TestDivCon ['receptor', recatoms, appname, hamname];
+    else
+        recmess = 'ERROR: Receptor Missing\n';
     endif
-
-    local [recok, recmess] = qb_TestDivCon ['receptor', recatoms, appname, hamname];
-    local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatoms, appname, hamname];
-
-    local intermess = '';
-// overlap 
-    intermess = qb_InterMoleculeOverlap [recatoms, ligatoms];
-    if neL [intermess, ''] then
-        recok = 0;
-        ligok = 0;
-        ligmess = tok_cat [ligmess, intermess];
+    
+    if not isnull ligatoms then
+        [ligok, ligmess] = qb_TestDivCon ['ligand', ligatoms, appname, hamname];
+    else
+        ligmess = 'WARNING/ERROR: Ligand missing\n';
+    endif
+    
+    if recok and ligok then
+        local intermess = '';
+    // overlap 
+        intermess = qb_InterMoleculeOverlap [recatoms, ligatoms];
+        if neL [intermess, ''] then
+            recok = 0;
+            ligok = 0;
+            ligmess = tok_cat [ligmess, intermess];
+        endif
     endif
 
     return [recok, recmess, ligok, ligmess];
@@ -1879,7 +1894,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
     elseif trig === 'performprep' then
         run ['structprep_ui.svl'];
     elseif trig === 'performtests' then
-    
+write ['vals: {}\n', vals];
         if vals.allposes then
             [vals, ligatoms] = qb_ResetLigand [wkey, vals];
         endif
@@ -1917,7 +1932,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
                 exit [];
             endif
         endif
-
+write ['vals.mode: {}\n', vals.mode];
         if vals.mode === 'Many-to-Many' then
             Message [msgkey, 
                 'Running tests on complex in MOE Window ... skipping.'];
@@ -2456,17 +2471,21 @@ global function qb_InitCorePanel [wkey, status, defaults]
     qb_HamSetsInit [];
 
 // DEL    status.prevwd = defaults.workdir;
-    WindowSetData [wkey, dropfirst defaults];
+    WindowSetData [wkey, defaults];
 // DEL    WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1],
-    WindowSetAttr [wkey, [allposes: [sensitive: 0],
-        recbox: [sensitive: 0], recdb: [allowBlank: 1],
-        posebox: [sensitive: 0], posedb: [allowBlank: 1],
-        poseschg: [sensitive: 0],
-// DEL        ham: [text: HAMILTONIANS | status.allowham],
-        mode: [text: RUN_MODES | status.allowmode],
-        chgbox: [page: select [2, 1, defaults.mode === 'Single Point']],
-        ckdbchg: [sensitive: defaults.mode === 'One-to-Many' 
-        or defaults.mode === 'Many-to-Many']]];
+    WindowSetAttr 
+        [wkey, 
+            [allposes: [sensitive: 0],
+                recbox: [sensitive: 0], recdb: [allowBlank: 1],
+                posebox: [sensitive: 0], posedb: [allowBlank: 1],
+                poseschg: [sensitive: 0]
+        // DEL        ham: [text: HAMILTONIANS | status.allowham],
+        // DEL        mode: [text: RUN_MODES | status.allowmode],
+//                 chgbox: [page: select [2, 1, defaults.mode === 'Single Point']],
+//                ckdbchg: [sensitive: defaults.mode === 'One-to-Many' 
+//                or defaults.mode === 'Many-to-Many']
+            ]
+        ];
 
     status = qb_UpdateCharge [wkey, defaults, status, 0];
 
@@ -3243,6 +3262,9 @@ global function qb_SplitComplex [testsingle]
     recatoms = cat [_Atoms '$$solvent', _Atoms '$$receptor'];
     ligatoms = _Atoms '$$ligand';
 
+//    if length ligatoms === 0 or length ligatoms >= length complexatoms then
+//        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
+//    endif
 
 
     return [recatoms,ligatoms, ''];
@@ -3488,7 +3510,7 @@ endfunction
 global function qb_UpdateCharge [wkey, vals, status, warn]
 
     if MOE_BATCH then exit ['Should only be run from MOE Window.']; endif
-
+write ['IN qb_UpdateCharge vals: {}\n',vals]; // DEL
     if vals.mode === 'Single Point' then
         local [colchg, colok, colerrmess] = CalcCollectionCharge [];
         if (colchg === [] or colok === []) then
@@ -3552,7 +3574,7 @@ global function qb_UpdateCorePanel [wkey, status, coreopts]
         status = UpdateComplexChargeStatus [wkey, status, coreopts.recchg, 
             coreopts.ligchg, 1];  
     endif
-
+write ['IN qb_UpdateCorePanel\n'];
     UpdateMode [wkey, coreopts, status];
 // DEL    status.prevwd = UpdateCWD [wkey, coreopts.cwd, coreopts.workdir, 
 // DEL        coreopts.workdir];
