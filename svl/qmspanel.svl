@@ -101,6 +101,7 @@ const QMSCORE_OPT_DEFAULTS =
         ['freq',         0             ],
         ['opt',          1             ],
         ['shift',        9.0           ],
+        ['ham',          5             ],
         ['analpwd',      1             ]       //  Generate PWD row data
     ];
 
@@ -109,6 +110,22 @@ const LIG_OPTS =
     'none',
     'free',
     'bound'
+    ];
+
+const ALG_OPTS =
+    [
+    'Linear Scaling',
+    'Cubic Scaling'
+    ];
+
+const HAMILTONIANS =
+    [
+    'AM1',
+    'MNDO',
+    'MNDO/d',
+    'PDDG-PM3',
+    'PM3',
+    'PM6'
     ];
 
 const HEADER = 
@@ -126,73 +143,157 @@ const HEADER =
         '']
     ];
 
-const PANEL =
-    [
-    Vbox :
+// DELconst PANEL =
+// DEL    [
+// DEL    Vbox :
+// DEL        [
+// DEL        Hbox :
+// DEL            [
+// DEL            extendH: 1,
+// DEL            Option :
+// DEL                [
+// DEL                name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
+// DEL                type: 'int', minWidth: 5, extendH: 1,
+// DEL                bubbleHelp:
+// DEL                    'A QM-based ligand optimization can be performed\n'
+// DEL                    'prior to scoring. This optimization may occur\n'
+// DEL                    'either while the ligand is docked within the target\n'
+// DEL                    'or while the ligand is separate from the target.\n'
+// DEL                    'Warning: this optional step will significantly\n'
+// DEL                    'increase the CPU cost of the calculation.'
+// DEL                ],
+// DEL            Separator : 
+// DEL                [
+// DEL                vertical:0, shadow:'noline', extendH: 1, margin:1
+// DEL                ],
+// DEL            Text :
+// DEL                [
+// DEL                name: 'shift', title: 'Shift:', len: 30, extendH: 1, 
+// DEL                type: 'real', allowBlank: 0,
+// DEL                shortcut: ['0.0', '2.0', '4.0', '8.0', '16.0'],
+// DEL                bubbleHelp:
+// DEL                    'Initial dynamic level shift (eV).'
+// DEL                ],
+// DEL            Separator : 
+// DEL                [
+// DEL                vertical:0, shadow:'noline', extendH: 1, margin:1
+// DEL                ],
+// DEL            Checkbox :
+// DEL                [
+// DEL                name: 'freq', text: 'Frequency',
+// DEL                bubbleHelp:
+// DEL                    'Perform frequency calculation to determine ligand\n'
+// DEL                    'entropy in score function.  Warning: may increase\n'
+// DEL                    'CPU cost of the calculation.'
+// DEL                ]
+// DEL            ]
+// DEL        ],
+// DEL
+// DEL    Separator : [flushLeft:1, extendH:1, margin:1],
+// DEL
+// DEL    Hbox :
+// DEL        [
+// DEL        extendH: 1,
+// DEL        name: 'analbox',
+// DEL        Checkbox :
+// DEL            [
+// DEL            name: 'analpwd', text: 'PWD', title: 'Generate:',
+// DEL            bubbleHelp:
+// DEL                'Generate pair-wise decomposition data\n'
+// DEL                'after the QMScore calculations.'
+// DEL            ],
+// DEL        Separator : 
+// DEL            [
+// DEL            vertical:0, shadow:'noline', extendH: 1, margin:1
+// DEL            ]
+// DEL        ],
+// DEL
+// DEL    Separator : [flushLeft:1, extendH:1, margin:1]
+// DEL    ];
+
+    const PANEL =
         [
-        Hbox :
-            [
-            extendH: 1,
-            Option :
-                [
-                name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
-                type: 'int', minWidth: 5, extendH: 1,
-                bubbleHelp:
-                    'A QM-based ligand optimization can be performed\n'
-                    'prior to scoring. This optimization may occur\n'
-                    'either while the ligand is docked within the target\n'
-                    'or while the ligand is separate from the target.\n'
-                    'Warning: this optional step will significantly\n'
-                    'increase the CPU cost of the calculation.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 1, margin:1
-                ],
-            Text :
-                [
-                name: 'shift', title: 'Shift:', len: 30, extendH: 1, 
-                type: 'real', allowBlank: 0,
-                shortcut: ['0.0', '2.0', '4.0', '8.0', '16.0'],
-                bubbleHelp:
-                    'Initial dynamic level shift (eV).'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 1, margin:1
-                ],
-            Checkbox :
-                [
-                name: 'freq', text: 'Frequency',
-                bubbleHelp:
-                    'Perform frequency calculation to determine ligand\n'
-                    'entropy in score function.  Warning: may increase\n'
-                    'CPU cost of the calculation.'
-                ]
-            ]
-        ],
-
-    Separator : [flushLeft:1, extendH:1, margin:1],
-
-    Hbox :
-        [
-        extendH: 1,
-        name: 'analbox',
-        Checkbox :
-            [
-            name: 'analpwd', text: 'PWD', title: 'Generate:',
-            bubbleHelp:
-                'Generate pair-wise decomposition data\n'
-                'after the QMScore calculations.'
-            ],
-        Separator : 
-            [
-            vertical:0, shadow:'noline', extendH: 1, margin:1
-            ]
-        ],
-
-    Separator : [flushLeft:1, extendH:1, margin:1]
-    ];
+        Vbox:
+            [ extendH: 1,
+// DEL            Hbox :
+// DEL                [
+// DEL                name: 'dbbox', extendH: 1,
+// DEL                FSBText :
+// DEL                    [
+// DEL                    name: 'scoredb', len: 40, extendH: 1, title: 'Output DB:',
+// DEL                    mode: 'saveAs', allowBlank: 0,
+// DEL                    bubbleHelp:
+// DEL                        'The name of the output database that will hold\n'
+// DEL                        'the run paramaters and scoring results.'
+// DEL                    ],
+// DEL                Button : [ name: 'browse_scoredb', text: 'Browse...' ]
+// DEL                ],
+// DEL            Separator : [flushLeft:1, extendH:1, margin:1],
+                Mbox : 
+                    [ 	    columns: 2, columnMajor:1, uniformCols:1,
+                    name: 'calcbox', extendH: 1,
+                    Option :
+                        [
+                        name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
+                        type: 'int', minWidth: 8,
+                        bubbleHelp:
+                            ''
+                        ],
+                    Option :
+                        [
+                        name: 'scaling', title: 'Calculation:', text: ALG_OPTS,
+                        type: 'int', minWidth: 8,
+                        bubbleHelp:
+                            'Linear vs. Cubic refers to the scaling factor of the\n'
+                            'calculation where Linear scales accordingly to O(n)\n'
+                            'and Cubic scaling is the more conventional variety\n'
+                            '(e.g. O(n^3) or worse) where n corresponds to the number\n'
+                            'of electrons in the system. The cross over point is at\n'
+                            'approximately 450 atoms.'
+                        ],
+                    Option :
+                        [
+                        name: 'opt', title: 'LigOpt:', text: LIG_OPTS,
+                        type: 'int', minWidth: 8, extendH: 1,
+                        bubbleHelp:
+                            'A QM-based ligand optimization can be performed\n'
+                            'prior to scoring. This optimization may occur\n'
+                            'either while the ligand is docked within the target\n'
+                            'or while the ligand is separate from the target.\n'
+                            'Warning: this optional step will significantly\n'
+                            'increase the CPU cost of the calculation.'
+                        ],
+                    Text :
+                        [
+                        name: 'shift', title: 'Shift:', minWidth: 8, extendH: 1, 
+                        type: 'real', allowBlank: 0,
+                        shortcut: ['0.0', '2.0', '4.0', '8.0', '16.0'],
+                        bubbleHelp:
+                            'Initial dynamic level shift (eV).'
+                        ]
+                    ],
+            Separator : [flushLeft:1, extendH:1, margin:1],
+                Hbox:   
+                    [
+                    name: 'analbox', extendH: 1,
+                    Checkbox :
+                        [
+                        name: 'freq', text: 'Frequency',title: 'Generate:',
+                        bubbleHelp:
+                            'Perform frequency calculation to determine ligand\n'
+                            'entropy in score function.  Warning: may increase\n'
+                            'CPU cost of the calculation.'
+                        ],
+                    Checkbox :
+                        [
+                        name: 'analpwd', text: 'PWD', 
+                        bubbleHelp:
+                            'Generate pair-wise decomposition data\n'
+                            'after the QMScore calculations.'
+                        ] 
+                    ]
+           ]
+        ];
 
     //  Local Functions
 
@@ -311,7 +412,7 @@ endfunction
  ****************************************************************************/
 global function qb_TagQMSVals [vals]
     local qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
-                        vals.freq, vals.opt, vals.shift,
+                        vals.freq, vals.opt, vals.shift, vals.ham,
                         vals.analpwd]];
     return tagcat [qmsopts,tag tr QMSCORE_OPT_DEFAULTS];
 endfunction
@@ -421,6 +522,7 @@ global function qb_QMScoreSetupPanel []
 
                     coreopts = qb_TagCoreVals [vals];
                     qmsopts = qb_TagQMSVals[vals];
+
                     if dbFileName === [] then
                         dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts, 
                             [], QMS_NUM_FIELDS, 'qmscore', status.notforced];
