@@ -113,11 +113,11 @@ const CORE_OPT_DEFAULTS =
     ['scoredb',      'qbscore.mdb' ],
     ['recdb',        ''            ],
     ['posedb',       ''            ],
-    ['testLP',       1             ],
-    ['testOverlap',  1             ],
-    ['testHam',      1             ],
-    ['testH',        1             ],
-    ['testMM',       1             ],
+// DEL    ['testLP',       1             ],
+// DEL    ['testOverlap',  1             ],
+// DEL    ['testHam',      1             ],
+// DEL    ['testH',        1             ],
+// DEL    ['testMM',       1             ],
     ['recchg',       0             ],
     ['ligchg',       0             ],
     ['colchg',       0             ],
@@ -518,11 +518,11 @@ const CORE_PANEL =
                 ] ]
             ]
         ],
-                Data :  [   name: 'testLP'  ],
-                Data :  [   name: 'testOverlap' ],
-                Data :  [   name: 'testHam' ],
-                Data :  [   name: 'testH'   ],
-                Data :  [   name: 'testMM'  ],
+// DEL                Data :  [   name: 'testLP'  ],
+// DEL                Data :  [   name: 'testOverlap' ],
+// DEL                Data :  [   name: 'testHam' ],
+// DEL                Data :  [   name: 'testH'   ],
+// DEL                Data :  [   name: 'testMM'  ],
                 Data :  [   name: 'poseschg'  ],
                 Data :  [   name: 'mode'  ],
                 Data :  [   name: 'allposes'  ],
@@ -954,8 +954,7 @@ function SingleMol;
  *  Copy the Poses database into the QMScore output database.
  *
  ****************************************************************************/
-local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
-        missH, MM, appname, hamname, recmol, recmess]
+local function CopyPoseDB [resultskey, poseskey, appname, hamname, recmol, recmess]
 
     local mess = '', msgkey;
     local [fields, ftypes] = db_Fields poseskey;
@@ -1006,13 +1005,11 @@ local function CopyPoseDB [resultskey, poseskey, lp, overlap, hamcompat,
             chgok = ChargeOK [ligatms, charge];
         endif
 
-        local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatms, 
-            lp, overlap, hamcompat, missH, MM, appname, hamname];
+        local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatms, appname, hamname];
 
         local intermess = '';
-        if overlap then
-            intermess = qb_InterMoleculeOverlap [recatms, ligatms];
-        endif
+// overlap 
+        intermess = qb_InterMoleculeOverlap [recatms, ligatms];
 
         stsmess = cat [stsmess, GetStatusMessage ['Ligand', chgok],
             string tok_cat [ligmess, intermess]];
@@ -1056,8 +1053,7 @@ endfunction
  *  HACK alert:  temporarily renames mol fields to make copying easier.
  *
  ****************************************************************************/
-local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
-        hamcompat, missH, MM, appname, hamname]
+local function CopyRecPoseDB [resultskey, recskey, poseskey, appname, hamname]
 
     local mess = '', msgkey;
     if db_nEntries recskey <> db_nEntries poseskey then
@@ -1100,8 +1096,7 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
         local recatms = cat oAtoms recchs;
         local recchg = CalcCharge [recatms];
         local recchgok = ChargeOK [recatms, recchg];
-        local [recok, recmess] = qb_TestDivCon ['receptor', recatms, 
-            lp, overlap, hamcompat, missH, MM, appname, hamname];
+        local [recok, recmess] = qb_TestDivCon ['receptor', recatms, appname, hamname];
         stsmess = cat [GetStatusMessage ['Receptor', recchgok],
             string recmess];
         recchset = append [recchset, recchs];
@@ -1142,13 +1137,11 @@ local function CopyRecPoseDB [resultskey, recskey, poseskey, lp, overlap,
 
         posechg = CalcCharge [poseatms];
         local posechgok = ChargeOK [poseatms, posechg];
-        local [poseok, posemess] = qb_TestDivCon ['ligand', poseatms,
-            lp, overlap, hamcompat, missH, MM, appname, hamname];
+        local [poseok, posemess] = qb_TestDivCon ['ligand', poseatms,appname, hamname];
 
         local intermess = '';
-        if overlap then
-            intermess = qb_InterMoleculeOverlap [recatmset (ith), poseatms];
-        endif
+// overlap then
+        intermess = qb_InterMoleculeOverlap [recatmset (ith), poseatms];
 
         stsmess = cat [stsmess, GetStatusMessage ['Ligand', posechgok],
             string tok_cat [posemess, intermess]];
@@ -1244,6 +1237,8 @@ local function HamCompatability [appname, hamname, atoms]
 
     if appname === 'perturb' then appname = 'nmr'; endif
     local elems = uniq aElement atoms;
+write ['appname: {}\n', appname];
+write ['hamname: {}\n', hamname];
     local compatlist = tagpeek [G_hamsets, [appname, hamname]];
     local idx = indexof [elems, compatlist];
     local m = idx == 0;
@@ -1379,27 +1374,23 @@ endfunction
  *  detectable problems.
  *
  ****************************************************************************/
-local function TestComplex [lonepairs, overlap, hamcompat, missextraH,
-        MMtype, appname, hamname]
+local function TestComplex [appname, hamname]
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
     if recatoms === [] or ligatoms === [] then
         return  [0, '', 0, errmess];
     endif
 
-    local [recok, recmess] = qb_TestDivCon ['receptor', recatoms, 
-        lonepairs, overlap, hamcompat, missextraH, MMtype, appname, hamname];
-    local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatoms,
-        lonepairs, overlap, hamcompat, missextraH, MMtype, appname, hamname];
+    local [recok, recmess] = qb_TestDivCon ['receptor', recatoms, appname, hamname];
+    local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatoms, appname, hamname];
 
     local intermess = '';
-    if overlap then
-        intermess = qb_InterMoleculeOverlap [recatoms, ligatoms];
-        if neL [intermess, ''] then
-            recok = 0;
-            ligok = 0;
-            ligmess = tok_cat [ligmess, intermess];
-        endif
+// overlap 
+    intermess = qb_InterMoleculeOverlap [recatoms, ligatoms];
+    if neL [intermess, ''] then
+        recok = 0;
+        ligok = 0;
+        ligmess = tok_cat [ligmess, intermess];
     endif
 
     return [recok, recmess, ligok, ligmess];
@@ -1415,8 +1406,7 @@ endfunction
  *  Note:  this only checks the receptors and ligands in the molecule fields.
  *
  ****************************************************************************/
-local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
-        testMM, appname, hamname]
+local function TestDBMols [dbpath, appname, hamname]
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
@@ -1483,25 +1473,22 @@ local function TestDBMols [dbpath, testLP, testOverlap, testHam, testH,
         local [ligmol, ligchg] = db_ReadFields [dbkey, rowkey, ligflds];
         local ligchns = mol_Create ligmol;
         local ligatms = cat oAtoms ligchns;
-        local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatms,
-            testLP, testOverlap, testHam, testH, testMM, appname, hamname];
+        local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatms, appname, hamname];
         if coreopts.mode === 'Many-to-Many' then
             [recmols, recchg] = db_ReadFields [dbkey, rowkey, recflds];
             recchns = mol_Create recmols;
             recatms = cat oAtoms recchns;
 
-            [recok, recmess] = qb_TestDivCon ['receptor', recatms,
-                testLP, testOverlap, testHam, testH, testMM, appname, hamname];
+            [recok, recmess] = qb_TestDivCon ['receptor', recatms, appname, hamname];
         endif
 
         local intermess = '';
-        if testOverlap then
-            intermess = qb_InterMoleculeOverlap [recatms, ligatms];
-            if neL [intermess, ''] then
-                recok = 0;
-                ligok = 0;
-                ligmess = tok_cat [ligmess, intermess];
-            endif
+// testOverlap 
+        intermess = qb_InterMoleculeOverlap [recatms, ligatms];
+        if neL [intermess, ''] then
+            recok = 0;
+            ligok = 0;
+            ligmess = tok_cat [ligmess, intermess];
         endif
 
         oDestroy ligchns;
@@ -1740,12 +1727,10 @@ endfunction
  *  created system.
  *
  ****************************************************************************/
-global function qb_CheckChgTestDivConCollection [colmol, colchg,
-        lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname]
+global function qb_CheckChgTestDivConCollection [colmol, colchg, appname, hamname]
 
     local colatms = cat oAtoms mol_Create colmol;
-    local [colok, colmess] = qb_TestDivCon ['collection', colatms, 
-        lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname];
+    local [colok, colmess] = qb_TestDivCon ['collection', colatms, appname, hamname];
     local colchgok = ChargeOK [colatms, colchg];
 
     local colatmsets = SplitCollection [colatms];
@@ -1766,13 +1751,11 @@ endfunction
  *  created system.
  *
  ****************************************************************************/
-global function qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,
-        lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname]
+global function qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg, appname, hamname]
 
     local mess = '';
     local recatms = cat oAtoms recmol;
-    local [recok, recmess] = qb_TestDivCon ['receptor', recatms, 
-        lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname];
+    local [recok, recmess] = qb_TestDivCon ['receptor', recatms, appname, hamname];
     mess = tok_cat [mess, recmess];
     local recchgok = ChargeOK [recatms, recchg];
     local ligatms = cat oAtoms ligmol;
@@ -1781,8 +1764,7 @@ global function qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,
         mess = tok_cat [mess, 'Ligand must be a single molecule.'];
     endif
 
-    local [ligok, ligmess] = qb_TestDivCon ['ligand', ligatms,
-        lonepair, overlap, hamcompat, missextraH, MMtype, appname, hamname];
+    local [ligok, ligmess] = qb_TestDivCon ['ligand',ligatms,appname, hamname];
     mess = tok_cat [mess, ligmess];
 
     if not ligsingle then ligok = 0; endif
@@ -1790,13 +1772,12 @@ global function qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,
     local ligchgok = ChargeOK [ligatms, ligchg];
 
     local intermess = '';
-    if overlap then
-        intermess = qb_InterMoleculeOverlap [recatms, ligatms];
-        if neL [intermess, ''] then
-            recok = 0;
-            ligok = 0;
-            mess = tok_cat [mess, intermess];
-        endif
+// overlap 
+    intermess = qb_InterMoleculeOverlap [recatms, ligatms];
+    if neL [intermess, ''] then
+        recok = 0;
+        ligok = 0;
+        mess = tok_cat [mess, intermess];
     endif
 
     return [recok, recchgok, ligok, ligchgok, mess];
@@ -1898,16 +1879,10 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
     elseif trig === 'performprep' then
         run ['structprep_ui.svl'];
     elseif trig === 'performtests' then
-        if allfalse [vals.testLP, vals.testOverlap, vals.testHam, vals.testH,
-                vals.testMM] then
-            Warning 'No tests selected.';
-            return [status, ligatoms, btasks];
-        endif
-
+    
         if vals.allposes then
             [vals, ligatoms] = qb_ResetLigand [wkey, vals];
         endif
-
 
         local recok = 1, recmess = '', ligok = 1, ligmess = '';
         local colok = 1, colmess = '';
@@ -1922,14 +1897,10 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
                     exit [];
                 endif
 
-                [colok, colmess] = qb_TestDivCon ['collection', collection, 
-                    vals.testLP, vals.testOverlap, vals.testHam,
-                    vals.testH, vals.testMM, status.appname,
+                [colok, colmess] = qb_TestDivCon ['collection', collection, status.appname,
                     (HAM_KEYS | status.allowham)(vals.ham)];
             else
-                [recok, recmess, ligok, ligmess] = TestComplex [
-                    vals.testLP, vals.testOverlap, vals.testHam,
-                    vals.testH, vals.testMM, status.appname,
+                [recok, recmess, ligok, ligmess] = TestComplex [status.appname,
                     (HAM_KEYS | status.allowham)(vals.ham)];
             endif
         endif
@@ -1938,8 +1909,7 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
             if second task_fork [statics:'share'] === 'child' then
                 local msgkey2 = Message [0, 
                     'Running tests on MOEDivCon database ...'];
-                TestDBMols [vals.scoredb, vals.testLP, vals.testOverlap,
-                    vals.testHam, vals.testH, vals.testMM, status.appname,
+                TestDBMols [vals.scoredb, status.appname,
                     (HAM_KEYS | status.allowham)(vals.ham)];
                 msgkey2 = Message [msgkey2, 
                     'Running tests on MOEDivCon database ... done.'];
@@ -3048,9 +3018,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         stsmess = GetStatusMessage ['Collection', neL [status.colchg, CHGRED]];
         if dotests then
             [colok, colmess] = qb_TestDivCon ['collection', collection, 
-                coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
-                coreopts.testH, coreopts.testMM, status.appname,
-                (HAM_KEYS | status.allowham)(appopts.ham)];
+                status.appname, (HAM_KEYS | status.allowham)(appopts.ham)];
         endif
 
         if tok_length colmess > 0 then
@@ -3092,9 +3060,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         if dotests then
             recstsmess = GetStatusMessage ['Receptor', neL [status.recchg,
                 CHGRED]];
-            [recok, recmess, ligok, ligmess] = TestComplex [
-                coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
-                coreopts.testH, coreopts.testMM, status.appname,
+            [recok, recmess, ligok, ligmess] = TestComplex [status.appname,
                 (HAM_KEYS | status.allowham)(appopts.ham)];
         endif
 
@@ -3153,9 +3119,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
         endif
 
         if coreopts.mode === 'One-to-Many' then
-            local pmess = CopyPoseDB [dbkey, posekey, coreopts.testLP,
-                coreopts.testOverlap, coreopts.testHam, coreopts.testH,
-                coreopts.testMM, status.appname,
+            local pmess = CopyPoseDB [dbkey, posekey, status.appname,
                 (HAM_KEYS | status.allowham)(appopts.ham),
                 receptor, recstsmess];
             if neL [pmess, ''] then
@@ -3182,9 +3146,7 @@ global function qb_SetUpScoreDB [status, coreopts, appopts, complex, fields,
                 exit [];
             endif
 
-            local rmess = CopyRecPoseDB [dbkey, reckey, posekey, 
-                coreopts.testLP, coreopts.testOverlap, coreopts.testHam,
-                coreopts.testH, coreopts.testMM, status.appname,
+            local rmess = CopyRecPoseDB [dbkey, reckey, posekey,status.appname,
                 (HAM_KEYS | status.allowham)(appopts.ham)];
             if neL [rmess, ''] then
                 db_Close reckey;
@@ -3361,8 +3323,6 @@ global function qb_TagCoreVals [vals]
 // DEL        vals.mode, vals.allposes, vals.cwd, vals.workdir, vals.scoredb,
         vals.mode, vals.allposes, vals.scoredb,
         vals.recdb, vals.posedb,
-        vals.testLP, vals.testOverlap, vals.testHam,
-        vals.testH, vals.testMM,
         vals.recchg, vals.ligchg, vals.colchg, vals.poseschg
 // DEL        , vals.ham,
         , vals.scaling
@@ -3385,8 +3345,7 @@ endfunction
  *  H counts:  ignore amines (MOE treats terminal amines as ammonium cations).
  *
  ****************************************************************************/
-global function qb_TestDivCon [which, atoms, lonepair, overlap, hamcompat,
-        missextraH, MMtype, appname, hamname]
+global function qb_TestDivCon [which, atoms, appname, hamname]
 
     local warn = 0, error = 0, mess = '';
     local indices, residues, rnames, rnums, ruids, anames, ith; 
@@ -3396,117 +3355,112 @@ global function qb_TestDivCon [which, atoms, lonepair, overlap, hamcompat,
     local ions = aIon atoms;
 
     //  Look for explicit lone pairs (MOE parsing errors)
-    if lonepair then
-        [indices] = indicesof [1, (elements == 'LP')];
-        if length indices > 0 then
-            residues = oParent atoms [indices];
-            rnames = rName residues;
-            rnums = rNumber residues;
-            ruids = rUID residues;
-            anames = aName atoms [indices];
-            ith = 0; 
-            mess = tok_cat [mess, '    Error!  LP atoms:\n'];
-            for length indices loop
-                ith = ith + 1;
-                mess = tok_cat [mess, twrite ['        {}: {} in {}: {} {}\n', 
-                    indices(ith), anames(ith), rnums(ith), rnames(ith),
-                    ruids(ith)]];
-            endloop
+// lonepair 
+    [indices] = indicesof [1, (elements == 'LP')];
+    if length indices > 0 then
+        residues = oParent atoms [indices];
+        rnames = rName residues;
+        rnums = rNumber residues;
+        ruids = rUID residues;
+        anames = aName atoms [indices];
+        ith = 0; 
+        mess = tok_cat [mess, '    Error!  LP atoms:\n'];
+        for length indices loop
+            ith = ith + 1;
+            mess = tok_cat [mess, twrite ['        {}: {} in {}: {} {}\n', 
+                indices(ith), anames(ith), rnums(ith), rnames(ith),
+                ruids(ith)]];
+        endloop
 
-            error = 1;
-        endif
+        error = 1;
     endif
 
     //  Look for overlapping atoms
-    if overlap then
-        local pairs = AtomOverlap [atoms, atoms];
-        if length pairs > 0 then
-            aSetSelected [pairs,1];
-            residues = oParent pairs;
-            rnames = rName residues;
-            rnums = rNumber residues;
-            ruids = rUID residues;
-            anames = aName pairs;
-            indices = aNumber pairs;
-            local dists = app aDist pairs;
-            mess = tok_cat [mess, '    Error!  Overlapping atoms:\n'];
-            for ith = 1, length pairs, 1 loop
-                mess = tok_cat [mess, twrite ['       [SELECTED] {}: {} in {}: {} {}'
-                     ' is {}A from {}: {} in {}: {} {} \n', 
-                    indices(ith)(1), anames(ith)(1), rnums(ith)(1), 
-                    rnames(ith)(1), ruids(ith)(1),  dists(ith), indices(ith)(2), 
-                    anames(ith)(2), rnums(ith)(2), rnames(ith)(2),
-                    ruids(ith)(2)]];
-            endloop
+// overlap 
+    local pairs = AtomOverlap [atoms, atoms];
+    if length pairs > 0 then
+        aSetSelected [pairs,1];
+        residues = oParent pairs;
+        rnames = rName residues;
+        rnums = rNumber residues;
+        ruids = rUID residues;
+        anames = aName pairs;
+        indices = aNumber pairs;
+        local dists = app aDist pairs;
+        mess = tok_cat [mess, '    Error!  Overlapping atoms:\n'];
+        for ith = 1, length pairs, 1 loop
+            mess = tok_cat [mess, twrite ['       [SELECTED] {}: {} in {}: {} {}'
+                 ' is {}A from {}: {} in {}: {} {} \n', 
+                indices(ith)(1), anames(ith)(1), rnums(ith)(1), 
+                rnames(ith)(1), ruids(ith)(1),  dists(ith), indices(ith)(2), 
+                anames(ith)(2), rnums(ith)(2), rnames(ith)(2),
+                ruids(ith)(2)]];
+        endloop
 
-            error = 1;
-        endif
+        error = 1;
     endif
 
     //  Look for incompatible atoms for hamiltonian
-    if hamcompat then
-        local badelems = HamCompatability [appname, hamname, atoms];
-        if length badelems > 0 then
-            mess = tok_cat [mess, '    Error!  Incompatible atoms for'
-            ' selected Hamiltonian:\n       '];
-            for ith = 1, length badelems, 1 loop
-                mess = tok_cat [mess, ' ', badelems (ith)];
-            endloop
+// hamcompat 
+    local badelems = HamCompatability [appname, hamname, atoms];
+    if length badelems > 0 then
+        mess = tok_cat [mess, '    Error!  Incompatible atoms for'
+        ' selected Hamiltonian:\n       '];
+        for ith = 1, length badelems, 1 loop
+            mess = tok_cat [mess, ' ', badelems (ith)];
+        endloop
 
-            mess = tok_cat [mess, '\n'];
-            error = 1;
-        endif
+        mess = tok_cat [mess, '\n'];
+        error = 1;
     endif
 
     //  Look for missing/extra H and C+
-    if missextraH then
-        local hcount = aHCount atoms;
-        local explicit = aExplicitHCount atoms;
-        [indices] = indicesof [1, ((hcount <> explicit)
-            and not ((elements == 'N') and ((ions == 1) or (chgs == 1))
-            and (hcount - explicit == 1)))
-            or ((elements == 'C') and ((ions == 1) or (chgs == 1)))];
-        if length indices > 0 then
-            residues = oParent atoms [indices];
-            rnames = rName residues;
-            rnums = rNumber residues;
-            ruids = rUID residues;
-            anames = aName atoms [indices];
-            ith = 0; 
-            mess = tok_cat [mess, '    Warning!  Check H on atoms:\n'];
-            for length indices loop
-                ith = ith + 1;
-                mess = tok_cat [mess, twrite ['        {}: {} in {}: {} {}\n', 
-                    indices(ith), anames(ith), rnums(ith), rnames(ith),
-                    ruids(ith)]];
-            endloop
+// missextraH 
+    local hcount = aHCount atoms;
+    local explicit = aExplicitHCount atoms;
+    [indices] = indicesof [1, ((hcount <> explicit)
+        and not ((elements == 'N') and ((ions == 1) or (chgs == 1))
+        and (hcount - explicit == 1)))
+        or ((elements == 'C') and ((ions == 1) or (chgs == 1)))];
+    if length indices > 0 then
+        residues = oParent atoms [indices];
+        rnames = rName residues;
+        rnums = rNumber residues;
+        ruids = rUID residues;
+        anames = aName atoms [indices];
+        ith = 0; 
+        mess = tok_cat [mess, '    Warning!  Check H on atoms:\n'];
+        for length indices loop
+            ith = ith + 1;
+            mess = tok_cat [mess, twrite ['        {}: {} in {}: {} {}\n', 
+                indices(ith), anames(ith), rnums(ith), rnames(ith),
+                ruids(ith)]];
+        endloop
 
-            warn = 1;
-        endif
+        warn = 1;
     endif
 
     //  Look for unknown MM atom types
-    if MMtype then
-        local mmtypes = aMMType atoms;
-        [indices] = indicesof [1, (mmtypes == '??')];
-        if length indices > 0 then
-            residues = oParent atoms [indices];
-            rnames = rName residues;
-            rnums = rNumber residues;
-            ruids = rUID residues;
-            anames = aName atoms [indices];
-            ith = 0; 
-            mess = tok_cat [mess, 
-                '    Warning!  Unknown MM types for atoms:\n'];
-            for length indices loop
-                ith = ith + 1;
-                mess = tok_cat [mess, twrite ['        {}: {} in {}: {} {}\n', 
-                    indices(ith), anames(ith), rnums(ith), rnames(ith),
-                    ruids(ith)]];
-            endloop
+// MMtype 
+    local mmtypes = aMMType atoms;
+    [indices] = indicesof [1, (mmtypes == '??')];
+    if length indices > 0 then
+        residues = oParent atoms [indices];
+        rnames = rName residues;
+        rnums = rNumber residues;
+        ruids = rUID residues;
+        anames = aName atoms [indices];
+        ith = 0; 
+        mess = tok_cat [mess, 
+            '    Warning!  Unknown MM types for atoms:\n'];
+        for length indices loop
+            ith = ith + 1;
+            mess = tok_cat [mess, twrite ['        {}: {} in {}: {} {}\n', 
+                indices(ith), anames(ith), rnums(ith), rnames(ith),
+                ruids(ith)]];
+        endloop
 
-            warn = 1;
-        endif
+        warn = 1;
     endif
 
     if error then
@@ -3632,8 +3586,7 @@ global function qb_VerifyDivConCollection [wkey, status, vals]
         exit [];
     endif
 
-    local [colok, colmess] = qb_TestDivCon ['collection', collection, 
-            1, 1, 1, 0, 0, status.appname,
+    local [colok, colmess] = qb_TestDivCon ['collection', collection, status.appname,
             (HAM_KEYS | status.allowham)(vals.ham)];
 
     if not alltrue [colok, colchgok] then
@@ -3693,8 +3646,7 @@ global function qb_VerifyDivConComplex [wkey, status, vals]
         neL [vals.mode, 'Many-to-Many']];
     local recchgok = neL [status.recchg, CHGRED];
     local ligchgok = neL [status.ligchg, CHGRED];
-    local [recok, rm, ligok, lm] = TestComplex [1, 1, 1, 0, 0, status.appname,
-        (HAM_KEYS | status.allowham)(vals.ham)];
+    local [recok, rm, ligok, lm] = TestComplex [status.appname,(HAM_KEYS | status.allowham)(vals.ham)];
 
     if not alltrue [recok, recchgok, ligok, ligchgok] then
         if not alltrue [recok, ligok] then

@@ -500,7 +500,6 @@ global function qb_QMScoreSetupPanel []
                         WindowSetAttr [wkey, [dbbox:    [sensitive: 0]]]; // when updating, can't change mode.
                         WindowSetAttr [wkey, [panel:    [onTrigger: ['return', 'validate', 'return', 'return', 'return']]]];
                         WindowSetAttr [wkey, [panel:    [sensitive: [1, 0, 1, 1, 1]]]];
-
                         WindowSetData [wkey, ldqmsopts];
                     endif
 
@@ -555,7 +554,7 @@ global function qb_QMScoreSetupPanel []
 // DEL                    qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS,
 // DEL                        [vals.freq, vals.opt, vals.shift,
 // DEL                        vals.analpwd]];
-                    coreopts = qb_TagQMSVals [vals];
+                    qmsopts = qb_TagQMSVals [vals];
 
                     dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
                         [], QMS_NUM_FIELDS, 'qmscore', status.notforced];

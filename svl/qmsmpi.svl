@@ -338,9 +338,7 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
 
     //  Run all error tests unless forced not to do so by user.
     local [recok, recchgok, ligok, ligchgok, ckmsg]
-        = qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,
-            status.notforced, status.notforced, status.notforced,
-            coreopts.testH, coreopts.testMM, 'qms',
+        = qb_CheckChgTestDivConComplex [recmol, recchg, ligmol, ligchg,'qms',
             HAM_KEYS (coreopts.ham)];
 
     if alltrue [recok, recchgok, ligok, ligchgok] then
