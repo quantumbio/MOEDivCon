@@ -429,6 +429,8 @@ global function qb_QMScoreSetupPanel []
     static ligatoms;
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+    local yesrun = not OS_MSWIN;
+write ['yesrun = {}\n',yesrun]; // DEL
     if WindowShow ['QMScorePanel', 1] then return; endif
 
     local coreopts = [], qmsopts = [], browsetasks = [], dbkey = 0;
@@ -443,6 +445,7 @@ global function qb_QMScoreSetupPanel []
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
     WindowSetData [wkey, appdflts];
+    WindowSetAttr [wkey, [panel:    [sensitive: [yesrun, 0, 1, 1, 1]]]];
     WindowShow [wkey, 1];
 
     loop
@@ -500,7 +503,7 @@ global function qb_QMScoreSetupPanel []
                         WindowSetAttr [wkey, [posebox:  [sensitive: 0]]]; // when updating, can't change mode.
                         WindowSetAttr [wkey, [dbbox:    [sensitive: 0]]]; // when updating, can't change mode.
                         WindowSetAttr [wkey, [panel:    [onTrigger: ['return', 'validate', 'return', 'return', 'return']]]];
-                        WindowSetAttr [wkey, [panel:    [sensitive: [1, 0, 1, 1, 1]]]];
+                        WindowSetAttr [wkey, [panel:    [sensitive: [yesrun, 0, 1, 1, 1]]]];
                         WindowSetData [wkey, ldqmsopts];
                     endif
 
