@@ -130,190 +130,189 @@ const PANEL =
                     'and tables, and to form filenames.'
                 ]
             ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            title: 'Scoring     ',
-            extendH: 1,
-            Checkbox :
-                [
-                name: 'sf_e_ab', text: 'E_AB', title: 'QM:',
-                bubbleHelp:
-                    'E_AB is the exchange between atoms.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Checkbox :
-                [
-                name: 'sf_e_abp', text: 'E_ABp',
-                bubbleHelp:
-                    'E_ABp is the electron-electron repulsion.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Checkbox :
-                [
-                name: 'sf_e_abc', text: 'E_ABc',
-                bubbleHelp:
-                    'E_ABc is the core-electron interaction.'
-                ]
-            ],
-
-        Hbox :
-            [
-            title: 'Function    ',
-            extendH: 1,
-            Checkbox :
-                [
-                name: 'sf_e_r6', text: 'E_R6', title: 'MM:',
-                bubbleHelp:
-                    'E_R6 is the van der Waals repulsive component.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Checkbox :
-                [
-                name: 'sf_e_r12', text: 'E_R12',
-                bubbleHelp:
-                    'E_R12 is the van der Waals attractive component.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Checkbox :
-                [
-                name: 'sf_e_ele', text: 'E_ELE',
-                bubbleHelp:
-                    'E_ELE is the electrostatic component.'
-                ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            title: 'Activities  ',
-            extendH: 1,
-            Text :
-                [
-                name: 'expact_hdr', allowBlank: 0, title: 'Field:',
-                type: 'char', len: 40,
-                bubbleHelp:
-                    'The MOE database field name for\n'
-                    'the experimental activity values.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Button :
-                [
-                name: 'loadact', text: 'Load',
-                bubbleHelp:
-                    'Load in the experimental activity data\n'
-                    'from a csv file using the given field name.'
-                ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            title: 'Residues    ',
-            extendH: 1,
-            Label :
-                [
-                font: 'mediumBold', text: 'Pruning:'
-                ],
-            Text :
-                [
-                name: 'prune_zero', allowBlank: 0,
-                title: 'Maximum percent zero:',
-                type: 'int', len: 5,
-                bubbleHelp:
-                    'Prune residues which have greater than the\n'
-                    'specified % of zero values for the selected\n'
-                    'energies for the ligands in the training set;\n'
-                    'that is; those distant from the pocket with\n'
-                    'very little interaction with the ligands.'
-                ],
-            Label :
-                [
-                font: 'mediumBold', text: '%'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Text :
-                [
-                name: 'prune_sd', allowBlank: 0, title: 'Minimum SD:',
-                type: 'real', len: 5,
-                bubbleHelp:
-                    'Prune residues which have a smaller standard\n'
-                    'deviation over the values of the selected energies\n'
-                    'for the ligands in the training set than the\n'
-                    'specified SD; that is, exclude those that do have\n'
-                    'not distinguishing characteristic.'
-                ]
-            ],
-
-        Hbox :
-            [
-            title: '            ',
-            extendH: 1,
-            Text :
-                [
-                name: 'numtopres', allowBlank: 0,
-                title: 'Number of top scorers:',
-                type: 'int', len: 5,
-                bubbleHelp:
-                    'Keep only the specified number of top scoring\n'
-                    'residues to show in the Heat Map (max 30).'
-                ]
-            ],
-
-        Separator : [flushLeft:1, extendH:1, margin:1],
-
-        Hbox :
-            [
-            title: 'PLS         ',
-            extendH: 1,
-            Text :
-                [
-                name: 'numcomps', allowBlank: 0,
-                title: 'Number of components:',
-                type: 'int', len: 5,
-                bubbleHelp:
-                    'Number of components to include in\n'
-                    'the model during PLS analysis.'
-                ],
-            Separator : 
-                [
-                vertical:0, shadow:'noline', extendH: 0, margin:1
-                ],
-            Text :
-                [
-                name: 'trainingset', title: 'Training set size:',
-                len: 5, extendH: 0, 
-                type: 'int', allowBlank: 0,
-                bubbleHelp:
-                    'Size of the training set (the first N ligands\n'
-                    'or receptors/ligand pairs are treated as\n'
-                    'the training set during PLS analysis).'
-                ]
-            ]
-        ],
-
+//         Separator : [flushLeft:1, extendH:1, margin:1],
+// 
+//         Hbox :
+//             [
+//             title: 'Scoring     ',
+//             extendH: 1,
+//             Checkbox :
+//                 [
+//                 name: 'sf_e_ab', text: 'E_AB', title: 'QM:',
+//                 bubbleHelp:
+//                     'E_AB is the exchange between atoms.'
+//                 ],
+//             Separator : 
+//                 [
+//                 vertical:0, shadow:'noline', extendH: 0, margin:1
+//                 ],
+//             Checkbox :
+//                 [
+//                 name: 'sf_e_abp', text: 'E_ABp',
+//                 bubbleHelp:
+//                     'E_ABp is the electron-electron repulsion.'
+//                 ],
+//             Separator : 
+//                 [
+//                 vertical:0, shadow:'noline', extendH: 0, margin:1
+//                 ],
+//             Checkbox :
+//                 [
+//                 name: 'sf_e_abc', text: 'E_ABc',
+//                 bubbleHelp:
+//                     'E_ABc is the core-electron interaction.'
+//                 ]
+//             ],
+// 
+//         Hbox :
+//             [
+//             title: 'Function    ',
+//             extendH: 1,
+//             Checkbox :
+//                 [
+//                 name: 'sf_e_r6', text: 'E_R6', title: 'MM:',
+//                 bubbleHelp:
+//                     'E_R6 is the van der Waals repulsive component.'
+//                 ],
+//             Separator : 
+//                 [
+//                 vertical:0, shadow:'noline', extendH: 0, margin:1
+//                 ],
+//             Checkbox :
+//                 [
+//                 name: 'sf_e_r12', text: 'E_R12',
+//                 bubbleHelp:
+//                     'E_R12 is the van der Waals attractive component.'
+//                 ],
+//             Separator : 
+//                 [
+//                 vertical:0, shadow:'noline', extendH: 0, margin:1
+//                 ],
+//             Checkbox :
+//                 [
+//                 name: 'sf_e_ele', text: 'E_ELE',
+//                 bubbleHelp:
+//                     'E_ELE is the electrostatic component.'
+//                 ]
+//             ],
+// 
+//         Separator : [flushLeft:1, extendH:1, margin:1],
+// 
+//         Hbox :
+//             [
+//             title: 'Activities  ',
+//             extendH: 1,
+//             Text :
+//                 [
+//                 name: 'expact_hdr', allowBlank: 0, title: 'Field:',
+//                 type: 'char', len: 40,
+//                 bubbleHelp:
+//                     'The MOE database field name for\n'
+//                     'the experimental activity values.'
+//                 ],
+//             Separator : 
+//                 [
+//                 vertical:0, shadow:'noline', extendH: 0, margin:1
+//                 ],
+//             Button :
+//                 [
+//                 name: 'loadact', text: 'Load',
+//                 bubbleHelp:
+//                     'Load in the experimental activity data\n'
+//                     'from a csv file using the given field name.'
+//                 ]
+//             ],
+// 
+//         Separator : [flushLeft:1, extendH:1, margin:1],
+// 
+//         Hbox :
+//             [
+//             title: 'Residues    ',
+//             extendH: 1,
+//             Label :
+//                 [
+//                 font: 'mediumBold', text: 'Pruning:'
+//                 ],
+//             Text :
+//                 [
+//                 name: 'prune_zero', allowBlank: 0,
+//                 title: 'Maximum percent zero:',
+//                 type: 'int', len: 5,
+//                 bubbleHelp:
+//                     'Prune residues which have greater than the\n'
+//                     'specified % of zero values for the selected\n'
+//                     'energies for the ligands in the training set;\n'
+//                     'that is; those distant from the pocket with\n'
+//                     'very little interaction with the ligands.'
+//                 ],
+//             Label :
+//                 [
+//                 font: 'mediumBold', text: '%'
+//                 ],
+//             Separator : 
+//                 [
+//                 vertical:0, shadow:'noline', extendH: 0, margin:1
+//                 ],
+//             Text :
+//                 [
+//                 name: 'prune_sd', allowBlank: 0, title: 'Minimum SD:',
+//                 type: 'real', len: 5,
+//                 bubbleHelp:
+//                     'Prune residues which have a smaller standard\n'
+//                     'deviation over the values of the selected energies\n'
+//                     'for the ligands in the training set than the\n'
+//                     'specified SD; that is, exclude those that do have\n'
+//                     'not distinguishing characteristic.'
+//                 ]
+//             ],
+// 
+//         Hbox :
+//             [
+//             title: '            ',
+//             extendH: 1,
+//             Text :
+//                 [
+//                 name: 'numtopres', allowBlank: 0,
+//                 title: 'Number of top scorers:',
+//                 type: 'int', len: 5,
+//                 bubbleHelp:
+//                     'Keep only the specified number of top scoring\n'
+//                     'residues to show in the Heat Map (max 30).'
+//                 ]
+//             ],
+// 
+//         Separator : [flushLeft:1, extendH:1, margin:1],
+// 
+//         Hbox :
+//             [
+//             title: 'PLS         ',
+//             extendH: 1,
+//             Text :
+//                 [
+//                 name: 'numcomps', allowBlank: 0,
+//                 title: 'Number of components:',
+//                 type: 'int', len: 5,
+//                 bubbleHelp:
+//                     'Number of components to include in\n'
+//                     'the model during PLS analysis.'
+//                 ],
+//             Separator : 
+//                 [
+//                 vertical:0, shadow:'noline', extendH: 0, margin:1
+//                 ],
+//             Text :
+//                 [
+//                 name: 'trainingset', title: 'Training set size:',
+//                 len: 5, extendH: 0, 
+//                 type: 'int', allowBlank: 0,
+//                 bubbleHelp:
+//                     'Size of the training set (the first N ligands\n'
+//                     'or receptors/ligand pairs are treated as\n'
+//                     'the training set during PLS analysis).'
+//                 ]
+//             ]
+//         ],
+// 
         
     Separator : [flushLeft:1, extendH:1, margin:1],
 
@@ -350,9 +349,21 @@ const PANEL =
                 'Save the analytic results in a csv file.'
             ]
         ],
-        
+        Data :  [   name: 'sf_e_ab'  ],
+        Data :  [   name: 'sf_e_abp'  ],
+        Data :  [   name: 'sf_e_abc'  ],
+        Data :  [   name: 'sf_e_r6'  ],
+        Data :  [   name: 'sf_e_r12'  ],
+        Data :  [   name: 'sf_e_ele'  ],
+        Data :  [   name: 'expact_hdr'  ],
+        Data :  [   name: 'prune_zero'  ],
+        Data :  [   name: 'prune_sd'  ],
+        Data :  [   name: 'numtopres'  ],
+        Data :  [   name: 'numcomps'  ],
+        Data :  [   name: 'trainingset'  ],
+
     Separator : [flushLeft:1, extendH:1, margin:1]
-    ];
+    ] ];
 
 	//  Global Variables
 
