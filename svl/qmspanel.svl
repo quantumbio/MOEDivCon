@@ -445,7 +445,7 @@ write ['yesrun = {}\n',yesrun]; // DEL
     local wkey = WindowCreate cat [HEADER, qb_GetCorePanel [], PANEL];
     status = qb_InitCorePanel [wkey, status, coredflts];
     WindowSetData [wkey, appdflts];
-    WindowSetAttr [wkey, [panel:    [sensitive: [yesrun, 0, 1, 1, 1]]]];
+    WindowSetAttr [wkey, [panel:    [sensitive: [yesrun, 1, 1, 1, 1]]]];
     WindowShow [wkey, 1];
 
     loop
