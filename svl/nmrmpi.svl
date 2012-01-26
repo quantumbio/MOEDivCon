@@ -109,12 +109,9 @@ global function qb_NMRScoreMPI [dbpath, jobid]
     local dbrowkeys = db_Entries dbkey;
     local nrows = db_nEntries dbkey;
 
-// DEL    local currdir = getenv 'PWD';
     local perpath = fpath dbpath;
     local pertail = fbase ftail dbpath;
     local perfile = twrite ['{}/{}.h5', perpath, pertail];
-// DEL    local workdir = select [currdir, fabsname coreopts.workdir, 
-// DEL        coreopts.cwd];
     local workdir = cd [];
 
     if not isnull jobid then

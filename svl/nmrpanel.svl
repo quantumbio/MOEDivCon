@@ -324,12 +324,6 @@ local function RunCalc [dbkey]
     local perfile = twrite ['{}/{}.h5', perpath, pertail];
 
     local workdir = cd [];
-// DEL    if coreopts.cwd === 1 then
-// DEL        workdir = getenv 'PWD';
-// DEL    else
-// DEL        workdir = fabsname coreopts.workdir;
-// DEL    endif
-// DEL    coreopts.workdir = workdir;
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
@@ -401,12 +395,6 @@ local function RunOneToManyCalc [oldkey]
     local perfile = twrite ['{}/{}.h5', perpath, pertail];
 
     local workdir = cd [];
-// DEL    if coreopts.cwd === 1 then
-// DEL        workdir = getenv 'PWD';
-// DEL    else
-// DEL        workdir = fabsname coreopts.workdir;
-// DEL    endif
-// DEL    coreopts.workdir = workdir;
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 

@@ -52,7 +52,6 @@ function qb_HeatMapSetupPanel;
 
 function qb_PWDAnalysis;
 
-function qb_PWDAnalysisTmp;   // DELME
 
 function pro_Join;
 function pro_Align;
