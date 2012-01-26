@@ -143,92 +143,11 @@ const HEADER =
         '']
     ];
 
-// DELconst PANEL =
-// DEL    [
-// DEL    Vbox :
-// DEL        [
-// DEL        Hbox :
-// DEL            [
-// DEL            extendH: 1,
-// DEL            Option :
-// DEL                [
-// DEL                name: 'opt', title: 'Ligand Optimization:', text: LIG_OPTS,
-// DEL                type: 'int', minWidth: 5, extendH: 1,
-// DEL                bubbleHelp:
-// DEL                    'A QM-based ligand optimization can be performed\n'
-// DEL                    'prior to scoring. This optimization may occur\n'
-// DEL                    'either while the ligand is docked within the target\n'
-// DEL                    'or while the ligand is separate from the target.\n'
-// DEL                    'Warning: this optional step will significantly\n'
-// DEL                    'increase the CPU cost of the calculation.'
-// DEL                ],
-// DEL            Separator : 
-// DEL                [
-// DEL                vertical:0, shadow:'noline', extendH: 1, margin:1
-// DEL                ],
-// DEL            Text :
-// DEL                [
-// DEL                name: 'shift', title: 'Shift:', len: 30, extendH: 1, 
-// DEL                type: 'real', allowBlank: 0,
-// DEL                shortcut: ['0.0', '2.0', '4.0', '8.0', '16.0'],
-// DEL                bubbleHelp:
-// DEL                    'Initial dynamic level shift (eV).'
-// DEL                ],
-// DEL            Separator : 
-// DEL                [
-// DEL                vertical:0, shadow:'noline', extendH: 1, margin:1
-// DEL                ],
-// DEL            Checkbox :
-// DEL                [
-// DEL                name: 'freq', text: 'Frequency',
-// DEL                bubbleHelp:
-// DEL                    'Perform frequency calculation to determine ligand\n'
-// DEL                    'entropy in score function.  Warning: may increase\n'
-// DEL                    'CPU cost of the calculation.'
-// DEL                ]
-// DEL            ]
-// DEL        ],
-// DEL
-// DEL    Separator : [flushLeft:1, extendH:1, margin:1],
-// DEL
-// DEL    Hbox :
-// DEL        [
-// DEL        extendH: 1,
-// DEL        name: 'analbox',
-// DEL        Checkbox :
-// DEL            [
-// DEL            name: 'analpwd', text: 'PWD', title: 'Generate:',
-// DEL            bubbleHelp:
-// DEL                'Generate pair-wise decomposition data\n'
-// DEL                'after the QMScore calculations.'
-// DEL            ],
-// DEL        Separator : 
-// DEL            [
-// DEL            vertical:0, shadow:'noline', extendH: 1, margin:1
-// DEL            ]
-// DEL        ],
-// DEL
-// DEL    Separator : [flushLeft:1, extendH:1, margin:1]
-// DEL    ];
 
     const PANEL =
         [
         Vbox:
             [ extendH: 1,
-// DEL            Hbox :
-// DEL                [
-// DEL                name: 'dbbox', extendH: 1,
-// DEL                FSBText :
-// DEL                    [
-// DEL                    name: 'scoredb', len: 40, extendH: 1, title: 'Output DB:',
-// DEL                    mode: 'saveAs', allowBlank: 0,
-// DEL                    bubbleHelp:
-// DEL                        'The name of the output database that will hold\n'
-// DEL                        'the run paramaters and scoring results.'
-// DEL                    ],
-// DEL                Button : [ name: 'browse_scoredb', text: 'Browse...' ]
-// DEL                ],
-// DEL            Separator : [flushLeft:1, extendH:1, margin:1],
                 Mbox : 
                     [ 	    columns: 2, columnMajor:1, uniformCols:1,
                     name: 'calcbox', extendH: 1,
@@ -323,9 +242,6 @@ function qb_TagQMSVals;
 
 local function UpdateDB[vals]
     local coreopts = qb_TagCoreVals [vals];
-// DEL    local qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
-// DEL        vals.freq, vals.opt, vals.shift,
-// DEL        vals.analpwd]];
     local qmsopts = qb_TagQMSVals [vals];
 
     qb_SaveOptions [coreopts, qmsopts];
@@ -430,7 +346,6 @@ global function qb_QMScoreSetupPanel []
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
     local yesrun = not OS_MSWIN;
-write ['yesrun = {}\n',yesrun]; // DEL
     if WindowShow ['QMScorePanel', 1] then return; endif
 
     local coreopts = [], qmsopts = [], browsetasks = [], dbkey = 0;
@@ -472,8 +387,6 @@ write ['yesrun = {}\n',yesrun]; // DEL
                         local ldrecs, ldligs, ldsts,ldcoreopts,ldqmsopts;
                         [dbkey, ldrecs, ldligs, ldsts, ldcoreopts,
                             ldqmsopts] = LoadDB [dbpath];
-// DEL                        local [ldkey, ldrecs, ldligs, ldsts, ldcoreopts,
-// DEL                            ldqmsopts] = LoadDB [dbpath];
                             
                         Close [force:1];
                         local idx = 1;
@@ -555,9 +468,6 @@ write ['yesrun = {}\n',yesrun]; // DEL
                     if not status.verified then exit []; endif
 
                     coreopts = qb_TagCoreVals [vals];
-// DEL                    qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS,
-// DEL                        [vals.freq, vals.opt, vals.shift,
-// DEL                        vals.analpwd]];
                     qmsopts = qb_TagQMSVals [vals];
 
                     dbkey = qb_SetUpScoreDB [status, coreopts, qmsopts,
@@ -573,16 +483,6 @@ write ['yesrun = {}\n',yesrun]; // DEL
                     task_prio 0;
 
                     UpdateDB [vals];
-// DEL                    
-// DEL                    coreopts = qb_TagCoreVals [vals];
-// DEL                    qmsopts = tag [first tr QMSCORE_OPT_DEFAULTS, [
-// DEL                        vals.freq, vals.opt, vals.shift,
-// DEL                        vals.analpwd]];
-// DEL
-// DEL                    qb_SaveOptions [coreopts, qmsopts];
-// DEL
-// DEL                    Message [0, 'MOEDivCon QMScore update is done.'];
-// DEL                    
                     sleep 2;
                     exit [];
                 endif

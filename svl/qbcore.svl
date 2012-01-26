@@ -108,21 +108,13 @@ const CORE_OPT_DEFAULTS =
     ['mode',         'One-to-One'  ],
    // ['mode',         'Many-to-Many'  ],
     ['allposes',     0             ],
-// DEL    ['cwd',          1             ],
-// DEL    ['workdir',      ''            ],
     ['scoredb',      'qbscore.mdb' ],
     ['recdb',        ''            ],
     ['posedb',       ''            ],
-// DEL    ['testLP',       1             ],
-// DEL    ['testOverlap',  1             ],
-// DEL    ['testHam',      1             ],
-// DEL    ['testH',        1             ],
-// DEL    ['testMM',       1             ],
     ['recchg',       0             ],
     ['ligchg',       0             ],
     ['colchg',       0             ],
     ['poseschg',     0             ],
-// DEL    ['ham',          5             ],
     ['scaling',      1             ]
     ];
 
@@ -138,15 +130,6 @@ const RUN_MODES =
     'Many-to-Many'
     ];
 
-// DELconst HAMILTONIANS =
-// DEL    [
-// DEL    'AM1',
-// DEL    'MNDO',
-// DEL    'MNDO/d',
-// DEL    'PDDG-PM3',
-// DEL    'PM3',
-// DEL    'PM6'
-// DEL    ];
 
 const HAM_KEYS =
     [
@@ -158,11 +141,6 @@ const HAM_KEYS =
     'pm6'
     ];
 
-// DELconst ALG_OPTS =
-// DEL    [
-// DEL    'Linear Scaling',
-// DEL    'Cubic Scaling'
-// DEL    ];
 
 const REC_SETS =
     [
@@ -183,7 +161,6 @@ const CORE_PANEL =
         name: 'dbbox', extendH: 1,
         FSBText :
             [
-// DEL            name: 'scoredb', len: 40, extendH: 1, title: 'Output DB:',
             name: 'scoredb', extendH: 1, title: 'Output:',
             mode: 'saveAs', allowBlank: 0,
             bubbleHelp:
@@ -193,64 +170,12 @@ const CORE_PANEL =
         Button : [ name: 'browse_scoredb', text: 'Browse...' ]
         ],
 
-// DEL    Separator : [flushLeft:1, extendH:1, margin:1],
-// DEL
-// DEL    Hbox :
-// DEL        [
-// DEL        name: 'wdbox', extendH: 1,
-// DEL        Text :
-// DEL            [
-// DEL            name: 'workdir', len: 40, extendH: 1, title: 'Working Dir:',
-// DEL            type: 'char', allowBlank: 0,
-// DEL            shortcut: ['/tmp', '.', '~', '~/tmp', '/scratch'],
-// DEL            bubbleHelp:
-// DEL                'The name of the working directory for storing\n'
-// DEL                'QB DivCon intermediate calculations and logs.\n'
-// DEL                'The absolute path to the specified directory\n'
-// DEL                'will be stored and used at execution time.'
-// DEL            ],
-// DEL        Separator : 
-// DEL            [
-// DEL            vertical:0, shadow:'noline', extendH: 0, margin:1
-// DEL            ],
-// DEL        Checkbox :
-// DEL            [
-// DEL            name: 'cwd', text: 'CWD', onTrigger: 'return', 
-// DEL            bubbleHelp:
-// DEL                'Set the current working directory using\n'
-// DEL                'the run time environment variable $PWD.'
-// DEL            ]
-// DEL        ],
 
     Separator : [flushLeft:1, extendH:1, margin:1],
 
     Vbox :
         [
         name: 'modebox', extendH:1,
-// DEL        Radio :
-// DEL            [
-// DEL            name: 'mode', text: RUN_MODES, columns: 4,
-// DEL            extendH: 1, onTrigger: 'return', title: 'Mapping Mode:',
-// DEL            type: 'char',
-// DEL            bubbleHelp:
-// DEL                'The mapping mode of receptors to ligand/poses:\n'
-// DEL                '  SinglePoint:  The receptor only.\n'
-// DEL                '  One-to-One:  One ligand docked into one receptor.\n'
-// DEL                '  One-to-Many:  Many ligand poses docked into the same receptor.\n'
-// DEL                '  Many-to-Many:  Many ligand poses, each docked into its own receptor.'
-// DEL            ],
-// DEL        Separator : 
-// DEL            [
-// DEL            vertical:0, shadow:'noline', extendH: 0, margin:1
-// DEL            ],
-// DEL        Checkbox :
-// DEL            [
-// DEL            name: 'allposes', text: 'Show all poses?',
-// DEL            onTrigger: 'return',
-// DEL            bubbleHelp:
-// DEL                'Load all of the poses from the database\n'
-// DEL                'and show them in the MOE Window.'
-// DEL            ]
 
     Hbox: 
     [
@@ -274,7 +199,6 @@ const CORE_PANEL =
         name: 'recbox', extendH: 1,
         FSBText :
             [
-// DEL            name: 'recdb', len: 40, extendH: 1, title: 'Receptor DB:',
             name: 'recdb', extendH: 1,
             mode: 'open', allowBlank: 0,
             bubbleHelp:
@@ -306,7 +230,6 @@ const CORE_PANEL =
         name: 'posebox', extendH: 1,
         FSBText :
             [
-// DEL            name: 'posedb', len: 40, extendH: 1, title: 'Ligand/Pose DB:',
             name: 'posedb', extendH: 1,
             mode: 'open', allowBlank: 0,
             bubbleHelp:
@@ -345,68 +268,8 @@ const CORE_PANEL =
                     'the opened corresponding QMScore database.'
                 ]
             ]
-// DEL        Separator : 
-// DEL            [
-// DEL            vertical:0, shadow:'noline', extendH: 0, margin:1
-// DEL            ],
-// DEL        Mbox :
-// DEL            [
-// DEL            columns: 4, spacingH: 'medium',
-// DEL            extendH: 1, name: 'moltests',
-// DEL                Label :
-// DEL                    [
-// DEL                    font: 'mediumBold', text: 'Error:', 
-// DEL                    bubbleHelp:
-// DEL                        'These are tests for problems with the receptor(s)\n'
-// DEL                        'and ligand(s) that will cause DivCon to fail.'
-// DEL                    ],
-// DEL                Checkbox :
-// DEL                    [
-// DEL                    name: 'testLP', text: 'Lone Pairs',
-// DEL                    bubbleHelp:
-// DEL                        'Check to ensure that there are no lone pairs\n'
-// DEL                        '(often the result of MOE misparsing a PDB file).'
-// DEL                    ],
-// DEL                Checkbox :
-// DEL                    [
-// DEL                    name: 'testOverlap', text: 'Atom Overlap',
-// DEL                    bubbleHelp:
-// DEL                        'Check to ensure that there are no\n'
-// DEL                        'overlapping atoms (inter- and intramolecular).'
-// DEL                    ],
-// DEL                Checkbox :
-// DEL                    [
-// DEL                    name: 'testHam', text: 'Compatibility',
-// DEL                    bubbleHelp:
-// DEL                        'Check to ensure that all atoms are\n'
-// DEL                        'compatible with the chosen Hamiltonian.'
-// DEL                    ],
-// DEL                Label :
-// DEL                    [
-// DEL                    font: 'mediumBold', text: 'Warning:',
-// DEL                    bubbleHelp:
-// DEL                        'These are tests for problems with the receptor(s)\n'
-// DEL                        'and ligand(s) that may or may not cause DivCon to\n'
-// DEL                        ' fail, but the results will probably be questionable.'
-// DEL                    ],
-// DEL                Checkbox :
-// DEL                    [
-// DEL                    name: 'testH', text: 'Missing/Extra H',
-// DEL                    bubbleHelp:
-// DEL                        'Check to ensure that there are no missing or\n'
-// DEL                        'extra H (e.g., truncated residue, C=OH, etc.).'
-// DEL                    ],
-// DEL                Checkbox :
-// DEL                    [
-// DEL                    name: 'testMM', text: 'No MM Type',
-// DEL                    bubbleHelp:
-// DEL                        'Check to ensure that all atoms\n'
-// DEL                        'have a defined MM atom type.'
-// DEL                    ]
-// DEL            ]
         ],
 
-// DEL    Separator : [flushLeft:1, extendH:1, margin:1],
 
     Hbox :
         [
@@ -428,10 +291,6 @@ const CORE_PANEL =
                     'and "Lig Chg" fields of the QMScore database.'
                 ]
             ],
-// DEL        Separator : 
-// DEL            [
-// DEL            vertical:0, shadow:'noline', extendH: 0, margin:1
-// DEL            ],
 
         Pager:
             [ extendH:1,
@@ -451,14 +310,6 @@ const CORE_PANEL =
                             '   Green:   charge calculated by MOE.\n'
                             '   Red:      charge problematic for DivCon.'
                         ]
-// DEL                    Text :
-// DEL                        [
-// DEL                        name: 'recchg', allowBlank: 0,
-// DEL                        type: 'int', minWidth: 4,
-// DEL                        onTrigger: 'return',
-// DEL                        bubbleHelp:
-// DEL                            'Total charge of receptor.'
-// DEL                        ]
                     ],
                 Hbox :
                     [
@@ -474,21 +325,6 @@ const CORE_PANEL =
                             '   Red:      charge problematic for DivCon.'
 
                         ]
-// DEL                    Text :
-// DEL                        [
-// DEL                        name: 'ligchg', allowBlank: 0,
-// DEL                        type: 'int', minWidth: 4, extendH: 1,
-// DEL                        onTrigger: 'return',
-// DEL                        bubbleHelp:
-// DEL                            'Total charge of ligand.'
-// DEL                        ]
-// DEL                    Checkbox :
-// DEL                        [
-// DEL                        name: 'poseschg', text: 'All Poses',
-// DEL                        bubbleHelp:
-// DEL                            'Use the ligand charge for all\n'
-// DEL                            'poses in the poses database.'
-// DEL                        ]
                     ]
                 ],
             Vbox :
@@ -518,46 +354,13 @@ const CORE_PANEL =
                 ] ]
             ]
         ],
-// DEL                Data :  [   name: 'testLP'  ],
-// DEL                Data :  [   name: 'testOverlap' ],
-// DEL                Data :  [   name: 'testHam' ],
-// DEL                Data :  [   name: 'testH'   ],
-// DEL                Data :  [   name: 'testMM'  ],
                 Data :  [   name: 'poseschg'  ],
                 Data :  [   name: 'mode'  ],
                 Data :  [   name: 'allposes'  ],
                 Data :  [   name: 'recchg'  ],
                 Data :  [   name: 'ligchg'  ],
 
-// DEL    Separator : [flushLeft:1, extendH:1, margin:1],
 
-// DEL    Hbox :
-// DEL        [
-// DEL        name: 'calcbox', extendH: 1,
-// DEL        Option :
-// DEL            [
-// DEL            name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
-// DEL            type: 'int', minWidth: 8,
-// DEL            bubbleHelp:
-// DEL                ''
-// DEL            ],
-// DEL        Separator : 
-// DEL            [
-// DEL            vertical:0, shadow:'noline', extendH: 0, margin:1
-// DEL            ],
-// DEL        Option :
-// DEL            [
-// DEL            name: 'scaling', title: 'Calculation:', text: ALG_OPTS,
-// DEL            type: 'int', minWidth: 8,
-// DEL            bubbleHelp:
-// DEL                'Linear vs. Cubic refers to the scaling factor of the\n'
-// DEL                'calculation where Linear scales accordingly to O(n)\n'
-// DEL                'and Cubic scaling is the more conventional variety\n'
-// DEL                '(e.g. O(n^3) or worse) where n corresponds to the number\n'
-// DEL                'of electrons in the system. The cross over point is at\n'
-// DEL                'approximately 450 atoms.'
-// DEL            ]
-// DEL        ],
 
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
@@ -1379,12 +1182,7 @@ local function TestComplex [appname, hamname]
     local recok = 0, recmess = '';
     local ligok = 0, ligmess = '';
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
-// DEL    if recatoms === [] or ligatoms === [] then
-// DELwrite ['TestComplex IN IF |{}|\n',errmess];
-// DEL        return  [0, '', 0, errmess];
-// DEL    endif
 
-write ['length recatoms: {}\n', length recatoms]; // DEL
     if not isnull recatoms then
         [recok, recmess] = qb_TestDivCon ['receptor', recatoms, appname, hamname];
     else
@@ -1623,25 +1421,6 @@ local function UpdateComplexChargeStatus [wkey, status, recchg, ligchg, warn]
     return status;
 endfunction
 
-// DEL/****************************************************************************
-// DEL *                          UpdateCWD
-// DEL *
-// DEL *  Update the window based on new CWD value.
-// DEL *
-// DEL ****************************************************************************/
-// DELlocal function UpdateCWD [wkey, cwd, wd, prev]
-// DEL
-// DEL    if cwd === 1 then
-// DEL        WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1]]];
-// DEL        WindowSetData [wkey, [workdir: '']];
-// DEL        return wd;
-// DEL    else
-// DEL        WindowSetAttr [wkey, [workdir: [sensitive: 1, allowBlank: 0]]];
-// DEL        WindowSetData [wkey, [workdir: prev]];
-// DEL        return prev;
-// DEL    endif
-// DEL
-// DELendfunction
 
 function qb_ResetLigand;
 
@@ -1808,7 +1587,6 @@ endfunction
 global function qb_CoreEnable [wkey, which]
 
     WindowSetAttr [wkey, [dbbox: [sensitive: which],
-// DEL            wdbox: [sensitive: which], 
             modebox: [sensitive: which], 
             recbox: [sensitive: which], posebox: [sensitive: which], 
             chargebox: [sensitive: which], testbox: [sensitive: which],
@@ -1835,11 +1613,6 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
     local btid;
     local tmpSet;
 
-// DEL    if trig === 'cwd' then
-// DEL        status.prevwd = UpdateCWD [wkey, vals.cwd, vals.workdir,
-// DEL            status.prevwd];
-// DEL
-// DEL    elseif trig === 'mode' then
     if trig === 'mode' then
         UpdateMode [wkey, vals, status];
 
@@ -2470,17 +2243,13 @@ global function qb_InitCorePanel [wkey, status, defaults]
 
     qb_HamSetsInit [];
 
-// DEL    status.prevwd = defaults.workdir;
     WindowSetData [wkey, defaults];
-// DEL    WindowSetAttr [wkey, [workdir: [sensitive: 0, allowBlank: 1],
     WindowSetAttr 
         [wkey, 
             [allposes: [sensitive: 0],
                 recbox: [sensitive: 0], recdb: [allowBlank: 1],
                 posebox: [sensitive: 0], posedb: [allowBlank: 1],
                 poseschg: [sensitive: 0]
-        // DEL        ham: [text: HAMILTONIANS | status.allowham],
-        // DEL        mode: [text: RUN_MODES | status.allowmode],
 //                 chgbox: [page: select [2, 1, defaults.mode === 'Single Point']],
 //                ckdbchg: [sensitive: defaults.mode === 'One-to-Many' 
 //                or defaults.mode === 'Many-to-Many']
@@ -3342,11 +3111,9 @@ global function qb_TagCoreVals [vals]
 
     local coreopts = tag [first tr CORE_OPT_DEFAULTS, [
         second first CORE_OPT_DEFAULTS,
-// DEL        vals.mode, vals.allposes, vals.cwd, vals.workdir, vals.scoredb,
         vals.mode, vals.allposes, vals.scoredb,
         vals.recdb, vals.posedb,
         vals.recchg, vals.ligchg, vals.colchg, vals.poseschg
-// DEL        , vals.ham,
         , vals.scaling
         ]];
 
@@ -3510,7 +3277,6 @@ endfunction
 global function qb_UpdateCharge [wkey, vals, status, warn]
 
     if MOE_BATCH then exit ['Should only be run from MOE Window.']; endif
-write ['IN qb_UpdateCharge vals: {}\n',vals]; // DEL
     if vals.mode === 'Single Point' then
         local [colchg, colok, colerrmess] = CalcCollectionCharge [];
         if (colchg === [] or colok === []) then
@@ -3576,8 +3342,6 @@ global function qb_UpdateCorePanel [wkey, status, coreopts]
     endif
 write ['IN qb_UpdateCorePanel\n'];
     UpdateMode [wkey, coreopts, status];
-// DEL    status.prevwd = UpdateCWD [wkey, coreopts.cwd, coreopts.workdir, 
-// DEL        coreopts.workdir];
 
     return status;
 endfunction

@@ -161,11 +161,6 @@ global function qb_RunNMRPerturb [dbkey, jobid]
     local perfile = twrite ['{}/{}.h5', perpath, pertail];
 
     local workdir = cd [];
-// DEL    if coreopts.cwd === 1 then
-// DEL        workdir = getenv 'PWD';
-// DEL    else
-// DEL        workdir = fabsname coreopts.workdir;
-// DEL    endif
 
     if not isnull jobid then
         workdir = twrite ['{}/{}', workdir, jobid];
@@ -180,7 +175,6 @@ global function qb_RunNMRPerturb [dbkey, jobid]
         endif
     endif
 
-// DEL    coreopts.workdir = workdir;
     write ['Persistent File:  {}\n', perfile];
     write ['Work Dir:  {}\n', workdir];
 
