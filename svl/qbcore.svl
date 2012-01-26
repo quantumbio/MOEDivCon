@@ -1040,8 +1040,6 @@ local function HamCompatability [appname, hamname, atoms]
 
     if appname === 'perturb' then appname = 'nmr'; endif
     local elems = uniq aElement atoms;
-write ['appname: {}\n', appname];
-write ['hamname: {}\n', hamname];
     local compatlist = tagpeek [G_hamsets, [appname, hamname]];
     local idx = indexof [elems, compatlist];
     local m = idx == 0;
@@ -1501,7 +1499,6 @@ global function qb_AtomsToMols []
 
     local [recatoms, ligatoms, errmess] = qb_SplitComplex [1];
 
-
     local ligmol = mol_Extract ligatoms;
     local recmol = mol_Extract recatoms;
 
@@ -1667,7 +1664,6 @@ global function qb_CoreHandler [wkey, trig, status, vals, ligatoms, btasks]
     elseif trig === 'performprep' then
         run ['structprep_ui.svl'];
     elseif trig === 'performtests' then
-write ['vals: {}\n', vals];
         if vals.allposes then
             [vals, ligatoms] = qb_ResetLigand [wkey, vals];
         endif
@@ -1705,7 +1701,6 @@ write ['vals: {}\n', vals];
                 exit [];
             endif
         endif
-write ['vals.mode: {}\n', vals.mode];
         if vals.mode === 'Many-to-Many' then
             Message [msgkey, 
                 'Running tests on complex in MOE Window ... skipping.'];
@@ -3031,49 +3026,7 @@ global function qb_SplitComplex [testsingle]
     recatoms = cat [_Atoms '$$solvent', _Atoms '$$receptor'];
     ligatoms = _Atoms '$$ligand';
 
-//    if length ligatoms === 0 or length ligatoms >= length complexatoms then
-//        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
-//    endif
-
-
     return [recatoms,ligatoms, ''];
-    // not sure why we need the rest:
-
-    const COLLECTNAMES = ['QB_LIGAND', 'LIGX_LIGAND'];
-    local cname;
-
-    local colnames = oCollections [];
-    for cname in COLLECTNAMES loop
-        if anytrue eqE [cname, colnames] then
-            //  Make sure the ligand atoms maintain their order in complex.
-            col = cat oAtoms oGetCollection cname;
-            col = join [col, complexatoms];
-            x = x_sort aNumber col;
-            ligatoms  = col [x];
-            break;
-        endif
-    endloop
-
-    if length ligatoms === 0 then
-        ligatoms  = _Atoms '$$ligand';
-    endif
-
-    if length ligatoms === 0 or length ligatoms >= length complexatoms then
-        return [[], [], 'No ligand was recognized.\n  Use LigX to define it.'];
-    endif
-
-    if testsingle and not SingleMol [ligatoms] then
-        return [[], [], 'Ligand must to be a single molecule.'];
-    endif
-
-    oSetCollection ['QB_LIGAND', ligatoms];
-
-    //  Make sure the receptor atoms maintain their order in complex.
-    col = diff [complexatoms, ligatoms];
-    x = x_sort aNumber col;
-    recatoms  = col [x];
-
-    return [recatoms, ligatoms, ''];
 endfunction
 
 /****************************************************************************
@@ -3340,7 +3293,6 @@ global function qb_UpdateCorePanel [wkey, status, coreopts]
         status = UpdateComplexChargeStatus [wkey, status, coreopts.recchg, 
             coreopts.ligchg, 1];  
     endif
-write ['IN qb_UpdateCorePanel\n'];
     UpdateMode [wkey, coreopts, status];
 
     return status;
@@ -3412,7 +3364,6 @@ endfunction
  *  be used even if they are problematic for DivCon.
  *
  *  Assumption:  called from MOE gui, not moebatch.
- *
  *
  ****************************************************************************/
 global function qb_VerifyDivConComplex [wkey, status, vals]
