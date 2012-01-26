@@ -1274,6 +1274,12 @@ local function UpdateComplex [ligtok, radius]
         G_surface.lig = ligatoms;
     endif
 
+// update the Ligand Interactions Panel if it is up:
+    local idx = 0;
+    if idx = indexof ['LigandInteractions', WindowNameList[]] then
+        WindowTrigger [(WindowKeyList[])(idx), [panel:'Apply']];
+    endif
+
     local lignuc, ligbnd;
     if isnull G_surface.lig then
         lignuc = 'small-sphere';
