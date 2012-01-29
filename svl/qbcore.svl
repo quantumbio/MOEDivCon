@@ -359,9 +359,6 @@ const CORE_PANEL =
                 Data :  [   name: 'allposes'  ],
                 Data :  [   name: 'recchg'  ],
                 Data :  [   name: 'ligchg'  ],
-
-
-
     Separator : [flushLeft:1, extendH:1, margin:1]
     ];
 
@@ -1037,7 +1034,6 @@ global G_hamsets;
  *
  ****************************************************************************/
 local function HamCompatability [appname, hamname, atoms]
-
     if appname === 'perturb' then appname = 'nmr'; endif
     local elems = uniq aElement atoms;
     local compatlist = tagpeek [G_hamsets, [appname, hamname]];
