@@ -1815,7 +1815,7 @@ global function qb_CreateMessWin [message, len, wd]
         [isnull len, isnull wd]];
 
     local messwin = WindowCreate MESS_WINDOW;
-    WindowSetAttr [messwin, [mess: [len: msglen, width: msgwd]]];
+    WindowSetAttr [messwin, [mess: [len: msglen, width: msgwd, extendH:1, extendV:1]]];
     WindowSetData [messwin, [mess: message]];
     WindowShow [messwin, 1];
     loop
