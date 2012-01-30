@@ -68,7 +68,7 @@ const LIG_KEYS =
 
 global bRUN_MPI;
 
-local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numokay]
+local function ManageMOEDivConMPI[pstdout,pstdin,process_keys,warnings,dbkey,numokay]
 
     local results = [];
     local return_statement = [];
@@ -82,36 +82,36 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
 
     local result_ith = 0;
     while exe_status process_keys(1) and result_ith <= numokay loop
-        results = [];
-        [[return_statement]] = fread [stdout, '{c:*}'];
 
+        results = [];
+        [[return_statement]] = fread [pstdout, '{c:*}'];
         if return_statement === "status" then
-            [[rowcnt]] = fread [stdout, '{n:}'];
+            [[rowcnt]] = fread [pstdout, '{n:}'];
             write ['  Getting status for pose {} ({} of {})\n', rowcnt, 
                 result_ith+1, numokay];
-	    [[status_length]] = fread [stdout, '{n:}'];
+	    [[status_length]] = fread [pstdout, '{n:}'];
             for status_length loop
-                [[return_statement]] = fread [stdout, '{c:*}'];
+                [[return_statement]] = fread [pstdout, '{c:*}'];
                 print ['running', return_statement];
             endloop
-            fwrite [stdin, '{c:}\n', 'Ok'];
+            fwrite [pstdin, '{c:}\n', 'Ok'];
         elseif return_statement === "success" then
-            [[rowcnt]] = fread [stdout, '{n:}'];
+            [[rowcnt]] = fread [pstdout, '{n:}'];
             write ['  Getting results for pose {} ({} of {})\n', rowcnt, 
                 result_ith+1, numokay];
 
             local name, nameValue;
             local parameter, parameterValue;
-            [[name]] = fread [stdout, '{c:*}'];
-            [[nameValue]] = fread [stdout, '{c:*}'];
+            [[name]] = fread [pstdout, '{c:*}'];
+            [[nameValue]] = fread [pstdout, '{c:*}'];
             results = cat [results, [[name, nameValue]]];
             for NUMRESULTS loop
-                [[parameter]] = fread [stdout, '{c:*}'];
-                [[parameterValue]] = fread [stdout, '{n:}'];
+                [[parameter]] = fread [pstdout, '{c:*}'];
+                [[parameterValue]] = fread [pstdout, '{n:}'];
                 results = cat [results, [[parameter, parameterValue]]];
             endloop
 
-            fwrite [stdin, '{c:}\n', 'Ok'];
+            fwrite [pstdin, '{c:}\n', 'Ok'];
             qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
             local sucmess = "Success";
             if not isnull  warnings (rowcnt)
@@ -128,31 +128,31 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
 
         elseif return_statement === "error" then
 
-            [[rowcnt]] = fread [stdout, '{n:}'];
+            [[rowcnt]] = fread [pstdout, '{n:}'];
             if rowcnt < 1 or rowcnt > length dbrowkeys then
                 write ['Getting chairman error message:\n'];
 
                 while neL [return_statement, "DivCon done."] loop
-                    [[return_statement]] = fread [stdout, '{c:*}'];
+                    [[return_statement]] = fread [pstdout, '{c:*}'];
                     write ['    {}\n', return_statement];
                 endloop;
 
-                fwrite [stdin, '{c:}\n', 'Ok'];
+                fwrite [pstdin, '{c:}\n', 'Ok'];
             else
                 write ['  Getting error message for pose {} ({} of {})\n', rowcnt, 
                     result_ith+1, numokay];
 
-                [[return_statement]] = fread [stdout, '{c:*}'];
+                [[return_statement]] = fread [pstdout, '{c:*}'];
                 if neL [return_statement, "DivCon done."] then
                     divconerrmess = cat [divconerrmess, return_statement];
-                    [[return_statement]] = fread [stdout, '{c:*}'];
+                    [[return_statement]] = fread [pstdout, '{c:*}'];
                 endif
                 while neL [return_statement, "DivCon done."] loop
                     divconerrmess = cat [divconerrmess, "\n", return_statement];
-                    [[return_statement]] = fread [stdout, '{c:*}'];
+                    [[return_statement]] = fread [pstdout, '{c:*}'];
                 endloop;
 
-                fwrite [stdin, '{c:}\n', 'Ok'];
+                fwrite [pstdin, '{c:}\n', 'Ok'];
 
                 if isnull divconerrmess then
                     divconerrmess = "Error:  unknown error!";
@@ -171,14 +171,14 @@ local function ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numok
             result_ith = result_ith + 1;
 
         elseif return_statement === "DivCon done." then
-            fwrite [stdin, '{c:}\n', 'Ok'];
+            fwrite [pstdin, '{c:}\n', 'Ok'];
             return;
         endif
     endloop
     
 endfunction
 
-local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,rowcnt,dbkey]
+local function ManageMOEDivConScoring[pstdout,pstdin,process_keys,warnings,rowcnt,dbkey]
 
     local results = [];
     local return_statement = [];
@@ -200,32 +200,31 @@ local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,rowcnt,
     
     local success = 0;
     local sleep_time = 0.1;
-
     while exe_status process_keys(1) loop
         results = [];
-        fwrite [stdin, '{c:}\n', 'status'];
-        [[return_statement]] = fread [stdout, '{c:*}'];
+        fwrite [pstdin, '{c:}\n', 'status'];
+        [[return_statement]] = fread [pstdout, '{c:*}'];
 
         if return_statement === "noupdate" then
         elseif return_statement === "running" then
-	    [[status_length]] = fread [stdout, '{n:}'];
+	    [[status_length]] = fread [pstdout, '{n:}'];
             for status_length loop
-                [[return_statement]] = fread [stdout, '{c:*}'];
+                [[return_statement]] = fread [pstdout, '{c:*}'];
                 write ['    running | {}\n', return_statement];
             endloop
         elseif return_statement === "success" then
             local name, nameValue;
             local parameter, parameterValue;
-            [[name]] = fread [stdout, '{c:*}'];
-            [[nameValue]] = fread [stdout, '{c:*}'];
+            [[name]] = fread [pstdout, '{c:*}'];
+            [[nameValue]] = fread [pstdout, '{c:*}'];
             results = cat [results, [[name, nameValue]]];
             for NUMRESULTS loop
-                [[parameter]] = fread [stdout, '{c:*}'];
-                [[parameterValue]] = fread [stdout, '{n:}'];
+                [[parameter]] = fread [pstdout, '{c:*}'];
+                [[parameterValue]] = fread [pstdout, '{n:}'];
                 results = cat [results, [[parameter, parameterValue]]];
             endloop
             success = 1;
-            fwrite [stdin, '{c:}\n', 'Ok'];
+            fwrite [pstdin, '{c:}\n', 'Ok'];
 
             local sucmess = "Success";
             if not isnull  warnings (rowcnt)
@@ -241,16 +240,16 @@ local function ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,rowcnt,
                 qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), sucmess];
             endif
         elseif return_statement === "error" then
-            [[return_statement]] = fread [stdout, '{c:*}'];
+            [[return_statement]] = fread [pstdout, '{c:*}'];
             if neL [return_statement, "DivCon done."] then
                 divconerrmess = cat [divconerrmess, return_statement];
-                [[return_statement]] = fread [stdout, '{c:*}'];
+                [[return_statement]] = fread [pstdout, '{c:*}'];
             endif
             while neL [return_statement, "DivCon done."] loop
                 divconerrmess = cat [divconerrmess, "\n", return_statement];
-                [[return_statement]] = fread [stdout, '{c:*}'];
+                [[return_statement]] = fread [pstdout, '{c:*}'];
             endloop;
-            fwrite [stdin, '{c:}\n', 'Ok'];
+            fwrite [pstdin, '{c:}\n', 'Ok'];
         endif
         sleep sleep_time;
     endloop
@@ -273,26 +272,26 @@ local function InitMOEDivConQMScore[perfile,workdir,nrows,coreopts]
     local prios = exe_getpriority process_keys;
     exe_setpriority [process_keys, prios];
 
-    local stdin = exe_stdin process_keys;
-    local stdout = exe_stdout process_keys;
-    local stderr = exe_stderr process_keys;
+    local pstdin = exe_stdin process_keys;
+    local pstdout = exe_stdout process_keys;
+    local pstderr = exe_stderr process_keys;
 
     //  Pass down the dirs, options and number of possible jobs.
-    fwrite [stdin, '{c:}\n', perfile];
-    fwrite [stdin, '{c:}\n', select ['PWD', 'NOPWD', coreopts.analpwd]];
-    fwrite [stdin, '{c:}\n', select ['COMPRESSION', 'NOCOMPRESSION', 1]];
-    fwrite [stdin, '{c:}\n', select ['PERSISTCOMPLEXDENSITY', 'NOPERSISTCOMPLEXDENSITY', 0]];
-    fwrite [stdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
-    fwrite [stdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD', coreopts.scaling === 1]];
-    fwrite [stdin, '{c:}\n', select ['FREQ', 'NOFREQ', coreopts.freq]];
-    fwrite [stdin, '{c:}\n', LIG_KEYS(coreopts.opt)];
-    fwrite [stdin, '{n:}\n', coreopts.shift];
-    fwrite [stdin, '{n:}\n', nrows];
+    fwrite [pstdin, '{c:}\n', perfile];
+    fwrite [pstdin, '{c:}\n', select ['PWD', 'NOPWD', coreopts.analpwd]];
+    fwrite [pstdin, '{c:}\n', select ['COMPRESSION', 'NOCOMPRESSION', 1]];
+    fwrite [pstdin, '{c:}\n', select ['PERSISTCOMPLEXDENSITY', 'NOPERSISTCOMPLEXDENSITY', 0]];
+    fwrite [pstdin, '{c:}\n', HAM_KEYS(coreopts.ham)];
+    fwrite [pstdin, '{c:}\n', select ['NOSTANDARD', 'STANDARD', coreopts.scaling === 1]];
+    fwrite [pstdin, '{c:}\n', select ['FREQ', 'NOFREQ', coreopts.freq]];
+    fwrite [pstdin, '{c:}\n', LIG_KEYS(coreopts.opt)];
+    fwrite [pstdin, '{n:}\n', coreopts.shift];
+    fwrite [pstdin, '{n:}\n', nrows];
 
     local start = clock[];
     write ['\nQMScore beginning: {}\n',asctime [start]];
 
-    return [process_keys,stdin,stdout,stderr,start];
+    return [process_keys,pstdin,pstdout,pstderr,start];
 endfunction
 
 local function ShutdownMOEDivConQMScore [process_keys,start,results]
@@ -319,7 +318,7 @@ local function ShutdownMOEDivConQMScore [process_keys,start,results]
 
 endfunction
 
-local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,dbkey]
+local function SendPairForScore [pstdin,pstdout,recmol,ligmol,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,dbkey]
 
     local recchg = coreopts.recchg;
     local ligchg = coreopts.ligchg;
@@ -346,17 +345,18 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
 
         //  Pass the two backbones to QuantumBio's DivCon QMScore
         write ['Sending pose {} of {}\n', rowcnt, nrows];
-        fwrite [stdin, '{n:}\n', rowcnt];
+        fwrite [pstdin, '{n:}\n', rowcnt];
 
-        fwrite [stdin, '{c:}\n', cName [recmol]];
-        fwrite [stdin, '{n:}\n', recchg];
-        qb_PassBackbone [stdout, stdin, recmol];
-        qb_PassValues [stdout, stdin, [] ];
+        fwrite [pstdin, '{c:}\n', cName [recmol]];
+        fwrite [pstdin, '{n:}\n', recchg];
+        qb_PassBackbone [pstdout, pstdin, recmol];
+        qb_PassValues [pstdout, pstdin, [] ];
 
-        fwrite [stdin, '{c:}\n', cName [ligmol]];
-        fwrite [stdin, '{n:}\n', ligchg];
-        qb_PassBackbone [stdout, stdin, ligmol];
-        qb_PassValues [stdout, stdin, nonQBtagged ];
+        fwrite [pstdin, '{c:}\n', cName [ligmol]];
+        fwrite [pstdin, '{n:}\n', ligchg];
+
+        qb_PassBackbone [pstdout, pstdin, ligmol];
+        qb_PassValues [pstdout, pstdin, nonQBtagged ];
         warnings (rowcnt) = ckmsg;
 
     else
@@ -382,19 +382,19 @@ local function SendPairForScore [stdin,stdout,recmol,ligmol,coreopts,status,nonQ
         write ['Skipping pose {} of {}\n', rowcnt, nrows];
         write ['QMScore Error:  {}\n', errmess];
 
-        fwrite [stdin, '{n:}\n', 0];            //  skipping
+        fwrite [pstdin, '{n:}\n', 0];            //  skipping
     endif
     
     return [warnings,numokay];
     
 endfunction
 
-global function qb_QMScorePair [recmol, ligmol, perfile, coreopts,
-        status,errortests,nonQBtagged,workdir] 
+global function qb_QMScorePair [recmol,ligmol,perfile,coreopts,qmsopts,status,errortests,workdir,nonQBtagged] 
     sleep 1;    // allows previous script to open the right mdb file for monitoring.
     local [osys, nsys] = SystemPush [];
     bRUN_MPI = 0;
 
+    coreopts = cat [coreopts,qmsopts];
     //  If there are any errors, return immediately.  Run all error tests
     //  unless forced not to by user.
     qb_HamSetsInit [];
@@ -403,23 +403,23 @@ global function qb_QMScorePair [recmol, ligmol, perfile, coreopts,
     local errmess = "", success = 0;
 
     //  exe_open child process inherits parent's environment.
-    local process_keys,stdin,stdout,stderr,start;
+    local process_keys,pstdin,pstdout,pstderr,start;
     local recressets = mol_Create recmol;
     cSetName [recressets,recmol(1)(MOL_NAME)];
     local ligressets = mol_Create ligmol;
     cSetName [ligressets,ligmol(1)(MOL_NAME)];
-    [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,rowcnt,coreopts];
+    [process_keys,pstdin,pstdout,pstderr,start] = InitMOEDivConQMScore[perfile,workdir,rowcnt,coreopts];
 
     //  Pass the two backbones to QuantumBio's DivCon QMScore
     //
     //  SplitReceptor ensures that there is only one chain per molecule
     //  in the receptor collection.
-    [warnings,numokay] = SendPairForScore [stdin,stdout,recressets,ligressets,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,[]];
+    [warnings,numokay] = SendPairForScore [pstdin,pstdout,recressets,ligressets,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,[]];
     
-    local results = ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,rowcnt,[]];
+    local results = ManageMOEDivConScoring[pstdout,pstdin,process_keys,warnings,rowcnt,[]];
 
-    //  Look for error messages from stderr.
-    local [[newerror]] = fread [stderr, '{c:*}'];
+    //  Look for error messages from pstderr.
+    local [[newerror]] = fread [pstderr, '{c:*}'];
     while length newerror > 0 loop
        // Hack!  Skip openmpi ignored error messages
         local errstrs = wordsplit [newerror, "()"];
@@ -430,7 +430,7 @@ global function qb_QMScorePair [recmol, ligmol, perfile, coreopts,
             errmess = cat [newerror, errmess];
         endif
 
-        [[newerror]] = fread [stderr, '{c:*}'];
+        [[newerror]] = fread [pstderr, '{c:*}'];
     endloop
 
     ShutdownMOEDivConQMScore[process_keys,start,results];
@@ -485,9 +485,9 @@ global function qb_QMScoreMDB [dbkey, jobid]
         endif
     endif
 
-    local process_keys,stdin,stdout,stderr,start;
+    local process_keys,pstdin,pstdout,pstderr,start;
     if bRUN_MPI then
-        [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,coreopts];
+        [process_keys,pstdin,pstdout,pstderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,coreopts];
     endif
 
     // process the fields in the QMScore mdb file and strip out the stuff we added
@@ -504,7 +504,7 @@ global function qb_QMScoreMDB [dbkey, jobid]
     for rowkey in dbrowkeys loop
 
         if not bRUN_MPI then
-            [process_keys,stdin,stdout,stderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,coreopts];
+            [process_keys,pstdin,pstdout,pstderr,start] = InitMOEDivConQMScore[perfile,workdir,nrows,coreopts];
             qb_SaveDivConStatus [dbkey, rowkey, "Running....  "];
         endif
         
@@ -514,7 +514,7 @@ global function qb_QMScoreMDB [dbkey, jobid]
         local oldstatus = qb_GetDivConStatus [dbkey, rowkey];
         if  eqL ["Success", keep [oldstatus, 7]] then
             write ['Skipping on success pose {} of {}\n', rowcnt, nrows];
-            fwrite [stdin, '{n:}\n', 0];            //  skipping
+            fwrite [pstdin, '{n:}\n', 0];            //  skipping
             continue;
         endif
 
@@ -535,14 +535,14 @@ global function qb_QMScoreMDB [dbkey, jobid]
         
         local nonQBtagged = tag [nonQBfields, db_ReadFields [dbkey,rowkey,nonQBfields]];
         
-        [warnings,numokay] = SendPairForScore [stdin,stdout,recressets,ligressets,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,dbkey];
+        [warnings,numokay] = SendPairForScore [pstdin,pstdout,recressets,ligressets,coreopts,status,nonQBtagged,numokay,warnings,rowcnt,dbkey];
 
         if not bRUN_MPI then
-            local results = ManageMOEDivConScoring[stdout,stdin,process_keys,warnings,rowcnt,dbkey];
+            local results = ManageMOEDivConScoring[pstdout,pstdin,process_keys,warnings,rowcnt,dbkey];
 
-            //  Look for error messages from stderr.
+            //  Look for error messages from pstderr.
             errmess = "";
-            local [[newerror]] = fread [stderr, '{c:*}'];
+            local [[newerror]] = fread [pstderr, '{c:*}'];
             while length newerror > 0 loop
                 // Hack!  Skip openmpi ignored error messages
                 local errstrs = wordsplit [newerror, "()"];
@@ -553,7 +553,7 @@ global function qb_QMScoreMDB [dbkey, jobid]
                     errmess = cat [newerror, errmess];
                 endif
         
-                [[newerror]] = fread [stderr, '{c:*}'];
+                [[newerror]] = fread [pstderr, '{c:*}'];
             endloop
 
             ShutdownMOEDivConQMScore[process_keys,start,results];
@@ -566,7 +566,7 @@ global function qb_QMScoreMDB [dbkey, jobid]
 
     //  Abort if there are no results to collect
     if numokay === 0 then
-        fwrite [stdin, '{c:}\n', 'Ok'];
+        fwrite [pstdin, '{c:}\n', 'Ok'];
         ShutdownMOEDivConQMScore[process_keys,start,[]];
         exit [];
     endif
@@ -574,11 +574,11 @@ global function qb_QMScoreMDB [dbkey, jobid]
     //  Collect and store results
 
     if bRUN_MPI then
-        ManageMOEDivConMPI[stdout,stdin,process_keys,warnings,dbkey,numokay];
+        ManageMOEDivConMPI[pstdout,pstdin,process_keys,warnings,dbkey,numokay];
         
-        //  Look for error messages from stderr.
+        //  Look for error messages from pstderr.
         errmess = "";
-        [[newerror]] = fread [stderr, '{c:*}'];
+        [[newerror]] = fread [pstderr, '{c:*}'];
         while length newerror > 0 loop
             // Hack!  Skip openmpi ignored error messages
             errstrs = wordsplit [newerror, "()"];
@@ -589,7 +589,7 @@ global function qb_QMScoreMDB [dbkey, jobid]
                 errmess = cat [newerror, errmess];
             endif
     
-            [[newerror]] = fread [stderr, '{c:*}'];
+            [[newerror]] = fread [pstderr, '{c:*}'];
         endloop
     
         ShutdownMOEDivConQMScore[process_keys,start,[]];
