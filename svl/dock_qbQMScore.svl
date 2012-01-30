@@ -47,6 +47,7 @@ global function dock_score_qbQMScore [cmd, arg, opt]
         ['shift',        9.0           ],
         ['analpwd',      1             ],       //  Generate PWD row data
         ['ham',          5          ],
+        ['hamrdio',      'PM3'         ],
         ['scoredb',      'qbscore.mdb' ]
         ];
     
@@ -60,11 +61,11 @@ global function dock_score_qbQMScore [cmd, arg, opt]
     const HAMILTONIANS =
         [
         'AM1',
-        'MNDO',
-        'MNDO/d',
-        'PDDG-PM3',
-        'PM3',
-        'PM6'
+//        'MNDO',
+//        'MNDO/d',
+//        'PDDG-PM3',
+        'PM3'
+//        'PM6'
         ];
     
     const ALG_OPTS =
@@ -96,8 +97,8 @@ global function dock_score_qbQMScore [cmd, arg, opt]
                     name: 'calcbox', extendH: 1,
                     Option :
                         [
-                        name: 'ham', title: 'Hamiltonian:', text: HAMILTONIANS,
-                        type: 'int', minWidth: 8,
+                        name: 'hamrdio', title: 'Hamiltonian:', text: HAMILTONIANS,
+                        type: 'char', minWidth: 8,
                         bubbleHelp:
                             ''
                         ],
@@ -154,7 +155,8 @@ global function dock_score_qbQMScore [cmd, arg, opt]
                             'after the QMScore calculations.'
                         ] 
                     ]
-           ]
+           ],
+                           Data :  [   name: 'ham'  ]
         ];
 
     if cmd === 'ID' then
@@ -206,7 +208,22 @@ global function dock_score_qbQMScore [cmd, arg, opt]
     local [osys, nsys] = SystemPush [];
     local errortests = 1;
     
+// hack! (down) - this is to support the old method for Hamiltonians - go away for next reversion
+    const HAMILTONIANS2 =
+        [
+        'AM1',
+        'MNDO',
+        'MNDO/d',
+        'PDDG-PM3',
+        'PM3',
+        'PM6'
+        ];    
+    opt.ham = indexof [opt.hamrdio,HAMILTONIANS2];
+// hack! (up) - this is to support the old method for Hamiltonians - go away for next reversion
+    
     local coreopts = qb_TagCoreVals[opt];
+    // set the defaults for this interface
+    coreopts.mode = 'Many-to-Many';
     local qmsopts = qb_TagQMSVals[opt];
     local status = qb_GetDefaultsStatus[];
     
@@ -220,7 +237,7 @@ global function dock_score_qbQMScore [cmd, arg, opt]
     recMolNew(1)(MOL_NAME) = twrite['{}_{}',*rec.mol(1)(MOL_NAME),posecount];
     ligMolNew(1)(MOL_NAME) = twrite['{}_{}',ligMolNew(1)(MOL_NAME),posecount];
     oDestroy Chains [];
-    
+
     if wascalled === 0 then
         dbkey = qb_CreateQMScoreDB [status,coreopts,qmsopts];
         wascalled = 1;
@@ -231,7 +248,7 @@ global function dock_score_qbQMScore [cmd, arg, opt]
     local perfile = twrite ['{}/{}.h5', fpath fabsname db_Filename dbkey, 
         fbase ftail fabsname db_Filename dbkey];
 
-    local [results, errmess] = qb_QMScorePair [recMolNew, ligMolNew, perfile, coreopts, qmsopts, status, errortests,fpath fabsname db_Filename dbkey];
+    local [results, errmess] = qb_QMScorePair [recMolNew, ligMolNew, perfile, coreopts, qmsopts, status, errortests,fpath fabsname db_Filename dbkey,[]];
 
     if results === [] then
         if errmess === [] or errmess === '' then

@@ -2501,7 +2501,6 @@ endfunction
  *
  ****************************************************************************/
 global function qb_PassValues [inpipe, outpipe, nonQBtagged]
-
 	if isnull nonQBtagged then
 		fwrite [outpipe, '{c:}\n', 0];
 	else
