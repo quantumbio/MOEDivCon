@@ -363,6 +363,7 @@ global function qb_QMScoreSetupPanel []
     status = qb_InitCorePanel [wkey, status, coredflts];
     WindowSetData [wkey, appdflts];
     WindowSetAttr [wkey, [panel:    [sensitive: [yesrun, 1, 1, 1, 1]]]];
+    WindowSetAttr [wkey, [freq:    [sensitive:0]]];
     WindowSetAttr [wkey, [hamrdio:    [text: HAMILTONIANS | [1,0,0,0,1,0]]]];
     WindowShow [wkey, 1];
 
