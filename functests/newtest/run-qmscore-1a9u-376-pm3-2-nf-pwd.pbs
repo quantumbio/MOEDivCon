@@ -19,6 +19,6 @@ cat $PBS_NODEFILE
 # Change the path and name for the MOE database.
 USER_DATADB="$PBS_O_WORKDIR/qmscore-1a9u-376-pm3-2-nf-pwd.mdb"
 
-moebatch -exec "run ['qmsmpi.svl', ['$USER_DATADB', '$PBS_JOBID']]" -exit
+qbmoebatch -exec "run ['qmsmpi.svl', ['$USER_DATADB', '$PBS_JOBID']]" -exit
 
 date
