@@ -10,6 +10,7 @@ from glob import glob
 # Submit each job.
 submitted_job_ids = set([])
 for scriptfile in glob('*.pbs'):
+    print 'Submitting job ' + scriptfile + ' to PBS id '
     job_id = string.strip(subprocess.Popen(['qsub', scriptfile], stdout=subprocess.PIPE).communicate()[0])
     print 'Submitted job ' + scriptfile + ' with PBS id ' + job_id
     submitted_job_ids.add(job_id)
