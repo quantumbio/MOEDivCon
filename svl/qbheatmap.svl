@@ -1392,6 +1392,13 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initrad,
 
             elseif vals.panel === 'Animate' then
 
+                // close the Ligand Interactions Panel if it is up 
+                //      (it is unable to keep up with animate)
+                local idx = 0;
+                if idx = indexof ['LigandInteractions', WindowNameList[]] then
+                    WindowTrigger [(WindowKeyList[])(idx), [panel:'Close']];
+                endif
+
                 if second task_fork [statics:'share'] === 'child' then
                     task_prio 0;
 
