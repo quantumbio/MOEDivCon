@@ -276,3 +276,40 @@ global function qb_SaveComplexes[]
         fwrite_TriposMOL2 [moloutpat, lig];
     endloop
 endfunction
+
+function conf_Superpose;
+
+// qb_StrucRMSd function takes two sets of Atoms [X & Y] and returns to RMSD.
+//      Uses the aPrioSMI in order to determine the uniq atom ID and re-orders atoms.
+//      Will then superimpose the structure on the screen for viewing.
+global function qb_Superimpose [Xatms,Yatms]
+
+    local xAatms = first apt get [ [ Xatms, aPrioSMI Xatms],[x_sort aPrioSMI Xatms] ];
+    local yAatms = first apt get [ [ Yatms, aPrioSMI Xatms],[x_sort aPrioSMI Yatms] ];
+    
+    local X = aPos xAatms;
+    local Y = aPos yAatms;
+    
+//    local [ok,msd,R,T,Yi]=conf_Superpose [X,Y,aFixed yAatms, aMass yAatms, aPrioZQH yAatms, BondGraph yAatms, REAL_MAX];
+    local [ok,msd,R,T,Yi]=conf_Superpose [X,Y,aFixed yAatms, aMass yAatms, aPrioZQH yAatms, BondGraph yAatms, REAL_MAX];
+    
+    aSetPos [yAatms,matmul[R,aPos yAatms - T]];   // superimpose atoms to the new locations
+    
+    write [' msd: {}\n', msd];
+    
+endfunction
+
+function pro_Join;
+
+// in order to run superimpose from the command line, the following function can be used to read
+//  in any supported MOE file type, create the necessary chains, and then output the rmsd.
+global function qb_runSuperimpose [Xfile, Yfile]
+    local Xchains = ReadAuto[Xfile];
+    local Ychains = ReadAuto[Yfile];
+    
+    pro_Join Xchains;
+    pro_Join Ychains;
+    
+    qb_Superimpose[first cAtoms Xchains, first cAtoms Ychains];
+    
+endfunction
