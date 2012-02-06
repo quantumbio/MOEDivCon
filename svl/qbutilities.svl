@@ -303,6 +303,7 @@ function pro_Join;
 
 // in order to run superimpose from the command line, the following function can be used to read
 //  in any supported MOE file type, create the necessary chains, and then output the rmsd.
+//   % qbmoebatch -exec "run ['qbutilities.svl',['s2561.final.mol2','1,1,2-trichloroethane.final.mol2'],'qb_runSuperimpose']" -quit
 global function qb_runSuperimpose [Xfile, Yfile]
     local Xchains = ReadAuto[Xfile];
     local Ychains = ReadAuto[Yfile];
