@@ -295,7 +295,7 @@ global function qb_Superimpose [Xatms,Yatms]
     
     aSetPos [yAatms,matmul[R,aPos yAatms - T]];   // superimpose atoms to the new locations
     
-    write [' msd: {}\n', msd];
+    return msd;
     
 endfunction
 
@@ -311,6 +311,8 @@ global function qb_runSuperimpose [Xfile, Yfile]
     pro_Join Xchains;
     pro_Join Ychains;
     
-    qb_Superimpose[first cAtoms Xchains, first cAtoms Ychains];
+    local msd = qb_Superimpose[first cAtoms Xchains, first cAtoms Ychains];
+
+    write [' msd: {}\n', msd];
     
 endfunction
