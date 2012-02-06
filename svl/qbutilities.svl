@@ -277,9 +277,9 @@ global function qb_SaveComplexes[]
     endloop
 endfunction
 
-function conf_Superpose;
+function conf_Superpose;        // used from $MOE/lib/svl/calc.svl/conf_u.svl
 
-// qb_StrucRMSd function takes two sets of Atoms [X & Y] and returns to RMSD.
+// qb_StrucRMSd function takes two sets of Atoms [X & Y] and returns the RMSD.
 //      Uses the aPrioSMI in order to determine the uniq atom ID and re-orders atoms.
 //      Will then superimpose the structure on the screen for viewing.
 global function qb_Superimpose [Xatms,Yatms]
@@ -313,6 +313,6 @@ global function qb_runSuperimpose [Xfile, Yfile]
     
     local msd = qb_Superimpose[first cAtoms Xchains, first cAtoms Ychains];
 
-    write [' msd: {}\n', msd];
+    write [' RMSD: {}\n', msd];
     
 endfunction
