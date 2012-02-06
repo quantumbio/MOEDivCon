@@ -290,7 +290,6 @@ global function qb_Superimpose [Xatms,Yatms]
     local X = aPos xAatms;
     local Y = aPos yAatms;
     
-//    local [ok,msd,R,T,Yi]=conf_Superpose [X,Y,aFixed yAatms, aMass yAatms, aPrioZQH yAatms, BondGraph yAatms, REAL_MAX];
     local [ok,msd,R,T,Yi]=conf_Superpose [X,Y,aFixed yAatms, aMass yAatms, aPrioZQH yAatms, BondGraph yAatms, REAL_MAX];
     
     aSetPos [yAatms,matmul[R,aPos yAatms - T]];   // superimpose atoms to the new locations
