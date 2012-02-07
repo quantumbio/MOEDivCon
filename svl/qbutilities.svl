@@ -279,10 +279,16 @@ endfunction
 
 function conf_Superpose;        // used from $MOE/lib/svl/calc.svl/conf_u.svl
 
-// qb_StrucRMSd function takes two sets of Atoms [X & Y] and returns the RMSD.
-//      Uses the aPrioSMI in order to determine the uniq atom ID and re-orders atoms.
-//      Will then superimpose the structure on the screen for viewing.
-global function qb_Superimpose [Xatms,Yatms]
+// qb_Superimpose function takes two sets of Atoms [X & Y] and returns the RMSD.
+//      Uses the aPrioSMI in order to determine the uniq atom ID and re-orders atoms accordingly.
+//              (this reordering accounts for the possibility that the atoms are listed in a different order)
+//      Once RMSD calculated, the structures are superimposed upon eachother on the molecular viewer.
+//      if the 'yes' token is passed for yesCOM then it will get the center of mass RMSD.
+//      ex:    qb_Superimpose[first cAtoms first Chains[], first cAtoms second Chains[],'yes']
+//      otherwise, it will just be the straight geometric RMSD
+//      ex:     qb_Superimpose[first cAtoms first Chains[], first cAtoms second Chains[]]
+
+global function qb_Superimpose [Xatms,Yatms,yesCOM]
 
     local xAatms = first apt get [ [ Xatms, aPrioSMI Xatms],[x_sort aPrioSMI Xatms] ];
     local yAatms = first apt get [ [ Yatms, aPrioSMI Xatms],[x_sort aPrioSMI Yatms] ];
@@ -290,7 +296,14 @@ global function qb_Superimpose [Xatms,Yatms]
     local X = aPos xAatms;
     local Y = aPos yAatms;
     
-    local [ok,msd,R,T,Yi]=conf_Superpose [X,Y,aFixed yAatms, aMass yAatms, aPrioZQH yAatms, BondGraph yAatms, REAL_MAX];
+    local weight1;
+    if yesCOM === 'yes' then
+        weight1 = aMass yAatms;
+    else
+        weight1 = igen length xAatms > 0;
+    endif
+
+    local [ok,msd,R,T,Yi]=conf_Superpose [X,Y,aFixed yAatms, weight1, aPrioZQH yAatms, BondGraph yAatms, REAL_MAX];
     
     aSetPos [yAatms,matmul[R,aPos yAatms - T]];   // superimpose atoms to the new locations
     
@@ -302,16 +315,20 @@ function pro_Join;
 
 // in order to run superimpose from the command line, the following function can be used to read
 //  in any supported MOE file type, create the necessary chains, and then output the rmsd.
-//   % qbmoebatch -exec "run ['qbutilities.svl',['s2561.final.mol2','1,1,2-trichloroethane.final.mol2'],'qb_runSuperimpose']" -quit
-global function qb_runSuperimpose [Xfile, Yfile]
+//  if the 'yes' token is passed for yesCOM then it will get the center of mass RMSD.
+//  ex: % qbmoebatch -exec "run ['qbutilities.svl',['first.mol2','second.mol2','yes'],'qb_runSuperimpose']" -quit
+//      otherwise, it will just be the straight geometric RMSD
+//  ex: % qbmoebatch -exec "run ['qbutilities.svl',['first.mol2','second.mol2'],'qb_runSuperimpose']" -quit
+
+global function qb_runSuperimpose [Xfile, Yfile, yesCOM]
     local Xchains = ReadAuto[Xfile];
     local Ychains = ReadAuto[Yfile];
     
     pro_Join Xchains;
     pro_Join Ychains;
     
-    local msd = qb_Superimpose[first cAtoms Xchains, first cAtoms Ychains];
+    local msd = qb_Superimpose[first cAtoms Xchains, first cAtoms Ychains, yesCOM];
 
-    write [' RMSD: {}\n', msd];
+    write ['{}\t{}\t{}\n', Xfile, Yfile, msd];
     
 endfunction
