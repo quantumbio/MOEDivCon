@@ -291,7 +291,7 @@ function conf_Superpose;        // used from $MOE/lib/svl/calc.svl/conf_u.svl
 global function qb_Superimpose [Xatms,Yatms,yesCOM]
 
     local xAatms = first apt get [ [ Xatms, aPrioSMI Xatms],[x_sort aPrioSMI Xatms] ];
-    local yAatms = first apt get [ [ Yatms, aPrioSMI Xatms],[x_sort aPrioSMI Yatms] ];
+    local yAatms = first apt get [ [ Yatms, aPrioSMI Yatms],[x_sort aPrioSMI Yatms] ];
     
     local X = aPos xAatms;
     local Y = aPos yAatms;
@@ -307,6 +307,8 @@ global function qb_Superimpose [Xatms,Yatms,yesCOM]
     
     aSetPos [yAatms,matmul[R,aPos yAatms - T]];   // superimpose atoms to the new locations
     
+    aSetName [Xatms, app token apt swrite ['{}_{}', aElement Xatms, aPrioSMI Xatms]];
+    aSetName [Yatms, app token apt swrite ['{}_{}', aElement Yatms, aPrioSMI Yatms]];
     return msd;
     
 endfunction
