@@ -29,7 +29,7 @@ fi
 
 # setup the MOE environment
 if [ -z "${MOE_SVL_RUNPATH}" ]; then
-    MOE_SVL_RUNPATH="${QBHOME}/svl"; export MOE_SVL_RUNPATH
+    MOE_SVL_RUNPATH="${QBHOME}/svl:${HOME}/svl"; export MOE_SVL_RUNPATH
 else
     MOE_SVL_RUNPATH="${QBHOME}/svl:$MOE_SVL_RUNPATH"; export MOE_SVL_RUNPATH
 fi
