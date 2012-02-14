@@ -4,14 +4,14 @@
 #
 # Created on 2010-12-07 by Scott Woods <scott@westarete.com> for QuantumBio Inc.
 
-import subprocess, string, sys, time
+import os, subprocess, string, sys, time
 from glob import glob
 
 # Submit each job.
 submitted_job_ids = set([])
 for scriptfile in glob('*.pbs'):
     print 'Submitting job ' + scriptfile + ' to PBS id '
-    job_id = string.strip(subprocess.Popen(['qsub','-v','SUITE_PATH', scriptfile], stdout=subprocess.PIPE).communicate()[0])
+    job_id = string.strip(subprocess.Popen(['qsub','-v','SUITE_PATH='+os.environ.get('SUITE_PATH'), scriptfile], stdout=subprocess.PIPE).communicate()[0])
     print 'Submitted job ' + scriptfile + ' with PBS id ' + job_id
     submitted_job_ids.add(job_id)
 
