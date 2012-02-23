@@ -41,6 +41,6 @@ if os.path.getsize(output_file) == 0:
 else:
     for logfile in glob('./*.log'):
         shutil.copy2(logfile,os.environ.get("WORKSPACE")+'/MOEDivcon/functests')
-    print "Databases differ. See https://ci.quantumbioinc.com/job/MOEDivconIntegrationTests/ws/MOEDivcon/functests/qbmdbdiff-error.log for details."
-    print "It's never there.  Instead it is at /home/hudson/shared_workspace/$JOB_NAME/MOEDivcon/functests.  Studying how this after failure can be put back into workspace. Starts in svl"
+    print "Databases differ. See https://ci.quantumbioinc.com/job/MOEDivconIntegration-Tests/ws/MOEDivcon/functests/qbmdbdiff-error.log for details."
+    print "Or the artifact https://ci.quantumbioinc.com/job/MOEDivconIntegration-Tests/ws/MOEDivcon/functests/qbmdbdiff-error.log."
     sys.exit(1)
