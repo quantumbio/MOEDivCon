@@ -4,7 +4,7 @@
 #
 # Created on 2010-12-07 by Scott Woods <scott@westarete.com> for QuantumBio Inc.
 
-import os.path, re, subprocess, shlex, sys
+import os, os.path, re, subprocess, shlex, sys
 from glob import glob
 
 if len(sys.argv) != 3:
@@ -39,6 +39,7 @@ if not os.path.exists(output_file):
 if os.path.getsize(output_file) == 0:
     print "Output file is empty. Databases are the same."
 else:
+    run('cp ./*.log '+os.environ.get('WORKSPACE')+'/MOEDivcon/functests')
     print "Databases differ. See https://ci.quantumbioinc.com/job/MOEDivconIntegrationTests/ws/MOEDivcon/functests/qbmdbdiff-error.log for details."
     print "It's never there.  Instead it is at /home/hudson/shared_workspace/$JOB_NAME/MOEDivcon/functests.  Studying how this after failure can be put back into workspace. Starts in svl"
     sys.exit(1)
