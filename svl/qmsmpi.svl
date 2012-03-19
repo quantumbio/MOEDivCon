@@ -347,12 +347,12 @@ local function SendPairForScore [pstdin,pstdout,recmol,ligmol,coreopts,status,no
         write ['Sending pose {} of {}\n', rowcnt, nrows];
         fwrite [pstdin, '{n:}\n', rowcnt];
 
-        fwrite [pstdin, '{c:}\n', cName [recmol]];
+        fwrite [pstdin, '{c:}\n', first cat cName [recmol]];
         fwrite [pstdin, '{n:}\n', recchg];
         qb_PassBackbone [pstdout, pstdin, recmol];
         qb_PassValues [pstdout, pstdin, [] ];
 
-        fwrite [pstdin, '{c:}\n', cName [ligmol]];
+        fwrite [pstdin, '{c:}\n', first cat cName [ligmol]];
         fwrite [pstdin, '{n:}\n', ligchg];
 
         qb_PassBackbone [pstdout, pstdin, ligmol];
@@ -529,7 +529,6 @@ global function qb_QMScoreMDB [dbkey, jobid]
         cSetName [recressets,recmol(1)(MOL_NAME)];
         local ligressets = mol_Create ligmol;
         cSetName [ligressets,ligmol(1)(MOL_NAME)];
-        
         coreopts.recchg = recchg;
         coreopts.ligchg = ligchg;
         
