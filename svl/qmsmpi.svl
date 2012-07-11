@@ -226,20 +226,21 @@ local function ManageMOEDivConScoring[pstdout,pstdin,process_keys,warnings,rowcn
             success = 1;
             fwrite [pstdin, '{c:}\n', 'Ok'];
 
-            local sucmess = "Success";
+            divconerrmess = "Success";
             if not isnull  warnings (rowcnt)
                     and neL [warnings (rowcnt), '']
                     and neL [warnings (rowcnt), '\n'] then
 
-                sucmess = cat [sucmess, "-warnings!\n", string warnings (rowcnt)];
+                divconerrmess = cat [divconerrmess, "-warnings!\n", string warnings (rowcnt)];
             else
-                sucmess = cat [sucmess, "\n"];
+                divconerrmess = cat [divconerrmess, "\n"];
             endif
             if not isnull dbkey then
                 qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
-                qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), sucmess];
+                qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), divconerrmess];
             endif
         elseif return_statement === "error" then
+            divconerrmess = "ERROR:";
             [[return_statement]] = fread [pstdout, '{c:*}'];
             if neL [return_statement, "DivCon done."] then
                 divconerrmess = cat [divconerrmess, return_statement];
@@ -250,6 +251,10 @@ local function ManageMOEDivConScoring[pstdout,pstdin,process_keys,warnings,rowcn
                 [[return_statement]] = fread [pstdout, '{c:*}'];
             endloop;
             fwrite [pstdin, '{c:}\n', 'Ok'];
+            if not isnull dbkey then
+                qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
+                qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), divconerrmess];
+            endif
         endif
         sleep sleep_time;
     endloop
