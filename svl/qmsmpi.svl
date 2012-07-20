@@ -239,6 +239,13 @@ local function ManageMOEDivConScoring[pstdout,pstdin,process_keys,warnings,rowcn
                 qb_SaveQMScore [dbkey, dbrowkeys(rowcnt), results];
                 qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), divconerrmess];
             endif
+        elseif return_statement === "condition" then
+            [[return_statement]] = fread [pstdout, '{c:*}'];
+            if return_statement === "overwrite?" then
+                [[return_statement]] = fread [pstdout, '{c:*}'];
+                fwrite [pstdin, '{c:}\n', 'no'];
+            else
+            endif
         elseif return_statement === "error" then
             divconerrmess = "ERROR:";
             [[return_statement]] = fread [pstdout, '{c:*}'];
