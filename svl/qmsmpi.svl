@@ -125,7 +125,12 @@ local function ManageMOEDivConMPI[pstdout,pstdin,process_keys,warnings,dbkey,num
 
             qb_SaveDivConStatus [dbkey, dbrowkeys(rowcnt), sucmess];
             result_ith = result_ith + 1;
-
+        elseif return_statement === "condition" then
+            [[return_statement]] = fread [pstdout, '{c:*}'];
+            if return_statement === "overwrite?" then
+                [[return_statement]] = fread [pstdout, '{c:*}'];
+                fwrite [pstdin, '{c:}\n', 'no'];
+            endif
         elseif return_statement === "error" then
 
             [[rowcnt]] = fread [pstdout, '{n:}'];
@@ -243,8 +248,15 @@ local function ManageMOEDivConScoring[pstdout,pstdin,process_keys,warnings,rowcn
             [[return_statement]] = fread [pstdout, '{c:*}'];
             if return_statement === "overwrite?" then
                 [[return_statement]] = fread [pstdout, '{c:*}'];
-                fwrite [pstdin, '{c:}\n', 'no'];
-            else
+                if not MOE_BATCH then
+                    if YesNo 'DivCon (*.h5) file with similar data found. Do you wish to overwrite?' then
+                        fwrite [pstdin, '{c:}\n', 'yes'];
+                    else
+                        fwrite [pstdin, '{c:}\n', 'no'];
+                    endif
+                else
+                    fwrite [pstdin, '{c:}\n', 'no'];
+                endif
             endif
         elseif return_statement === "error" then
             divconerrmess = "ERROR:";
