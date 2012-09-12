@@ -236,7 +236,7 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
 //                    hLigandCollectionObject.selectMember(9);
 //                    int[] formalCharge=(int[])((Vector)hLigandCollectionObject.read()).elementAt(9);
                     SVLJava.print(targetAtomSymbols.length+" lengths "+ligandAtomSymbols.length);
-    SVLVar[] data=new SVLVar[9];
+    SVLVar[] data=new SVLVar[10];
     ArrayList<Integer> targetIndexList=new  ArrayList<Integer>();
     ArrayList<Integer> ligandIndexList=new  ArrayList<Integer>();
     ArrayList<Double> EabList=new  ArrayList<Double>();
@@ -246,6 +246,7 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
     ArrayList<Double> dispersionList=new  ArrayList<Double>();
     ArrayList<Double> repulsionList=new  ArrayList<Double>();
     ArrayList<Double> electrostaticList=new  ArrayList<Double>();
+    ArrayList<Double> distanceList=new  ArrayList<Double>();
                         //bufferedPWDWriter.append("Target Index,Target Atom,Target Residue,Target Sequence,Ligand Index,Ligand Atom,Ligand Residue,Ligand Sequence,Distance,E_AB,E_ABp,E_ABc\n");
                     for(int atomIndex=0;atomIndex<targetAtomSymbols.length;atomIndex++)
                     {
@@ -264,6 +265,7 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
                             dispersionList.add(pwdValues[7*iw+4]);
                             repulsionList.add(pwdValues[7*iw+5]);
                             electrostaticList.add(pwdValues[7*iw+6]);
+                            distanceList.add(distance);
 //                            //bufferedPWDWriter.append(atomIndex+","+targetAtomNames[atomIndex]+","+targetResidueNames[atomIndex]+","+targetSequence[atomIndex]+","+ligandAtomIndex+","+ligandAtomNames[ligandAtomIndex]+","+ligandResidueNames[ligandAtomIndex]+","+ligandSequence[ligandAtomIndex]+","+distance+","+pwdValues[3*iw]+","+pwdValues[3*iw+1]+","+pwdValues[3*iw+2]+"\n");
                         }
                     }
@@ -277,6 +279,7 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
                     double[] dispersion=new double[targetIndexList.size()];
                     double[] repulsion=new double[targetIndexList.size()];
                     double[] electrostatic=new double[targetIndexList.size()];
+                    double[] distance=new double[targetIndexList.size()];
                     for(int index=0;index<targetIndex.length;index++)
                     {
                     targetIndex[index]=targetIndexList.get(index);
@@ -288,6 +291,7 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
                     dispersion[index]=dispersionList.get(index);
                     repulsion[index]=repulsionList.get(index);
                     electrostatic[index]=electrostaticList.get(index);
+                    distance[index]=distanceList.get(index);
                     }
     data[0]=new SVLVar(targetIndex);
     data[1]=new SVLVar(ligandIndex);
@@ -298,6 +302,7 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
     data[6]=new SVLVar(dispersion);
     data[7]=new SVLVar(repulsion);
     data[8]=new SVLVar(electrostatic);
+    data[9]=new SVLVar(distance);
     
                     
                     //bufferedPWDWriter.close();
