@@ -906,6 +906,13 @@ is divided into following sections:
             <param name="call.target" value="jar"/>
             <param name="transfer.built-jar.properties" value="${built-jar.properties}"/>
         </antcall>
+        <antcall target="-maybe-call-dep">
+            <param name="call.built.properties" value="${built-jar.properties}"/>
+            <param location="${project.QBReporter}" name="call.subproject"/>
+            <param location="${project.QBReporter}/build.xml" name="call.script"/>
+            <param name="call.target" value="jar"/>
+            <param name="transfer.built-jar.properties" value="${built-jar.properties}"/>
+        </antcall>
     </target>
     <target depends="init,-check-automatic-build,-clean-after-automatic-build" name="-verify-automatic-build"/>
     <target depends="init" name="-check-automatic-build">
@@ -938,7 +945,7 @@ is divided into following sections:
     <target if="has.persistence.xml" name="-copy-persistence-xml">
         <mkdir dir="${build.classes.dir}/META-INF"/>
         <copy todir="${build.classes.dir}/META-INF">
-            <fileset dir="${meta.inf.dir}" includes="persistence.xml"/>
+            <fileset dir="${meta.inf.dir}" includes="persistence.xml orm.xml"/>
         </copy>
     </target>
     <target name="-post-compile">
@@ -1390,6 +1397,13 @@ is divided into following sections:
             <param name="call.built.properties" value="${built-clean.properties}"/>
             <param location="${project.HDFView}" name="call.subproject"/>
             <param location="${project.HDFView}/build.xml" name="call.script"/>
+            <param name="call.target" value="clean"/>
+            <param name="transfer.built-clean.properties" value="${built-clean.properties}"/>
+        </antcall>
+        <antcall target="-maybe-call-dep">
+            <param name="call.built.properties" value="${built-clean.properties}"/>
+            <param location="${project.QBReporter}" name="call.subproject"/>
+            <param location="${project.QBReporter}/build.xml" name="call.script"/>
             <param name="call.target" value="clean"/>
             <param name="transfer.built-clean.properties" value="${built-clean.properties}"/>
         </antcall>
