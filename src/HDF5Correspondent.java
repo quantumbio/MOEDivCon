@@ -26,13 +26,14 @@ import svljava.SVLJava;
 import svljava.SVLJavaException;
 import svljava.SVLVar;
 import svljava.SVLWriter;
+import com.quantumbioinc.datacorrespondent.Correspondent;
 
         
 /**
  *
  * @author roger
  */
-public class HDF5Correspondent implements SVLJavaDriver {
+public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
 
     private int taskID = 0;		// SVL task identifier
     
@@ -46,7 +47,11 @@ public class HDF5Correspondent implements SVLJavaDriver {
             SVLJava.print("cmd="+cmd);
 	    SVLVar res = arg.peek(2);		// its argument
             SVLJava.print("length="+res.length());
-	    if(cmd.equals("retrieveQMScore" ))
+	    if(cmd.equals("listModels" ))
+            {
+                res = listModels(res);
+            }
+            else if(cmd.equals("retrieveQMScore" ))
             {
                 res = retrieveQMScore(res);
             }
@@ -59,7 +64,7 @@ public class HDF5Correspondent implements SVLJavaDriver {
                 res = retrieveAtomByAtomPWD(res);
             }
 	    else {
-		throw new SVLJavaException("Unknown command: '" + cmd + "'.");
+		throw new SVLJavaException("here Unknown command: '" + cmd + "'.");
 	    }
 	    return res;
 	}
@@ -68,6 +73,31 @@ public class HDF5Correspondent implements SVLJavaDriver {
 	    ex.printStackTrace(new PrintWriter(sw));
 	    throw new SVLJavaException("Exception:\n"+sw.toString());
 	}
+    }
+
+    private SVLVar listModels(SVLVar var) throws SVLJavaException, IOException, Exception
+    {
+        String filename = var.peek(1).getTokn(1);
+        H5File h5File=new H5File(filename, H5File.READ);
+        h5File.open();
+        ArrayList<String> targetList=findTargets(h5File);
+        SVLVar[] data=new SVLVar[targetList.size()];
+        for(int index=0;index<targetList.size();index++)
+        {
+            SVLVar[] individuals=new SVLVar[3];
+            individuals[0]=new SVLVar(targetList.get(index));
+            individuals[1]=new SVLVar("Target");
+            String xPath="/DivCon/"+targetList.get(index)+"/QM Score";
+            HObject ho=findHDF5Object(h5File, xPath);
+            H5CompoundDS hObject=(H5CompoundDS)ho;
+            if(hObject!=null){
+                Vector o=(Vector)hObject.getData();
+                individuals[2]=new SVLVar((String[])o.elementAt(0));
+            }
+            data[index]=new SVLVar(individuals);
+        }
+        h5File.close();
+        return new SVLVar(data);
     }
 
     private SVLVar retrieveQMScore(SVLVar var) throws SVLJavaException, IOException, Exception
@@ -328,42 +358,6 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
     return new SVLVar(data);
 }
     
-  protected HObject findHDF5Object(FileFormat file, String path)
-  {
-      if (file == null || path == null)
-          return null;
-
-      if (!path.endsWith("/"))
-          path = path+"/";
-
-      DefaultMutableTreeNode theRoot =
-                        (DefaultMutableTreeNode)file.getRootNode();
-
-      if (theRoot == null)
-          return null;
-      else if (path.equals("/"))
-          return (HObject)theRoot.getUserObject();
-
-      Enumeration local_enum =
-            ((DefaultMutableTreeNode)theRoot).breadthFirstEnumeration();
-      DefaultMutableTreeNode theNode = null;
-      HObject theObj = null;
-      boolean hit=false;
-      while(local_enum.hasMoreElements())
-      {
-          theNode = (DefaultMutableTreeNode)local_enum.nextElement();
-          theObj = (HObject)theNode.getUserObject();
-          String fullPath = theObj.getFullName()+"/";
-          if (path.equals(fullPath))
-          {
-              hit=true;
-              break;
-          }
-      }
-      if(!hit) return null;
-      return theObj;
- }
- 
     protected int indexW(int i, int j)
     {
         int indw,ki,kj;
