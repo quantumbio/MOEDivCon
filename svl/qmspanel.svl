@@ -392,7 +392,6 @@ global function qb_QMScoreSetupPanel []
                         local ldrecs, ldligs, ldsts,ldcoreopts,ldqmsopts;
                         [dbkey, ldrecs, ldligs, ldsts, ldcoreopts,
                             ldqmsopts] = LoadDB [dbpath];
-                            
                         Close [force:1];
                         local idx = 1;
                         if length ldrecs >= 1 then
@@ -401,7 +400,6 @@ global function qb_QMScoreSetupPanel []
                             if neL [ldrec, []] and neL [ldlig, []] then
                                 origligmol = ldlig;
                                 local chainsList = mol_Create ldrec;
-                                pro_Join chainsList;
                                 oSetCollection ['Receptor', cat oAtoms chainsList];
                                 ligatoms = cat oAtoms mol_Create origligmol;
                                 oSetCollection ['QB_LIGAND', ligatoms];
