@@ -84,17 +84,18 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         SVLVar[] data=new SVLVar[targetList.size()];
         for(int index=0;index<targetList.size();index++)
         {
-            SVLVar[] individuals=new SVLVar[3];
-            individuals[0]=new SVLVar(targetList.get(index));
-            individuals[1]=new SVLVar("Target");
+            SVLVar[] individuals=new SVLVar[2];
+            individuals[0]=new SVLVar(targetList.get(index), true);
+            //individuals[0].
+            //individuals[1]=new SVLVar("Target");
             String xPath="/DivCon/"+targetList.get(index)+"/QM Score";
             HObject ho=findHDF5Object(h5File, xPath);
             H5CompoundDS hObject=(H5CompoundDS)ho;
             if(hObject!=null){
                 Vector o=(Vector)hObject.getData();
-                individuals[2]=new SVLVar((String[])o.elementAt(0));
+                individuals[1]=new SVLVar((String[])o.elementAt(0));
             }
-            data[index]=new SVLVar(individuals);
+            data[index]=new SVLVar(new String[]{"Target", "Ligand"}, individuals);
         }
         h5File.close();
         return new SVLVar(data);
@@ -167,14 +168,33 @@ private SVLVar retrieveResiduePWD(SVLVar var) throws SVLJavaException, IOExcepti
             if(pwdDataset.length!=5) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
             List pwdRow=pwdGroup.getMemberList();
             pwdDataset[0]=new SVLVar(pwdGroup.getName());
-            H5ScalarDS sequenceA=(H5ScalarDS)pwdRow.get(0);
-            pwdDataset[1]=new SVLVar((int[])sequenceA.read());
-            H5ScalarDS sequenceB=(H5ScalarDS)pwdRow.get(1);
-            pwdDataset[2]=new SVLVar((int[])sequenceB.read());
-            H5ScalarDS sequenceValues=(H5ScalarDS)pwdRow.get(2);
-            pwdDataset[3]=new SVLVar((double[])sequenceValues.read());
-            H5ScalarDS sequenceLabels=(H5ScalarDS)pwdRow.get(3);
-            pwdDataset[4]=new SVLVar(sequenceLabels.readBytes());
+            for(int memberIndex=0;memberIndex<4;memberIndex++)
+            {
+                H5ScalarDS member=(H5ScalarDS)pwdRow.get(memberIndex);
+                if(member.getName().compareTo("Sequence A")==0)
+                {
+                    pwdDataset[1]=new SVLVar((int[])member.read());
+                }
+                else if(member.getName().compareTo("Sequence B")==0)
+                {
+                    pwdDataset[2]=new SVLVar((int[])member.read());
+                }
+                else if(member.getName().compareTo(target)==0)
+                {
+                    pwdDataset[4]=new SVLVar(member.readBytes());
+                }
+                else
+                {
+                    pwdDataset[3]=new SVLVar((double[])member.read());
+                }
+            }
+//            pwdDataset[1]=new SVLVar((int[])sequenceA.read());
+//            H5ScalarDS sequenceB=(H5ScalarDS)pwdRow.get(1);
+//            pwdDataset[2]=new SVLVar((int[])sequenceB.read());
+//            H5ScalarDS sequenceValues=(H5ScalarDS)pwdRow.get(2);
+//            pwdDataset[3]=new SVLVar((double[])sequenceValues.read());
+//            H5ScalarDS sequenceLabels=(H5ScalarDS)pwdRow.get(3);
+//            pwdDataset[4]=new SVLVar(sequenceLabels.readBytes());
             data[index]=new SVLVar(pwdDataset);
         }
             h5File.close();
@@ -284,7 +304,8 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
                     {
                         int iw=indexW(atomIndex+1, targetAtomSymbols.length+ligandAtomIndex+1);
                         double distance=Math.sqrt(Math.pow(x[atomIndex]-xLigand[ligandAtomIndex],2)+Math.pow(y[atomIndex]-yLigand[ligandAtomIndex],2)+Math.pow(z[atomIndex]-zLigand[ligandAtomIndex],2));
-                        if(distance<=4.0 || pwdValues[7*iw]!=0.0)
+                        //if(distance<=4.0 || pwdValues[7*iw]!=0.0)
+                        if(pwdValues[7*iw]!=0.0)
                         {
                             targetIndexList.add(atomIndex);
                             ligandIndexList.add(ligandAtomIndex);
