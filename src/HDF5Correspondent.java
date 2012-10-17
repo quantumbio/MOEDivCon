@@ -63,6 +63,10 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             {
                 res = retrieveAtomByAtomPWD(res);
             }
+	    else if (cmd.equals("retrieveNMRAverages"))
+            {
+                res = retrieveNMRAverages(res);
+            }
 	    else {
 		throw new SVLJavaException("here Unknown command: '" + cmd + "'.");
 	    }
@@ -94,6 +98,10 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             if(hObject!=null){
                 Vector o=(Vector)hObject.getData();
                 individuals[1]=new SVLVar((String[])o.elementAt(0));
+            }
+            else
+            {
+                individuals[1]=new SVLVar();
             }
             data[index]=new SVLVar(new String[]{"Target", "Ligand"}, individuals);
         }
@@ -158,7 +166,7 @@ private SVLVar retrieveResiduePWD(SVLVar var) throws SVLJavaException, IOExcepti
         String xPath="/DivCon/"+target+"/PWD Solvation";
         HObject ho=findHDF5Object(h5File, xPath);
         H5Group hObject=(H5Group)ho;
-        if(hObject==null) throw new SVLJavaException("PWD does not exist for: '" + target + "'.");
+        if(hObject==null) return new SVLVar();//throw new SVLJavaException("PWD does not exist for: '" + target + "'.");
     SVLVar[] data=new SVLVar[hObject.getNumberOfMembersInFile()];
         List pwdMembers=hObject.getMemberList();
         for(int index=0;index<hObject.getNumberOfMembersInFile();index++)
@@ -375,6 +383,37 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
 //            pwdDataset[4]=new SVLVar(sequenceLabels.readBytes());
 //            data[index]=new SVLVar(pwdDataset);
 //        }
+            h5File.close();
+    return new SVLVar(data);
+}
+    
+private SVLVar retrieveNMRAverages(SVLVar var) throws SVLJavaException, IOException, Exception
+{
+    String filename = var.peek(1).getTokn(1);
+    String target = var.peek(1).getTokn(2);
+    H5File h5File=new H5File(filename, H5File.READ);
+    h5File.open();
+                    String xPath="/DivCon/"+target+"/NMR Matrices";
+                    H5Group nmrGroup=(H5Group)findHDF5Object(h5File, xPath);
+            SVLVar[] averages=new SVLVar[3];
+            List nmrRow=nmrGroup.getMemberList();
+            for(int memberIndex=0;memberIndex<5;memberIndex++)
+            {
+                H5ScalarDS member=(H5ScalarDS)nmrRow.get(memberIndex);
+                if(member.getName().compareTo("Selected Indices")==0)
+                {
+                    averages[0]=new SVLVar((int[])member.read());
+                }
+                else if(member.getName().compareTo("Average")==0)
+                {
+                    averages[1]=new SVLVar((double[])member.read());
+                }
+                else if(member.getName().compareTo("Anisotropy")==0)
+                {
+                    averages[2]=new SVLVar((double[])member.read());
+                }
+            }
+    SVLVar data=new SVLVar(new String[]{"Index", "Average", "Anisotropy"}, averages);
             h5File.close();
     return new SVLVar(data);
 }
