@@ -94,7 +94,7 @@ const ROWCOLFONT_H = 10;
 const OPT_DEFAULTS =
     [
     ['mapradio',     1             ],
-    ['cutoff',       1             ],
+    ['cutoff',       0             ],
     ['sigma',        3.0           ],
     ['nticks',       9             ],
     ['radius',       5.0           ],
@@ -443,9 +443,13 @@ local function DrawCell [colors, width, height, mincut, maxcut, value]
             local step = (maxcut - mincut) / (length colors);
             cidx = ceil ((value - mincut) / step);
         endif
-    
-        gr_box [key, [0, [0, 0], [width , height],
-            colors (cidx), 1, colors (cidx)]];
+        if value == 0 then
+            gr_box [key, [0, [0, 0], [width , height],
+                icolor'white', 1, icolor'white']];
+        else
+            gr_box [key, [0, [0, 0], [width , height],
+                colors (cidx), 1, colors (cidx)]];
+        endif
     endif        
 
     return key;
@@ -797,9 +801,9 @@ local function GetNegColors [mincut, num]
     endif
 
     //  White
-    r = 255; g = 255; b = 255;
-    newcolor = r * R_FACTOR + g * G_FACTOR + b;
-    colors = append [colors, newcolor];
+//    r = 255; g = 255; b = 255;
+//    newcolor = r * R_FACTOR + g * G_FACTOR + b;
+//    colors = append [colors, newcolor];
 
     return colors;
 
@@ -857,9 +861,9 @@ local function GetPosColors [maxcut, num]
     endif
 
     //  White
-    r = 255; g = 255; b = 255;
-    newcolor = r * R_FACTOR + g * G_FACTOR + b;
-    colors = append [colors, newcolor];
+//    r = 255; g = 255; b = 255;
+//    newcolor = r * R_FACTOR + g * G_FACTOR + b;
+//    colors = append [colors, newcolor];
 
     return reverse colors;
 endfunction
@@ -936,9 +940,9 @@ local function GetMonoNegColors [mincut, num]
     endif
 
     //  White
-    r = 255; g = 255; b = 255;
-    newcolor = r * R_FACTOR + g * G_FACTOR + b;
-    colors = append [colors, newcolor];
+//    r = 255; g = 255; b = 255;
+//    newcolor = r * R_FACTOR + g * G_FACTOR + b;
+//    colors = append [colors, newcolor];
 
     return colors;
 
@@ -981,9 +985,9 @@ local function GetMonoPosColors [maxcut, num]
     endif
 
     //  White
-    r = 255; g = 255; b = 255;
-    newcolor = r * R_FACTOR + g * G_FACTOR + b;
-    colors = append [colors, newcolor];
+//    r = 255; g = 255; b = 255;
+//    newcolor = r * R_FACTOR + g * G_FACTOR + b;
+//    colors = append [colors, newcolor];
 
     return reverse colors;
 endfunction

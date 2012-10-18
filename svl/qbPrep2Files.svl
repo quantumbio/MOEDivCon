@@ -65,13 +65,13 @@ function _Atoms;
 function fwrite_TriposMOL2;
 function pro_Align;
 function pro_Join;
+function MM;
 
 // QB Toolbox:
-function qb_TetherMMMin;
-function qb_Nearby;
-function qb_SelectOnRadius;
-function qb_CleanDelAtoms;
+function qbSelectOnRadius;
+function qbCleanDelAtoms;
 function qbSelectResidueOnRadius;
+function qbNearby;
 
 const DEFAULTS = [
     enableWatPart:0,        // partitions waters into each of the atoms/residues and reprotonates.
@@ -122,7 +122,7 @@ local function writeMol2 [outpat,chains,prtElementList]
     
 endfunction
 
-global function qbWriteElementList [targ_patt,opt]
+local function qbWriteElementList [targ_patt,opt]
     opt = tagcat[opt, DEFAULTS];
     local srcfilelist_targ = flist [cd [], targ_patt];
     local fname_targ, targ_chains = [], lig_chains = [];
@@ -135,7 +135,7 @@ global function qbWriteElementList [targ_patt,opt]
     endloop
 endfunction
     
-global function qb_VennStructures [targ_patt, opt, ligand_mdb]
+local function qbVennStructures [targ_patt, opt, ligand_mdb]
 
     opt = tagcat[opt, DEFAULTS];
 write ['opt: {}\n',opt];
@@ -183,19 +183,19 @@ write ['lig_chains: {}\n', length cat lig_chains];
     endif
 // return;
     if opt.enableCropOnLig then
-        local vennAtms = qb_SelectOnRadius [cat cAtoms lig_chains, opt.qmcrop_radius];
+        local vennAtms = qbSelectOnRadius [cat cAtoms lig_chains, opt.qmcrop_radius];
         vennAtms = diff [vennAtms, cat cAtoms lig_chains];
         local all_rObject = cat cResidues targ_chains;
         aSetSelected [Atoms[],0];
         aSetSelected [rAtoms all_rObject [x_diff [cat cAlignmentPositions targ_chains,uniq sort cat rPos aResidue vennAtms]],1];
-        qb_CleanDelAtoms cat rAtoms all_rObject [x_diff [cat cAlignmentPositions targ_chains,uniq sort cat rPos aResidue vennAtms]];
+        qbCleanDelAtoms cat rAtoms all_rObject [x_diff [cat cAlignmentPositions targ_chains,uniq sort cat rPos aResidue vennAtms]];
     endif
 
     if opt.enableCutWat then
     // get the solvent atoms that are far from the ligand
-        local nearsolatms = qb_Nearby [_Atoms '$$solvent', cat cAtoms lig_chains, opt.wat_radius];
+        local nearsolatms = qbNearby [_Atoms '$$solvent', cat cAtoms lig_chains, opt.wat_radius];
         local todelatms = diff [_Atoms '$$solvent',nearsolatms];                
-        qb_CleanDelAtoms todelatms;
+        qbCleanDelAtoms todelatms;
         write ['\nList of kept solvent: {}\n', nearsolatms];
     endif
 
@@ -213,19 +213,42 @@ write ['lig_chains: {}\n', length cat lig_chains];
 
 endfunction
 
-global function qbSplitModels [fname]
+global function qbTetherMMMin [weight]
+//    pot_Load ['$MOE/lib/mmff94x.ff'];    // switch to OPLS-AA as this will do a better job.
 
-    oDestroy Chains [];
-    ReadAuto [fname,[multi_model:1]];
-    local tmpTag;
-    for tmpTag in cTag Chains[] loop
-        local tmpChains = Chains[] | cTag Chains[] == tmpTag;
-        writeMol2[twrite ['{}.mol2',tmpTag],tmpChains];
-    endloop
+	pot_SetCharges [];
+
+    pot_Setup
+        [
+        strEnable:1, angEnable:1, stbEnable:1, oopEnable:1, torEnable:1,
+        vdwEnable:1, eleEnable:1, solEnable:1, resEnable:1, strWeight:1, 
+        angWeight:1, stbWeight:1, oopWeight:1, torWeight:1, vdwWeight:1, 
+        eleWeight:1, solWeight:1, cutoffEnable:1, cutoffOn:8, cutoffOff:10, 
+        angForm:0, eleDist:0, vdwScale14:0.5, vdwBuffer1:0, vdwBuffer2:0, 
+        eleScale14:0.5, eleDielectric:1, eleBuffer:0, solDielectric:80, 
+        solDielectricOffset:0, state0:1, state1:0, state2:1, threadCount:0
+        ];
+    
+    pot_Info [];
+
+    local atoms = Atoms [];
+    local m = aMMType atoms == '??';
+    if anytrue m then
+	    write ['\nWARNING:  There are unparameterized atoms in the system.\n\n'];
+    endif
+
+    local tetherWeight = rep [weight, length atoms];
+    (tetherWeight | aAtomicNumber atoms <= 1) = 0;
+    
+    if weight > 0 then
+        MM [    tetherWeight:    tetherWeight    ];
+    else
+        MM[];
+    endif
     
 endfunction
 
-global function qbReparentSolvent []
+local function qbReparentSolvent []
     local solvChains = uniq aChain _Atoms ['$$solvent'];
     oDestroy [cat cAtoms solvChains | aElement cat cAtoms solvChains == 'H'];   // destroys all protons on oxygens
     local solvChain, oxAtm;
@@ -281,14 +304,14 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
     write ['\nnChains= {}\n', nChains[] ];
         
     if opt.enableCropOnLig then
-        qb_CleanDelAtoms cat diff [Atoms[],qbSelectResidueOnRadius [cat cAtoms lig_chains, opt.qmcrop_radius]];
+        qbCleanDelAtoms cat diff [Atoms[],qbSelectResidueOnRadius [cat cAtoms lig_chains, opt.qmcrop_radius]];
     endif
         
     if opt.enableCutWat then
     // get the solvent atoms that are far from the ligand
-        local nearsolatms = qb_Nearby [_Atoms '$$solvent', cat cAtoms lig_chains, opt.wat_radius];
+        local nearsolatms = qbNearby [_Atoms '$$solvent', cat cAtoms lig_chains, opt.wat_radius];
         local todelatms = diff [_Atoms '$$solvent',nearsolatms];                
-        qb_CleanDelAtoms todelatms;
+        qbCleanDelAtoms todelatms;
         write ['\nList of kept solvent: {}\n', nearsolatms];
     endif
 
@@ -311,7 +334,7 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
     endif
     
     if opt.enableOpt then
-        qb_TetherMMMin [opt.tether_val];
+        qbTetherMMMin [opt.tether_val];
     endif
     
     oSetCollection['Receptor',cat targ_chains];
