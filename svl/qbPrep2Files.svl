@@ -1,0 +1,337 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif   
+
+/****************************************************************************
+ *                                qbPrep2Files.svl
+ *
+ *  Read in a PDB, MOL2, or any other file MOE supports, add protons using
+ *  Protonate3D, and finally tether-minimize all atoms in the system. Two
+ *  mol2 file are produced: 
+ *      p_${basefilename}.mol2  - corresponds to protonated form.
+ *      mp_${basefilename}.mol2 - corresponds to minimized form.
+ *
+ *  Main function:
+ *
+ *    qbPrep2Files [target_filename, ligand_filename, [options]]
+ *
+ *  Example moebatch call:
+ *
+ *    qbmoebatch -licwait -exec "run ['qbPrep2Files.svl',['target.mol2','ligand.mol2',[]]]" -exit
+ *          Run the script on target.mol2 and ligand.mol2 files in CWD.
+ *          This setup will use default options.
+ *
+ *    qbmoebatch -licwait -exec "run ['qbPrep2Files.svl',['D_glucose.mol2',[],[enableOpt:0,enableLigFix:0]]]" -exit
+ *          Run the script on D_glucose.mol2 within the CWD.
+ *          This setup will only run the job on a single ligand mol2 file, and it will turn off
+ *              optimization and fixing the ligand protonation during protonation.
+ *
+ *   moebatch -licwait -exec "run ['qbPrep2Files.svl',['HYP_reduce.pdb',[],[enableOpt:0,enableLigFix:0,enableProtonate:1,protAtomList:[3],enablePreciseHOH:0]]]" -exit
+ *          The script can also be used to only protonate atoms you wish to protonate.
+ *              protAtomList:[3] will protonate just the 3rd atom in the file. protAtomList:[3,5] will
+ *              protonate both the 3rd and the 5th atoms in the file. (and so on).
+ *
+ *  moebatch -licwait -exec "run ['$HOME/svl/qbPrep2Files.svl',['testing.moe',[],[enableOpt:0,enableProtonate:0,enableCropOnLig:0,enableCutWat:0]]]" -exit
+ *          Simply splits the complex into target and ligand.
+ *
+ *      NOTE: -licwait is used to wait for a license to free. It will wait forever.
+ *
+ ****************************************************************************/
+
+#set main 'qbPrep2Files' 
+
+function Protonate3D;
+function _Atoms;
+function fwrite_TriposMOL2;
+function pro_Align;
+function pro_Join;
+
+// QB Toolbox:
+function qb_TetherMMMin;
+function qb_Nearby;
+function qb_SelectOnRadius;
+function qb_CleanDelAtoms;
+function qbSelectResidueOnRadius;
+
+const DEFAULTS = [
+    enableWatPart:0,        // partitions waters into each of the atoms/residues and reprotonates.
+    enableOpt:1,            // turn on optimization
+    tether_val:100,         // tethers the heavy atoms at a certain restraint.
+    enableProtonate:0,      // turns on Protonate3D
+    protAtomList:[],        // list of atom indices to protonate
+    enablePreciseHOH:0,     // turns on precise waters in Protonate3D (can cause LONG calc if turned on).
+    enableLigFix:1,         // but fixes the ligand protonation
+    enableCutWat:0,         // it will not remove all waters beyond ligand
+    wat_radius:4.5,         // using this distance from ligand
+    enableCropOnLig:0,      // turns off cropping target around ligand
+    qmcrop_radius:0,        // acceptable distance around ligand to leave in
+    residueRenumber:0,      // renumbers the residues (not implemented)
+    prtElementList:['H','C']       // elements to print to atom list file (such as for NMR or belly)
+];
+
+local function writeElementList [outpat,chains,prtElementList]
+
+    if not isnull prtElementList then
+        local atmlist = sort cat indicesof [prtElementList,cat aElement cat cAtoms chains];
+        local fileHDL = fopenw twrite ['{}.atms',fbase ftail outpat];
+        local atmID;
+        for atmID in atmlist loop
+            fwrite [fileHDL,'    ATOM {}\n',atmID];
+        endloop
+        fclose fileHDL;
+    endif
+
+endfunction
+
+local function writeMol2 [outpat,chains,prtElementList]
+
+    if isnull chains then
+        return;
+    endif
+    
+    write ['outfile: {}\n', outpat];
+
+    pot_SetCharges [];
+    
+    cSetTag [chains, cTag first chains];
+//    cSetName [chains, cName first chains];
+//    chains = pro_Join[chains];
+    
+    fwrite_TriposMOL2 [outpat,chains];
+    writeElementList [outpat,chains,prtElementList];
+    
+endfunction
+
+global function qbWriteElementList [targ_patt,opt]
+    opt = tagcat[opt, DEFAULTS];
+    local srcfilelist_targ = flist [cd [], targ_patt];
+    local fname_targ, targ_chains = [], lig_chains = [];
+    for fname_targ in srcfilelist_targ loop
+        oDestroy Chains [];
+        write ['\nReading ... {}\n', fname_targ];
+        targ_chains = ReadAuto [fname_targ,[multi_model:1]];
+        local tmpChainTag = first cName targ_chains;
+        writeElementList[twrite ['{}_rec.atms',tmpChainTag],targ_chains,opt.prtElementList];
+    endloop
+endfunction
+    
+global function qb_VennStructures [targ_patt, opt, ligand_mdb]
+
+    opt = tagcat[opt, DEFAULTS];
+write ['opt: {}\n',opt];
+
+    local srcfilelist_targ = flist [cd [], targ_patt];
+    local fname_targ, targ_chains = [], lig_chains = [];
+    local tmpChainTag;
+
+    // read in the targets
+    for fname_targ in srcfilelist_targ loop
+        write ['\nReading ... {}\n', fname_targ];
+        local tmpRecChains = ReadAuto [fname_targ,[multi_model:1]];
+        targ_chains = append [targ_chains,diff[tmpRecChains,join[tmpRecChains,uniq aChain _Atoms '$$ligand']]];
+        lig_chains = append [lig_chains,join[tmpRecChains,uniq aChain _Atoms '$$ligand']];
+    endloop
+    
+// process the mdb file if its provided
+    if not isnull ligand_mdb then
+        local mdb = db_Open ligand_mdb;
+        local mfield = db_RequireFieldType [mdb, 'molecule'];
+        local entCnt = 0;
+        local ent = 0;
+        while (ent = db_NextEntry [mdb, ent]) loop
+            entCnt = entCnt + 1;
+            local mol = first db_ReadFields [mdb, ent, mfield];
+            local tmp_chains = mol_Create mol;
+            cSetName [tmp_chains, twrite ['{}_{}',mol(1)(MOL_NAME),entCnt]];
+            pot_SetCharges [];
+            lig_chains = append[lig_chains,tmp_chains];
+        endloop
+    endif
+
+    targ_chains = cat targ_chains;
+    lig_chains = cat lig_chains;
+    
+write ['targ_chains: {}\n', length cat targ_chains];
+write ['lig_chains: {}\n', length cat lig_chains];
+    oSetCollection['Receptor',cat targ_chains];
+    View[];
+    write ['\nnChains= {}\n', nChains[] ];
+    
+    pro_Align [Chains[],[superpose:1,enable_structural:0]];
+    if length targ_chains == 1 then
+        rSetPos[cResidues targ_chains,cAlignmentPositions targ_chains];
+    endif
+// return;
+    if opt.enableCropOnLig then
+        local vennAtms = qb_SelectOnRadius [cat cAtoms lig_chains, opt.qmcrop_radius];
+        vennAtms = diff [vennAtms, cat cAtoms lig_chains];
+        local all_rObject = cat cResidues targ_chains;
+        aSetSelected [Atoms[],0];
+        aSetSelected [rAtoms all_rObject [x_diff [cat cAlignmentPositions targ_chains,uniq sort cat rPos aResidue vennAtms]],1];
+        qb_CleanDelAtoms cat rAtoms all_rObject [x_diff [cat cAlignmentPositions targ_chains,uniq sort cat rPos aResidue vennAtms]];
+    endif
+
+    if opt.enableCutWat then
+    // get the solvent atoms that are far from the ligand
+        local nearsolatms = qb_Nearby [_Atoms '$$solvent', cat cAtoms lig_chains, opt.wat_radius];
+        local todelatms = diff [_Atoms '$$solvent',nearsolatms];                
+        qb_CleanDelAtoms todelatms;
+        write ['\nList of kept solvent: {}\n', nearsolatms];
+    endif
+
+    local tmpChains;
+//    for tmpChainTag in cTag targ_chains loop
+//        local tmpChains = Chains[] | cTag Chains [] == tmpChainTag;
+    for tmpChainTag in cName targ_chains loop
+        tmpChains = Chains[] | cName Chains [] == tmpChainTag;   
+        writeMol2[twrite ['{}_rec.mol2',tmpChainTag],join [tmpChains,targ_chains],opt.prtElementList];
+    endloop
+    for tmpChainTag in cName lig_chains loop
+        tmpChains = Chains[] | cName Chains [] == tmpChainTag;   
+        writeMol2[twrite ['{}_lig.mol2',tmpChainTag],join [tmpChains,lig_chains],opt.prtElementList];
+    endloop
+
+endfunction
+
+global function qbSplitModels [fname]
+
+    oDestroy Chains [];
+    ReadAuto [fname,[multi_model:1]];
+    local tmpTag;
+    for tmpTag in cTag Chains[] loop
+        local tmpChains = Chains[] | cTag Chains[] == tmpTag;
+        writeMol2[twrite ['{}.mol2',tmpTag],tmpChains];
+    endloop
+    
+endfunction
+
+global function qbReparentSolvent []
+    local solvChains = uniq aChain _Atoms ['$$solvent'];
+    oDestroy [cat cAtoms solvChains | aElement cat cAtoms solvChains == 'H'];   // destroys all protons on oxygens
+    local solvChain, oxAtm;
+    for solvChain in solvChains loop
+        local origResidues = cat cResidues solvChain;
+        for oxAtm in cat cAtoms solvChain loop
+            local newResidue = oCreate solvChain;
+            rSetName[newResidue,'HOH'];
+            oReparent[oxAtm, newResidue];
+        endloop
+        oDestroy origResidues;
+    endloop
+    local atomsToProtonate = cat cAtoms solvChains;
+    Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,[],[],[]];
+endfunction
+
+global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the function argument
+
+    opt = tagcat[opt, DEFAULTS];
+    
+    local targ_chains, lig_chains;
+        
+    pot_Load ['$MOE/lib/mmff94x.ff'];    // switch to OPLS-AA as this will do a better job.
+
+    oDestroy Chains [];
+    
+    write ['\nReading ... {}\n', fname_targ];
+    targ_chains = ReadAuto fname_targ;
+    if not isnull fname_lig then
+        write ['\nReading ... {}\n', fname_lig];
+        lig_chains = ReadAuto fname_lig;
+    else
+        fname_lig = fname_targ;
+        lig_chains = uniq oChains _Atoms '$$ligand';
+    endif
+    
+    if isnull targ_chains or isnull lig_chains then
+        opt.enableCropOnLig = 0;
+        opt.enableCutWat = 0;
+    endif
+
+    if targ_chains === lig_chains then
+        opt.enableCropOnLig = 0;
+        opt.enableCutWat = 0;
+    endif
+    
+    if opt.enableWatPart then
+        qbReparentSolvent[];
+    endif
+    
+    targ_chains = diff [Chains[],lig_chains];
+    
+    write ['\nnChains= {}\n', nChains[] ];
+        
+    if opt.enableCropOnLig then
+        qb_CleanDelAtoms cat diff [Atoms[],qbSelectResidueOnRadius [cat cAtoms lig_chains, opt.qmcrop_radius]];
+    endif
+        
+    if opt.enableCutWat then
+    // get the solvent atoms that are far from the ligand
+        local nearsolatms = qb_Nearby [_Atoms '$$solvent', cat cAtoms lig_chains, opt.wat_radius];
+        local todelatms = diff [_Atoms '$$solvent',nearsolatms];                
+        qb_CleanDelAtoms todelatms;
+        write ['\nList of kept solvent: {}\n', nearsolatms];
+    endif
+
+    if opt.enableProtonate then
+        local preciseWaters = [];
+        if opt.enablePreciseHOH then
+            preciseWaters = _Atoms '$$solvent';
+        endif
+        local atomsToProtonate = Atoms[];
+        if not isnull opt.protAtomList then
+            atomsToProtonate = (Atoms[])[indexof[opt.protAtomList,aNumber Atoms[]]];
+        endif
+        if opt.enableLigFix then
+//            Protonate3D [Atoms[],Atoms[],Atoms[],cat cAtoms lig_chains,preciseWaters,[]];
+            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,cat cAtoms lig_chains,preciseWaters,[]];
+        else
+//            Protonate3D [Atoms[],Atoms[],Atoms[],[],preciseWaters,[]];
+            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,[],preciseWaters,[]];
+        endif
+    endif
+    
+    if opt.enableOpt then
+        qb_TetherMMMin [opt.tether_val];
+    endif
+    
+    oSetCollection['Receptor',cat targ_chains];
+    oSetCollection['Ligand',cat lig_chains];
+    
+    writeMol2[twrite ['mp_{}.mol2',fbase ftail fname_lig],Chains[],opt.prtElementList];
+    writeMol2[twrite ['targ_{}.mol2',fbase ftail fname_lig],targ_chains,opt.prtElementList];
+    writeMol2[twrite ['lig_{}.mol2',fbase ftail fname_lig],lig_chains,opt.prtElementList];
+
+endfunction 
+
+global function qbProcessFileGroup [targ_patt,fname_lig,opt]
+
+    write ['Running set ... \n'];
+
+    local srcfilelist_targ = flist [cd [], targ_patt];
+    local fname_targ;
+    for fname_targ in srcfilelist_targ loop
+        oDestroy Chains [];
+        qbPrep2Files [fname_targ, fname_lig, opt];
+    endloop
+
+endfunction
