@@ -1,0 +1,153 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif
+
+// general MOE functions
+function _Atoms;
+
+// These are various selection tools used in several parts of the code.
+
+// function Nearby is from menu.svl
+// Nearby calculates those atoms of set A that are near to some atom in
+// set B where "near" is a specified distance
+
+global function qbNearby [Aatoms, Batoms, dist]
+    local i, seg, idx, r2, prox;
+    local nmask = zero Aatoms;
+    const PACKET = 100;
+
+    if length Aatoms > length Batoms then
+	prox = prox_open [dist, aPos Aatoms, dist];
+
+	for i in split [x_id Batoms, PACKET] loop
+	    [seg, idx, r2] = prox_find [prox, aPos Batoms[i], 0];
+	    nmask[idx] = 1;
+	endloop
+
+	prox_close prox;
+    else
+	prox = prox_open [dist, aPos Batoms, dist];
+
+	for i in split [x_id Aatoms, PACKET] loop
+	    [seg, idx, r2] = prox_find [prox, aPos Aatoms[i], 0];
+	    nmask[i] = notnot seg;
+	endloop
+
+	prox_close prox;
+    endif
+
+    return Aatoms | nmask;
+endfunction
+
+// function that will take a list of atoms and delete them (and their parents) correctly
+//      this function will also the EditDeleteAtoms function to reprotonate bonds that are broken.
+function EditDeleteAtoms, EditDeleteConsequences;
+
+#ifnbif aLightBonds
+// from $MOE/lib/svl/run/editdel.svl
+local function aLightBonds atoms
+    local nbr = aBonds atoms;
+    return nbr || aIsLight nbr;
+endfunction
+#endif
+
+global function qbCleanDelAtoms del
+
+    del = uniq cat prepend [aLightBonds del, del];
+    local [d_chains, d_res] = EditDeleteConsequences del;
+    EditDeleteAtoms del;
+    oDestroy [d_res,d_chains];
+    
+endfunction
+
+// qbInvertSelection will only invert the selection on the chains provided.
+//      no other chains will be impacted one way or the other
+//      the list of newly selected atoms are returned
+global function qbInvertSelection [tmpChains]
+    local selected = cat cAtoms tmpChains | cat aSelected [cat cAtoms tmpChains];
+    local notselected = cat cAtoms tmpChains | cat not aSelected [cat cAtoms tmpChains];
+    aSetSelected [selected, 0];
+    aSetSelected [notselected, 1];
+    return notselected;
+endfunction
+
+// Function:    qbSelectOnRadius 
+// Author:      Lance Westerhoff
+// Date Added:  12/9/2011
+//
+//  Function to create a selection based on the atoms provided in the
+//      first argument and the radius provided in the second arugment.
+//      Returns the list of atom objects so it can be used in scripts
+//      easily as well.
+//
+//      Can be used both in scripts and in the GUI. NOTE: the selection
+//          IS NOT residue inclusive!
+//
+//      Example (select atoms 15.0A from ligand)
+//          qbSelectOnRadius [_Atoms '$$ligand', 15.0]
+
+local function qbSelectOnRadius [Batoms, radius]
+
+//    local nearatms = cat rAtoms aResidue qbNearby [Atoms[], Batoms, radius];
+    local nearatms = qbNearby [Atoms[], Batoms, radius];
+    
+    aSetSelected [nearatms, 1];
+
+    return nearatms;
+    
+endfunction
+
+global function qbSelectResidueOnRadius [Batoms,radius,tmpChains]
+
+    local allatms;
+    if isnull tmpChains then
+        allatms = Atoms[];
+    else
+        allatms = cat cAtoms tmpChains;
+    endif
+    local nearatms = cat rAtoms aResidue qbNearby [allatms, Batoms, radius];
+    
+    aSetSelected [nearatms, 1];
+
+    return nearatms;
+    
+endfunction
+
+global function qbSelectWatOnRadius [Batoms, radius,yInvert]
+
+    local allSelected = rSelected uniq cat aResidue qbSelectOnRadius [Batoms, radius];
+    local allWats = uniq cat aResidue _Atoms '$$solvent';
+    
+    local selectedWats = cat [allWats | cat rSelected allWats];
+
+    local UnselectedWats = cat [allWats | rSelected allWats == 0];
+
+    aSetSelected [Atoms[],0];
+    if isnull yInvert then
+        aSetSelected [rAtoms selectedWats,1];
+    else
+        aSetSelected [rAtoms UnselectedWats,1];
+    endif
+
+endfunction
+

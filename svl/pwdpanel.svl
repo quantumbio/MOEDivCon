@@ -47,12 +47,13 @@ function qb_RMSD;
 function qb_SaveEnvAnal;
 function qb_SplitComplex;
 function qb_GetCoreEnv;
+function qbSelectResidueOnRadius;
 
 function qb_HeatMapSetupPanel;
 
 function qb_PWDAnalysis;
 
-
+function _Atoms;
 function pro_Join;
 function pro_Align;
 
@@ -60,7 +61,7 @@ const PWD_EXPACT_HDR = 'QMScore';
 
 const RMSD_MAX = 0.1;
 const MAT_TRANS_MIN = 0x80;
-const INITDIST = 7.5;
+const INITDIST = 5.0;
 const INITSEL = 1;
 
 const QBPWD_OPT_DEFAULTS =
@@ -887,8 +888,8 @@ local function LoadMols [pwdfilename]
     local allLigAtms = [];
     for idx = 1, length G_surface.recmols, 1 loop
         targ_chainsList(idx) = mol_Create G_surface.recmols(idx);
-        pro_Join targ_chainsList(idx);
-        targ_chainsList(idx) = targ_chainsList(idx)(1);
+//        pro_Join targ_chainsList(idx);
+//        targ_chainsList(idx) = targ_chainsList(idx)(1);
         aSetHidden [oAtoms targ_chainsList(idx),1];
 		cSetName [targ_chainsList(idx), G_surface.recmols(idx)(1)(MOL_NAME)];
     endloop
@@ -908,10 +909,10 @@ local function LoadMols [pwdfilename]
     local tmpRecMols = [];
     local tmpLigMols = [];
     for idx = 1, length G_surface.recmols, 1 loop
-        tmpRecMols(idx) = mol_Extract [targ_chainsList(idx)];
+        tmpRecMols(idx) = mol_Extract targ_chainsList(idx);
     endloop
     for idx = 1, length G_surface.ligmols, 1 loop
-        tmpLigMols(idx) = mol_Extract [lig_chainsList(idx)];
+        tmpLigMols(idx) = mol_Extract lig_chainsList(idx);
     endloop
     G_surface.recmols = tmpRecMols;
     G_surface.ligmols = tmpLigMols; 
@@ -1214,6 +1215,9 @@ local function ShowTable [data, postscript]
 
 endfunction
 
+local function GetResidueInformation[]
+
+endfunction
 
 /****************************************************************************
  *
@@ -1237,12 +1241,17 @@ local function UpdateComplex [ligtok, radius]
 	//    @todo: this fixes an error when empty, however we should provide an improved error.
         return;
     endif
+        
+    local RibbonModeList, showH;
 
     local redosurf = 0, vdwR = [], vdwE = [];
     if not isnull G_surface.recmols then
+        showH = 0;
         if G_surface.init then
             Close [force:1];
         else
+            showH = [aHidden Atoms [] | aElement Atoms [] == 'H'](1)(1);
+            RibbonModeList = rRibbonMode Residues[] | rRibbonMode Residues[] <> 'none';
             oDestroy uniq oChains G_surface.rec;
         endif
         local recidx = G_surface.molidx;
@@ -1293,8 +1302,25 @@ local function UpdateComplex [ligtok, radius]
     local ligchn = mol_Create G_surface.ligmols (G_surface.molidx);
     G_surface.lig = cat cAtoms ligchn;
     oSetCollection ['QB_LIGAND', G_surface.lig];
+    // set some visual properties
     aSetNucleusLook [G_surface.lig, lignuc];
     aSetBondLook [G_surface.lig, ligbnd];
+    local metalAtoms = Atoms [] | m_join [aElement Atoms[],el_Elements[] | el_Metal el_Elements[]];
+    aSetNucleusLook[metalAtoms,'small-sphere'];
+    aSetLabelElement[metalAtoms,1];
+    aSetHidden[Atoms [] | aElement Atoms[] == 'H',showH];
+    if showH then
+        aSetHidden[_Atoms '$$solvent',0];
+    endif
+    local receptorAtoms = qbSelectResidueOnRadius[oGetCollection ['QB_LIGAND'],radius+1];
+    aSetSelected [receptorAtoms,0];
+    aSetBondLook [receptorAtoms,'cylinder'];
+    aSetHidden [diff [Atoms [],receptorAtoms],1];
+    
+    // @todo: this should be made based on the UID and then transcribed from one to the other
+    if length RibbonModeList then
+        rSetRibbonMode[Residues[],RibbonModeList(1)];
+    endif
 
     if gtL [length G_surface.ligmols, 1]  
             and (G_surface.init or neL [G_surface.dist, radius]) then
@@ -1323,7 +1349,6 @@ endfunction
  *
  ****************************************************************************/
 local function UpdateResidue [restok, row, col, zoom]
-
     if col === 0 then
         aSetLabelRes [G_surface.resatms | oValid G_surface.resatms, 0];
         G_surface.resatms = [];
@@ -1344,7 +1369,10 @@ local function UpdateResidue [restok, row, col, zoom]
 
     G_surface.restok = restok;
     G_surface.resatms = resatms;
-
+    
+    aSetHidden [resatms,0];
+    aSetBondLook [resatms,'cylinder'];
+    
 	local [idx, m] = sam graph_ccomponent BondGraph resatms;
     local aa;
 	for aa in split [resatms [idx], mtoc m] loop
@@ -1478,7 +1506,6 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
     elseif selcol > 0 then
         restok = resnames (selcol);
     endif
-
     local redosurf = UpdateComplex [ligtok, radius];
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
         mincut, maxcut, colors];
