@@ -39,9 +39,9 @@ else
     MOE_SVL_LOAD="${QBHOME}/svl"; export MOE_SVL_LOAD
 fi
 
-MOEPATH=`dirname ${MOEBIN}`
-MOEPATH=`dirname ${MOEPATH}`
-CLASSPATH=$QBHOME/${PLTFM_VER}/MOEDivcon.jar:$MOEPATH/java/svljava.jar:${CLASSPATH} ; export CLASSPATH        
+MOEHOME=`dirname ${MOEBIN}`
+MOEHOME=`dirname ${MOEHOME}`
+CLASSPATH=$QBHOME/${PLTFM_VER}/MOEDivcon.jar:$MOEHOME/java/svljava.jar:${CLASSPATH} ; export CLASSPATH        
 if [ -z "${SVL_CLASSPATH}" ]; then
     SVL_CLASSPATH=$CLASSPATH ; export SVL_CLASSPATH
 else
