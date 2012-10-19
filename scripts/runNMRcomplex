@@ -17,7 +17,7 @@ if [ ! "$QBHOME" ]; then
         progdir=`pwd`/"$progdir"
     fi
     
-    QBHOME=`echo "$progdir" | sed 's:/bin$::'`
+    QBHOME=`echo "$progdir" | sed 's:/scripts$::'`
     export QBHOME
 fi
 
@@ -30,7 +30,8 @@ errorOut()
 #   echo "12345678901234567890123456789012345678901234567890123456789012345678901234567890"
     echo
     echo "REQUIRED Command line arguments:"
-    echo "  --complex=FILENAME  * File corresponding to protein/ligand complex"
+    echo "  --target=FILENAME   * File corresponding to protein structure"
+    echo "  --ligand=FILENAME   * File corresponding to ligand structure"
     echo
     echo "Optional Command line arguments:"
     echo "  --radius=#          * Radius around ligand to include.  Default=${cutRadius}"
@@ -59,8 +60,11 @@ while test $# -gt 0 ; do
         --disableProtonate)
             doProtonate=0
             ;;
-        --complex=*)
-            inFile=$optarg
+        --target=*)
+            inTargetFile=$optarg
+            ;;
+        --ligand=*)
+            inLigandFile=$optarg
             ;;
         *)
             echo "ERROR: $optarg option not available for --build..."
@@ -73,14 +77,51 @@ filename=$(basename "$inFile")
 extension="${filename##*.}"
 filename="${filename%.*}"
 
-if [ -z "$inFile" ] ; then
+if [ -z "$inTargetFile" ] ; then
+    echo "ERROR: Target File REQUIRED!"
     errorOut
 fi
 
-MOEARGS="['$inFile',[],[enableOpt:0,enableProtonate:$doProtonate,enableLigFix:1,enableCropOnLig:1,qmcrop_radius:$cutRadius]]"
+if [ -z "$inLigandFile" ] ; then
+    echo "ERROR: Target File REQUIRED!"
+    errorOut
+fi
+
+MOEARGS="['$inTargetFile','$inLigandFile',[enableOpt:0,enableProtonate:$doProtonate,enableLigFix:1,enableCropOnLig:1,qmcrop_radius:$cutRadius]]"
 echo $MOEARGS
 
 ${QBHOME}/bin/qbmoebatch moebatch -exec "run ['$QBHOME/svl/qbPrep2Files.svl',$MOEARGS,'qbPrep2Files']" -exit
 
-# divcon -i mp_${filename}.mol2 -I 
+if [ -e lig_${filename}.atms ] ; then
+    echo "ERROR: lig_${filename}.atms NOT FOUND!"
+    errorOut
+fi
+
+if [ -e lig_${filename}.mol2 ] ; then
+    echo "ERROR: lig_${filename}.mol2 NOT FOUND!"
+    errorOut
+fi
+
+if [ -e mp_${filename}.atms ] ; then
+    echo "ERROR: mp_${filename}.atms NOT FOUND!"
+    errorOut
+fi
+
+if [ -e mp_${filename}.mol2 ] ; then
+    echo "ERROR: mp_${filename}.mol2 NOT FOUND!"
+    errorOut
+fi
+
+echo "Running DivCon"
+
+atmlist=`cat lig_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
+echo "[nmr]" > lig_${filename}.ini
+echo "atom=${atmlist%?}" >> lig_${filename}.ini
+
+atmlist=`cat mp_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
+echo "[nmr]" > mp_${filename}.ini
+echo "atom=${atmlist%?}" mp_${filename}.ini
+
+divcon --nmr -i lig_${filename}.mol2 --hamiltonian=mndo_nmr -I lig_${filename}.ini  -O --standard
+divcon --nmr -i mp_${filename}.mol2  --hamiltonian=mndo_nmr -I mp_${filename}.ini   -O --standard
 

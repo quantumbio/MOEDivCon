@@ -75,6 +75,7 @@ function qbNearby;
 
 const DEFAULTS = [
     enableWatPart:0,        // partitions waters into each of the atoms/residues and reprotonates.
+    enableAutoPrep:0,       // Run the MOE structure preparation tool.
     enableOpt:1,            // turn on optimization
     tether_val:100,         // tethers the heavy atoms at a certain restraint.
     enableProtonate:0,      // turns on Protonate3D
@@ -265,6 +266,16 @@ local function qbReparentSolvent []
     Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,[],[],[]];
 endfunction
 
+// function to pull a ligand out of a complex and give it its own chain (return chain)
+local function qbReparentLigand[inAtoms]
+    local ligandResidue = uniq aResidue inAtoms;
+    local newChain = oCreate [0];
+    cSetName [newChain,cName rChain first ligandResidue];
+    cSetTag [newChain, cTag rChain first ligandResidue];
+    oReparent[ligandResidue,newChain];
+    return newChain;
+endfunction
+
 global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the function argument
 
     opt = tagcat[opt, DEFAULTS];
@@ -282,9 +293,17 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
         lig_chains = ReadAuto fname_lig;
     else
         fname_lig = fname_targ;
-        lig_chains = uniq oChains _Atoms '$$ligand';
+        lig_chains = uniq aChain _Atoms '$$ligand';
+        local tmp_targ_chains = uniq aChain _Atoms '$$receptor';
+        if length join[tmp_targ_chains,lig_chains] then
+            lig_chains = qbReparentLigand[_Atoms '$$ligand'];
+        endif
     endif
     
+    if opt.enableAutoPrep then
+        run ['$MOE/lib/svl/run/structprep_ui.svl',[cmd:'cli']];
+    endif
+
     if isnull targ_chains or isnull lig_chains then
         opt.enableCropOnLig = 0;
         opt.enableCutWat = 0;
@@ -302,7 +321,7 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
     targ_chains = diff [Chains[],lig_chains];
     
     write ['\nnChains= {}\n', nChains[] ];
-        
+    
     if opt.enableCropOnLig then
         qbCleanDelAtoms cat diff [Atoms[],qbSelectResidueOnRadius [cat cAtoms lig_chains, opt.qmcrop_radius]];
     endif
@@ -314,7 +333,7 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
         qbCleanDelAtoms todelatms;
         write ['\nList of kept solvent: {}\n', nearsolatms];
     endif
-
+    
     if opt.enableProtonate then
         local preciseWaters = [];
         if opt.enablePreciseHOH then
@@ -337,8 +356,10 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
         qbTetherMMMin [opt.tether_val];
     endif
     
-    oSetCollection['Receptor',cat targ_chains];
-    oSetCollection['Ligand',cat lig_chains];
+    targ_chains = join [targ_chains,Chains[]];
+
+    oSetCollection['Receptor', targ_chains];
+    oSetCollection['Ligand', lig_chains];
     
     writeMol2[twrite ['mp_{}.mol2',fbase ftail fname_lig],Chains[],opt.prtElementList];
     writeMol2[twrite ['targ_{}.mol2',fbase ftail fname_lig],targ_chains,opt.prtElementList];
