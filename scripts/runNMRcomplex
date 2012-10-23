@@ -4,7 +4,7 @@ doProtonate=0
 cutRadius=5
 doHNMR=1
 doCNMR=0
-doStructMin=0
+doStructMin=1
 
 if [ ! "$QBHOME" ]; then
     PRG=$0
@@ -38,16 +38,19 @@ errorOut()
     echo "REQUIRED Command line arguments:"
     echo "  --target=FILENAME    * File corresponding to protein structure"
     echo "  --ligand=FILENAME    * File corresponding to ligand structure"
+    echo "          OR"
+    echo "  --complex=FILENAME   * File corresponding to complex structure"
+    echo "                          WARNING: Perception used to determine target/ligand"
     echo
     echo "Optional Command line arguments:"
     echo "  --radius=#           * Radius around ligand to include.  Default=${cutRadius}"
-    echo "  --enableProtonate    * enable protonation                Default=${ynProt}"
+    echo "  --enableProtonate    * enable protonation (Protonate3D)  Default=${ynProt}"
     echo "  --setqbhome          * Set QBHOME variable.              Default=${QBHOME}"
     echo "  --enableH            * Enable H CS prediction.           Default=${ynHNMR}"
     echo "  --enableC            * Enable C CS prediction.           Default=${ynCNMR}"
     echo "  --enableMinimization * Minimize structure with MMFF.     Default=${ynSTRMIN}"
     echo 
-    echo "NOTE: for all --enableX options, use --disableX to turn off."
+    echo "NOTE: for all --enableX options, use --disableX to disable."
     echo
     echo "For help, email support@quantumbioinc.com"
     echo 
@@ -96,35 +99,56 @@ while test $# -gt 0 ; do
         --ligand=*)
             inLigandFile=$optarg
             ;;
+        --complex=*)
+            inComplexFile=$optarg
+            ;;
         --setqbhome=*)
             QBHOME=$optarg ; export QBHOME
             ;;
         *)
-            echo "ERROR: $optarg option not available for --build..."
+            echo "ERROR: $optarg option not available..."
             errorOut
         esac
     shift
 done
 
-filename=$(basename "$inLigandFile")
+if [ ! -z "$inComplexFile" ] ; then
+    ynCmplx=1
+else
+    ynCmplx=0
+fi
+
+if [ $ynCmplx -eq 0 ] ; then
+    if [ -z "$inTargetFile" ] ; then
+        echo "ERROR: Target File REQUIRED!"
+        errorOut
+    elif [ ! -e "$inTargetFile" ] ; then
+        echo "ERROR: Target file $inTargetFile NOT FOUND"
+        errorOut
+    fi
+    
+    if [ -z "$inLigandFile" ] ; then
+        echo "ERROR: Target File REQUIRED!"
+        errorOut
+    elif [ ! -e "$inLigandFile" ] ; then
+        echo "ERROR: Ligand file $inLigandFile NOT FOUND"
+        errorOut
+    fi
+    MOEFILES="'$inTargetFile','$inLigandFile'"
+    filename=$(basename "$inLigandFile")
+else
+    if [ -z "$inComplexFile" ] ; then
+        echo "ERROR: Complex File REQUIRED!"
+        errorOut
+    elif [ ! -e "$inComplexFile" ] ; then
+        echo "ERROR: Complex file $inComplexFile NOT FOUND"
+        errorOut
+    fi
+    MOEFILES="'$inComplexFile',[]"
+    filename=$(basename "$inComplexFile")
+fi
 extension="${filename##*.}"
 filename="${filename%.*}"
-
-if [ -z "$inTargetFile" ] ; then
-    echo "ERROR: Target File REQUIRED!"
-    errorOut
-elif [ ! -e "$inTargetFile" ] ; then
-    echo "ERROR: Target file $inTargetFile NOT FOUND"
-    errorOut
-fi
-
-if [ -z "$inLigandFile" ] ; then
-    echo "ERROR: Target File REQUIRED!"
-    errorOut
-elif [ ! -e "$inLigandFile" ] ; then
-    echo "ERROR: Ligand file $inLigandFile NOT FOUND"
-    errorOut
-fi
 
 if [ $doHNMR -eq 1 ] ; then
     if [ $doCNMR -eq 1 ] ; then
@@ -140,9 +164,10 @@ else
 fi
 MOENMRATMS="prtElementList:${MOENMRATMS}"
 
-MOEARGS="['$inTargetFile','$inLigandFile',[enableOpt:0,enableProtonate:$doProtonate,enableLigFix:1,enableCropOnLig:1,qmcrop_radius:$cutRadius,${MOENMRATMS}]]"
+MOEARGS="[${MOEFILES},[hamiltonian:'mndo',qmApplication:'nmr',quitonerror:1,enableOpt:$doStructMin,tether_val:0,enableProtonate:$doProtonate,enableLigFix:0,enableCropOnLig:1,qmcrop_radius:$cutRadius,${MOENMRATMS}]]"
 echo $MOEARGS
 
+rm -f lig_${filename}.atms lig_${filename}.mol2 mp_${filename}.atms mp_${filename}.mol2 targ_${filename}.atms targ_${filename}.mol2
 ${QBHOME}/bin/qbmoebatch moebatch -exec "run ['$QBHOME/svl/qbPrep2Files.svl',$MOEARGS,'qbPrep2Files']" -exit
 
 if [ ! -e lig_${filename}.atms ] ; then
@@ -169,14 +194,26 @@ echo "Running DivCon"
 
 atmlist=`cat lig_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
 echo "calnuc=0" > lig_${filename}.ini
+echo "maxit=300" >> lig_${filename}.ini
 echo "[nmr]" >> lig_${filename}.ini
 echo "atom=${atmlist%?}" >> lig_${filename}.ini
 
 atmlist=`cat mp_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
 echo "calnuc=0" > mp_${filename}.ini
+echo "maxit=300" >> mp_${filename}.ini
 echo "[nmr]" >> mp_${filename}.ini
 echo "atom=${atmlist%?}" >> mp_${filename}.ini
 
-${QBHOME}/bin/divcon --nmr -i lig_${filename}.mol2 --hamiltonian=mndo_nmr -I lig_${filename}.ini  -O --standard -d lig_${filename}.h5
-# ${QBHOME}/bin/divcon --nmr -i mp_${filename}.mol2  --hamiltonian=mndo_nmr -I mp_${filename}.ini   -O --standard -d mp_${filename}.h5
+if ( ${QBHOME}/bin/divcon --nmr -i lig_${filename}.mol2 --hamiltonian=mndo_nmr -I lig_${filename}.ini -O --standard -d lig_${filename}.h5 --charge=labute --screen ) ; then
+    echo ; echo "Ligand NMR Calculation Successful" ; echo
+else
+    echo ; echo "Ligand NMR Calculation Unsuccessful - try running with --enableMinimization" ; echo
+    exit 1
+fi
 
+if ( ${QBHOME}/bin/divcon --nmr -i mp_${filename}.mol2  --hamiltonian=mndo_nmr -I mp_${filename}.ini -O --standard -d mp_${filename}.h5 --charge=labute --screen ) ; then
+    echo ; echo "Complex NMR Calculation Successful" ; echo
+else
+    echo ; echo "Complex NMR Calculation Unsuccessful - try running with --enableMinimization" ; echo
+    exit 1
+fi
