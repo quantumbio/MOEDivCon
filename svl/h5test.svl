@@ -2,11 +2,14 @@
 #set version '2012.10'
 #set main    'qbTesth5Main'
 
+// example:
+// qbmoebatch -exec "run ['h5test.svl',['c387.h5']]" -exit
 
 function list_models;
 function retrieve_qm_score;
 function retrieve_residue_pwd;
 function retrieve_atom_by_atom_pwd;
+function retrieve_nmr_averages;
 
 function qbTesth5Main [h5file]
     write ['{}\n',h5file];
@@ -24,9 +27,13 @@ function qbTesth5Main [h5file]
     write ['{}\n', modelTags.Target];
     write ['{}\n', modelTags.Ligand];
     
+    local NMRvalues=cat retrieve_nmr_averages [h5file,modelTags.Target];
+    write ['{}\n',NMRvalues.Index];
+    write ['{}\n',NMRvalues.Average];
+    
 //    local modelName = twrite['{}',first cat list_models [h5file]];
 //    print modelName;
-    print retrieve_qm_score [h5file, modelTags.Target];
+//    print retrieve_qm_score [h5file, modelTags.Target];
 //    print retrieve_residue_pwd ['./AstexSet.h5', 'rec'];
 //    print retrieve_atom_by_atom_pwd [h5file, modelName];
 

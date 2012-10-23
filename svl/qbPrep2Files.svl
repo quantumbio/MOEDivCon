@@ -72,6 +72,7 @@ function qbSelectOnRadius;
 function qbCleanDelAtoms;
 function qbSelectResidueOnRadius;
 function qbNearby;
+function qb_TestDivCon;
 
 const DEFAULTS = [
     enableWatPart:0,        // partitions waters into each of the atoms/residues and reprotonates.
@@ -87,6 +88,9 @@ const DEFAULTS = [
     enableCropOnLig:0,      // turns off cropping target around ligand
     qmcrop_radius:0,        // acceptable distance around ligand to leave in
     residueRenumber:0,      // renumbers the residues (not implemented)
+    hamiltonian:'pm6',     // the Hamiltonian to be used downstream
+    qmApplication:'qms',       // the particular QM application to be used downstream
+    quitonerror:0,          // by default, the run will continue even on error (not good if used in shell script)
     prtElementList:['H','C']       // elements to print to atom list file (such as for NMR or belly)
 ];
 
@@ -301,7 +305,7 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
     endif
     
     if opt.enableAutoPrep then
-        run ['$MOE/lib/svl/run/structprep_ui.svl',[cmd:'cli']];
+        run ['$MOE/lib/svl/run/structprep_ui.svl',[cmd:'cli',batch_protonate3d:0]];
     endif
 
     if isnull targ_chains or isnull lig_chains then
@@ -360,6 +364,18 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
 
     oSetCollection['Receptor', targ_chains];
     oSetCollection['Ligand', lig_chains];
+    
+    if not isnull opt.hamiltonian and not isnull opt.qmApplication then
+        local testErrs=qb_TestDivCon [twrite ['{} + {}',fname_targ,fname_lig],Atoms[],opt.qmApplication,opt.hamiltonian];
+        if first testErrs == 0 then
+            write ['ERROR: DivCon Test Prep Failed! Reported:\n'];
+            write ['  {}',second testErrs];
+            write [' WARNING: output mol2 files should not be used in DivCon calculation!\n'];
+            if opt.quitonerror then
+                return first testErrs;
+            endif
+        endif
+    endif
     
     writeMol2[twrite ['mp_{}.mol2',fbase ftail fname_lig],Chains[],opt.prtElementList];
     writeMol2[twrite ['targ_{}.mol2',fbase ftail fname_lig],targ_chains,opt.prtElementList];
