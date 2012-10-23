@@ -1036,7 +1036,7 @@ global G_hamsets;
  *  and algorithm.
  *
  ****************************************************************************/
-global function HamCompatability [appname, hamname, atoms]
+local function HamCompatability [appname, hamname, atoms]
     qb_HamSetsInit[];
     if appname === 'perturb' then appname = 'nmr'; endif
     local elems = uniq aElement atoms;
