@@ -53,6 +53,8 @@ errorOut()
     echo "NOTE: for all --enableX options, use --disableX to disable."
     echo
     echo "For help, email support@quantumbioinc.com"
+    echo
+    echo " Also, visit: http://www.quantumbioinc.com/support/manual"
     echo 
     exit 1
 }

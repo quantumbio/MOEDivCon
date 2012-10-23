@@ -370,9 +370,11 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
         if first testErrs == 0 then
             write ['ERROR: DivCon Test Prep Failed! Reported:\n'];
             write ['  {}',second testErrs];
-            write [' WARNING: output mol2 files should not be used in DivCon calculation!\n'];
             if opt.quitonerror then
+                write [' Output Aborted\n'];
                 return first testErrs;
+            else
+                write [' WARNING: output mol2 files should not be used in DivCon calculation!\n'];
             endif
         endif
     endif
