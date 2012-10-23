@@ -1044,7 +1044,8 @@ local function HamCompatability [appname, hamname, atoms]
     local idx = indexof [elems, compatlist];
     local m = idx == 0;
     if anytrue m then
-        return elems | m;
+        local tmpOffensiveElements = elems | m;
+        return [elems | m,compatlist];
     endif
 
     return [];
@@ -3143,14 +3144,21 @@ global function qb_TestDivCon [which, atoms, appname, hamname]
 
     //  Look for incompatible atoms for hamiltonian
 // hamcompat 
-    local badelems = HamCompatability [appname, hamname, atoms];
-    if length badelems > 0 then
+    local hamiltonianCompatResults = HamCompatability [appname, hamname, atoms];
+    if length hamiltonianCompatResults > 0 then
+        local badelems = first hamiltonianCompatResults;
+        local goodelems = second hamiltonianCompatResults;
         mess = tok_cat [mess, '    Error!  Incompatible atoms for'
         ' selected Hamiltonian (',twrite['{}:{}',appname,hamname],'):\n       '];
         for ith = 1, length badelems, 1 loop
             mess = tok_cat [mess, ' ', badelems (ith)];
         endloop
-
+        mess = tok_cat [mess, '\n'];
+        mess = tok_cat [mess, '    Selected Hamiltonian supports:\n       '];
+        for ith = 1, length goodelems, 1 loop
+            mess = tok_cat [mess, ' ', goodelems (ith)];
+        endloop
+        
         mess = tok_cat [mess, '\n'];
         error = 1;
     endif
