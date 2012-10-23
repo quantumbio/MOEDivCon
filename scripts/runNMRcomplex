@@ -209,7 +209,10 @@ echo "atom=${atmlist%?}" >> mp_${filename}.ini
 if ( ${QBHOME}/bin/divcon --nmr -i lig_${filename}.mol2 --hamiltonian=mndo_nmr -I lig_${filename}.ini -O --standard -d lig_${filename}.h5 --charge=labute --screen ) ; then
     echo ; echo "Ligand NMR Calculation Successful" ; echo
 else
-    echo ; echo "Ligand NMR Calculation Unsuccessful - try running with --enableMinimization" ; echo
+    echo ; echo "ERROR: Ligand NMR Calculation Unsuccessful - try running with --enableMinimization"
+           echo "   NOTE: NMR Support in DivCon5.x is considered beta. In order to help improve the"
+           echo "           algorithm, if possible please send input along with divcon.log file to"
+           echo "           support@quantumbioinc.com"
     exit 1
 fi
 
@@ -217,5 +220,8 @@ if ( ${QBHOME}/bin/divcon --nmr -i mp_${filename}.mol2  --hamiltonian=mndo_nmr -
     echo ; echo "Complex NMR Calculation Successful" ; echo
 else
     echo ; echo "Complex NMR Calculation Unsuccessful - try running with --enableMinimization" ; echo
+           echo "   NOTE: NMR Support in DivCon5.x is considered beta. In order to help improve the"
+           echo "           algorithm, if possible please send input along with divcon.log file to"
+           echo "           support@quantumbioinc.com"
     exit 1
 fi
