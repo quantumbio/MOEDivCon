@@ -32,6 +32,9 @@ function _Atoms;
 function pro_HydrogenBonds;
 function Seq_NameToLetter;
 
+// QBToolBox
+function qb_HamSetsInit;
+
 	//  Database Fields
 const LIG_FIELD = 'Ligand/Pose';
 const LIGCHG_FIELD = 'Lig Chg';
@@ -1033,7 +1036,8 @@ global G_hamsets;
  *  and algorithm.
  *
  ****************************************************************************/
-local function HamCompatability [appname, hamname, atoms]
+global function HamCompatability [appname, hamname, atoms]
+    qb_HamSetsInit[];
     if appname === 'perturb' then appname = 'nmr'; endif
     local elems = uniq aElement atoms;
     local compatlist = tagpeek [G_hamsets, [appname, hamname]];
@@ -3142,7 +3146,7 @@ global function qb_TestDivCon [which, atoms, appname, hamname]
     local badelems = HamCompatability [appname, hamname, atoms];
     if length badelems > 0 then
         mess = tok_cat [mess, '    Error!  Incompatible atoms for'
-        ' selected Hamiltonian:\n       '];
+        ' selected Hamiltonian (',twrite['{}:{}',appname,hamname],'):\n       '];
         for ith = 1, length badelems, 1 loop
             mess = tok_cat [mess, ' ', badelems (ith)];
         endloop

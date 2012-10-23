@@ -57,8 +57,9 @@ G_hamsets =
             ],
         pm6:
             [
-            'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si',
-            'P', 'S', 'Cl', 'K', 'Fe', 'Zn', 'Br', 'Cd', 'I', 'Hg'
+            'H', 'Be', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si', 'P', 'S',
+            'Cl', 'K', 'Ca', 'Zn', 'Ga', 'Ge', 'Ar', 'Se', 'Br', 'Cd', 'In',
+            'Sn', 'Sb', 'Te', 'I', 'Hg', 'Tl', 'Pb', 'Bi'
             ],
         qbm1:
             [
