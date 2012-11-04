@@ -5,18 +5,43 @@ local function jvmqb arg
 endfunction
 
 
-global function list_models  arg = jvmqb ['listModels' , [arg] ];
-global function retrieve_qm_score  arg = jvmqb ['retrieveQMScore' , [arg] ];
-global function retrieve_residue_pwd  arg  = jvmqb ['retrieveResiduePWD' , [arg]  ];
-global function retrieve_atom_by_atom_pwd  arg  = jvmqb ['retrieveAtomByAtomPWD' , [arg]  ];
-global function retrieve_nmr_averages  arg = jvmqb ['retrieveNMRAverages' , [arg] ];
+global function qbListModels  arg = jvmqb ['listModels' , [arg] ];
+global function qbRetrieveQMScore  arg = jvmqb ['retrieveQMScore' , [arg] ];
+global function qbRetrieveResiduePWD  arg  = jvmqb ['retrieveResiduePWD' , [arg]  ];
+global function qbRetrieveAtomByAtomPWD  arg  = jvmqb ['retrieveAtomByAtomPWD' , [arg]  ];
+global function qbRetrieveAtomByAtomMRM  arg  = jvmqb ['retrieveAtomByAtomMRM' , [arg]  ];
+global function qbRetrieveNMRAverages  arg = jvmqb ['retrieveNMRAverages' , [arg] ];
 
-function main []
-    print list_models ['/home/roger/testing-grounds/Lance/JnJ-Janssen/Combined/3OY.h5'];
-    print retrieve_qm_score ['/home/roger/testing-grounds/Lance/JnJ-Janssen/Combined/3OY.h5', '3OYA_target'];
-    //print retrieve_residue_pwd ['/home/roger/testing-grounds/Lance/JnJ-Janssen/Combined/3OY.h5', '3OYA_target'];
-    //print retrieve_atom_by_atom_pwd ['/home/roger/testing-grounds/Lance/JnJ-Janssen/Combined/3OY.h5', '3OYA_target'];
-    print list_models ['/home/roger/workspace/divcon-tests/simple-test/c387.h5'];
-    print retrieve_nmr_averages ['/home/roger/workspace/divcon-tests/simple-test/c387.h5', 'c387'];
+// The following function can be used test the new h5 
+// example:
+// qbmoebatch -exec "qbTesth5Main['c387.h5']" -exit
+
+function qbTesth5Main [h5file]
+    write ['{}\n',h5file];
+    if isnull h5file then
+        return;
+    endif
+
+    print qbListModels [h5file];
+    
+    write ['length {}\n', length cat qbListModels [h5file]];
+    
+    local modelTags = cat qbListModels [h5file];
+    
+    write ['length modelTags.Target : {}\n', length modelTags.Target];
+    
+    write ['modelTags.Target: {}\n', modelTags.Target];
+    write ['modelTags.Ligand: {}\n', modelTags.Ligand];
+    
+//    local NMRvalues=cat qbRetrieveNMRAverages [h5file,modelTags.Target];
+//    write ['{}\n',NMRvalues.Index];
+//    write ['{}\n',NMRvalues.Average];
+
+    print qbListModels [h5file];
+    print qbRetrieveQMScore [h5file, modelTags.Target];
+    print qbRetrieveResiduePWD [h5file, modelTags.Target];
+    print qbRetrieveAtomByAtomPWD [h5file, modelTags.Target];
+    print qbRetrieveAtomByAtomMRM [h5file, modelTags.Target];
+    print qbRetrieveNMRAverages [h5file, modelTags.Target];
 
 endfunction

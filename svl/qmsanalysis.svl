@@ -37,8 +37,8 @@ function qb_GetChainsByTag;
 function pro_Align_Prompt;
 function qb_GetCoreOpts;
 
-function retrieve_residue_pwd;
-function list_models;
+function qbRetrieveResiduePWD;
+function qbListModels;
 
 const ENGERGIES =
     [
@@ -128,7 +128,7 @@ global function qb_PWDAnalysis [qmsfilename, G_surface]
         local sequenceNumberForA = [], val, sequenceNumberForB = [], val2, values = [];
         local numcols7th=numcols/7;
 
-        local pwdData = cat retrieve_residue_pwd [scorepath, twrite ['{}',recName],twrite ['{}',ligName]];
+        local pwdData = cat qbRetrieveResiduePWD [scorepath, twrite ['{}',recName],twrite ['{}',ligName]];
 
         sequenceNumberForA = pwdData(2);
         sequenceNumberForB = pwdData(3);
@@ -295,8 +295,8 @@ global function qb_PWDAnalysisORIG [qmsfilename, G_surface]
              [[val]] = fread [stdout, '{n:}\n'];
              sequenceNumberForB = append [sequenceNumberForB, val];
         endloop
-            local modelNameS = cat list_models [scorepath];
-            local pwdData = retrieve_residue_pwd [scorepath, twrite ['{}',modelNameS.Target]];
+            local modelNameS = cat qbListModels [scorepath];
+            local pwdData = qbRetrieveResiduePWD [scorepath, twrite ['{}',modelNameS.Target]];
 
             write ['sequenceNumberForA(before): {}\n', sequenceNumberForA];
             sequenceNumberForA = pwdData(idx)(2);
