@@ -101,9 +101,13 @@ const OPT_DEFAULTS =
     ['ncolors',     16             ],
     ['mono',         1             ],
     ['ribbons',     0               ],
-    ['isolate',     0               ]
+    ['isolate',     1               ],
+    ['showsolv',    1               ]
     ];
 
+global function qbGetHeatMapOpts[]
+    return tag tr OPT_DEFAULTS;
+endfunction
 
 const SIGMAS = ['1.0', '2.0', '3.0', '4.0', '5.0', '6.0', '7.0'];
 const NUM_TICKS  = ['5', '9', '13', '17', '25', '33'];
@@ -280,6 +284,16 @@ const PANEL =
                 [
                 vertical:0, shadow:'noline', extendH: 0, margin:1
                 ],
+            Checkbox :
+                [
+                name: 'showsolv', text: 'Show Solvent',
+                bubbleHelp:
+                    'Show or hide solvent.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
             Text :
                 [
                 name: 'radius', len: 7,
@@ -310,13 +324,13 @@ const PANEL =
  *  Automatically selects rows, columns or cells.
  *
  ****************************************************************************/
-local function Animate [dir, data, numrows, numcols, selfun, radius, mincut, 
+local function Animate [dir, data, numrows, numcols, selfun, opts, mincut, 
         maxcut, colors];
 
     local selrow, selcol, errmess;
     if dir === 'row' then
         for selrow = 1, numrows, 1 loop
-            errmess = call [selfun, [data, selrow, 0, radius, mincut,
+            errmess = call [selfun, [data, selrow, 0, opts, mincut,
                 maxcut, colors]];
             if not isnull errmess and neL [errmess, ''] then
                 Warning errmess;
@@ -328,7 +342,7 @@ local function Animate [dir, data, numrows, numcols, selfun, radius, mincut,
 
     elseif dir === 'col' then
         for selcol = 1, numcols, 1 loop
-            errmess = call [selfun, [data, 0, selcol, radius, mincut,
+            errmess = call [selfun, [data, 0, selcol, opts, mincut,
                 maxcut, colors]];
             if not isnull errmess and neL [errmess, ''] then
                 Warning errmess;
@@ -341,7 +355,7 @@ local function Animate [dir, data, numrows, numcols, selfun, radius, mincut,
     elseif dir === 'cell' then
         for selrow = 1, numrows, 1 loop
             for selcol = 1, numcols, 1 loop
-                errmess = call [selfun, [data, selrow, selcol, radius, mincut,
+                errmess = call [selfun, [data, selrow, selcol, opts, mincut,
                     maxcut, colors]];
                 if not isnull errmess and neL [errmess, ''] then
                     Warning errmess;
@@ -1366,7 +1380,7 @@ global function qbHeatMapSetupPanel [data, numsignifcols, selfun, initrad,
 
     [selrow, selcol] = IndexToRowCol [optdflts.mapradio, numrows, 
         numcols];
-    local selerrmess = call [selfun, [data, selrow, selcol, optdflts.radius, 
+    local selerrmess = call [selfun, [data, selrow, selcol, optdflts, 
         mincut, maxcut, colors]];
     if not isnull selerrmess and neL [selerrmess, ''] then
         WindowDestroy wkey;
@@ -1429,7 +1443,7 @@ global function qbHeatMapSetupPanel [data, numsignifcols, selfun, initrad,
                     task_prio 0;
 
                     WindowShow [wkey, 0];
-                    Animate ['row', data, numrows, numcols, selfun, vals.radius,
+                    Animate ['row', data, numrows, numcols, selfun, vals,
                         mincut, maxcut, colors];
                     WindowShow [wkey, 1];
 
@@ -1437,7 +1451,7 @@ global function qbHeatMapSetupPanel [data, numsignifcols, selfun, initrad,
                     [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows,
                         numcols];
                     selerrmess = call [selfun, [data, selrow, selcol, 
-                        vals.radius, mincut, maxcut, colors]];
+                        vals, mincut, maxcut, colors]];
                     if not isnull selerrmess and neL [selerrmess, ''] then
                         Warning selerrmess;
                     endif
@@ -1465,7 +1479,7 @@ global function qbHeatMapSetupPanel [data, numsignifcols, selfun, initrad,
                    endif
 
                     selerrmess = call [selfun, [data, selrow, selcol, 
-                        vals.radius, mincut, maxcut, colors]];
+                        vals, mincut, maxcut, colors]];
                     if not isnull selerrmess and neL [selerrmess, ''] then
                         Warning selerrmess;
                     endif
@@ -1484,7 +1498,7 @@ global function qbHeatMapSetupPanel [data, numsignifcols, selfun, initrad,
 
                 [selrow, selcol] = IndexToRowCol [vals.mapradio, numrows, 
                     numcols];
-                selerrmess = call [selfun, [data, selrow, selcol, vals.radius,
+                selerrmess = call [selfun, [data, selrow, selcol, vals,
                     mincut, maxcut, colors]];
                 if not isnull selerrmess and neL [selerrmess, ''] then
                     Warning selerrmess;

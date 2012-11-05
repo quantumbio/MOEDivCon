@@ -47,7 +47,8 @@ function qb_RMSD;
 function qb_SaveEnvAnal;
 function qb_SplitComplex;
 function qb_GetCoreEnv;
-function qbSelectResidueOnRadius;
+function qbGetResidueOnRadius;
+function qbGetHeatMapOpts;
 
 function qbHeatMapSetupPanel;
 
@@ -502,6 +503,7 @@ endfunction
 
 function LoadMols;
 function UpdateComplex;
+function UpdateRendering;
 function UpdateSurfaceMap;
 
 /****************************************************************************
@@ -557,15 +559,15 @@ endfunction
  *  Acknowledgement:  borrowed heavily from surfmap.svl.
  *
  ****************************************************************************/
-local function CreateSurfaceMap [radius, ligtok, restoks, pwdfilename]
+local function CreateSurfaceMap [opts, ligtok, restoks, pwdfilename]
 	if isnull G_surface then
 		InitG_surface [];
 		LoadMols [pwdfilename];
 	endif
 	
 	if G_surface.init === 1 then
-		UpdateComplex [ligtok, radius];
-	
+		UpdateComplex [ligtok, opts];
+	    UpdateRendering [opts];
 		local missing = CheckResidues [restoks];
 		if length missing > 0 then
 			Warning twrite ['The following residues are not \n'
@@ -579,7 +581,7 @@ local function CreateSurfaceMap [radius, ligtok, restoks, pwdfilename]
 		GSetTransparency [G_surface.gobj, trans];
 		local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
 		GSetMaterial [G_surface.gobj, mat];
-		UpdateSurfaceMap [radius, 1, []];
+		UpdateSurfaceMap [opts, 1, []];
 		G_surface.init = 0;
     endif
 
@@ -1215,7 +1217,37 @@ local function ShowTable [data, postscript]
 
 endfunction
 
-local function GetResidueInformation[]
+/****************************************************************************
+ *
+ *                          UpdateRendering
+ *
+ *  Update the various visual settings based on the pwdpanel settings.
+ *
+ ****************************************************************************/
+local function UpdateRendering [opts]
+    local ligAtoms = oGetCollection['QB_LIGAND'];
+    if isnull ligAtoms then
+        ligAtoms = _Atoms '$$ligand';
+    endif
+
+    // set some visual properties
+    aSetNucleusLook [ligAtoms, 'small-sphere'];
+    aSetBondLook [ligAtoms, 'cylinder'];
+    local metalAtoms = Atoms [] | m_join [aElement Atoms[],el_Elements[] | el_Metal el_Elements[]];
+    aSetNucleusLook[metalAtoms,'small-sphere'];
+    aSetLabelElement[metalAtoms,1];
+    aSetHidden[Atoms [] | aElement Atoms[] == 'H',opts.isolate];
+    aSetHidden[_Atoms '$$solvent',not opts.showsolv];
+
+    local pocketAtoms = qbGetResidueOnRadius[ligAtoms,opts.radius+1];
+
+    aSetBondLook [pocketAtoms,'cylinder'];
+    aSetHidden [diff [Atoms [],pocketAtoms],opts.isolate];
+    if opts.ribbons then
+        rSetRibbonMode[Residues[],'auto'];
+    else
+        rSetRibbonMode[Residues[],'none'];
+    endif
 
 endfunction
 
@@ -1228,7 +1260,8 @@ endfunction
  *  created.
  *
  ****************************************************************************/
-local function UpdateComplex [ligtok, radius]
+local function UpdateComplex [ligtok, opts]
+
     if ligtok === '' then return 0; endif
     if isnull G_surface then return 0; endif
     if isnull G_surface.ligmols then return 0; endif
@@ -1236,14 +1269,12 @@ local function UpdateComplex [ligtok, radius]
     if G_surface.molidx === molidx then return 0; endif
 
     G_surface.molidx = molidx;
-    
     if isnull G_surface.molidx then
 	//    @todo: this fixes an error when empty, however we should provide an improved error.
         return;
     endif
         
     local RibbonModeList, showH;
-
     local redosurf = 0, vdwR = [], vdwE = [];
     if not isnull G_surface.recmols then
         showH = 0;
@@ -1251,7 +1282,6 @@ local function UpdateComplex [ligtok, radius]
             Close [force:1];
         else
             showH = [aHidden Atoms [] | aElement Atoms [] == 'H'](1)(1);
-            RibbonModeList = rRibbonMode Residues[] | rRibbonMode Residues[] <> 'none';
             oDestroy uniq oChains G_surface.rec;
         endif
         local recidx = G_surface.molidx;
@@ -1302,28 +1332,10 @@ local function UpdateComplex [ligtok, radius]
     local ligchn = mol_Create G_surface.ligmols (G_surface.molidx);
     G_surface.lig = cat cAtoms ligchn;
     oSetCollection ['QB_LIGAND', G_surface.lig];
-    // set some visual properties
-    aSetNucleusLook [G_surface.lig, lignuc];
-    aSetBondLook [G_surface.lig, ligbnd];
-    local metalAtoms = Atoms [] | m_join [aElement Atoms[],el_Elements[] | el_Metal el_Elements[]];
-    aSetNucleusLook[metalAtoms,'small-sphere'];
-    aSetLabelElement[metalAtoms,1];
-    aSetHidden[Atoms [] | aElement Atoms[] == 'H',showH];
-    if showH then
-        aSetHidden[_Atoms '$$solvent',0];
-    endif
-    local receptorAtoms = qbGetResidueOnRadius[oGetCollection ['QB_LIGAND'],radius+1];
-    aSetBondLook [receptorAtoms,'cylinder'];
-    aSetHidden [diff [Atoms [],receptorAtoms],1];
-    
-    // @todo: this should be made based on the UID and then transcribed from one to the other
-    if length RibbonModeList then
-        rSetRibbonMode[Residues[],RibbonModeList(1)];
-    endif
 
     if gtL [length G_surface.ligmols, 1]  
-            and (G_surface.init or neL [G_surface.dist, radius]) then
-        CreatePockets [radius];
+            and (G_surface.init or neL [G_surface.dist, opts.radius]) then
+        CreatePockets [opts.radius];
     endif
 
     if isnull G_surface.grids (G_surface.molidx) then
@@ -1393,7 +1405,7 @@ endfunction
  *  Acknowledgement:  borrowed heavily from surfmap.svl.
  *
  ****************************************************************************/
-local function UpdateSurfaceMap [radius, redogrid, atomcolors]
+local function UpdateSurfaceMap [opts, redogrid, atomcolors]
 
     if isnull G_surface then return; endif
 
@@ -1410,13 +1422,13 @@ local function UpdateSurfaceMap [radius, redogrid, atomcolors]
 
     local [s_idx, s_color, s_vpt, s_vnorm] = gvtx;
 
-    if G_surface.init or neL [radius, G_surface.dist]
+    if G_surface.init or neL [opts.radius, G_surface.dist]
             or (redogrid and isnull gvtx) then
         local msgkey = Message [0, 'Calculating surface ...'];
-        if G_surface.init or neL [radius, G_surface.dist] then
+        if G_surface.init or neL [opts.radius, G_surface.dist] then
             local grids = rep [[], G_surface.numgrids];
             G_surface.grids = grids;
-            G_surface.dist = radius;
+            G_surface.dist = opts.radius;
         endif
 
         gvtx = msurf_MolecularSurface [aPos G_surface.rec, 
@@ -1482,7 +1494,7 @@ endfunction
  *                          qb_QBPWDSelectHandler
  *
  ****************************************************************************/
-global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
+global function qb_QBPWDSelectHandler [data, selrow, selcol, opts,
         mincut, maxcut, colors]
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
@@ -1505,10 +1517,11 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, radius,
     elseif selcol > 0 then
         restok = resnames (selcol);
     endif
-    local redosurf = UpdateComplex [ligtok, radius];
+    local redosurf = UpdateComplex [ligtok, opts];
+    UpdateRendering[opts];
     local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
         mincut, maxcut, colors];
-    UpdateSurfaceMap [radius, redosurf, atomcolors];
+    UpdateSurfaceMap [opts, redosurf, atomcolors];
     UpdateResidue [restok, selrow, selcol, 0];
 
 endfunction
@@ -1587,7 +1600,7 @@ global function qb_QBPWDSetupPanel []
                 endif
 
                 local rowdata = last data;
-                CreateSurfaceMap [INITDIST, first rowdata (INITSEL), 
+                CreateSurfaceMap [qbGetHeatMapOpts[], first rowdata (INITSEL), 
                     last rowdata(INITSEL), pwdfilename];
 
                 heatmaptask = task_key -1;
