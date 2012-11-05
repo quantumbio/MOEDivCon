@@ -117,7 +117,7 @@ local function qbSelectOnRadius [Batoms, radius]
     
 endfunction
 
-global function qbSelectResidueOnRadius [Batoms,radius,tmpChains]
+global function qbGetResidueOnRadius [Batoms,radius,tmpChains]
 
     local allatms;
     if isnull tmpChains then
@@ -126,9 +126,14 @@ global function qbSelectResidueOnRadius [Batoms,radius,tmpChains]
         allatms = cat cAtoms tmpChains;
     endif
     local nearatms = cat rAtoms aResidue qbNearby [allatms, Batoms, radius];
-    
-    aSetSelected [nearatms, 1];
+    return nearatms;
 
+endfunction
+
+global function qbSelectResidueOnRadius [Batoms,radius,tmpChains]
+
+    local nearatms = qbGetResidueOnRadius[Batoms,radius,tmpChains];
+    aSetSelected [nearatms, 1];
     return nearatms;
     
 endfunction

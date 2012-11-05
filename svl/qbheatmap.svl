@@ -1242,7 +1242,7 @@ endfunction
 
 /****************************************************************************
  *
- *                          qb_HeatMapSetupPanel
+ *                          qbHeatMapSetupPanel
  *
  *  Parameters:
  *
@@ -1281,7 +1281,7 @@ endfunction
  *  ToDo:  add controls for using abbreviated or full row/cal label names.
  *
  ****************************************************************************/
-global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initrad, 
+global function qbHeatMapSetupPanel [data, numsignifcols, selfun, initrad, 
         help, closefun]
 
     static selrow, selcol, mincut, maxcut, colors;
@@ -1357,7 +1357,6 @@ global function qb_HeatMapSetupPanel [data, numsignifcols, selfun, initrad,
         bubbleHelp: bhelp], maptitle: [graphics: mapkey],
         rowlbl: [graphics: rowkey], collbl: [graphics: colkey]]];
     WindowShow [wkey, 1];
-
 
     gr_destroy mapkey;
     gr_destroy rowkey;

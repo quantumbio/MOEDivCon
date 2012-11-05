@@ -49,7 +49,7 @@ function qb_SplitComplex;
 function qb_GetCoreEnv;
 function qbSelectResidueOnRadius;
 
-function qb_HeatMapSetupPanel;
+function qbHeatMapSetupPanel;
 
 function qb_PWDAnalysis;
 
@@ -1312,8 +1312,7 @@ local function UpdateComplex [ligtok, radius]
     if showH then
         aSetHidden[_Atoms '$$solvent',0];
     endif
-    local receptorAtoms = qbSelectResidueOnRadius[oGetCollection ['QB_LIGAND'],radius+1];
-    aSetSelected [receptorAtoms,0];
+    local receptorAtoms = qbGetResidueOnRadius[oGetCollection ['QB_LIGAND'],radius+1];
     aSetBondLook [receptorAtoms,'cylinder'];
     aSetHidden [diff [Atoms [],receptorAtoms],1];
     
@@ -1592,7 +1591,7 @@ global function qb_QBPWDSetupPanel []
                     last rowdata(INITSEL), pwdfilename];
 
                 heatmaptask = task_key -1;
-                qb_HeatMapSetupPanel [data,  SIGNIFRES, 
+                qbHeatMapSetupPanel [data,  SIGNIFRES, 
                     'qb_QBPWDSelectHandler', INITDIST, SHOWHELP,
                     'qb_QBPWDCloseHandler'];
                 exit [];
