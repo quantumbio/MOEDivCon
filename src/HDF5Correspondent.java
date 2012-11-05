@@ -183,12 +183,84 @@ private SVLVar retrieveResiduePWD(SVLVar var) throws SVLJavaException, IOExcepti
 {
     String filename = var.peek(1).getTokn(1);
     String target = var.peek(1).getTokn(2);
+    String ligand="";
+    if(var.peek(1).length()>2)
+    {
+        ligand = var.peek(1).getTokn(3);
+        //if(true) return new SVLVar("retrieveAtomByAtomPWD "+ligand);
+    }
     H5File h5File=new H5File(filename, H5File.READ);
     h5File.open();
         String xPath="/DivCon/"+target+"/PWD Solvation";
         HObject ho=findHDF5Object(h5File, xPath);
         H5Group hObject=(H5Group)ho;
-        if(hObject==null) return new SVLVar();//throw new SVLJavaException("PWD does not exist for: '" + target + "'.");
+        if(hObject==null) return new SVLVar();
+    if(ligand.length()>0)
+    {
+            List<HObject> ligandList=hObject.getMemberList();
+            H5Group pwdTargetLigandObject=null;
+            boolean hit=false;
+            for(int index=0;index<hObject.getNumberOfMembersInFile();index++)
+            {
+                pwdTargetLigandObject=(H5Group)ligandList.get(index);
+                if(pwdTargetLigandObject.getName().endsWith("-"+ligand))
+                {
+                    hit=true;
+                    break;
+                }
+            }
+            if(!hit)
+            {
+                h5File.close();
+            return new SVLVar();
+            }
+            SVLVar[] pwdDataset=new SVLVar[pwdTargetLigandObject.getNumberOfMembersInFile()+1];
+            if(pwdDataset.length!=5) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            List pwdRow=pwdTargetLigandObject.getMemberList();
+            pwdDataset[0]=new SVLVar(pwdTargetLigandObject.getName());
+            if(pwdRow.size()==4)
+            {
+                for(int memberIndex=0;memberIndex<4;memberIndex++)
+                {
+                    H5ScalarDS member=(H5ScalarDS)pwdRow.get(memberIndex);
+                    if(member.getName().compareTo("Sequence A")==0)
+                    {
+                        pwdDataset[1]=new SVLVar((int[])member.read());
+                    }
+                    else if(member.getName().compareTo("Sequence B")==0)
+                    {
+                        pwdDataset[2]=new SVLVar((int[])member.read());
+                    }
+                    else if(member.getName().compareTo(target)==0)
+                    {
+                        pwdDataset[4]=new SVLVar(member.readBytes());
+                    }
+                    else
+                    {
+                        pwdDataset[3]=new SVLVar((double[])member.read());
+                    }
+                }
+            }
+            else
+            {
+                pwdDataset[1]=new SVLVar();
+                pwdDataset[2]=new SVLVar();
+                pwdDataset[3]=new SVLVar();
+                pwdDataset[4]=new SVLVar();
+            }
+//            pwdDataset[1]=new SVLVar((int[])sequenceA.read());
+//            H5ScalarDS sequenceB=(H5ScalarDS)pwdRow.get(1);
+//            pwdDataset[2]=new SVLVar((int[])sequenceB.read());
+//            H5ScalarDS sequenceValues=(H5ScalarDS)pwdRow.get(2);
+//            pwdDataset[3]=new SVLVar((double[])sequenceValues.read());
+//            H5ScalarDS sequenceLabels=(H5ScalarDS)pwdRow.get(3);
+//            pwdDataset[4]=new SVLVar(sequenceLabels.readBytes());
+           SVLVar data=new SVLVar(new String[]{"name", "indexA", "indexB", "values", "labels"}, pwdDataset);
+            h5File.close();
+    return new SVLVar(data);
+    }
+    else
+    {
     SVLVar[] data=new SVLVar[hObject.getNumberOfMembersInFile()];
         List pwdMembers=hObject.getMemberList();
         for(int index=0;index<hObject.getNumberOfMembersInFile();index++)
@@ -229,6 +301,7 @@ private SVLVar retrieveResiduePWD(SVLVar var) throws SVLJavaException, IOExcepti
         }
             h5File.close();
     return new SVLVar(data);
+    }
 }
     
 private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOException, Exception
