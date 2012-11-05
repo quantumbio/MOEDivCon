@@ -99,7 +99,9 @@ const OPT_DEFAULTS =
     ['nticks',       9             ],
     ['radius',       5.0           ],
     ['ncolors',     16             ],
-    ['mono',         1             ]
+    ['mono',         1             ],
+    ['ribbons',     0               ],
+    ['isolate',     0               ]
     ];
 
 
@@ -254,9 +256,30 @@ const PANEL =
                 bubbleHelp: 'Number of labeled ticks on color scale.'
                 ]
             ],
+        Separator : [flushLeft:1, extendH:1, margin:1],
         Hbox :
             [
             extendH: 1,
+            Checkbox :
+                [
+                name: 'ribbons', text: 'Render Ribbons',
+                bubbleHelp:
+                    'Render ribbons for receptor'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
+            Checkbox :
+                [
+                name: 'isolate', text: 'Isolate Pocket',
+                bubbleHelp:
+                    'Display pocket residues only per radius.'
+                ],
+            Separator : 
+                [
+                vertical:0, shadow:'noline', extendH: 0, margin:1
+                ],
             Text :
                 [
                 name: 'radius', len: 7,
