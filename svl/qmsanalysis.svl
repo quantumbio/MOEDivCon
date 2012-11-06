@@ -129,7 +129,6 @@ global function qb_PWDAnalysis [qmsfilename, G_surface]
         local numcols7th=numcols/7;
 
         local pwdData = cat qbRetrieveResiduePWD [scorepath, twrite ['{}',recName],twrite ['{}',ligName]];
-write ['pwdData: {}\n', pwdData]; //DELME
         sequenceNumberForA = pwdData.indexA;
         sequenceNumberForB = pwdData.indexB;
         values = pwdData.values;
