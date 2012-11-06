@@ -143,7 +143,6 @@ endfunction
 local function qbVennStructures [targ_patt, opt, ligand_mdb]
 
     opt = tagcat[opt, DEFAULTS];
-write ['opt: {}\n',opt];
 
     local srcfilelist_targ = flist [cd [], targ_patt];
     local fname_targ, targ_chains = [], lig_chains = [];
@@ -176,8 +175,6 @@ write ['opt: {}\n',opt];
     targ_chains = cat targ_chains;
     lig_chains = cat lig_chains;
     
-write ['targ_chains: {}\n', length cat targ_chains];
-write ['lig_chains: {}\n', length cat lig_chains];
     oSetCollection['Receptor',cat targ_chains];
     View[];
     write ['\nnChains= {}\n', nChains[] ];
