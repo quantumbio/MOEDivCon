@@ -322,3 +322,95 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
     endif
 endfunction
 
+// QuantumBio h5 Java/SVL interface functions
+function qbRetrieveNMRAverages;
+function qbListModels;
+
+global function qbProcessComplexCSP[targetfile,ligandfile,targeth5,ligandh5,complexh5]
+
+    if not tok_length ftype targetfile then
+        write ['ERROR: {} does not exist\n', targetfile];
+        return;
+    endif
+    if not tok_length ftype ligandfile then
+        write ['ERROR: {} does not exist\n', ligandfile];
+        return;
+    endif
+    if not tok_length ftype targeth5 then
+        write ['ERROR: {} does not exist\n', targeth5];
+        return;
+    endif
+    if not tok_length ftype ligandh5 then
+        write ['ERROR: {} does not exist\n', ligandh5];
+        return;
+    endif
+    if not tok_length ftype complexh5 then
+        write ['ERROR: {} does not exist\n', complexh5];
+        return;
+    endif
+
+    oDestroy Chains[];
+    local targetChains=ReadAuto[targetfile];
+    local ligandChains=ReadAuto[ligandfile];
+    local complexChains=Chains[];
+
+    local ligandAtoms = cat cAtoms ligandChains;
+    local targetAtoms = cat cAtoms targetChains;
+    local complexAtoms = cat cAtoms complexChains;
+
+    local complexAtmCnt = length complexAtoms;
+    local ligandAtmCnt = length ligandAtoms;
+    local targetAtmCnt = length targetAtoms;
+
+    local modelTags = cat qbListModels [ligandh5];
+    local ligandValues=cat qbRetrieveNMRAverages [ligandh5, modelTags.target];
+
+    modelTags = cat qbListModels [targeth5];
+    local targetValues=cat qbRetrieveNMRAverages [targeth5, modelTags.target];
+
+    modelTags = cat qbListModels [complexh5];
+    local complexValues=cat qbRetrieveNMRAverages [complexh5, modelTags.target];
+
+    local complexValuesProcessed;
+    local targetValuesProcessed;
+    local ligandValuesProcessed;
+
+    local reference;
+    for reference in complexValues.index loop
+        complexValuesProcessed.(totok complexAtoms(reference)) = complexValues.average(indexof [reference,complexValues.index]);
+    endloop
+
+    for reference in ligandValues.index loop
+        ligandValuesProcessed.(totok ligandAtoms(reference)) = ligandValues.average(indexof [reference,ligandValues.index]);
+    endloop
+
+    for reference in targetValues.index loop
+        targetValuesProcessed.(totok targetAtoms(reference)) = targetValues.average(indexof [reference,targetValues.index]);
+    endloop
+    
+    write ['length ligandAtoms: {}\n', length ligandAtoms];
+    write ['length targetAtoms: {}\n', length targetAtoms];
+    write ['length complexAtoms: {}\n', length complexAtoms];
+
+    write ['\nLigand Observed (Atom Discrete):\n'];
+    write ['Residue/Atom\tUnbound\t- Bound\t\t= CSP\n'];
+
+    for reference in ligandAtoms loop
+        if not isnull ligandValuesProcessed.(totok reference) and not isnull complexValuesProcessed.(totok reference) then
+            write ['{} {}:{}:{}\t{}\t- {}\t= {}\n',
+                rName aResidue reference,rNumber aResidue reference,aName reference,aPrioCIP reference,ligandValuesProcessed.(totok reference),
+                complexValuesProcessed.(totok reference),ligandValuesProcessed.(totok reference)-complexValuesProcessed.(totok reference)];
+            endif
+    endloop
+    
+    write ['\nTarget Observed (Atom Discrete):\n'];
+    write ['Residue/Atom\tUnbound\t- Bound\t\t= CSP\n'];
+
+    for reference in targetAtoms loop
+        if not isnull targetValuesProcessed.(totok reference) and not isnull complexValuesProcessed.(totok reference) then
+            write ['{} {}:{}:{}\t{}\t- {}\t= {}\n',
+                rName aResidue reference,rNumber aResidue reference,aName reference,aPrioCIP reference,targetValuesProcessed.(totok reference),
+                complexValuesProcessed.(totok reference), targetValuesProcessed.(totok reference)-complexValuesProcessed.(totok reference)];
+        endif
+    endloop
+endfunction
