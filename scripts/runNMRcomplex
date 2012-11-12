@@ -2,9 +2,11 @@
 
 doProtonate=0
 cutRadius=5
+cutRadiusLimit=5
 doHNMR=1
 doCNMR=0
 doStructMin=1
+
 
 if [ ! "$QBHOME" ]; then
     PRG=$0
@@ -32,6 +34,8 @@ errorOut()
     test $doStructMin -eq 1 && ynSTRMIN="enabled" || ynSTRMIN="disabled"
 
     echo
+    echo "WARNING! NMR Support in DivCon5.x is considered beta."
+    echo
     echo "Usage: runNMRcomplex.sh --complex=FILENAME"
 #   echo "12345678901234567890123456789012345678901234567890123456789012345678901234567890"
     echo
@@ -43,7 +47,8 @@ errorOut()
     echo "                          WARNING: Perception used to determine target/ligand"
     echo
     echo "Optional Command line arguments:"
-    echo "  --radius=#           * Radius around ligand to include.  Default=${cutRadius}"
+    echo "  --radius=#           * Radius around ligand to include.  Default=${cutRadius}A"
+    echo "                          Radius limited to ${cutRadiusLimit}A in beta version."
     echo "  --enableProtonate    * enable protonation (Protonate3D)  Default=${ynProt}"
     echo "  --setqbhome          * Set QBHOME variable.              Default=${QBHOME}"
     echo "  --enableH            * Enable H CS prediction.           Default=${ynHNMR}"
@@ -113,6 +118,11 @@ while test $# -gt 0 ; do
         esac
     shift
 done
+
+if [ ${cutRadius} -gt ${cutRadiusLimit} ] ; then
+    echo "ERROR: In Beta stage, --radius option limited to ${cutRadiusLimit}A!"
+    errorOut
+fi
 
 if [ ! -z "$inComplexFile" ] ; then
     ynCmplx=1
@@ -192,6 +202,16 @@ if [ ! -e mp_${filename}.mol2 ] ; then
     errorOut
 fi
 
+if [ ! -e targ_${filename}.atms ] ; then
+    echo "ERROR: mp_${filename}.atms NOT FOUND!"
+    errorOut
+fi
+
+if [ ! -e targ_${filename}.mol2 ] ; then
+    echo "ERROR: mp_${filename}.mol2 NOT FOUND!"
+    errorOut
+fi
+
 echo "Running DivCon"
 
 atmlist=`cat lig_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
@@ -205,6 +225,22 @@ echo "calnuc=0" > mp_${filename}.ini
 echo "maxit=300" >> mp_${filename}.ini
 echo "[nmr]" >> mp_${filename}.ini
 echo "atom=${atmlist%?}" >> mp_${filename}.ini
+
+atmlist=`cat targ_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
+echo "calnuc=0" > targ_${filename}.ini
+echo "maxit=300" >> targ_${filename}.ini
+echo "[nmr]" >> targ_${filename}.ini
+echo "atom=${atmlist%?}" >> targ_${filename}.ini
+
+if ( ${QBHOME}/bin/divcon --nmr -i targ_${filename}.mol2  --hamiltonian=mndo_nmr -I targ_${filename}.ini -O --standard -d targ_${filename}.h5 --charge=labute --screen ) ; then
+    echo ; echo "Target NMR Calculation Successful" ; echo
+else
+    echo ; echo "Target NMR Calculation Unsuccessful - try running with --enableMinimization" ; echo
+           echo "   NOTE: NMR Support in DivCon5.x is considered beta. In order to help improve the"
+           echo "           algorithm, if possible please send input along with divcon.log file to"
+           echo "           support@quantumbioinc.com"
+    exit 1
+fi
 
 if ( ${QBHOME}/bin/divcon --nmr -i lig_${filename}.mol2 --hamiltonian=mndo_nmr -I lig_${filename}.ini -O --standard -d lig_${filename}.h5 --charge=labute --screen ) ; then
     echo ; echo "Ligand NMR Calculation Successful" ; echo
@@ -225,3 +261,5 @@ else
            echo "           support@quantumbioinc.com"
     exit 1
 fi
+
+${QBHOME}/bin/qbmoebatch -exec "qbProcessComplexLigand  ['targ_${filename}.mol2','lig_${filename}.mol2','targ_${filename}.h5','lig_${filename}.h5','mp_${filename}.h5']" -exit
