@@ -3423,4 +3423,3 @@ global function qb_VerifyDivConComplex [wkey, status, vals]
 
     return status;
 endfunction
-

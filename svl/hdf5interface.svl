@@ -16,7 +16,7 @@ global function qbRetrieveNMRAverages  arg = jvmqb ['retrieveNMRAverages' , [arg
 // example:
 // qbmoebatch -exec "qbTesth5Main['c387.h5']" -exit
 
-function qbTesth5Main [h5file]
+global function qbTesth5Main [h5file]
     write ['{}\n',h5file];
     if isnull h5file then
         return;
