@@ -63,6 +63,7 @@
 function Protonate3D;
 function _Atoms;
 function fwrite_TriposMOL2;
+function fwrite_PDB;
 function pro_Align;
 function pro_Join;
 function MM;
@@ -73,6 +74,7 @@ function qbCleanDelAtoms;
 function qbSelectResidueOnRadius;
 function qbNearby;
 function qb_TestDivCon;
+function qbSelectWatOnRadius;
 
 const DEFAULTS = [
     enableWatPart:0,        // partitions waters into each of the atoms/residues and reprotonates.
@@ -91,6 +93,7 @@ const DEFAULTS = [
     hamiltonian:'pm6',     // the Hamiltonian to be used downstream
     qmApplication:'qms',       // the particular QM application to be used downstream
     quitonerror:0,          // by default, the run will continue even on error (not good if used in shell script)
+    outfiletype:'mol2',     // output file type supported by script (can be either mol2 or PDB).
     prtElementList:['H','C']       // elements to print to atom list file (such as for NMR or belly)
 ];
 
@@ -108,22 +111,25 @@ local function writeElementList [outpat,chains,prtElementList]
 
 endfunction
 
-local function writeMol2 [outpat,chains,prtElementList]
+local function writeMol2 [outpat,chains,opt]
 
     if isnull chains then
         return;
     endif
-    
-    write ['outfile: {}\n', outpat];
 
     pot_SetCharges [];
     
     cSetTag [chains, cTag first chains];
 //    cSetName [chains, cName first chains];
 //    chains = pro_Join[chains];
-    
-    fwrite_TriposMOL2 [outpat,chains];
-    writeElementList [outpat,chains,prtElementList];
+    if opt.outfiletype === 'pdb' then
+        write ['outfile: {}\n', twrite ['{}.pdb',outpat]];
+        fwrite_PDB [twrite ['{}.pdb',outpat],chains];
+    else
+        write ['outfile: {}\n', twrite ['{}.mol2',outpat]];
+        fwrite_TriposMOL2 [twrite ['{}.mol2',outpat],chains];
+    endif
+    writeElementList [outpat,chains,opt.prtElementList];
     
 endfunction
 
@@ -195,10 +201,7 @@ local function qbVennStructures [targ_patt, opt, ligand_mdb]
 
     if opt.enableCutWat then
     // get the solvent atoms that are far from the ligand
-        local nearsolatms = qbNearby [_Atoms '$$solvent', cat cAtoms lig_chains, opt.wat_radius];
-        local todelatms = diff [_Atoms '$$solvent',nearsolatms];                
-        qbCleanDelAtoms todelatms;
-        write ['\nList of kept solvent: {}\n', nearsolatms];
+        qbCleanDelAtoms qbSelectWatOnRadius [_Atoms '$$ligand',opt.wat_radius,'invert'];
     endif
 
     local tmpChains;
@@ -206,11 +209,11 @@ local function qbVennStructures [targ_patt, opt, ligand_mdb]
 //        local tmpChains = Chains[] | cTag Chains [] == tmpChainTag;
     for tmpChainTag in cName targ_chains loop
         tmpChains = Chains[] | cName Chains [] == tmpChainTag;   
-        writeMol2[twrite ['{}_rec.mol2',tmpChainTag],join [tmpChains,targ_chains],opt.prtElementList];
+        writeMol2[twrite ['{}_rec',tmpChainTag],join [tmpChains,targ_chains],opt];
     endloop
     for tmpChainTag in cName lig_chains loop
         tmpChains = Chains[] | cName Chains [] == tmpChainTag;   
-        writeMol2[twrite ['{}_lig.mol2',tmpChainTag],join [tmpChains,lig_chains],opt.prtElementList];
+        writeMol2[twrite ['{}_lig',tmpChainTag],join [tmpChains,lig_chains],opt];
     endloop
 
 endfunction
@@ -329,10 +332,7 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
         
     if opt.enableCutWat then
     // get the solvent atoms that are far from the ligand
-        local nearsolatms = qbNearby [_Atoms '$$solvent', cat cAtoms lig_chains, opt.wat_radius];
-        local todelatms = diff [_Atoms '$$solvent',nearsolatms];                
-        qbCleanDelAtoms todelatms;
-        write ['\nList of kept solvent: {}\n', nearsolatms];
+        qbCleanDelAtoms qbSelectWatOnRadius [_Atoms '$$ligand',opt.wat_radius,'invert'];
     endif
     
     if opt.enableProtonate then
@@ -376,9 +376,9 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
         endif
     endif
     
-    writeMol2[twrite ['mp_{}.mol2',fbase ftail fname_lig],Chains[],opt.prtElementList];
-    writeMol2[twrite ['targ_{}.mol2',fbase ftail fname_lig],targ_chains,opt.prtElementList];
-    writeMol2[twrite ['lig_{}.mol2',fbase ftail fname_lig],lig_chains,opt.prtElementList];
+    writeMol2[twrite ['mp_{}',fbase ftail fname_lig],Chains[],opt];
+    writeMol2[twrite ['targ_{}',fbase ftail fname_lig],targ_chains,opt];
+    writeMol2[twrite ['lig_{}',fbase ftail fname_lig],lig_chains,opt];
 
 endfunction 
 
