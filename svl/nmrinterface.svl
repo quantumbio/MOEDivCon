@@ -358,10 +358,6 @@ global function qbProcessComplexCSP[targetfile,ligandfile,targeth5,ligandh5,comp
     local targetAtoms = cat cAtoms targetChains;
     local complexAtoms = cat cAtoms complexChains;
 
-    local complexAtmCnt = length complexAtoms;
-    local ligandAtmCnt = length ligandAtoms;
-    local targetAtmCnt = length targetAtoms;
-
     local modelTags = cat qbListModels [ligandh5];
     local ligandValues=cat qbRetrieveNMRAverages [ligandh5, modelTags.target];
 

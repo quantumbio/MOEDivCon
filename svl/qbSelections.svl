@@ -153,6 +153,8 @@ global function qbSelectWatOnRadius [Batoms, radius,yInvert]
     else
         aSetSelected [rAtoms UnselectedWats,1];
     endif
+    
+    return Atoms[] | aSelected Atoms[];
 
 endfunction
 
