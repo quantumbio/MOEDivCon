@@ -37,22 +37,30 @@
  *
  *  Example moebatch call:
  *
- *    qbmoebatch -licwait -exec "run ['qbPrep2Files.svl',['target.mol2','ligand.mol2',[]]]" -exit
+ *  qbmoebatch -licwait -exec "run ['qbPrep2Files.svl',['target.mol2','ligand.mol2',[]]]" -exit
  *          Run the script on target.mol2 and ligand.mol2 files in CWD.
  *          This setup will use default options.
  *
- *    qbmoebatch -licwait -exec "run ['qbPrep2Files.svl',['D_glucose.mol2',[],[enableOpt:0,enableLigFix:0]]]" -exit
+ *  qbmoebatch -licwait -exec "run ['qbPrep2Files.svl',['D_glucose.mol2',[],[enableOpt:0,enableLigFix:0]]]" -exit
  *          Run the script on D_glucose.mol2 within the CWD.
  *          This setup will only run the job on a single ligand mol2 file, and it will turn off
  *              optimization and fixing the ligand protonation during protonation.
  *
- *   moebatch -licwait -exec "run ['qbPrep2Files.svl',['HYP_reduce.pdb',[],[enableOpt:0,enableLigFix:0,enableProtonate:1,protAtomList:[3],enablePreciseHOH:0]]]" -exit
+ *  qbmoebatch -licwait -exec "run ['qbPrep2Files.svl',['HYP_reduce.pdb',[],[enableOpt:0,enableLigFix:0,enableProtonate:1,protAtomList:[3],enablePreciseHOH:0]]]" -exit
  *          The script can also be used to only protonate atoms you wish to protonate.
  *              protAtomList:[3] will protonate just the 3rd atom in the file. protAtomList:[3,5] will
  *              protonate both the 3rd and the 5th atoms in the file. (and so on).
  *
- *  moebatch -licwait -exec "run ['$HOME/svl/qbPrep2Files.svl',['testing.moe',[],[enableOpt:0,enableProtonate:0,enableCropOnLig:0,enableCutWat:0]]]" -exit
+ *  qbmoebatch -licwait -exec "run ['$HOME/svl/qbPrep2Files.svl',['testing.moe',[],[enableOpt:0,enableProtonate:0,enableCropOnLig:0,enableCutWat:0]]]" -exit
  *          Simply splits the complex into target and ligand.
+ *
+ *  qbmoebatch  -exec "run ['qbPrep2Files.svl',['1AZM_PDB.pdb',[],[enableOpt:0,enableLigFix:0,outfiletype:'pdb',enableProtonate:1,protPH:7.4]]]" -exit
+ *          Read in a PDB file and protonate it freely (with no optimization and now fixing of current protonation states) at pH=7.4.
+ *              Also output pdb file instead of mol2 file
+ *
+ *  qbmoebatch -exec "run ['qbPrep2Files.svl',['1AZM_2.pdb',[],[enableOpt:0,enableCutWat:1,wat_radius:5.0,outfiletype:'pdb',renameLigand:'LIG',printRes:['LIG',5.0]]]]" -exit
+ *          Process a PDB file and disable any options for protonation and optimization. Cut waters greater then 5.0A away from ligand. The ligand will be renamed to
+ *              LIG, and the list of residues within the ligand will be written to a file with the res extension.
  *
  *      NOTE: -licwait is used to wait for a license to free. It will wait forever.
  *
@@ -79,9 +87,10 @@ function qbSelectWatOnRadius;
 const DEFAULTS = [
     enableWatPart:0,        // partitions waters into each of the atoms/residues and reprotonates.
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
-    enableOpt:1,            // turn on optimization
+    enableOpt:0,            // turn on optimization
     tether_val:100,         // tethers the heavy atoms at a certain restraint.
     enableProtonate:0,      // turns on Protonate3D
+    protPH:[],             // set pH in Protonate3D to default
     protAtomList:[],        // list of atom indices to protonate
     enablePreciseHOH:0,     // turns on precise waters in Protonate3D (can cause LONG calc if turned on).
     enableLigFix:1,         // but fixes the ligand protonation
@@ -90,24 +99,51 @@ const DEFAULTS = [
     enableCropOnLig:0,      // turns off cropping target around ligand
     qmcrop_radius:0,        // acceptable distance around ligand to leave in
     residueRenumber:0,      // renumbers the residues (not implemented)
+    renameLigand:[],        // rename ligand based upon the name of the name provided (e.g. LIG whatever)
+    printAtms:[],           // ['LIG',5.0] print the atoms within 5A of residue LIG.
+    printRes:[],           // ['LIG',5.0] print the atoms within 5A of residue LIG.
     hamiltonian:'pm6',     // the Hamiltonian to be used downstream
     qmApplication:'qms',       // the particular QM application to be used downstream
     quitonerror:0,          // by default, the run will continue even on error (not good if used in shell script)
     outfiletype:'mol2',     // output file type supported by script (can be either mol2 or PDB).
-    prtElementList:['H','C']       // elements to print to atom list file (such as for NMR or belly)
+    prtElementList:[]       // ['H','C'] elements to print to atom list file (such as for NMR or belly)
 ];
 
-local function writeElementList [outpat,chains,prtElementList]
-
-    if not isnull prtElementList then
-        local atmlist = sort cat indicesof [prtElementList,cat aElement cat cAtoms chains];
-        local fileHDL = fopenw twrite ['{}.atms',fbase ftail outpat];
+local function writeElementList [outpat,chains,opt]
+    local atmlist = [];
+    local reslist = [];
+    local allResidues;
+    local Batoms;
+    if not isnull opt.prtElementList then
+        atmlist = sort cat indicesof [opt.prtElementList,cat aElement cat cAtoms chains];
+    elseif not isnull opt.printAtms then
+        allResidues = cat cResidues chains;
+        Batoms = allResidues[sort cat indicesof [first opt.printAtms,cat rName allResidues]];
+        atmlist = aNumber uniq qbSelectResidueOnRadius[uniq cat rAtoms Batoms,second opt.printAtms,chains];
+    elseif not isnull opt.printRes then
+        allResidues = cat cResidues chains;
+        Batoms = allResidues[sort cat indicesof [first opt.printRes,cat rName allResidues]];
+        reslist = uniq rUID aResidue uniq qbSelectResidueOnRadius[uniq cat rAtoms Batoms,second opt.printRes,chains];
+    endif
+    
+    local fileHDL;
+    if not isnull atmlist then
+        fileHDL = fopenw twrite ['{}.atms',fbase ftail outpat];
         local atmID;
         for atmID in atmlist loop
             fwrite [fileHDL,'    ATOM {}\n',atmID];
         endloop
         fclose fileHDL;
-    endif
+    endif    
+
+    if not isnull reslist then
+        fileHDL = fopenw twrite ['{}.res',fbase ftail outpat];
+        local resID;
+        for resID in reslist loop
+            fwrite [fileHDL,'    RESIDUE {}\n',resID];
+        endloop
+        fclose fileHDL;
+    endif    
 
 endfunction
 
@@ -129,7 +165,7 @@ local function writeMol2 [outpat,chains,opt]
         write ['outfile: {}\n', twrite ['{}.mol2',outpat]];
         fwrite_TriposMOL2 [twrite ['{}.mol2',outpat],chains];
     endif
-    writeElementList [outpat,chains,opt.prtElementList];
+    writeElementList [outpat,chains,opt];
     
 endfunction
 
@@ -142,7 +178,7 @@ local function qbWriteElementList [targ_patt,opt]
         write ['\nReading ... {}\n', fname_targ];
         targ_chains = ReadAuto [fname_targ,[multi_model:1]];
         local tmpChainTag = first cName targ_chains;
-        writeElementList[twrite ['{}_rec.atms',tmpChainTag],targ_chains,opt.prtElementList];
+        writeElementList[twrite ['{}_rec.atms',tmpChainTag],targ_chains,opt];
     endloop
 endfunction
     
@@ -344,12 +380,14 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
         if not isnull opt.protAtomList then
             atomsToProtonate = (Atoms[])[indexof[opt.protAtomList,aNumber Atoms[]]];
         endif
+        local protOptions = [];
+        if not isnull opt.protPH then
+            protOptions=[pH:opt.protPH];
+        endif
         if opt.enableLigFix then
-//            Protonate3D [Atoms[],Atoms[],Atoms[],cat cAtoms lig_chains,preciseWaters,[]];
-            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,cat cAtoms lig_chains,preciseWaters,[]];
+            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,cat cAtoms lig_chains,preciseWaters,protOptions];
         else
-//            Protonate3D [Atoms[],Atoms[],Atoms[],[],preciseWaters,[]];
-            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,[],preciseWaters,[]];
+            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,[],preciseWaters,protOptions];
         endif
     endif
     
@@ -361,6 +399,11 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
 
     oSetCollection['Receptor', targ_chains];
     oSetCollection['Ligand', lig_chains];
+    
+    if not isnull opt.renameLigand then
+        write ['Number of Residues Renamed: {}\n',  length cat cat [cResidues lig_chains]];
+        rSetName [cResidues lig_chains,opt.renameLigand];
+    endif
     
     if not isnull opt.hamiltonian and not isnull opt.qmApplication then
         local testErrs=qb_TestDivCon [twrite ['{} + {}',fname_targ,fname_lig],Atoms[],opt.qmApplication,opt.hamiltonian];
