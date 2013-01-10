@@ -160,7 +160,7 @@ local function writeMol2 [outpat,chains,opt]
 //    chains = pro_Join[chains];
     if opt.outfiletype === 'pdb' then
         write ['outfile: {}\n', twrite ['{}.pdb',outpat]];
-        fwrite_PDB [twrite ['{}.pdb',outpat],chains];
+        fwrite_PDB [twrite ['{}.pdb',outpat],chains,[amber:1]];
     else
         write ['outfile: {}\n', twrite ['{}.mol2',outpat]];
         fwrite_TriposMOL2 [twrite ['{}.mol2',outpat],chains];
