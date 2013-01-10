@@ -397,12 +397,12 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
     
     targ_chains = join [targ_chains,Chains[]];
 
-    oSetCollection['Receptor', targ_chains];
-    oSetCollection['Ligand', lig_chains];
+//    oSetCollection['Receptor', targ_chains];
+//    oSetCollection['Ligand', lig_chains];
     
     if not isnull opt.renameLigand then
-        write ['Number of Residues Renamed: {}\n',  length cat cat [cResidues lig_chains]];
-        rSetName [cResidues lig_chains,opt.renameLigand];
+        write ['Number of Residues Renamed: {}\n',  length uniq cat cat [aResidue _Atoms '$$ligand']];
+        rSetName [aResidue uniq _Atoms '$$ligand',opt.renameLigand];
     endif
     
     if not isnull opt.hamiltonian and not isnull opt.qmApplication then
