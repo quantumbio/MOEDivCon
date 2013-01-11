@@ -62,6 +62,9 @@
  *          Process a PDB file and disable any options for protonation and optimization. Cut waters greater then 5.0A away from ligand. The ligand will be renamed to
  *              LIG, and the list of residues within the ligand will be written to a file with the res extension.
  *
+ *  qbmoebatch -exec "run ['qbPrep2Files.svl',['pre_1X8X.pdb',[],[enableOpt:0,enableCutWat:1,wat_radius:5.0,outfiletype:'pdb',enableAmberName:1,renameLigand:'LIG',printRes:['LIG',5.0]]]]" -exit
+ *          Same as above, but enables the AMBER atom/residue name option in the PDB writer.
+ *
  *      NOTE: -licwait is used to wait for a license to free. It will wait forever.
  *
  ****************************************************************************/
