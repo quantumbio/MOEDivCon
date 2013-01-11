@@ -106,6 +106,7 @@ const DEFAULTS = [
     qmApplication:'qms',       // the particular QM application to be used downstream
     quitonerror:0,          // by default, the run will continue even on error (not good if used in shell script)
     outfiletype:'mol2',     // output file type supported by script (can be either mol2 or PDB).
+    enableAmberName:0,         // output amber names in PDB files.
     prtElementList:[]       // ['H','C'] elements to print to atom list file (such as for NMR or belly)
 ];
 
@@ -160,7 +161,11 @@ local function writeMol2 [outpat,chains,opt]
 //    chains = pro_Join[chains];
     if opt.outfiletype === 'pdb' then
         write ['outfile: {}\n', twrite ['{}.pdb',outpat]];
-        fwrite_PDB [twrite ['{}.pdb',outpat],chains,[amber:1]];
+        if opt.enableAmberName then
+            fwrite_PDB [twrite ['{}.pdb',outpat],chains,[amber:1]];
+        else
+            fwrite_PDB [twrite ['{}.pdb',outpat],chains];
+        endif        
     else
         write ['outfile: {}\n', twrite ['{}.mol2',outpat]];
         fwrite_TriposMOL2 [twrite ['{}.mol2',outpat],chains];
