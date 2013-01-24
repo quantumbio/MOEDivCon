@@ -2,7 +2,7 @@
 #if 0
  // BEGIN COPYRIGHT
  /***********************************************************************
-    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    Copyright (c) 1998-2013 QuantumBio Inc. and/or its affiliates.
     
  This source code is the property of QuantumBio Inc. and/or its affiliates
  and is considered secret.
@@ -23,7 +23,7 @@
 #endif   
 
 /****************************************************************************
- *                                qbPrep2Files.svl
+ *                                qbStructurePrep.svl
  *
  *  Read in a PDB, MOL2, or any other file MOE supports, add protons using
  *  Protonate3D, and finally tether-minimize all atoms in the system. Two
@@ -33,36 +33,36 @@
  *
  *  Main function:
  *
- *    qbPrep2Files [target_filename, ligand_filename, [options]]
+ *    qbStructurePrep [target_filename, ligand_filename, [options]]
  *
  *  Example moebatch call:
  *
- *  qbmoebatch -licwait -exec "run ['qbPrep2Files.svl',['target.mol2','ligand.mol2',[]]]" -exit
+ *  qbmoebatch -licwait -exec "run ['qbStructurePrep.svl',['target.mol2','ligand.mol2',[]]]" -exit
  *          Run the script on target.mol2 and ligand.mol2 files in CWD.
  *          This setup will use default options.
  *
- *  qbmoebatch -licwait -exec "run ['qbPrep2Files.svl',['D_glucose.mol2',[],[enableOpt:0,enableLigFix:0]]]" -exit
+ *  qbmoebatch -licwait -exec "run ['qbStructurePrep.svl',['D_glucose.mol2',[],[enableOpt:0,enableLigFix:0]]]" -exit
  *          Run the script on D_glucose.mol2 within the CWD.
  *          This setup will only run the job on a single ligand mol2 file, and it will turn off
  *              optimization and fixing the ligand protonation during protonation.
  *
- *  qbmoebatch -licwait -exec "run ['qbPrep2Files.svl',['HYP_reduce.pdb',[],[enableOpt:0,enableLigFix:0,enableProtonate:1,protAtomList:[3],enablePreciseHOH:0]]]" -exit
+ *  qbmoebatch -licwait -exec "run ['qbStructurePrep.svl',['HYP_reduce.pdb',[],[enableOpt:0,enableLigFix:0,enableProtonate:1,protAtomList:[3],enablePreciseHOH:0]]]" -exit
  *          The script can also be used to only protonate atoms you wish to protonate.
  *              protAtomList:[3] will protonate just the 3rd atom in the file. protAtomList:[3,5] will
  *              protonate both the 3rd and the 5th atoms in the file. (and so on).
  *
- *  qbmoebatch -licwait -exec "run ['$HOME/svl/qbPrep2Files.svl',['testing.moe',[],[enableOpt:0,enableProtonate:0,enableCropOnLig:0,enableCutWat:0]]]" -exit
+ *  qbmoebatch -licwait -exec "run ['$HOME/svl/qbStructurePrep.svl',['testing.moe',[],[enableOpt:0,enableProtonate:0,enableCropOnLig:0,enableCutWat:0]]]" -exit
  *          Simply splits the complex into target and ligand.
  *
- *  qbmoebatch  -exec "run ['qbPrep2Files.svl',['1AZM_PDB.pdb',[],[enableOpt:0,enableLigFix:0,outfiletype:'pdb',enableProtonate:1,protPH:7.4]]]" -exit
+ *  qbmoebatch  -exec "run ['qbStructurePrep.svl',['1AZM_PDB.pdb',[],[enableOpt:0,enableLigFix:0,outfiletype:'pdb',enableProtonate:1,protPH:7.4]]]" -exit
  *          Read in a PDB file and protonate it freely (with no optimization and now fixing of current protonation states) at pH=7.4.
  *              Also output pdb file instead of mol2 file
  *
- *  qbmoebatch -exec "run ['qbPrep2Files.svl',['1AZM_2.pdb',[],[enableOpt:0,enableCutWat:1,wat_radius:5.0,outfiletype:'pdb',renameLigand:'LIG',printRes:['LIG',5.0]]]]" -exit
+ *  qbmoebatch -exec "run ['qbStructurePrep.svl',['1AZM_2.pdb',[],[enableOpt:0,enableCutWat:1,wat_radius:5.0,outfiletype:'pdb',renameLigand:'LIG',printRes:['LIG',5.0]]]]" -exit
  *          Process a PDB file and disable any options for protonation and optimization. Cut waters greater then 5.0A away from ligand. The ligand will be renamed to
  *              LIG, and the list of residues within the ligand will be written to a file with the res extension.
  *
- *  qbmoebatch -exec "run ['qbPrep2Files.svl',['pre_1X8X.pdb',[],[enableOpt:0,enableCutWat:1,wat_radius:5.0,outfiletype:'pdb',enableAmberName:1,renameLigand:'LIG',printRes:['LIG',5.0]]]]" -exit
+ *  qbmoebatch -exec "run ['qbStructurePrep.svl',['pre_1X8X.pdb',[],[enableOpt:0,enableCutWat:1,wat_radius:5.0,outfiletype:'pdb',enableAmberName:1,renameLigand:'LIG',printRes:['LIG',5.0]]]]" -exit
  *          Same as above, but enables the AMBER atom/residue name option in the PDB writer.
  *
  *      NOTE: -licwait is used to wait for a license to free. It will wait forever.
@@ -324,7 +324,136 @@ local function qbReparentLigand[inAtoms]
     return newChain;
 endfunction
 
+global function qbPrepareSystem [opt]
+
+    opt = tagcat[opt, DEFAULTS];
+    
+    write ['PrepOptions: {}\n', opt];
+
+    if opt.enableAutoPrep then
+        run ['$MOE/lib/svl/run/structprep_ui.svl',[cmd:'cli',batch_protonate3d:0]];
+    endif
+
+    local ligandAtoms = cat _Atoms '$$ligand';
+    local targetAtoms = cat diff [Atoms[], ligandAtoms];
+
+    if isnull targetAtoms or isnull ligandAtoms then
+        opt.enableCropOnLig = 0;
+        opt.enableCutWat = 0;
+    endif
+
+    if targetAtoms === ligandAtoms then
+        opt.enableCropOnLig = 0;
+        opt.enableCutWat = 0;
+    endif
+    
+    if opt.enableWatPart then
+        qbReparentSolvent[];
+    endif
+    
+    if opt.enableCropOnLig then
+        qbCleanDelAtoms cat diff [Atoms[],qbSelectResidueOnRadius [cat _Atoms '$$ligand', opt.qmcrop_radius]];
+    endif
+        
+    if opt.enableCutWat then
+    // get the solvent atoms that are far from the ligand
+        qbCleanDelAtoms qbSelectWatOnRadius [_Atoms '$$ligand',opt.wat_radius,'invert'];
+    endif
+    
+    if opt.enableProtonate then
+        local preciseWaters = [];
+        if opt.enablePreciseHOH then
+            preciseWaters = _Atoms '$$solvent';
+        endif
+        local atomsToProtonate = Atoms[];
+        if not isnull opt.protAtomList then
+            atomsToProtonate = (Atoms[])[indexof[opt.protAtomList,aNumber Atoms[]]];
+        endif
+        local protOptions = [];
+        if not isnull opt.protPH then
+            protOptions=[pH:opt.protPH];
+        endif
+        if opt.enableLigFix then
+            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,_Atoms '$$ligand',preciseWaters,protOptions];
+        else
+            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,[],preciseWaters,protOptions];
+        endif
+    endif
+    
+    if opt.enableOpt then
+        qbTetherMMMin [opt.tether_val];
+    endif
+        
+    if not isnull opt.renameLigand then
+        write ['Number of Residues Renamed: {}\n',  length uniq cat cat [aResidue _Atoms '$$ligand']];
+        rSetName [aResidue uniq _Atoms '$$ligand',opt.renameLigand];
+    endif
+    
+    if not isnull opt.hamiltonian and not isnull opt.qmApplication then
+        local testErrs=qb_TestDivCon [twrite ['{} + {}',cName first aChain cat diff [Atoms[], _Atoms '$$ligand'], cName first aChain cat _Atoms '$$ligand'],Atoms[],opt.qmApplication,opt.hamiltonian];
+        if first testErrs == 0 then
+            write ['WARNING: DivCon Test Prep Failed! Reported:\n'];
+            write ['  {}',second testErrs];
+            if opt.quitonerror then
+                write [' Output Aborted\n'];
+                return first testErrs;
+            else
+                write [' WARNING: output structure files should not be used in DivCon calculation!\n'];
+            endif
+        endif
+    endif
+    
+endfunction
+
 global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the function argument
+    opt = tagcat[opt, DEFAULTS];
+    
+    local targ_chains, lig_chains;
+        
+    pot_Load ['$MOE/lib/mmff94x.ff'];    // switch to OPLS-AA as this will do a better job.
+
+    oDestroy Chains [];
+    
+    write ['\nReading ... {}\n', fname_targ];
+    targ_chains = ReadAuto fname_targ;
+    if not isnull fname_lig then
+        write ['\nReading ... {}\n', fname_lig];
+        lig_chains = ReadAuto fname_lig;
+    else
+        fname_lig = fname_targ;
+        lig_chains = uniq aChain _Atoms '$$ligand';
+        local tmp_targ_chains = uniq aChain _Atoms '$$receptor';
+        if length join[tmp_targ_chains,lig_chains] then
+            lig_chains = qbReparentLigand[_Atoms '$$ligand'];
+        endif
+    endif
+    targ_chains = diff [Chains[],lig_chains];
+    
+    qbPrepareSystem [opt];
+    
+    targ_chains = join [targ_chains,Chains[]];
+    lig_chains = join [lig_chains,Chains[]];
+
+    writeMol2[twrite ['mp_{}',fbase ftail fname_lig],Chains[],opt];
+    writeMol2[twrite ['targ_{}',fbase ftail fname_lig],targ_chains,opt];
+    writeMol2[twrite ['lig_{}',fbase ftail fname_lig],lig_chains,opt];
+
+endfunction 
+
+global function qbProcessFileGroup [targ_patt,fname_lig,opt]
+
+    write ['Running set ... \n'];
+
+    local srcfilelist_targ = flist [cd [], targ_patt];
+    local fname_targ;
+    for fname_targ in srcfilelist_targ loop
+        oDestroy Chains [];
+        qbPrep2Files [fname_targ, fname_lig, opt];
+    endloop
+
+endfunction
+
+global function old_qbPrep2Files [fname_targ, fname_lig, opt]     // x is the function argument
 
     opt = tagcat[opt, DEFAULTS];
     
@@ -347,6 +476,7 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
             lig_chains = qbReparentLigand[_Atoms '$$ligand'];
         endif
     endif
+    targ_chains = diff [Chains[],lig_chains];
     
     if opt.enableAutoPrep then
         run ['$MOE/lib/svl/run/structprep_ui.svl',[cmd:'cli',batch_protonate3d:0]];
@@ -371,6 +501,8 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
     write ['\nnChains= {}\n', nChains[] ];
     
     if opt.enableCropOnLig then
+        local atomsToKeep = cat cAtoms lig_chains;
+    write ['length atomsToKeep : {}\n', length atomsToKeep];
         qbCleanDelAtoms cat diff [Atoms[],qbSelectResidueOnRadius [cat cAtoms lig_chains, opt.qmcrop_radius]];
     endif
         
@@ -433,15 +565,3 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
 
 endfunction 
 
-global function qbProcessFileGroup [targ_patt,fname_lig,opt]
-
-    write ['Running set ... \n'];
-
-    local srcfilelist_targ = flist [cd [], targ_patt];
-    local fname_targ;
-    for fname_targ in srcfilelist_targ loop
-        oDestroy Chains [];
-        qbPrep2Files [fname_targ, fname_lig, opt];
-    endloop
-
-endfunction

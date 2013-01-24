@@ -32,6 +32,138 @@ function Protonate3D;
 function fwrite_PDB;
 function pro_StandardRes;
 
+function CIF_fread_cif_all;
+function cif_ExtractInfo;
+
+// QB tool box
+function qbPrepareSystem;
+
+
+// Source code between  // ===================== lines based on code provided by CCG 1/2013
+// ===================== 
+const MONLIB_CIF_DICT = [
+    '_chem_comp.number_atoms_all':'int',
+    '_chem_comp.number_atoms_nh':'int',
+    '_chem_comp_atom.charge':'float',
+    '_chem_comp_atom.partial_charge':'float',
+    '_chem_comp_atom.x':'float',
+    '_chem_comp_atom.y':'float',
+    '_chem_comp_atom.z':'float',
+    '_chem_comp_bond.value_dist':'float',
+    '_chem_comp_bond.value_dist_esd':'float',
+    '_chem_comp_angle.value_angle':'float',
+    '_chem_comp_angle.value_angle_esd':'float',
+    '_chem_comp_tor.value_angle':'float',
+    '_chem_comp_tor.value_angle_esd':'float',
+    '_chem_comp_tor.period':'float',
+    '_chem_comp_plane_atom.dist_esd':'float'
+];
+
+local function applycif[ cif_file, root, atoms ]
+
+	// First read the cif file and build a db_mol data structure
+
+    local c = CIF_fread_cif_all [cif_file, MONLIB_CIF_DICT];
+
+    local tt = tok_cat[ 'comp_', root ];
+    local nn = length c.(tt).'_chem_comp_atom.atom_id';
+    local x0 = rep[ 0, nn ];
+    c.(tt).'_chem_comp_atom.x' = x0;
+    c.(tt).'_chem_comp_atom.y' = x0;
+    c.(tt).'_chem_comp_atom.z' = x0;
+
+    local d = cif_ExtractInfo [c.(tt), [hetnam: string toupper root,
+	type:'monlibcif', havechg: 1, verbose:1]];
+
+    local mol = first d.models;
+
+	// Map the names using unique smiles sorting
+
+    local [sys_old, sys_new] = SystemPush atoms;
+    atoms = Atoms[];
+
+    local dict_ckeys = mol_Create mol;
+    local dict_akeys = cat cAtoms dict_ckeys;
+
+    local newnames = [];
+
+    if length dict_akeys === length atoms then
+
+        local x_smi_dict = aPrioSMI dict_akeys;
+    
+        local sorted_dictname = aName ( dict_akeys[ x_sort x_smi_dict ] );
+    
+        local x_smi_mol = aPrioSMI atoms;
+        local x_mol = x_sort x_smi_mol;
+        local sorted_akeys = atoms[ x_sort x_smi_mol ];
+        newnames = sorted_dictname[ x_smi_mol ];
+    endif
+
+    SystemPop[ sys_old, sys_new ];
+    return newnames;
+
+endfunction
+
+local function ProcessCIF[ cif_file, atoms ]
+//    local cif_file = '~/Desktop/GOL.cif';
+    if isnull atoms then
+        atoms = Atoms[];
+    endif
+    local root = token first wordsplit[ string ftail[ cif_file], ".cif"];
+    root = tolower root;
+    local names = applycif[ cif_file, root, atoms ];
+    
+    if not isnull names then
+        write [' INFO: Use  {} for residue {} {}\n', cif_file, rName first aResidue atoms, rUID first aResidue atoms];
+        aSetName[ atoms, names ];
+    else
+        write ['WARNING: incomplete representation for {} residue {}\n', rName uniq aResidue atoms, rUID uniq aResidue atoms];
+    endif
+endfunction
+
+local function recursiveDirectoryList[directory]
+    local list = flist directory;
+    local tmpdir, filelist;
+    for tmpdir in list loop
+        if ftype tmpdir == 'dir' then
+            filelist = append [filelist, recursiveDirectoryList[tmpdir]];
+        else
+            filelist = append [filelist, tmpdir];
+        endif
+    endloop  
+    return cat filelist;
+endfunction
+
+local function RenameBasedOnCIF [atoms]
+    local phenixdb;
+    if isnull phenixdb then
+        if not isnull getenv 'PHENIX' then
+            phenixdb = tok_cat [getenv 'PHENIX', '/chem_data/'];
+        else
+               //            1         2         3         4         5         6         7         8
+               //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
+            write ['WARNING: In order to attempt the use of CIF-based naming, you must supply path \n'];
+            write ['         to PHENIX cif database using $PHENIX environment variable as per \n'];
+            write ['         PHENIX documentation.\n\n'];
+            return[];
+        endif
+    endif
+    write ['NOTE: Using Phenix cif database found at {}\n', phenixdb];
+
+    local ligandResidues = uniq aResidue atoms;
+    local tmpResidue;
+    local filelist = recursiveDirectoryList[phenixdb];
+    for tmpResidue in ligandResidues loop
+        local cifFile = fabsname filelist | fbase ftail filelist == rName tmpResidue;
+        if not isnull cifFile then
+            ProcessCIF[cifFile,cat rAtoms tmpResidue];
+        else
+            write ['WARNING: no CIF file found for {} residue {} \n', rName tmpResidue, rUID tmpResidue];
+        endif
+    endloop
+endfunction
+// ===================== 
+
 local function ProtonateResidue [tmpResidue]
     local mol = mol_Extract tmpResidue;
     local pdata = SystemPush [];
@@ -44,6 +176,9 @@ local function ProtonateResidue [tmpResidue]
     SystemPop pdata;
 endfunction
 
+// This function provides an APPROXIMATE renaming scheme for ligands to PDBv3 standards
+//  in order to address a MOE foible which does not name new protons based on the heavy element
+//  to which it is attached leading to non-unique atom names within a ligand.
 local function RenameHforPDBv3 [allAtoms]
     local tmpAtm;
     for tmpAtm in allAtoms | aElement allAtoms == 'H' loop
@@ -51,7 +186,7 @@ local function RenameHforPDBv3 [allAtoms]
         if not cat [aElement boundHeavy == 'C'] then
             if not strpos [string tok_cat ['H',aElement boundHeavy], string aName tmpAtm] then
                 local newname = tok_cat['H',aElement boundHeavy,tok_drop[aName tmpAtm,1]];
-                write [' INFO: {} in {} {} changed to {}\n', aName tmpAtm, rName aResidue tmpAtm,rUID aResidue tmpAtm, newname];
+//                write [' INFO: {} in {} {} changed to {}\n', aName tmpAtm, rName aResidue tmpAtm,rUID aResidue tmpAtm, newname];
                 aSetName[tmpAtm,newname];
             endif
         endif
@@ -69,16 +204,16 @@ local function WriteResidue [outResidue,fileHandle]
         residueName = totok [atoi newResidueName + 1];
         newResidueName = residueName;
         rSetName [outResidue, newResidueName];
-        write [' NOTE (residue name conversion): {} = {} {}\n', newResidueName, oldResidueName, rUID outResidue];
+        write ['NOTE (residue name conversion): {} = {} {}\n', newResidueName, oldResidueName, rUID outResidue];
         fwrite [fileHandle, ' {} = {} {}\n', newResidueName, oldResidueName, rUID outResidue];
     endif
 
     local mol = mol_Extract outResidue;
     local pdata = SystemPush [];
     savedResidueNameList = cat append [savedResidueNameList,residueName];
-    write [' INFO: Creating .... {}.pdb\n', residueName];
     fwrite_PDB [twrite ['{}.pdb',residueName],mol_Create mol];
     SystemPop pdata;
+    write [' INFO: Use {}.pdb for residue {}\n', residueName, rName outResidue];
 
 endfunction
 
@@ -104,22 +239,39 @@ local function WriteResiduePDBs[testResidue, residueList, fileHandle]
     
 endfunction
 
-global function qbPhenixPrep [inpdbfile]
-    oDestroy Chains[];
-    ReadAuto[inpdbfile];
+const PREPDEFAULTS = [
+    enableAutoPrep:1,       // Run the MOE structure preparation tool.
+    enableProtonate:1,      // turns on Protonate3D
+    enableLigFix:0         // but fixes the ligand protonation
+];
+
+global function qbPhenixPrep [inpdbfile,opt]
+    opt = tagcat[opt, PREPDEFAULTS];
 //    local residueList = cat [Residues [] | indexof [rName Residues[], cat [pro_StandardRes[],'HOH']] == 0];
     local residueList = uniq cat aResidue _Atoms '$$ligand';
+    
+    qbPrepareSystem [opt];
     residueList = cat [residueList | indexof [rName residueList, cat [pro_StandardRes[],'HOH']] == 0];
     RenameHforPDBv3[cat rAtoms residueList];
+    RenameBasedOnCIF[cat rAtoms residueList];
     
     local fileHandle = fopenw [twrite['{}-phenix.translation',fbase inpdbfile]];
-                    //                      1         2         3         4         5         6         7         8
-                    //   123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
-    fwrite [fileHandle, '#     The following is a list of temporary residue name translations. These translations\n'];
-    fwrite [fileHandle, '#     are provided in order to address Phenix atom/residue name requirements. Upon\n'];
-    fwrite [fileHandle, '#     completion of refinement, these translations can be applied to recreate original.\n'];
+                    //            1         2         3         4         5         6         7         8
+                    //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
+    fwrite [fileHandle, '# The following is a list of temporary residue name translations. These \n'];
+    fwrite [fileHandle, '# translations are provided in order to address Phenix atom/residue name \n'];
+    fwrite [fileHandle, '# requirements. Upon completion of refinement, these translations can be \n'];
+    fwrite [fileHandle, '# applied to recreate original using:\n'];
+    fwrite [fileHandle, '# qbmoebatch -exec "run [\'qbPhenixPrep.svl\',[\'POSTPHENIX.pdb\',\'{}\'],\'qbPostPhenix\']"\n',twrite['{}-phenix.translation',fbase inpdbfile]];
+    
     WriteResiduePDBs[first residueList, residueList, fileHandle];
     fclose fileHandle;
+endfunction
+
+global function qbPhenixPrepFile[inpdbfile,opt]
+    oDestroy Chains[];
+    ReadAuto[inpdbfile];
+    qbPhenixPrep[inpdbfile,opt];
     WritePDB[twrite['{}-phenix.pdb',fbase inpdbfile]];
 endfunction
 
@@ -144,6 +296,12 @@ global function qbPostPhenix [inpdbfile,trFile]
         endif
     endloop
     fclose fileHandle;
+endfunction
+
+global function qbPostPhenixFile [inpdbfile,trFile]
+    oDestroy Chains[];
+    ReadAuto[inpdbfile];
+    qbPostPhenix[inpdbfile,trFile];
     WritePDB[twrite['{}-after.pdb',fbase inpdbfile]];
 endfunction
 
