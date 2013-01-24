@@ -23,9 +23,9 @@
 #endif   
 
 
-// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb'],'qbPhenixPrep']" -exit
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb'],'qbPhenixPrepFile']" -exit
 
-// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb'],'qbPostPhenix']" -exit
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb'],'qbPostPhenixFile']" -exit
 
 function _Atoms;
 function Protonate3D;
@@ -38,6 +38,11 @@ function cif_ExtractInfo;
 // QB tool box
 function qbPrepareSystem;
 
+const PREPDEFAULTS = [
+    enableAutoPrep:0,       // Run the MOE structure preparation tool.
+    enableProtonate:1,      // Turns on Protonate3D
+    enableLigFix:0          // Fixes the ligand protonation
+];
 
 // Source code between  // ===================== lines based on code provided by CCG 1/2013
 // ===================== 
@@ -239,11 +244,53 @@ local function WriteResiduePDBs[testResidue, residueList, fileHandle]
     
 endfunction
 
-const PREPDEFAULTS = [
-    enableAutoPrep:1,       // Run the MOE structure preparation tool.
-    enableProtonate:1,      // turns on Protonate3D
-    enableLigFix:0         // but fixes the ligand protonation
-];
+function GetDistanceToLigand[inResidue]
+
+    local ligandPositions = cat _Atoms '$$ligand';
+    local residuePosiions = cat rAtoms inResidue;
+    if isnull ligandPositions or isnull residuePosiions then
+        return 'NONE';
+    endif
+
+    local atomA, atomB;
+    local shortDistance = 10000;
+    for atomA in ligandPositions loop
+        for atomB in residuePosiions loop
+            local tmpValue = sqrt add pow [sub [aPos atomA, aPos atomB],2];
+            if tmpValue < shortDistance then
+                shortDistance = tmpValue;
+            endif
+        endloop
+    endloop
+    
+    return shortDistance;
+
+endfunction
+
+function pro_PeptideFlags;
+local function FindPeptideBreaks[inChains]
+
+    if isnull inChains then
+        inChains = Chains[];
+    endif
+    local tmpChain;
+    for tmpChain in inChains loop
+        local residueList = cat cResidues tmpChain;
+        residueList = residueList | rAtomCount residueList;
+        residueList = diff [residueList, uniq aResidue _Atoms '$$solvent'];
+        residueList = diff [residueList, uniq aResidue _Atoms '$$ligand'];
+        local x = 1;
+        while x < length residueList loop
+            if not cat pro_PeptideFlags cat [residueList(x),residueList(x+1)] then
+                write ['WARNING: No Peptide Bond: {} {} ({} A) and {} {} ({} A)\n',
+                    rName residueList(x), rUID residueList(x), GetDistanceToLigand residueList(x),
+                    rName residueList(x+1), rUID residueList(x+1),GetDistanceToLigand residueList(x+1)];
+            endif
+            x = x + 1;
+        endloop
+    endloop
+    
+endfunction
 
 global function qbPhenixPrep [inpdbfile,opt]
     opt = tagcat[opt, PREPDEFAULTS];
@@ -254,6 +301,7 @@ global function qbPhenixPrep [inpdbfile,opt]
     residueList = cat [residueList | indexof [rName residueList, cat [pro_StandardRes[],'HOH']] == 0];
     RenameHforPDBv3[cat rAtoms residueList];
     RenameBasedOnCIF[cat rAtoms residueList];
+    FindPeptideBreaks[];
     
     local fileHandle = fopenw [twrite['{}-phenix.translation',fbase inpdbfile]];
                     //            1         2         3         4         5         6         7         8
@@ -276,9 +324,6 @@ global function qbPhenixPrepFile[inpdbfile,opt]
 endfunction
 
 global function qbPostPhenix [inpdbfile,trFile]
-    oDestroy Chains[];
-    ReadAuto[inpdbfile];
-    
     if isnull trFile then
         trFile = twrite ['{}.translation',fbase inpdbfile];
     endif
