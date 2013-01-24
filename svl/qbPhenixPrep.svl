@@ -1,0 +1,150 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2013 QuantumBio Inc. and/or its affiliates.
+    
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif   
+
+
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb'],'qbPhenixPrep']" -exit
+
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb'],'qbPostPhenix']" -exit
+
+function _Atoms;
+function Protonate3D;
+function fwrite_PDB;
+function pro_StandardRes;
+
+local function ProtonateResidue [tmpResidue]
+    local mol = mol_Extract tmpResidue;
+    local pdata = SystemPush [];
+    local tmpChains = mol_Create mol;
+    local tmpAtoms = cat cAtoms tmpChains;
+    Protonate3D [tmpAtoms,tmpAtoms,tmpAtoms,[],[],[]];
+    tmpAtoms = cat cAtoms tmpChains;        // must rebuild list to be used in subsequent steps.
+//    RenameHforPDBv3[tmpAtoms];
+//    fwrite_PDB [twrite ['{}.pdb',toupper rName aResidue first tmpAtoms],tmpChains];
+    SystemPop pdata;
+endfunction
+
+local function RenameHforPDBv3 [allAtoms]
+    local tmpAtm;
+    for tmpAtm in allAtoms | aElement allAtoms == 'H' loop
+        local boundHeavy = allAtoms | bOrder [tmpAtm, allAtoms];
+        if not cat [aElement boundHeavy == 'C'] then
+            if not strpos [string tok_cat ['H',aElement boundHeavy], string aName tmpAtm] then
+                local newname = tok_cat['H',aElement boundHeavy,tok_drop[aName tmpAtm,1]];
+                write [' INFO: {} in {} {} changed to {}\n', aName tmpAtm, rName aResidue tmpAtm,rUID aResidue tmpAtm, newname];
+                aSetName[tmpAtm,newname];
+            endif
+        endif
+    endloop
+endfunction
+
+local function WriteResidue [outResidue,fileHandle]
+
+    static newResidueName;
+    if isnull newResidueName then newResidueName = '100'; endif;
+    static savedResidueNameList;
+    local residueName = toupper rName outResidue;
+    if length pack indexof [savedResidueNameList,residueName] then
+        local oldResidueName = residueName;
+        residueName = totok [atoi newResidueName + 1];
+        newResidueName = residueName;
+        rSetName [outResidue, newResidueName];
+        write [' NOTE (residue name conversion): {} = {} {}\n', newResidueName, oldResidueName, rUID outResidue];
+        fwrite [fileHandle, ' {} = {} {}\n', newResidueName, oldResidueName, rUID outResidue];
+    endif
+
+    local mol = mol_Extract outResidue;
+    local pdata = SystemPush [];
+    savedResidueNameList = cat append [savedResidueNameList,residueName];
+    write [' INFO: Creating .... {}.pdb\n', residueName];
+    fwrite_PDB [twrite ['{}.pdb',residueName],mol_Create mol];
+    SystemPop pdata;
+
+endfunction
+
+local function WriteResiduePDBs[testResidue, residueList, fileHandle]
+    if isnull testResidue then
+        return;
+    endif
+    local tmpResidue;
+    local resdiueListMask = [];
+    for tmpResidue in residueList loop
+        resdiueListMask = cat append [resdiueListMask, 0];
+        if rName tmpResidue == rName testResidue then
+        if sort aName rAtoms tmpResidue === sort aName rAtoms testResidue then
+            resdiueListMask(length resdiueListMask) = 1;
+        endif
+        endif
+    endloop
+    local toSend = residueList | resdiueListMask;
+    WriteResidue [first toSend, fileHandle];
+    residueList = residueList | resdiueListMask == 0;
+    
+    WriteResiduePDBs [first residueList, residueList, fileHandle];
+    
+endfunction
+
+global function qbPhenixPrep [inpdbfile]
+    oDestroy Chains[];
+    ReadAuto[inpdbfile];
+//    local residueList = cat [Residues [] | indexof [rName Residues[], cat [pro_StandardRes[],'HOH']] == 0];
+    local residueList = uniq cat aResidue _Atoms '$$ligand';
+    residueList = cat [residueList | indexof [rName residueList, cat [pro_StandardRes[],'HOH']] == 0];
+    RenameHforPDBv3[cat rAtoms residueList];
+    
+    local fileHandle = fopenw [twrite['{}-phenix.translation',fbase inpdbfile]];
+                    //                      1         2         3         4         5         6         7         8
+                    //   123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+    fwrite [fileHandle, '#     The following is a list of temporary residue name translations. These translations\n'];
+    fwrite [fileHandle, '#     are provided in order to address Phenix atom/residue name requirements. Upon\n'];
+    fwrite [fileHandle, '#     completion of refinement, these translations can be applied to recreate original.\n'];
+    WriteResiduePDBs[first residueList, residueList, fileHandle];
+    fclose fileHandle;
+    WritePDB[twrite['{}-phenix.pdb',fbase inpdbfile]];
+endfunction
+
+global function qbPostPhenix [inpdbfile,trFile]
+    oDestroy Chains[];
+    ReadAuto[inpdbfile];
+    
+    if isnull trFile then
+        trFile = twrite ['{}.translation',fbase inpdbfile];
+    endif
+
+    local fileHandle = fopenr [trFile];
+    local line;
+    while length (line = freadb [fileHandle, 'line', 1]) loop
+        line = cat line;
+        if line(1) <> "#" then
+            local [newName, tmpEqual, oldName, resID] = wordsplit [line, " "];
+            newName = token newName;
+            oldName = token oldName;
+            write ['  INFO: rename {} to {}\n', newName, oldName];
+            rSetName [Residues [] | rName Residues [] == newName,oldName];
+        endif
+    endloop
+    fclose fileHandle;
+    WritePDB[twrite['{}-after.pdb',fbase inpdbfile]];
+endfunction
+
+#eof
