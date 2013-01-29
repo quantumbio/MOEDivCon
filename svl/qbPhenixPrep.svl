@@ -23,7 +23,7 @@
 #endif   
 
 
-// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb'],'qbPhenixPrepFile']" -exit
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb',[enableAutoPrep:1,enableProtonate:1,enableLigFix:0],'qbPhenixPrepFile']" -exit
 
 // example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb'],'qbPostPhenixFile']" -exit
 
