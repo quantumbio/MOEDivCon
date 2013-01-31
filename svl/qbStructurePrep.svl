@@ -89,6 +89,7 @@ function qbSelectWatOnRadius;
 
 const DEFAULTS = [
     enableWatPart:0,        // partitions waters into each of the atoms/residues and reprotonates.
+    enableStripLP:0,        // Remove LPs from file prior doing anything to the structure.
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
     enableOpt:0,            // turn on optimization
     tether_val:100,         // tethers the heavy atoms at a certain restraint.
@@ -110,23 +111,34 @@ const DEFAULTS = [
     quitonerror:0,          // by default, the run will continue even on error (not good if used in shell script)
     outfiletype:'mol2',     // output file type supported by script (can be either mol2 or PDB).
     enableAmberName:0,         // output amber names in PDB files.
-    prtElementList:[]       // ['H','C'] elements to print to atom list file (such as for NMR or belly)
+    prtElementList:[]       // [['H','C'],'L'] elements to print to atom list file (such as for NMR or belly)
+    					// L = ligand, T = target/receptor, [] or other = all
 ];
 
 local function writeElementList [outpat,chains,opt]
     local atmlist = [];
     local reslist = [];
-    local allResidues;
+    local allObjects;
+    local objectMask;
+    local tmpObjectMask;
     local Batoms;
     if not isnull opt.prtElementList then
-        atmlist = sort cat indicesof [opt.prtElementList,cat aElement cat cAtoms chains];
+    	allObjects = cat cAtoms chains;
+        if second opt.prtElementList == 'L' then
+            objectMask = m_join [allObjects, _Atoms '$$ligand'];
+        elseif second opt.prtElementList == 'T' then
+            objectMask = m_join [allObjects, _Atoms '$$receptor'];
+        else
+            objectMask = m_id allObjects;
+        endif
+	    atmlist = sort cat indicesof[first opt.prtElementList, mput [aElement allObjects,objectMask==0,0] ];
     elseif not isnull opt.printAtms then
-        allResidues = cat cResidues chains;
-        Batoms = allResidues[sort cat indicesof [first opt.printAtms,cat rName allResidues]];
+        allObjects = cat cResidues chains;
+        Batoms = allObjects[sort cat indicesof [first opt.printAtms,cat rName allObjects]];
         atmlist = aNumber uniq qbSelectResidueOnRadius[uniq cat rAtoms Batoms,second opt.printAtms,chains];
     elseif not isnull opt.printRes then
-        allResidues = cat cResidues chains;
-        Batoms = allResidues[sort cat indicesof [first opt.printRes,cat rName allResidues]];
+        allObjects = cat cResidues chains;
+        Batoms = allObjects[sort cat indicesof [first opt.printRes,cat rName allObjects]];
         reslist = uniq rUID aResidue uniq qbSelectResidueOnRadius[uniq cat rAtoms Batoms,second opt.printRes,chains];
     endif
     
@@ -328,8 +340,12 @@ global function qbPrepareSystem [opt]
 
     opt = tagcat[opt, DEFAULTS];
     
-    write ['PrepOptions: {}\n', opt];
-
+    write ['Running Options: {}\n', opt];
+    
+    if opt.enableStripLP then
+        qbCleanDelAtoms cat [Atoms [] | aElement Atoms [] == 'LP'];
+    endif
+    
     if opt.enableAutoPrep then
         run ['$MOE/lib/svl/run/structprep_ui.svl',[cmd:'cli',batch_protonate3d:0]];
     endif
@@ -440,16 +456,24 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
 
 endfunction 
 
-global function qbProcessFileGroup [targ_patt,fname_lig,opt]
+global function qbProcessFileGroup [targ_patt,lig_patt,opt]
 
     write ['Running set ... \n'];
 
     local srcfilelist_targ = flist [cd [], targ_patt];
-    local fname_targ;
-    for fname_targ in srcfilelist_targ loop
-        oDestroy Chains [];
-        qbPrep2Files [fname_targ, fname_lig, opt];
-    endloop
+    local srcfilelist_lig = flist [cd [], lig_patt];
+    
+    if length srcfilelist_targ == length srcfilelist_lig then
+    
+        local fname_targ;
+    
+        local count = 0;
+        for fname_targ in srcfilelist_targ loop
+            count = count + 1;
+            oDestroy Chains [];
+            qbPrep2Files [srcfilelist_targ(count), srcfilelist_lig(count), opt];
+        endloop
+    endif
 
 endfunction
 
