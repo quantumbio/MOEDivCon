@@ -87,6 +87,9 @@ function qbNearby;
 function qb_TestDivCon;
 function qbSelectWatOnRadius;
 
+// statics
+static wasPDB;
+
 const DEFAULTS = [
     enableWatPart:0,        // partitions waters into each of the atoms/residues and reprotonates.
     enableStripLP:0,        // Remove LPs from file prior doing anything to the structure.
@@ -111,6 +114,7 @@ const DEFAULTS = [
     quitonerror:0,          // by default, the run will continue even on error (not good if used in shell script)
     outfiletype:'mol2',     // output file type supported by script (can be either mol2 or PDB).
     enableAmberName:0,         // output amber names in PDB files.
+    wasPDB:0,               // option set to 1 when pdb file is read in.
     prtElementList:[]       // [['H','C'],'L'] elements to print to atom list file (such as for NMR or belly)
     					// L = ligand, T = target/receptor, [] or other = all
 ];
@@ -176,11 +180,10 @@ local function writeMol2 [outpat,chains,opt]
 //    chains = pro_Join[chains];
     if opt.outfiletype === 'pdb' then
         write ['outfile: {}\n', twrite ['{}.pdb',outpat]];
-        if opt.enableAmberName then
-            fwrite_PDB [twrite ['{}.pdb',outpat],chains,[amber:1]];
-        else
-            fwrite_PDB [twrite ['{}.pdb',outpat],chains];
-        endif        
+        local outPDBopt = [];
+        if wasPDB then outPDBopt.install_cryst = 1; endif;
+        if opt.enableAmberName then outPDBopt.amber = 1; endif;
+        fwrite_PDB [twrite ['{}.pdb',outpat],chains,outPDBopt];
     else
         write ['outfile: {}\n', twrite ['{}.mol2',outpat]];
         fwrite_TriposMOL2 [twrite ['{}.mol2',outpat],chains];
@@ -431,7 +434,13 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
     oDestroy Chains [];
     
     write ['\nReading ... {}\n', fname_targ];
-    targ_chains = ReadAuto fname_targ;
+    if fext fname_targ == 'pdb' or fext fname_targ == 'ent' then
+        targ_chains = ReadPDB [fname_targ,[install_cryst:1]];
+        wasPDB = 1;
+    else
+        targ_chains = ReadAuto fname_targ;
+        wasPDB = 0;
+    endif
     if not isnull fname_lig then
         write ['\nReading ... {}\n', fname_lig];
         lig_chains = ReadAuto fname_lig;
@@ -476,116 +485,4 @@ global function qbProcessFileGroup [targ_patt,lig_patt,opt]
     endif
 
 endfunction
-
-global function old_qbPrep2Files [fname_targ, fname_lig, opt]     // x is the function argument
-
-    opt = tagcat[opt, DEFAULTS];
-    
-    local targ_chains, lig_chains;
-        
-    pot_Load ['$MOE/lib/mmff94x.ff'];    // switch to OPLS-AA as this will do a better job.
-
-    oDestroy Chains [];
-    
-    write ['\nReading ... {}\n', fname_targ];
-    targ_chains = ReadAuto fname_targ;
-    if not isnull fname_lig then
-        write ['\nReading ... {}\n', fname_lig];
-        lig_chains = ReadAuto fname_lig;
-    else
-        fname_lig = fname_targ;
-        lig_chains = uniq aChain _Atoms '$$ligand';
-        local tmp_targ_chains = uniq aChain _Atoms '$$receptor';
-        if length join[tmp_targ_chains,lig_chains] then
-            lig_chains = qbReparentLigand[_Atoms '$$ligand'];
-        endif
-    endif
-    targ_chains = diff [Chains[],lig_chains];
-    
-    if opt.enableAutoPrep then
-        run ['$MOE/lib/svl/run/structprep_ui.svl',[cmd:'cli',batch_protonate3d:0]];
-    endif
-
-    if isnull targ_chains or isnull lig_chains then
-        opt.enableCropOnLig = 0;
-        opt.enableCutWat = 0;
-    endif
-
-    if targ_chains === lig_chains then
-        opt.enableCropOnLig = 0;
-        opt.enableCutWat = 0;
-    endif
-    
-    if opt.enableWatPart then
-        qbReparentSolvent[];
-    endif
-    
-    targ_chains = diff [Chains[],lig_chains];
-    
-    write ['\nnChains= {}\n', nChains[] ];
-    
-    if opt.enableCropOnLig then
-        local atomsToKeep = cat cAtoms lig_chains;
-    write ['length atomsToKeep : {}\n', length atomsToKeep];
-        qbCleanDelAtoms cat diff [Atoms[],qbSelectResidueOnRadius [cat cAtoms lig_chains, opt.qmcrop_radius]];
-    endif
-        
-    if opt.enableCutWat then
-    // get the solvent atoms that are far from the ligand
-        qbCleanDelAtoms qbSelectWatOnRadius [_Atoms '$$ligand',opt.wat_radius,'invert'];
-    endif
-    
-    if opt.enableProtonate then
-        local preciseWaters = [];
-        if opt.enablePreciseHOH then
-            preciseWaters = _Atoms '$$solvent';
-        endif
-        local atomsToProtonate = Atoms[];
-        if not isnull opt.protAtomList then
-            atomsToProtonate = (Atoms[])[indexof[opt.protAtomList,aNumber Atoms[]]];
-        endif
-        local protOptions = [];
-        if not isnull opt.protPH then
-            protOptions=[pH:opt.protPH];
-        endif
-        if opt.enableLigFix then
-            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,cat cAtoms lig_chains,preciseWaters,protOptions];
-        else
-            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,[],preciseWaters,protOptions];
-        endif
-    endif
-    
-    if opt.enableOpt then
-        qbTetherMMMin [opt.tether_val];
-    endif
-    
-    targ_chains = join [targ_chains,Chains[]];
-
-//    oSetCollection['Receptor', targ_chains];
-//    oSetCollection['Ligand', lig_chains];
-    
-    if not isnull opt.renameLigand then
-        write ['Number of Residues Renamed: {}\n',  length uniq cat cat [aResidue _Atoms '$$ligand']];
-        rSetName [aResidue uniq _Atoms '$$ligand',opt.renameLigand];
-    endif
-    
-    if not isnull opt.hamiltonian and not isnull opt.qmApplication then
-        local testErrs=qb_TestDivCon [twrite ['{} + {}',fname_targ,fname_lig],Atoms[],opt.qmApplication,opt.hamiltonian];
-        if first testErrs == 0 then
-            write ['ERROR: DivCon Test Prep Failed! Reported:\n'];
-            write ['  {}',second testErrs];
-            if opt.quitonerror then
-                write [' Output Aborted\n'];
-                return first testErrs;
-            else
-                write [' WARNING: output mol2 files should not be used in DivCon calculation!\n'];
-            endif
-        endif
-    endif
-    
-    writeMol2[twrite ['mp_{}',fbase ftail fname_lig],Chains[],opt];
-    writeMol2[twrite ['targ_{}',fbase ftail fname_lig],targ_chains,opt];
-    writeMol2[twrite ['lig_{}',fbase ftail fname_lig],lig_chains,opt];
-
-endfunction 
 
