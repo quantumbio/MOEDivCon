@@ -101,7 +101,16 @@ local function applycif[ cif_file, root, atoms ]
         local x_smi_mol = aPrioSMI atoms;
         local x_mol = x_sort x_smi_mol;
         local sorted_akeys = atoms[ x_sort x_smi_mol ];
-        newnames = sorted_dictname[ x_smi_mol ];
+write ['x_smi_dict: {}\n', sort x_smi_dict];
+write ['x_smi_mol: {}\n', sort x_smi_mol];
+        if sort x_smi_dict === sort x_smi_mol then
+write ['MATCH! 1\n'];
+            newnames = sorted_dictname[ x_smi_mol ];
+        else
+write ['NO MATCH! 1\n'];
+        endif
+    else
+write ['NO MATCH! 2\n'];
     endif
 
     SystemPop[ sys_old, sys_new ];
@@ -191,7 +200,7 @@ local function RenameHforPDBv3 [allAtoms]
         if not cat [aElement boundHeavy == 'C'] then
             if not strpos [string tok_cat ['H',aElement boundHeavy], string aName tmpAtm] then
                 local newname = tok_cat['H',aElement boundHeavy,tok_drop[aName tmpAtm,1]];
-//                write [' INFO: {} in {} {} changed to {}\n', aName tmpAtm, rName aResidue tmpAtm,rUID aResidue tmpAtm, newname];
+                write [' INFO: {} in {} {} changed to {}\n', aName tmpAtm, rName aResidue tmpAtm,rUID aResidue tmpAtm, newname];
                 aSetName[tmpAtm,newname];
             endif
         endif
@@ -292,14 +301,15 @@ local function FindPeptideBreaks[inChains]
     
 endfunction
 
+function qbCorrectAtomNames;
 global function qbPhenixPrep [inpdbfile,opt]
     opt = tagcat[opt, PREPDEFAULTS];
 //    local residueList = cat [Residues [] | indexof [rName Residues[], cat [pro_StandardRes[],'HOH']] == 0];
     local residueList = uniq cat aResidue _Atoms '$$ligand';
-    
     qbPrepareSystem [opt];
     residueList = cat [residueList | indexof [rName residueList, cat [pro_StandardRes[],'HOH']] == 0];
-    RenameHforPDBv3[cat rAtoms residueList];
+//    RenameHforPDBv3[cat rAtoms residueList];
+    qbCorrectAtomNames[];
     RenameBasedOnCIF[cat rAtoms residueList];
     FindPeptideBreaks[];
     
