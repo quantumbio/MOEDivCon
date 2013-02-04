@@ -129,7 +129,7 @@ local function ProcessCIF[ cif_file, inResidue ]
         residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
         return inResidue;
     else
-        write ['WARNING: incomplete representation for {} residue {}\n', rName uniq aResidue atoms, rUID uniq aResidue atoms];
+        write ['WARNING: incomplete representation for {} residue {}:{}\n', rName inResidue, cName rChain inResidue, rUID inResidue];
     endif
 endfunction
 
@@ -171,7 +171,7 @@ local function RenameBasedOnCIF [residueList]
         if not isnull cifFile then
             residuesToRemove = cat [residuesToRemove, ProcessCIF[cifFile,tmpResidue]];
         else
-            write ['WARNING: no CIF file found for {} residue {} \n', rName tmpResidue, rUID tmpResidue];
+            write ['WARNING: no CIF file found for {} residue {}:{} \n', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue];
         endif
     endloop
     return residuesToRemove;
@@ -196,11 +196,11 @@ local function RenameHforPDBv3 [allAtoms]
     endloop
 endfunction
 
-local function WriteResidue [outResidue]
+local function WriteResidue [outResidues]
     local fileHandle;
     static newResidueName;
     if isnull newResidueName then newResidueName = '100'; endif;
-    local residueName = toupper rName outResidue;
+    local residueName = toupper rName first outResidues;
     if length pack indexof [residueNamesTaken,residueName] then
         fileHandle = fopenx transFileName;
         if newResidueName == '100' then
@@ -211,7 +211,7 @@ local function WriteResidue [outResidue]
             fwrite [fileHandle, '# translations are provided in order to address Phenix atom/residue name \n'];
             fwrite [fileHandle, '# requirements. Upon completion of refinement, these translations can be \n'];
             fwrite [fileHandle, '# applied to recreate original using:\n'];
-            fwrite [fileHandle, '# qbmoebatch -exec "run [\'qbPhenixPrep.svl\',[\'POSTPHENIX.pdb\',\'{}\'],\'qbPostPhenix\']"\n',transFileName];
+            fwrite [fileHandle, '# qbmoebatch -exec "run [\'qbPhenixPrep.svl\',[\'POSTPHENIX.pdb\',\'{}\'],\'qbPostPhenixFile\']"\n',transFileName];
         else
             fileHandle = fopenx transFileName;
             fileHandle = fseek [fileHandle, fsize fileHandle];
@@ -219,18 +219,19 @@ local function WriteResidue [outResidue]
         local oldResidueName = residueName;
         residueName = totok [atoi newResidueName + 1];
         newResidueName = residueName;
-        rSetName [outResidue, newResidueName];
-        write ['NOTE (residue name conversion): {} = {} {}\n', newResidueName, oldResidueName, rUID outResidue];
-        fwrite [fileHandle, ' {} = {} {}\n', newResidueName, oldResidueName, rUID outResidue];
+        rSetName [outResidues, newResidueName];
+        write ['NOTE (residue name conversion): {} = {} {}\n', newResidueName, oldResidueName, rUID outResidues];
+//        fwrite [fileHandle, ' {} = {} : {}\n', newResidueName, oldResidueName,  twrite ['{}-{}',tr [rUID outResidues, cName rChain outResidues]]];
+        fwrite [fileHandle, ' {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]];
         fclose fileHandle;
     endif
 
-    local mol = mol_Extract outResidue;
+    local mol = mol_Extract first outResidues;
     local pdata = SystemPush [];
     residueNamesTaken = cat [residueNamesTaken,residueName];
     fwrite_PDB [twrite ['{}.pdb',residueName],mol_Create mol];
     SystemPop pdata;
-    write [' INFO: Use {}.pdb for residue {}\n', residueName, rName outResidue];
+    write [' INFO: Use {}.pdb for residue {}\n', residueName, rName outResidues];
 
 endfunction
 
@@ -271,9 +272,9 @@ local function FindPeptideBreaks[inChains]
         local x = 1;
         while x < length residueList loop
             if not cat pro_PeptideFlags cat [residueList(x),residueList(x+1)] then
-                write ['WARNING: No Peptide Bond: {} {} ({} A) and {} {} ({} A)\n',
-                    rName residueList(x), rUID residueList(x), GetDistanceToLigand residueList(x),
-                    rName residueList(x+1), rUID residueList(x+1),GetDistanceToLigand residueList(x+1)];
+                write ['WARNING: No Peptide Bond: {} {}:{} ({} A) and {} {}:{} ({} A)\n',
+                    rName residueList(x), cName rChain residueList(x), rUID residueList(x), GetDistanceToLigand residueList(x),
+                    rName residueList(x+1), cName rChain residueList(x+1), rUID residueList(x+1),GetDistanceToLigand residueList(x+1)];
             endif
             x = x + 1;
         endloop
@@ -294,11 +295,11 @@ global function qbPhenixPrep [inpdbfile,opt]
 
     local data = app aName rAtoms residueList;
     data = app sort data;
-    residueList = uniq residueList[x_fsort data];
+    residueList = uniq residueList[x_sort data];
 
-    local tmpResidue;
-    for tmpResidue in residueList loop
-        WriteResidue[tmpResidue];
+    local tmpIndexGrp;
+    for tmpIndexGrp in indicesof [uniq x_fsort data,x_fsort data] loop
+        WriteResidue[residueList[tmpIndexGrp]];
     endloop
 
     FindPeptideBreaks[];
@@ -323,7 +324,8 @@ global function qbPostPhenix [inpdbfile,trFile]
     while length (line = freadb [fileHandle, 'line', 1]) loop
         line = cat line;
         if line(1) <> "#" then
-            local [newName, tmpEqual, oldName, resID] = wordsplit [line, " "];
+            local newName = first wordsplit [line, " "];
+            local oldName = third wordsplit [line, " "];
             newName = token newName;
             oldName = token oldName;
             write ['  INFO: rename {} to {}\n', newName, oldName];
