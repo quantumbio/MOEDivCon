@@ -306,7 +306,9 @@ endfunction
 
 global function qbPhenixPrepFile[inpdbfile,opt]
     oDestroy Chains[];
-    ReadAuto[inpdbfile];
+    if not length ReadAuto[inpdbfile] then
+        return;
+    endif
     qbPhenixPrep[inpdbfile,opt];
     WritePDB[twrite['{}-phenix.pdb',fbase inpdbfile]];
 endfunction
@@ -333,7 +335,9 @@ endfunction
 
 global function qbPostPhenixFile [inpdbfile,trFile]
     oDestroy Chains[];
-    ReadAuto[inpdbfile];
+    if not length ReadAuto[inpdbfile] then;
+        return;
+    endif
     qbPostPhenix[inpdbfile,trFile];
     WritePDB[twrite['{}-after.pdb',fbase inpdbfile]];
 endfunction
