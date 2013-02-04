@@ -101,16 +101,9 @@ local function applycif[ cif_file, root, atoms ]
         local x_smi_mol = aPrioSMI atoms;
         local x_mol = x_sort x_smi_mol;
         local sorted_akeys = atoms[ x_sort x_smi_mol ];
-write ['x_smi_dict: {}\n', sort x_smi_dict];
-write ['x_smi_mol: {}\n', sort x_smi_mol];
-        if sort x_smi_dict === sort x_smi_mol then
-write ['MATCH! 1\n'];
+        if sort aPrioZQH atoms === sort aPrioZQH dict_akeys then
             newnames = sorted_dictname[ x_smi_mol ];
-        else
-write ['NO MATCH! 1\n'];
         endif
-    else
-write ['NO MATCH! 2\n'];
     endif
 
     SystemPop[ sys_old, sys_new ];
@@ -207,19 +200,34 @@ local function RenameHforPDBv3 [allAtoms]
     endloop
 endfunction
 
-local function WriteResidue [outResidue,fileHandle]
-
+local function WriteResidue [outResidue,fileName]
+    local fileHandle;
     static newResidueName;
     if isnull newResidueName then newResidueName = '100'; endif;
     static savedResidueNameList;
     local residueName = toupper rName outResidue;
     if length pack indexof [savedResidueNameList,residueName] then
+        fileHandle = fopenx fileName;
+        if newResidueName == '100' then
+            fileHandle = fopenw fileName;
+                            //            1         2         3         4         5         6         7         8
+                            //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
+            fwrite [fileHandle, '# The following is a list of temporary residue name translations. These \n'];
+            fwrite [fileHandle, '# translations are provided in order to address Phenix atom/residue name \n'];
+            fwrite [fileHandle, '# requirements. Upon completion of refinement, these translations can be \n'];
+            fwrite [fileHandle, '# applied to recreate original using:\n'];
+            fwrite [fileHandle, '# qbmoebatch -exec "run [\'qbPhenixPrep.svl\',[\'POSTPHENIX.pdb\',\'{}\'],\'qbPostPhenix\']"\n',fileName];
+        else
+            fileHandle = fopenx fileName;
+            fileHandle = fseek [fileHandle, fsize fileHandle];
+        endif
         local oldResidueName = residueName;
         residueName = totok [atoi newResidueName + 1];
         newResidueName = residueName;
         rSetName [outResidue, newResidueName];
         write ['NOTE (residue name conversion): {} = {} {}\n', newResidueName, oldResidueName, rUID outResidue];
         fwrite [fileHandle, ' {} = {} {}\n', newResidueName, oldResidueName, rUID outResidue];
+        fclose fileHandle;
     endif
 
     local mol = mol_Extract outResidue;
@@ -231,7 +239,7 @@ local function WriteResidue [outResidue,fileHandle]
 
 endfunction
 
-local function WriteResiduePDBs[testResidue, residueList, fileHandle]
+local function WriteResiduePDBs[testResidue, residueList, fileName]
     if isnull testResidue then
         return;
     endif
@@ -246,10 +254,10 @@ local function WriteResiduePDBs[testResidue, residueList, fileHandle]
         endif
     endloop
     local toSend = residueList | resdiueListMask;
-    WriteResidue [first toSend, fileHandle];
+    WriteResidue [first toSend, fileName];
     residueList = residueList | resdiueListMask == 0;
     
-    WriteResiduePDBs [first residueList, residueList, fileHandle];
+    WriteResiduePDBs [first residueList, residueList, fileName];
     
 endfunction
 
@@ -312,18 +320,8 @@ global function qbPhenixPrep [inpdbfile,opt]
     qbCorrectAtomNames[];
     RenameBasedOnCIF[cat rAtoms residueList];
     FindPeptideBreaks[];
-    
-    local fileHandle = fopenw [twrite['{}-phenix.translation',fbase inpdbfile]];
-                    //            1         2         3         4         5         6         7         8
-                    //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
-    fwrite [fileHandle, '# The following is a list of temporary residue name translations. These \n'];
-    fwrite [fileHandle, '# translations are provided in order to address Phenix atom/residue name \n'];
-    fwrite [fileHandle, '# requirements. Upon completion of refinement, these translations can be \n'];
-    fwrite [fileHandle, '# applied to recreate original using:\n'];
-    fwrite [fileHandle, '# qbmoebatch -exec "run [\'qbPhenixPrep.svl\',[\'POSTPHENIX.pdb\',\'{}\'],\'qbPostPhenix\']"\n',twrite['{}-phenix.translation',fbase inpdbfile]];
-    
-    WriteResiduePDBs[first residueList, residueList, fileHandle];
-    fclose fileHandle;
+
+    WriteResiduePDBs[first residueList, residueList, twrite['{}-phenix.translation',fbase inpdbfile] ];
 endfunction
 
 global function qbPhenixPrepFile[inpdbfile,opt]
