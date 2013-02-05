@@ -23,12 +23,11 @@
 #endif   
 
 
-// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb',[enableAutoPrep:1,enableProtonate:1,enableLigFix:0],'qbPhenixPrepFile']" -exit
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb',[enableAutoPrep:1,enableProtonate:1,enableLigFix:0]],'qbPhenixPrepFile']" -exit
 
-// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb'],'qbPostPhenixFile']" -exit
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C-phenix.pdb','1A2C-phenix.translation'],'qbPostPhenixFile']" -exit
 
 function _Atoms;
-function Protonate3D;
 function fwrite_PDB;
 function pro_StandardRes;
 function pro_PeptideFlags;
@@ -295,6 +294,11 @@ global function qbPhenixPrep [inpdbfile,opt]
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
     write ['Residues to treat: {}\n', uniq rName residueList];
     qbPrepareSystem [opt];
+    
+    // address a MOE-ism that renames HIS residues based on protonation
+    rSetName [cat [Residues [] | rName Residues [] == 'HIP'],'HIS'];
+    rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
+    rSetName [cat [Residues [] | rName Residues [] == 'HIE'],'HIS'];
 
 //    RenameHforPDBv3[cat rAtoms residueList];  // replaced by:
     qbCorrectAtomNames[];
