@@ -284,8 +284,9 @@ endfunction
 
 global function qbPhenixPrep [inpdbfile,opt]
     opt = tagcat[opt, PREPDEFAULTS];
-    local testResidues = cat [pro_StandardRes[],'HOH','ACE','NME','ASH','CYX'];
+    local testResidues = cat [pro_StandardRes[],'HOH','ACE','NME','ASH','CYX','DA','DT','DG','DC','A','U','G','C'];
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
+    write ['Residues to treat: {}\n', uniq rName residueList];
     qbPrepareSystem [opt];
 
 //    RenameHforPDBv3[cat rAtoms residueList];  // replaced by:
