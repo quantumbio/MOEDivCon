@@ -220,7 +220,7 @@ local function WriteResidue [outResidues]
         residueName = totok [atoi newResidueName + 1];
         newResidueName = residueName;
         rSetName [outResidues, newResidueName];
-        write ['NOTE (residue name conversion): {} = {} {}\n', newResidueName, oldResidueName, rUID outResidues];
+        write ['NOTE (residue name conversion): {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]];
 //        fwrite [fileHandle, ' {} = {} : {}\n', newResidueName, oldResidueName,  twrite ['{}-{}',tr [rUID outResidues, cName rChain outResidues]]];
         fwrite [fileHandle, ' {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]];
         fclose fileHandle;
