@@ -124,7 +124,7 @@ local function ProcessCIF[ cif_file, inResidue ]
     local names = applycif[ cif_file, root, atoms ];
     
     if not isnull names then
-        write [' INFO: Use  {} for residue {} {}\n', cif_file, rName inResidue, rUID inResidue];
+        write [' INFO: Use  {} for residue {} {}:{}\n', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue];
         aSetName[ atoms, names ];
         residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
         return inResidue;
@@ -189,7 +189,7 @@ local function RenameHforPDBv3 [allAtoms]
         if not cat [aElement boundHeavy == 'C'] then
             if not strpos [string tok_cat ['H',aElement boundHeavy], string aName tmpAtm] then
                 local newname = tok_cat['H',aElement boundHeavy,tok_drop[aName tmpAtm,1]];
-                write [' INFO: {} in {} {} changed to {}\n', aName tmpAtm, rName aResidue tmpAtm,rUID aResidue tmpAtm, newname];
+                write [' INFO: {} in {} {}:{} changed to {}\n', aName tmpAtm, rName aResidue tmpAtm,cName rChain aResidue tmpAtm, rUID aResidue tmpAtm, newname];
                 aSetName[tmpAtm,newname];
             endif
         endif
