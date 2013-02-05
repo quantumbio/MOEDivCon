@@ -284,7 +284,14 @@ endfunction
 
 global function qbPhenixPrep [inpdbfile,opt]
     opt = tagcat[opt, PREPDEFAULTS];
-    local testResidues = cat [pro_StandardRes[],'HOH','ACE','NME','ASH','CYX','DA','DT','DG','DC','A','U','G','C'];
+    local testResidues = cat
+        [pro_StandardRes[],'HOH','ACE','NME','ASH','CYX','DA','DT','DG','DC','A','U','G'
+        ,'C','AG','AL','AM','AS','AU','BA','BE','BR','CA','CL','CO','CS','CU','FE','GA',
+        'GE','HE','HG','HO','IN','KR','LI','MG','MN','MO','NA','NE','NI','PB','PD','PT',
+        'PU','RB','SC','SE','SI','SM','SN','SR','TC','TE','TL','XE','YB','ZN','AC','AT',
+        'BI','BK','CE','CF','DY','ER','ES','EU','FM','FR','HF','LA','LR','LU','MD','NB',
+        'ND','NP','OS','PA','PM','PO','PR','RA','RE','RH','RN','RU','SB','TA','TB','TH',
+        'TI','TM','ZR'];
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
     write ['Residues to treat: {}\n', uniq rName residueList];
     qbPrepareSystem [opt];
