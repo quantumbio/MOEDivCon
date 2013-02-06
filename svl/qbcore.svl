@@ -3423,3 +3423,36 @@ global function qb_VerifyDivConComplex [wkey, status, vals]
 
     return status;
 endfunction
+
+// This function will check the license file to make sure the user is allowed to run the
+//  software. It will produce a standard ERROR and it will return a zero if fail. Otherwise it will
+//  return 1. The calling function should then die if the 
+global function qbCheckLicense []
+    local qbhome = getenv 'QBHOME';
+    if isnull qbhome then
+        write ['ERROR: QBHOME must be set prior to running this script!\n\tContact support@quantumbioinc.com for information.'];
+        return 0;
+    endif
+    local licenseFile = twrite ['{}/{}',qbhome,'etc/license'];
+    local LICENSE_FILE = fopenr [licenseFile];
+    if not LICENSE_FILE then
+        write ['ERROR: {} not found!\n\tContact support@quantumbioinc.com for information.',licenseFile];
+    endif
+    local line = cat freadb [LICENSE_FILE, 'line', 1];
+    fclose LICENSE_FILE;
+    write ['{}\n', swrite ['{}',line] ];
+    local [day,month,year] = fieldsplit[third wordsplit  [ line, "\r\t"],"-"];
+    write ['| {} |\n',day]; // third wordsplit[ line," \t"] ];
+    write ['| {} |\n',month]; // third wordsplit[ line," \t"] ];
+    write ['| {} |\n',year]; // third wordsplit[ line," \t"] ];
+    
+    local months;
+    months.DEC = 11;
+    
+    write ['{}\n', months.(totok month)];
+    
+//    write ['{]\n', fullDate];
+//    local date = fieldsplit[fullDate,'-'];
+//    write ['{]\n', date];
+        
+endfunction
