@@ -78,6 +78,7 @@ function fwrite_PDB;
 function pro_Align;
 function pro_Join;
 function MM;
+function StructurePreparation;
 
 // QB Toolbox:
 function qbSelectOnRadius;
@@ -350,7 +351,7 @@ global function qbPrepareSystem [opt]
     endif
     
     if opt.enableAutoPrep then
-        run ['$MOE/lib/svl/run/structprep_ui.svl',[cmd:'cli',batch_protonate3d:0]];
+        StructurePreparation[batch_protonate3d:0];
     endif
 
     local ligandAtoms = cat _Atoms '$$ligand';
