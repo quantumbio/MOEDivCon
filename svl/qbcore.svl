@@ -3426,7 +3426,8 @@ endfunction
 
 // This function will check the license file to make sure the user is allowed to run the
 //  software. It will produce a standard ERROR and it will return a zero if fail. Otherwise it will
-//  return 1. The calling function should then die if the 
+//  return 1. The calling function should then return with error to MOE. (e.g. we aren't putting
+//  an exit[] in here as that would bring down MOE without opportunity to save).
 global function qbCheckLicense []
     local qbhome = getenv 'QBHOME';
     if isnull qbhome then
@@ -3437,22 +3438,33 @@ global function qbCheckLicense []
     local LICENSE_FILE = fopenr [licenseFile];
     if not LICENSE_FILE then
         write ['ERROR: {} not found!\n\tContact support@quantumbioinc.com for information.',licenseFile];
+        return 0;
     endif
     local line = cat freadb [LICENSE_FILE, 'line', 1];
     fclose LICENSE_FILE;
-    write ['{}\n', swrite ['{}',line] ];
     local [day,month,year] = fieldsplit[third wordsplit  [ line, "\r\t"],"-"];
-    write ['| {} |\n',day]; // third wordsplit[ line," \t"] ];
-    write ['| {} |\n',month]; // third wordsplit[ line," \t"] ];
-    write ['| {} |\n',year]; // third wordsplit[ line," \t"] ];
+    day =  tonum token day;
+    year =   tonum token year;
     
     local months;
-    months.DEC = 11;
-    
-    write ['{}\n', months.(totok month)];
-    
-//    write ['{]\n', fullDate];
-//    local date = fieldsplit[fullDate,'-'];
-//    write ['{]\n', date];
-        
+    months.DEC = 12;
+    months.NOV = 11;
+    months.OCT = 10;
+    months.SEP = 9;
+    months.AUG = 8;
+    months.JUL = 7;
+    months.JUN = 6;
+    months.MAY = 5;
+    months.APR = 4;
+    months.MAR = 3;
+    months.FEB = 2;
+    months.JAN = 1;
+  
+    if clock [] < timeYMD_to_clock[year, months.(token month),day,23,59,59] then
+        return 1;
+    else
+        write ['ERROR: Your License to use QuantumBio software has expired!\n\tContact sales@quantumbioinc.com for information.\n'];
+        return 0;
+    endif
+
 endfunction
