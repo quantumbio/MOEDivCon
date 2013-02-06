@@ -31,6 +31,7 @@ function _Atoms;
 function fwrite_PDB;
 function pro_StandardRes;
 function pro_PeptideFlags;
+function StructurePreparation;
 
 function CIF_fread_cif_all;
 function cif_ExtractInfo;
@@ -38,6 +39,7 @@ function cif_ExtractInfo;
 // QB tool box
 function qbPrepareSystem;
 function qbCorrectAtomNames;
+function qbCheckLicense;
 
 // statics
 static transFileName;
@@ -264,8 +266,6 @@ local function FindPeptideBreaks[inChains]
     
 endfunction
 
-function qbCheckLicense;
-function StructurePreparation;
 global function qbPhenixPrep [inpdbfile,opt]
     // WARNING: removal/circumvention of license check code is a direct violation of license agreement!
     if not qbCheckLicense[] then
