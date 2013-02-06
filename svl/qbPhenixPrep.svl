@@ -283,7 +283,10 @@ endfunction
 
 function qbCheckLicense;
 global function qbPhenixPrep [inpdbfile,opt]
-//    qbCheckLicense[];
+    // WARNING: removal/circumvention of license check code is a direct violation of license agreement!
+    if not qbCheckLicense[] then
+        return;
+    endif
     opt = tagcat[opt, PREPDEFAULTS];
     local testResidues = cat
         [pro_StandardRes[],'HOH','ACE','NME','ASH','CYX','DA','DT','DG','DC','A','U','G',
