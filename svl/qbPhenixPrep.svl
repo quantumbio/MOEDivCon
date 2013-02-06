@@ -45,6 +45,7 @@ static transFileName;
 const PREPDEFAULTS = [
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
     enableProtonate:1,      // Turns on Protonate3D
+    protPH:[],              // Set pH for Protonation
     enableLigFix:0          // Fixes the ligand protonation
 ];
 
@@ -177,24 +178,6 @@ local function RenameBasedOnCIF [residueList]
 endfunction
 // ===================== 
 
-// This function provides an APPROXIMATE renaming scheme for ligands to PDBv3 standards
-//  in order to address a MOE foible which does not name new protons based on the heavy element
-//  to which it is attached leading to non-unique atom names within a ligand.
-//  TODO: REMOVE or REPLACE - already replaced by call to qbCorrectAtomNames in qbFrom_structprep_ui.svl
-local function RenameHforPDBv3 [allAtoms]
-    local tmpAtm;
-    for tmpAtm in allAtoms | aElement allAtoms == 'H' loop
-        local boundHeavy = allAtoms | bOrder [tmpAtm, allAtoms];
-        if not cat [aElement boundHeavy == 'C'] then
-            if not strpos [string tok_cat ['H',aElement boundHeavy], string aName tmpAtm] then
-                local newname = tok_cat['H',aElement boundHeavy,tok_drop[aName tmpAtm,1]];
-                write [' INFO: {} in {} {}:{} changed to {}\n', aName tmpAtm, rName aResidue tmpAtm,cName rChain aResidue tmpAtm, rUID aResidue tmpAtm, newname];
-                aSetName[tmpAtm,newname];
-            endif
-        endif
-    endloop
-endfunction
-
 local function WriteResidue [outResidues]
     local fileHandle;
     static newResidueName;
@@ -282,6 +265,7 @@ local function FindPeptideBreaks[inChains]
 endfunction
 
 function qbCheckLicense;
+function StructurePreparation;
 global function qbPhenixPrep [inpdbfile,opt]
     // WARNING: removal/circumvention of license check code is a direct violation of license agreement!
     if not qbCheckLicense[] then
@@ -298,7 +282,9 @@ global function qbPhenixPrep [inpdbfile,opt]
          'TI','TM','ZR'];
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
     write ['Residues to treat: {}\n', uniq rName residueList];
-    qbCorrectAtomNames[];
+    
+    local t = StructurePreparation [cmd:'_types'];
+    StructurePreparation [disableTypes : diff [t, ['HName']], batch_protonate3d:0];
     qbPrepareSystem [opt];
     
     // address a MOE-ism that renames HIS residues based on protonation
@@ -306,8 +292,7 @@ global function qbPhenixPrep [inpdbfile,opt]
     rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HIE'],'HIS'];
 
-//    RenameHforPDBv3[cat rAtoms residueList];  // replaced by:
-    qbCorrectAtomNames[];
+    StructurePreparation [disableTypes : diff [t, ['HName']], batch_protonate3d:0];
     transFileName = twrite['{}-phenix.translation',fbase inpdbfile];
     residueList = diff [residueList,RenameBasedOnCIF[residueList]];
 
