@@ -161,7 +161,7 @@ const SPREP_DEF_MOEBATCH = [
     reportName		: '',
     autoIsolate		: 1,		    // 1 if single click isolates
 					    // in listbox.
-    batch_protonate3d	: 1,		    // run Protonate3D after fixing
+    batch_protonate3d	: 0,		    // run Protonate3D after fixing
 					    // errors in batch mode.
     disableTypes		: 'HName'
 ];
@@ -457,32 +457,42 @@ local function proprep_cb;
 
 local function initialize_SPREP_fcn opt 
     local prio = task_prio 0;
-    local pfcn = sym_find_f 'proprep_*';
+//    local pfcn = sym_find_f 'proprep_*';
+    local pfcn = sym_find_f 'proprep_ligand';
+//    local pfcn;
     local u_var = tok_drop [pfcn,8];
 
+// these are removed in favor of a single one (e.g. atomname)
+//    pfcn = cat [
+//	pfcn,
+//	#proprep_forcefield,
+//	#proprep_library,
+//	#proprep_atomname,
+//	#proprep_topology,
+//	#proprep_metal,
+//	#proprep_se,
+//	#proprep_missH,
+//	#proprep_cb,
+//	#proprep_charge
+//  ];
     pfcn = cat [
 	pfcn,
-	#proprep_forcefield,
-	#proprep_library,
-	#proprep_atomname,
-	#proprep_topology,
-	#proprep_metal,
-	#proprep_se,
-	#proprep_missH,
-	#proprep_cb,
-	#proprep_charge
+	#proprep_atomname
     ];
-
+write ['pfcn: {}\n', pfcn];
+//    u_var = cat [u_var,
+//	'forcefield',
+//	'library',
+//	'atomname',
+//	'topology',
+//	'metal',
+//	'se',
+//	'missH',
+//	'cb',
+//	'charge'
+//  ];
     u_var = cat [u_var,
-	'forcefield',
-	'library',
-	'atomname',
-	'topology',
-	'metal',
-	'se',
-	'missH',
-	'cb',
-	'charge'
+	'atomname'
     ];
 
 	// Get currently loaded types. If no type returned exit.
@@ -3108,15 +3118,109 @@ endfunction
 
 // ===== ProPrep entry point ==================================================
 
+global function OLD_StructurePreparationGUI opt;
+
+    if MOE_BATCH then
+	opt = tagcat [opt,SPREP_DEF_MOEBATCH];
+
+	    // If in MOE BATCH and using interactive give wanring that it is
+	    // not possible
+
+	if opt.cmd == 'interactive' then
+	   write
+		'There is no interactive mode for MOE batch. Please use\n'
+		'ProPrep [keys,[cmd:\'cli\']]. This will automatically fix\n'
+		'all errors in the loaded system. If you want to use the\n'
+		'interactive mode please use the MOE GUI\n';
+	    return;
+	endif
+    else
+
+	    // Show window if it already exists. Prevents two protein
+	    // prep panels from being open.
+
+	if WindowShow [WINDOW_NAME, 1] then
+	    return;
+	endif
+	opt = tagcat [opt,SPREP_DEF_MOEGUI];
+    endif
+
+	// Read amber library and initialize SPREP functions.
+
+    local lib_file = GetRC ['RotamerLibrary', STD_RES_LIB];
+    SPREP_RLIB = _amber_ResidueLibrary lib_file;
+    initialize_SPREP_fcn opt;
+
+    local nErr;
+
+	// Open up interactive GUI for Protein Preparation
+
+    if opt.cmd == 'interactive' then
+
+	sprep_panel opt;
+
+	// Run command line for for Protein Preparation. In this option
+	// all suggested fixes are applied followed by running Protonate3D.
+
+    elseif opt.cmd == 'cli' then
+
+	    // Fix Errors
+
+	update_system [];
+	fix_errors 0;
+
+	if opt.batch_protonate3d then
+	    local protectAtms = oGetCollection P3D_PROTECT_SET;
+	    local atms = cat oAtoms CNTXT_rkeys;
+	    Add_H atms;
+	    Protonate3D [atms,atms,atms,protectAtms,[],[verbose:0]];
+	endif
+
+	    // Fix errors caused by protonate 3D.
+
+	update_system [];
+	fix_errors 0;
+
+	if opt.reportName <> '' then
+	    write_report opt.reportName;
+	endif
+
+	update_system [];
+	nErr = get_number_err [];
+	return tag [SPREP_fcn.u_psumgroup,nErr];
+
+    elseif opt.cmd == 'summary' then
+	update_system [];
+	nErr = get_number_err [];
+	return tag [SPREP_fcn.u_psumgroup,nErr];
+
+    elseif opt.cmd == 'items' then
+	update_system [];
+	return keep [SPREP_prob,3];
+    elseif opt.cmd == '_items' then
+	update_system [];
+	return SPREP_prob;
+    endif
+endfunction
+
+global function _StructurePreparationGUI_OLD [chains, opt]
+    SPREP_chains = chains;
+    return OLD_StructurePreparationGUI opt;
+endfunction
+
 function proprep_diagnose_atomname;
 function proprep_fix_atomname;
 global function qbCorrectAtomNames []
-    local opt;
-    opt = tagcat [opt,SPREP_DEF_MOEGUI];
-    SPREP_RLIB = _amber_ResidueLibrary STD_RES_LIB;
-    initialize_SPREP_fcn opt;
-    update_system[];
+//    local opt;
+//    opt = tagcat [opt,SPREP_DEF_MOEGUI];
+//    SPREP_RLIB = _amber_ResidueLibrary STD_RES_LIB;
+//    initialize_SPREP_fcn opt;
+//    update_system[];
+
+    OLD_StructurePreparationGUI[];
+
     local failedAtoms = proprep_diagnose_atomname Residues[];
+write ['{}\n', rName first failedAtoms];
     proprep_fix_atomname [Residues[],failedAtoms];
 endfunction
 
@@ -5635,7 +5739,7 @@ local function proprep_diagnose_atomname res
 
     local r = (CNTXT_rkeys | not CNTXT_libmatch);
     local ratoms = cat rAtoms (r | m_diff [rType r, ['amino','dna','rna']]);
-    ratoms = ratoms | aOccupancy ratoms == 1;
+//    ratoms = ratoms | aOccupancy ratoms == 1;
     ratoms = split [ratoms, mtoc m_uniq aResidue ratoms];
     ratoms = ratoms | app length ratoms;
     local anames = aName ratoms;
