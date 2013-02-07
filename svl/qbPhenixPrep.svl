@@ -43,6 +43,7 @@ function qbCheckLicense;
 
 // statics
 static transFileName;
+static residueNamesTaken;
 
 const PREPDEFAULTS = [
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
@@ -118,19 +119,27 @@ local function applycif[ cif_file, root, atoms ]
 
 endfunction
 
-static residueNamesTaken;
+
+local function DoubleCheckCIFNames[inResidue,names]
+    local mol = mol_Extract inResidue;
+    local pdata = SystemPush [];
+    fwrite_PDB ['1234567890-tmp.pdb',mol_Create mol];
+    local testChains = ReadPDB['1234567890-tmp.pdb'];
+    fdelete '1234567890-tmp.pdb';
+    local newnames = cat aName rAtoms cResidues testChains;
+    SystemPop pdata;
+    return sort newnames === sort names;
+endfunction
+
 local function ProcessCIF[ cif_file, inResidue ]
     local atoms = cat rAtoms inResidue;
     local root = token first wordsplit[ string ftail[ cif_file], ".cif"];
     root = tolower root;
     local names = applycif[ cif_file, root, atoms ];
     
-    if not isnull names then
+    if not isnull names and DoubleCheckCIFNames[inResidue,names] then
         write [' INFO: Use  {} for residue {} {}:{}\n', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue];
-write ['names before: {}\n', names];  // DELME
         aSetName[ atoms, names ];
-write ['names after:  {} | {}\n', rName inResidue, cat aName rAtoms inResidue];                 // DELME
-write ['names test:   {}\n', cat aName rAtoms [Residues [] | rName Residues [] == 'KCX']];      // DELME
         residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
         return inResidue;
     else
@@ -272,7 +281,6 @@ endfunction
 local function RenameProtonsInOrder[inResidues]
     local inResidue;
     for inResidue in inResidues loop
-write ['Test: {}\n', rName inResidue];
         local allAtoms = cat rAtoms inResidue;
         local tmpHatom, Hcount = 0;
         
@@ -283,19 +291,6 @@ write ['Test: {}\n', rName inResidue];
     endloop
 endfunction
 
-local function DoubleCheckCIFNames[inResidues]
-    local inResidue;
-    for inResidue in inResidues loop
-write ['Test: {}\n', rName inResidue];
-        local allAtoms = cat rAtoms inResidue;
-        local tmpHatom, Hcount = 0;
-        
-        for tmpHatom in cat [allAtoms | aAtomicNumber allAtoms == 1] loop
-            Hcount = Hcount + 1;
-            aSetName [tmpHatom, twrite ['{}{}','H',Hcount]];
-        endloop
-    endloop
-endfunction
 
 global function qbPhenixPrep [inpdbfile,opt]
     // WARNING: removal/circumvention of license check code is a direct violation of license agreement!
@@ -325,7 +320,6 @@ global function qbPhenixPrep [inpdbfile,opt]
 
     StructurePreparation [disableTypes : diff [t, ['HName','AName']], batch_protonate3d:0];
     transFileName = twrite['{}-phenix.translation',fbase inpdbfile];
-write ['{}\n', length residueList];
 //    RenameProtonsInOrder [residueList];
     residueList = diff [residueList,RenameBasedOnCIF[residueList]];
 
@@ -337,7 +331,6 @@ write ['{}\n', length residueList];
     for tmpIndexGrp in indicesof [uniq x_fsort data,x_fsort data] loop
         WriteResidue[residueList[tmpIndexGrp]];
     endloop
-write ['names test:   {}\n', cat aName rAtoms [Residues [] | rName Residues [] == 'KCX']];      // DELME
 
     FindPeptideBreaks[];
 endfunction
@@ -352,10 +345,7 @@ global function qbPhenixPrepFile[inpdbfile,opt]
     endif
 
     qbPhenixPrep[inpdbfile,opt];
-//    WritePDB[twrite['{}-phenix.pdb',fbase inpdbfile],[cryst1:1]];
-write ['names test:   {}\n', cat aName rAtoms [Residues [] | rName Residues [] == 'KCX']];      // DELME
-    WritePDB[twrite['{}-phenix.pdb',fbase inpdbfile]];
-write ['names test:   {}\n', cat aName rAtoms [Residues [] | rName Residues [] == 'KCX']];      // DELME
+    WritePDB[twrite['{}-phenix.pdb',fbase inpdbfile],[cryst1:1]];
 endfunction
 
 global function qbPostPhenix [inpdbfile,trFile]
