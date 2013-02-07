@@ -323,10 +323,10 @@ global function qbPhenixPrep [inpdbfile,opt]
     rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HIE'],'HIS'];
 
-//    StructurePreparation [disableTypes : diff [t, ['HName','AName']], batch_protonate3d:0];
+    StructurePreparation [disableTypes : diff [t, ['HName','AName']], batch_protonate3d:0];
     transFileName = twrite['{}-phenix.translation',fbase inpdbfile];
 write ['{}\n', length residueList];
-    RenameProtonsInOrder [residueList];
+//    RenameProtonsInOrder [residueList];
     residueList = diff [residueList,RenameBasedOnCIF[residueList]];
 
     local data = app aName rAtoms residueList;
