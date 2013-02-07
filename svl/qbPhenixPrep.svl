@@ -23,7 +23,7 @@
 #endif   
 
 
-// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C.pdb',[enableAutoPrep:1,enableProtonate:1,enableLigFix:0]],'qbPhenixPrepFile']" -exit
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['3V7Y.pdb',[enableAutoPrep:0,enableProtonate:1,enableLigFix:0]],'qbPhenixPrepFile']" -exit
 
 // example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C-phenix.pdb','1A2C-phenix.translation'],'qbPostPhenixFile']" -exit
 
@@ -269,10 +269,32 @@ local function FindPeptideBreaks[inChains]
     
 endfunction
 
-local function RenameProtonsInOrder[inResidue]
+local function RenameProtonsInOrder[inResidues]
+    local inResidue;
+    for inResidue in inResidues loop
+write ['Test: {}\n', rName inResidue];
+        local allAtoms = cat rAtoms inResidue;
+        local tmpHatom, Hcount = 0;
+        
+        for tmpHatom in cat [allAtoms | aAtomicNumber allAtoms == 1] loop
+            Hcount = Hcount + 1;
+            aSetName [tmpHatom, twrite ['{}{}','H',Hcount]];
+        endloop
+    endloop
+endfunction
 
-    
-
+local function DoubleCheckCIFNames[inResidues]
+    local inResidue;
+    for inResidue in inResidues loop
+write ['Test: {}\n', rName inResidue];
+        local allAtoms = cat rAtoms inResidue;
+        local tmpHatom, Hcount = 0;
+        
+        for tmpHatom in cat [allAtoms | aAtomicNumber allAtoms == 1] loop
+            Hcount = Hcount + 1;
+            aSetName [tmpHatom, twrite ['{}{}','H',Hcount]];
+        endloop
+    endloop
 endfunction
 
 global function qbPhenixPrep [inpdbfile,opt]
@@ -282,7 +304,7 @@ global function qbPhenixPrep [inpdbfile,opt]
     endif
     opt = tagcat[opt, PREPDEFAULTS];
     local testResidues = cat
-        [pro_StandardRes[],'HOH','ACE','NME','ASH','CYX','DA','DT','DG','DC','A','U','G',
+        [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G',
           'C','AG','AL','AM','AS','AU','BA','BE','BR','CA','CL','CO','CS','CU','FE','GA',
          'GE','HE','HG','HO','IN','KR','LI','MG','MN','MO','NA','NE','NI','PB','PD','PT',
          'PU','RB','SC','SE','SI','SM','SN','SR','TC','TE','TL','XE','YB','ZN','AC','AT',
@@ -293,7 +315,7 @@ global function qbPhenixPrep [inpdbfile,opt]
     write ['Residues to treat: {}\n', uniq rName residueList];
     
     local t = StructurePreparation [cmd:'_types'];
-    StructurePreparation [disableTypes : diff [t, ['HName']], batch_protonate3d:0];
+//    StructurePreparation [disableTypes : diff [t, ['HName']], batch_protonate3d:0];
     qbPrepareSystem [opt];
     
     // address a MOE-ism that renames HIS residues based on protonation
@@ -301,8 +323,10 @@ global function qbPhenixPrep [inpdbfile,opt]
     rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HIE'],'HIS'];
 
-    StructurePreparation [disableTypes : diff [t, ['HName','AName']], batch_protonate3d:0];
+//    StructurePreparation [disableTypes : diff [t, ['HName','AName']], batch_protonate3d:0];
     transFileName = twrite['{}-phenix.translation',fbase inpdbfile];
+write ['{}\n', length residueList];
+    RenameProtonsInOrder [residueList];
     residueList = diff [residueList,RenameBasedOnCIF[residueList]];
 
     local data = app aName rAtoms residueList;
