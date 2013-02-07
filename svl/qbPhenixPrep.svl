@@ -127,7 +127,10 @@ local function ProcessCIF[ cif_file, inResidue ]
     
     if not isnull names then
         write [' INFO: Use  {} for residue {} {}:{}\n', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue];
+write ['names before: {}\n', names];  // DELME
         aSetName[ atoms, names ];
+write ['names after:  {} | {}\n', rName inResidue, cat aName rAtoms inResidue];                 // DELME
+write ['names test:   {}\n', cat aName rAtoms [Residues [] | rName Residues [] == 'KCX']];      // DELME
         residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
         return inResidue;
     else
@@ -266,6 +269,12 @@ local function FindPeptideBreaks[inChains]
     
 endfunction
 
+local function RenameProtonsInOrder[inResidue]
+
+    
+
+endfunction
+
 global function qbPhenixPrep [inpdbfile,opt]
     // WARNING: removal/circumvention of license check code is a direct violation of license agreement!
     if not qbCheckLicense[] then
@@ -292,7 +301,7 @@ global function qbPhenixPrep [inpdbfile,opt]
     rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HIE'],'HIS'];
 
-    StructurePreparation [disableTypes : diff [t, ['HName']], batch_protonate3d:0];
+    StructurePreparation [disableTypes : diff [t, ['HName','AName']], batch_protonate3d:0];
     transFileName = twrite['{}-phenix.translation',fbase inpdbfile];
     residueList = diff [residueList,RenameBasedOnCIF[residueList]];
 
@@ -304,6 +313,7 @@ global function qbPhenixPrep [inpdbfile,opt]
     for tmpIndexGrp in indicesof [uniq x_fsort data,x_fsort data] loop
         WriteResidue[residueList[tmpIndexGrp]];
     endloop
+write ['names test:   {}\n', cat aName rAtoms [Residues [] | rName Residues [] == 'KCX']];      // DELME
 
     FindPeptideBreaks[];
 endfunction
@@ -318,7 +328,10 @@ global function qbPhenixPrepFile[inpdbfile,opt]
     endif
 
     qbPhenixPrep[inpdbfile,opt];
-    WritePDB[twrite['{}-phenix.pdb',fbase inpdbfile],[cryst1:1]];
+//    WritePDB[twrite['{}-phenix.pdb',fbase inpdbfile],[cryst1:1]];
+write ['names test:   {}\n', cat aName rAtoms [Residues [] | rName Residues [] == 'KCX']];      // DELME
+    WritePDB[twrite['{}-phenix.pdb',fbase inpdbfile]];
+write ['names test:   {}\n', cat aName rAtoms [Residues [] | rName Residues [] == 'KCX']];      // DELME
 endfunction
 
 global function qbPostPhenix [inpdbfile,trFile]
