@@ -5722,7 +5722,7 @@ local function proprep_diagnose_atomname res
 
     local r = (CNTXT_rkeys | not CNTXT_libmatch);
     local ratoms = cat rAtoms (r | m_diff [rType r, ['amino','dna','rna']]);
-    ratoms = ratoms | aOccupancy ratoms == 1;
+//    ratoms = ratoms | aOccupancy ratoms == 1;
     ratoms = split [ratoms, mtoc m_uniq aResidue ratoms];
     ratoms = ratoms | app length ratoms;
     local anames = aName ratoms;
