@@ -168,6 +168,25 @@ local function recursiveDirectoryList[directory]
     return cat filelist;
 endfunction
 
+local function GetRNamesFromCIF[ciffiles,tmpResidue]
+    local tmpCIFfile = [];
+    if isnull ciffiles then
+        return tmpCIFfile;
+    endif
+    
+    for tmpCIFfile in ciffiles loop
+        local c = CIF_fread_cif_all [tmpCIFfile, MONLIB_CIF_DICT];
+    
+        local x;
+        local availableResEntries = [];
+        for x = 2, length c, 1 loop
+            availableResEntries = cat [availableResEntries, token toupper second fieldsplit[string first cat c[x], "_"]];
+        endloop
+        if length join [availableResEntries, rName tmpResidue] > 0 then ; return tmpCIFfile; endif
+    endloop
+    return [];
+endfunction
+
 local function RenameBasedOnCIF [residueList,ciffiles]
     local phenixdb;
     if not isnull getenv 'PHENIX' then
@@ -192,12 +211,13 @@ local function RenameBasedOnCIF [residueList,ciffiles]
     local foundResidues;
     local residuesToRemove;
     local filelist = recursiveDirectoryList[phenixdb];
-    if not isnull ciffiles then
-        filelist = cat [ciffiles, filelist];
-    endif
     for tmpResidue in residueList loop
-        local cifFile = fabsname filelist | fbase ftail filelist == rName tmpResidue;
+        local cifFile = GetRNamesFromCIF[ciffiles,tmpResidue];
+        if isnull cifFile then
+            cifFile = fabsname filelist | fbase ftail filelist == rName tmpResidue;
+        endif
         if not isnull cifFile then
+            write [' INFO: Attempting to use {} for {} residue {}:{}\n', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue];
             residuesToRemove = cat [residuesToRemove, ProcessCIF[cifFile,tmpResidue]];
         else
             write ['WARNING: no CIF file found for {} residue {}:{} \n', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue];
@@ -317,7 +337,7 @@ global function qbPhenixPrep [inpdbfile,opt,ciffiles]
     write ['Residues to treat: {}\n', uniq rName residueList];
     
     qbPrepareSystem [opt];
-    
+
     // address a MOE-ism that renames HIS residues based on protonation
     rSetName [cat [Residues [] | rName Residues [] == 'HIP'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
