@@ -23,7 +23,7 @@
 #endif   
 
 
-// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['3V7Y.pdb',[enableAutoPrep:0,enableProtonate:1,enableLigFix:0]],'qbPhenixPrepFile']" -exit
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['3V7Y.pdb',[enableAutoPrep:0,enableProtonate:1,enableLigFix:0],['test.cif','test2.cif']],'qbPhenixPrepFile']" -exit
 
 // example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C-phenix.pdb','1A2C-phenix.translation'],'qbPostPhenixFile']" -exit
 
@@ -48,7 +48,8 @@ static residueNamesTaken;
 const PREPDEFAULTS = [
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
     enableProtonate:1,      // Turns on Protonate3D
-    protPH:[],              // Set pH for Protonation
+    protPH:7.4,              // Set pH for Protonation
+    qmApplication:[],       // Skip the DivCon tests - we will be running no matter what since this is refinement.
     enableLigFix:0          // Fixes the ligand protonation
 ];
 
@@ -74,6 +75,13 @@ const MONLIB_CIF_DICT = [
 
 local function applycif[ cif_file, root, atoms ]
 
+    local newnames = [];
+    
+    if ftype cif_file === '' then
+        write ['WARNING: CIF filename {} not found!\n', cif_file];
+        return newnames;
+    endif
+    
 	// First read the cif file and build a db_mol data structure
 
     local c = CIF_fread_cif_all [cif_file, MONLIB_CIF_DICT];
@@ -98,8 +106,6 @@ local function applycif[ cif_file, root, atoms ]
     local dict_ckeys = mol_Create mol;
     local dict_akeys = cat cAtoms dict_ckeys;
 
-    local newnames = [];
-
     if length dict_akeys === length atoms then
 
         local x_smi_dict = aPrioSMI dict_akeys;
@@ -118,7 +124,6 @@ local function applycif[ cif_file, root, atoms ]
     return newnames;
 
 endfunction
-
 
 local function DoubleCheckCIFNames[inResidue,names]
     local mol = mol_Extract inResidue;
@@ -148,6 +153,9 @@ local function ProcessCIF[ cif_file, inResidue ]
 endfunction
 
 local function recursiveDirectoryList[directory]
+    if isnull directory then
+        return [];
+    endif
     local list = flist directory;
     local tmpdir, filelist;
     for tmpdir in list loop
@@ -160,26 +168,33 @@ local function recursiveDirectoryList[directory]
     return cat filelist;
 endfunction
 
-local function RenameBasedOnCIF [residueList]
+local function RenameBasedOnCIF [residueList,ciffiles]
     local phenixdb;
-    if isnull phenixdb then
-        if not isnull getenv 'PHENIX' then
-            phenixdb = tok_cat [getenv 'PHENIX', '/chem_data/'];
-        else
-               //            1         2         3         4         5         6         7         8
-               //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
-            write ['WARNING: In order to attempt the use of CIF-based naming, you must supply path \n'];
-            write ['         to PHENIX cif database using $PHENIX environment variable as per \n'];
-            write ['         PHENIX documentation.\n\n'];
+    if not isnull getenv 'PHENIX' then
+        phenixdb = tok_cat [getenv 'PHENIX', '/chem_data/'];
+        write ['NOTE: Using Phenix cif database found at {}\n', phenixdb];
+    else
+        write ['\n'];
+           //            1         2         3         4         5         6         7         8
+           //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
+        write ['WARNING: In order to attempt the use of CIF-based naming, you must supply path \n'];
+        write ['         to PHENIX cif database using $PHENIX environment variable as per \n'];
+        write ['         PHENIX documentation.\n'];
+        if isnull ciffiles then
+            write ['\n'];
             return[];
+        else
+            write [' NOTE: Attempting to use CIF files provided.\n\n'];
         endif
     endif
-    write ['NOTE: Using Phenix cif database found at {}\n', phenixdb];
 
     local tmpResidue;
     local foundResidues;
     local residuesToRemove;
     local filelist = recursiveDirectoryList[phenixdb];
+    if not isnull ciffiles then
+        filelist = cat [ciffiles, filelist];
+    endif
     for tmpResidue in residueList loop
         local cifFile = fabsname filelist | fbase ftail filelist == rName tmpResidue;
         if not isnull cifFile then
@@ -217,7 +232,6 @@ local function WriteResidue [outResidues]
         newResidueName = residueName;
         rSetName [outResidues, newResidueName];
         write ['NOTE (residue name conversion): {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]];
-//        fwrite [fileHandle, ' {} = {} : {}\n', newResidueName, oldResidueName,  twrite ['{}-{}',tr [rUID outResidues, cName rChain outResidues]]];
         fwrite [fileHandle, ' {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]];
         fclose fileHandle;
     endif
@@ -291,7 +305,7 @@ local function RenameProtonsInOrder[inResidues]
     endloop
 endfunction
 
-global function qbPhenixPrep [inpdbfile,opt]
+global function qbPhenixPrep [inpdbfile,opt,ciffiles]
     // WARNING: removal/circumvention of license check code is a direct violation of license agreement!
     if not qbCheckLicense[] then
         return;
@@ -312,7 +326,7 @@ global function qbPhenixPrep [inpdbfile,opt]
     local prepTypes = StructurePreparation [cmd:'_types'];
     StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0];
     transFileName = twrite['{}-phenix.translation',fbase inpdbfile];
-    residueList = diff [residueList,RenameBasedOnCIF[residueList]];
+    residueList = diff [residueList,RenameBasedOnCIF[residueList,ciffiles]];
 
     local data = app aName rAtoms residueList;
     data = app sort data;
@@ -326,7 +340,7 @@ global function qbPhenixPrep [inpdbfile,opt]
     FindPeptideBreaks[];
 endfunction
 
-global function qbPhenixPrepFile[inpdbfile,opt]
+global function qbPhenixPrepFile[inpdbfile,opt,ciffiles]
     oDestroy Chains[];
     local tmpIn;
     tmpIn.alt_loc = 1;
@@ -335,7 +349,7 @@ global function qbPhenixPrepFile[inpdbfile,opt]
         return;
     endif
 
-    qbPhenixPrep[inpdbfile,opt];
+    qbPhenixPrep[inpdbfile,opt,ciffiles];
     WritePDB[twrite['{}-phenix.pdb',fbase inpdbfile],[cryst1:1]];
 endfunction
 
