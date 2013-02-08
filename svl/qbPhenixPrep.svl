@@ -291,7 +291,6 @@ local function RenameProtonsInOrder[inResidues]
     endloop
 endfunction
 
-
 global function qbPhenixPrep [inpdbfile,opt]
     // WARNING: removal/circumvention of license check code is a direct violation of license agreement!
     if not qbCheckLicense[] then
@@ -303,8 +302,6 @@ global function qbPhenixPrep [inpdbfile,opt]
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
     write ['Residues to treat: {}\n', uniq rName residueList];
     
-    local t = StructurePreparation [cmd:'_types'];
-//    StructurePreparation [disableTypes : diff [t, ['HName']], batch_protonate3d:0];
     qbPrepareSystem [opt];
     
     // address a MOE-ism that renames HIS residues based on protonation
@@ -312,9 +309,9 @@ global function qbPhenixPrep [inpdbfile,opt]
     rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HIE'],'HIS'];
 
-    StructurePreparation [disableTypes : diff [t, ['HName','AName']], batch_protonate3d:0];
+    local prepTypes = StructurePreparation [cmd:'_types'];
+    StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0];
     transFileName = twrite['{}-phenix.translation',fbase inpdbfile];
-//    RenameProtonsInOrder [residueList];
     residueList = diff [residueList,RenameBasedOnCIF[residueList]];
 
     local data = app aName rAtoms residueList;
