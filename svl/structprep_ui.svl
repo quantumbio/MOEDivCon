@@ -1,6 +1,7 @@
 #svl
 //	structprep_ui.svl	user interface for automatic structure prep.
 //
+//	08-feb-2013 (cc) Fix aname of heavy or H only if non-uniq name
 //	06-feb-2013 (cc) return all types
 //	05-nov-2012 (cc) Bh updates
 //	25-oct-2012 (cc) Fixed move to calculated Chiral flag in private system.
@@ -5722,11 +5723,13 @@ local function proprep_diagnose_atomname res
 
     local r = (CNTXT_rkeys | not CNTXT_libmatch);
     local ratoms = cat rAtoms (r | m_diff [rType r, ['amino','dna','rna']]);
-//    ratoms = ratoms | aOccupancy ratoms == 1;
+    ratoms = ratoms | aOccupancy ratoms == 1;
     ratoms = split [ratoms, mtoc m_uniq aResidue ratoms];
     ratoms = ratoms | app length ratoms;
     local anames = aName ratoms;
     local m_uatoms = app m_uniq anames;
+    local isHonly = app andE aIsLight (ratoms || not m_uatoms);
+    local isHeavyonly = app andE not aIsLight (ratoms || not m_uatoms);
 
     [ratoms,anames,m_uatoms] = [ratoms,anames,m_uatoms] || [
 	not app andE m_uatoms
@@ -5738,13 +5741,24 @@ local function proprep_diagnose_atomname res
     local badatomnames = zero ratoms;
     local i;
     for i=1, length ratoms loop
-	local a = cat [
-	    ratoms(i) | not aIsLight ratoms(i),
-	    ratoms(i) | aIsLight ratoms(i)
-	];
-	anames = tok_cat [aElement a, totok x_id a];
+	local a  = ratoms(i) | not aIsLight ratoms(i);
+	local ha = ratoms(i) | aIsLight ratoms(i);
+	anames = aName a;
+	local hnames = aName ha;
+	if isHonly(i) then
+	    hnames = tok_cat [aElement ha, totok x_id ha];
+	elseif isHeavyonly(i) then
+	    anames = tok_cat [aElement a, totok x_id a];
+	else
+	    hnames = tok_cat [aElement ha, totok x_id ha];
+	    anames = tok_cat [aElement a, totok x_id a];
+	endif
+
+	anames = cat [anames, hnames];
+	a = cat [a, ha];
+
 	local x = indexof[a, ratoms(i)];
-	badatomnames(i) = anames[x_sort x];;
+	badatomnames(i) = anames[x_sort x];
     endloop;
 
     local txt = cat [
