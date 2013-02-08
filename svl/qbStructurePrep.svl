@@ -111,7 +111,7 @@ const DEFAULTS = [
     printAtms:[],           // ['LIG',5.0] print the atoms within 5A of residue LIG.
     printRes:[],           // ['LIG',5.0] print the atoms within 5A of residue LIG.
     hamiltonian:'pm6',     // the Hamiltonian to be used downstream
-    qmApplication:'qms',       // the particular QM application to be used downstream
+    qmApplication:[],       // the particular QM application to be used downstream
     quitonerror:0,          // by default, the run will continue even on error (not good if used in shell script)
     outfiletype:'mol2',     // output file type supported by script (can be either mol2 or PDB).
     enableAmberName:0,         // output amber names in PDB files.
