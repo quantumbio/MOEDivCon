@@ -382,7 +382,7 @@ global function qbPrepareSystem [opt]
     
     if opt.enableProtonate then
         local prepTypes = StructurePreparation [cmd:'_types'];
-        StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0];
+        StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName','HCount']], batch_protonate3d:0];
 
         local preciseWaters = [];
         if opt.enablePreciseHOH then
