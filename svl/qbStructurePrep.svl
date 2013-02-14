@@ -381,6 +381,9 @@ global function qbPrepareSystem [opt]
     endif
     
     if opt.enableProtonate then
+        local prepTypes = StructurePreparation [cmd:'_types'];
+        StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0];
+
         local preciseWaters = [];
         if opt.enablePreciseHOH then
             preciseWaters = _Atoms '$$solvent';
@@ -398,6 +401,7 @@ global function qbPrepareSystem [opt]
         else
             Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,[],preciseWaters,protOptions];
         endif
+        StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0];
     endif
     
     if opt.enableOpt then
