@@ -48,6 +48,7 @@ static residueNamesTaken;
 const PREPDEFAULTS = [
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
     enableProtonate:1,      // Turns on Protonate3D
+    forceUseElement:1,         // force reading of the element in the PDB file. Not a good idea if file format broken.
     protPH:7.4,              // Set pH for Protonation
     qmApplication:[],       // Skip the DivCon tests - we will be running no matter what since this is refinement.
     enableLigFix:0          // Fixes the ligand protonation
@@ -330,7 +331,6 @@ global function qbPhenixPrep [inpdbfile,opt,ciffiles]
     if not qbCheckLicense[] then
         return;
     endif
-    opt = tagcat[opt, PREPDEFAULTS];
     local testResidues = cat
         [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C'];
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
@@ -361,10 +361,12 @@ global function qbPhenixPrep [inpdbfile,opt,ciffiles]
 endfunction
 
 global function qbPhenixPrepFile[inpdbfile,opt,ciffiles]
+    opt = tagcat[opt, PREPDEFAULTS];
     oDestroy Chains[];
     local tmpIn;
     tmpIn.alt_loc = 1;
     tmpIn.install_cryst = 1;
+    tmpIn.use_element = opt.forceUseElement;
     if not length ReadPDB[inpdbfile,tmpIn] then
         return;
     endif
