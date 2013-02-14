@@ -31,7 +31,6 @@ function _Atoms;
 function fwrite_PDB;
 function pro_StandardRes;
 function pro_PeptideFlags;
-function StructurePreparation;
 
 function CIF_fread_cif_all;
 function cif_ExtractInfo;
@@ -343,8 +342,6 @@ global function qbPhenixPrep [inpdbfile,opt,ciffiles]
     rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HIE'],'HIS'];
 
-    local prepTypes = StructurePreparation [cmd:'_types'];
-    StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0];
     transFileName = twrite['{}-phenix.translation',fbase inpdbfile];
     residueList = diff [residueList,RenameBasedOnCIF[residueList,ciffiles]];
 
