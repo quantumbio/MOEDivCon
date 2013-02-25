@@ -100,6 +100,7 @@ const DEFAULTS = [
     enableProtonate:0,      // turns on Protonate3D
     protPH:[],             // set pH in Protonate3D to default
     protAtomList:[],        // list of atom indices to protonate
+    notProtAtomList:[],        // list of atom indices not to protonate
     enablePreciseHOH:0,     // turns on precise waters in Protonate3D (can cause LONG calc if turned on).
     enableLigFix:1,         // but fixes the ligand protonation
     enableCutWat:0,         // it will not remove all waters beyond ligand
@@ -344,6 +345,15 @@ global function qbPrepareSystem [opt]
 
     opt = tagcat[opt, DEFAULTS];
     
+    local atomsToProtonate;
+    if not isnull opt.protAtomList then     // needs to be set here because atom numbers can change!
+        atomsToProtonate = (Atoms[])[indexof[opt.protAtomList,aNumber Atoms[]]];
+    endif
+    local atomsNotToProtonate;
+    if not isnull opt.notProtAtomList then  // needs to be set here because atom numbers can change!
+        atomsNotToProtonate = (Atoms[])[indexof[opt.notProtAtomList,aNumber Atoms[]]];
+    endif
+    
     write ['Running Options: {}\n', opt];
     
     if opt.enableStripLP then
@@ -388,10 +398,14 @@ global function qbPrepareSystem [opt]
         if opt.enablePreciseHOH then
             preciseWaters = _Atoms '$$solvent';
         endif
-        local atomsToProtonate = Atoms[];
+
         if not isnull opt.protAtomList then
-            atomsToProtonate = (Atoms[])[indexof[opt.protAtomList,aNumber Atoms[]]];
+            atomsToProtonate = join [Atoms[], atomsToProtonate];
+        else
+            atomsToProtonate = Atoms[];
         endif
+        atomsToProtonate = diff [atomsToProtonate, atomsNotToProtonate];
+        
         local protOptions = [];
         if not isnull opt.protPH then
             protOptions=[pH:opt.protPH];

@@ -20,8 +20,7 @@
 
  ***********************************************************************/
  // END COPYRIGHT
-#endif   
-
+#endif
 
 // example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['3V7Y.pdb',[enableAutoPrep:0,enableProtonate:1,enableLigFix:0],['test.cif','test2.cif']],'qbPhenixPrepFile']" -exit
 
@@ -50,7 +49,8 @@ const PREPDEFAULTS = [
     forceUseElement:1,         // force reading of the element in the PDB file. Not a good idea if file format broken.
     protPH:7.4,              // Set pH for Protonation
     qmApplication:[],       // Skip the DivCon tests - we will be running no matter what since this is refinement.
-    enableLigFix:0          // Fixes the ligand protonation
+    enableLigFix:0,          // Fixes the ligand protonation
+    enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
 ];
 
 // Source code between  // ===================== lines based on code provided by CCG 1/2013
@@ -73,19 +73,10 @@ const MONLIB_CIF_DICT = [
     '_chem_comp_plane_atom.dist_esd':'float'
 ];
 
-local function applycif[ cif_file, root, atoms ]
-
-    local newnames = [];
-    
-    if ftype cif_file === '' then
-        write ['WARNING: CIF filename {} not found!\n', cif_file];
-        return newnames;
-    endif
-    
-	// First read the cif file and build a db_mol data structure
+local function cif2mol[ cif_file, root ]
+    root = tolower root;
 
     local c = CIF_fread_cif_all [cif_file, MONLIB_CIF_DICT];
-
     local tt = tok_cat[ 'comp_', root ];
     local nn = length c.(tt).'_chem_comp_atom.atom_id';
     local x0 = rep[ 0, nn ];
@@ -94,18 +85,88 @@ local function applycif[ cif_file, root, atoms ]
     c.(tt).'_chem_comp_atom.z' = x0;
 
     local d = cif_ExtractInfo [c.(tt), [hetnam: string toupper root,
-	type:'monlibcif', havechg: 1, verbose:1]];
+	    type:'monlibcif', havechg: 0, verbose:1]];
+    return first d.models;
+endfunction
 
-    local mol = first d.models;
+// JT: takes atom keys from a template (dictionary), modify the ionization
+//     state of the molecule and assign all the matching names from the
+//     dictionary.
+local function matchHydrogens[ cif_file, inResidue, root ]
+    local amol = cat rAtoms inResidue;
+    local amol_num = uniq aMoleculeNumber amol;
+    if length amol_num <> 1 or 
+        length cat amol <> length cat [Atoms[] | indexof[ aMoleculeNumber Atoms[], amol_num ]] then
+        write ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. not single, complete, small molecule, residue)\n',rName inResidue, cName rChain inResidue, rUID inResidue];
+        return [];
+    endif
+    
+	// Match heavy atoms of each molecule
+	// in a separate system
+	// Idea: strip off hydrogens, set ionization
+	// to zero and used the PrioSMI function
+	// to find matching heavy (between dictionary and molecule)
+	// IMPORTANT: it is expected that the two molecules have
+	// the same connection table and differ only by the
+	// ionization of their heavy atoms
 
-	// Map the names using unique smiles sorting
+    local sys_info = SystemPush amol;
+    local m_h = (aElement Atoms[]) == 'H';
+    oDestroy (Atoms[] | m_h);
+    aSetIon[ Atoms[], 0 ];
+    local x_smi_mol_heavy = aPrioSMI Atoms[];
+    local s_heavy_mol = oSerialNumber Atoms[];
+    local amolHeavyCnt = length cat Atoms[];
+    SystemPop sys_info;
 
-    local [sys_old, sys_new] = SystemPush atoms;
-    atoms = Atoms[];
+    sys_info = SystemPush[];
+    local adict = first cAtoms first mol_Create cif2mol[ cif_file, root ];
+    local name_prio = aName adict[ x_sort aPrioSMI adict ];
+    m_h = (aElement Atoms[]) == 'H';
+    local ion_heavy = aIon (Atoms[]| not m_h);
+    oDestroy (Atoms[] | m_h );
+    aSetIon[ Atoms[], 0 ];
+    local ions_ordered_dict_heavy = ion_heavy[ x_sort aPrioSMI Atoms[] ];
+    local cifHeavyCnt = length cat Atoms[];
+    SystemPop sys_info;
 
+    if amolHeavyCnt == cifHeavyCnt then
+        local amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
+        local amolisorted = amoli[ x_sort x_smi_mol_heavy ];
+        aSetIon[ amolisorted, ions_ordered_dict_heavy ];
+        Add_H amol;
+        amol = cat rAtoms inResidue;
+        local x_smi_mol  = aPrioSMI amol;
+        aSetName[  amol[ x_sort x_smi_mol ], name_prio ];
+    else
+        amol = [];
+    endif
+    return amol;
+endfunction
+
+local function applycif[ cif_file, root, atoms ]
+
+    local newnames = [];
+    
+    if ftype cif_file === '' then
+        write ['WARNING: CIF filename {} not found!\n', cif_file];
+        return newnames;
+    endif
+        
+    local mol = cif2mol[ cif_file, root ];
     local dict_ckeys = mol_Create mol;
     local dict_akeys = cat cAtoms dict_ckeys;
 
+    oDestroy dict_ckeys;
+    
+	// Map the names using unique smiles sorting
+
+    local sys_info = SystemPush atoms;
+    atoms = Atoms[];
+
+    dict_ckeys = mol_Create mol;
+    dict_akeys = cat cAtoms dict_ckeys;
+    
     if length dict_akeys === length atoms then
 
         local x_smi_dict = aPrioSMI dict_akeys;
@@ -120,11 +181,13 @@ local function applycif[ cif_file, root, atoms ]
         endif
     endif
 
-    SystemPop[ sys_old, sys_new ];
+    SystemPop sys_info;
     return newnames;
 
 endfunction
 
+// lmw - occasionally the MOE PDB read/writer will manipulate atom names.
+//      This function will return whether or not this is the case.
 local function DoubleCheckCIFNames[inResidue,names]
     local mol = mol_Extract inResidue;
     local pdata = SystemPush [];
@@ -139,7 +202,6 @@ endfunction
 local function ProcessCIF[ cif_file, inResidue ]
     local atoms = cat rAtoms inResidue;
     local root = token first wordsplit[ string ftail[ cif_file], ".cif"];
-    root = tolower root;
     local names = applycif[ cif_file, root, atoms ];
     
     if not isnull names and DoubleCheckCIFNames[inResidue,names] then
@@ -187,6 +249,30 @@ local function GetRNamesFromCIF[ciffiles,tmpResidue]
     return [];
 endfunction
 
+local function ProtonateBasedOnCif [residueList,ciffiles]
+    local filelist = [];
+    local fixedAtoms;
+    if not isnull getenv 'PHENIX' then
+        filelist = recursiveDirectoryList[tok_cat [getenv 'PHENIX', '/chem_data/']];
+    endif
+    if isnull cat [ciffiles,filelist] then
+        write ['NOTE: No CIF files processed for protonation.\n'];
+        return fixedAtoms;
+    endif
+    local tmpResidue;
+    for tmpResidue in residueList loop
+        local cifFile = GetRNamesFromCIF[ciffiles,tmpResidue];
+        if isnull cifFile then
+            cifFile = first cat [ fabsname filelist | fbase ftail filelist == rName tmpResidue ];
+        endif
+        if not isnull cifFile then
+            write [' INFO: Attempting to use {} for protonation of {} residue {}:{}\n', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue];
+            fixedAtoms = cat [fixedAtoms, matchHydrogens[cifFile, tmpResidue, rName tmpResidue]];
+        endif
+    endloop
+    return fixedAtoms;
+endfunction
+
 local function RenameBasedOnCIF [residueList,ciffiles]
     local phenixdb;
     if not isnull getenv 'PHENIX' then
@@ -208,13 +294,12 @@ local function RenameBasedOnCIF [residueList,ciffiles]
     endif
 
     local tmpResidue;
-    local foundResidues;
     local residuesToRemove;
     local filelist = recursiveDirectoryList[phenixdb];
     for tmpResidue in residueList loop
         local cifFile = GetRNamesFromCIF[ciffiles,tmpResidue];
         if isnull cifFile then
-            cifFile = fabsname filelist | fbase ftail filelist == rName tmpResidue;
+            cifFile = first cat [ fabsname filelist | fbase ftail filelist == rName tmpResidue ];
         endif
         if not isnull cifFile then
             write [' INFO: Attempting to use {} for {} residue {}:{}\n', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue];
@@ -334,6 +419,10 @@ global function qbPhenixPrep [inpdbfile,opt,ciffiles]
         [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C'];
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
     write ['Residues to treat: {}\n', uniq rName residueList];
+    
+    if opt.enableCIFprotons then
+        opt.notProtAtomList = aNumber ProtonateBasedOnCif[residueList,ciffiles];
+    endif
     
     qbPrepareSystem [opt];
 
