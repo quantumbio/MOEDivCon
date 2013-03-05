@@ -40,6 +40,7 @@ errorOut()
 #   echo "12345678901234567890123456789012345678901234567890123456789012345678901234567890"
     echo
     echo "REQUIRED Command line arguments:"
+    echo "  --expCSV=FILENAME    * File containing experimental CSP data (see example)."
     echo "  --target=FILENAME    * File corresponding to protein structure"
     echo "  --ligand=FILENAME    * File corresponding to ligand structure"
     echo "          OR"
@@ -108,6 +109,9 @@ while test $# -gt 0 ; do
             ;;
         --complex=*)
             inComplexFile=$optarg
+            ;;
+        --expCSV=*)
+            inExperimentalFile=$optarg
             ;;
         --setqbhome=*)
             QBHOME=$optarg ; export QBHOME
@@ -180,20 +184,10 @@ MOEARGS="[${MOEFILES},[hamiltonian:'mndo',qmApplication:'nmr',quitonerror:1,enab
 echo $MOEARGS
 
 rm -f lig_${filename}.atms lig_${filename}.mol2 mp_${filename}.atms mp_${filename}.mol2 targ_${filename}.atms targ_${filename}.mol2
-${QBHOME}/bin/qbmoebatch moebatch -exec "run ['$QBHOME/svl/qbPrep2Files.svl',$MOEARGS,'qbPrep2Files']" -exit
-
-if [ ! -e lig_${filename}.atms ] ; then
-    echo "ERROR: lig_${filename}.atms NOT FOUND!"
-    errorOut
-fi
+${QBHOME}/bin/qbmoebatch -exec "run ['$QBHOME/svl/qbPrep2Files.svl',$MOEARGS,'qbPrep2Files']" -exit
 
 if [ ! -e lig_${filename}.mol2 ] ; then
     echo "ERROR: lig_${filename}.mol2 NOT FOUND!"
-    errorOut
-fi
-
-if [ ! -e mp_${filename}.atms ] ; then
-    echo "ERROR: mp_${filename}.atms NOT FOUND!"
     errorOut
 fi
 
@@ -202,64 +196,88 @@ if [ ! -e mp_${filename}.mol2 ] ; then
     errorOut
 fi
 
-if [ ! -e targ_${filename}.atms ] ; then
-    echo "ERROR: mp_${filename}.atms NOT FOUND!"
-    errorOut
-fi
-
 if [ ! -e targ_${filename}.mol2 ] ; then
     echo "ERROR: mp_${filename}.mol2 NOT FOUND!"
     errorOut
 fi
 
+$QBHOME/bin/qbmoebatch -exec "qbProcessCSVNMR [ascii_file:'$inExperimentalFile',targ_file:'targ_${filename}.mol2',lig_file:'lig_${filename}.mol2',cmplx_file:'mp_${filename}.mol2']" -exit
+
+if [ ! -e lig_${filename}.atms && ! -e targ_${filename}.atms ] ; then
+    echo "ERROR: lig_${filename}.atms and/or targ_${filename}.atms NOT FOUND! (required for CSP)"
+    errorOut
+fi
+
+if [ ! -e mp_${filename}.atms ] ; then
+    echo "ERROR: mp_${filename}.atms NOT FOUND! (required for CSP)"
+    errorOut
+fi
+
 echo "Running DivCon"
 
-atmlist=`cat lig_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
-echo "calnuc=0" > lig_${filename}.ini
-echo "maxit=300" >> lig_${filename}.ini
-echo "[nmr]" >> lig_${filename}.ini
-echo "atom=${atmlist%?}" >> lig_${filename}.ini
+if [ -e lig_${filename}.atms ] ; then
+    atmlist=`cat lig_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
+    echo "calnuc=0" > lig_${filename}.ini
+    echo "maxit=300" >> lig_${filename}.ini
+    echo "[nmr]" >> lig_${filename}.ini
+    echo "atom=${atmlist%?}" >> lig_${filename}.ini
 
-atmlist=`cat mp_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
-echo "calnuc=0" > mp_${filename}.ini
-echo "maxit=300" >> mp_${filename}.ini
-echo "[nmr]" >> mp_${filename}.ini
-echo "atom=${atmlist%?}" >> mp_${filename}.ini
+    if ( ${QBHOME}/bin/divcon --nmr -i lig_${filename}.mol2 --hamiltonian=mndo_nmr -I lig_${filename}.ini -O --standard -d lig_${filename}.h5 --charge=labute --screen ) ; then
+        echo ; echo "Ligand NMR Calculation Successful" ; echo
+    else
+        echo ; echo "ERROR: Ligand NMR Calculation Unsuccessful - try running with --enableMinimization"
+               echo "   NOTE: NMR Support in DivCon5.x is considered beta. In order to help improve the"
+               echo "           algorithm, if possible please send input along with divcon.log file to"
+               echo "           support@quantumbioinc.com"
+        exit 1
+    fi
 
-atmlist=`cat targ_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
-echo "calnuc=0" > targ_${filename}.ini
-echo "maxit=300" >> targ_${filename}.ini
-echo "[nmr]" >> targ_${filename}.ini
-echo "atom=${atmlist%?}" >> targ_${filename}.ini
-
-if ( ${QBHOME}/bin/divcon --nmr -i targ_${filename}.mol2  --hamiltonian=mndo_nmr -I targ_${filename}.ini -O --standard -d targ_${filename}.h5 --charge=labute --screen ) ; then
-    echo ; echo "Target NMR Calculation Successful" ; echo
 else
-    echo ; echo "Target NMR Calculation Unsuccessful - try running with --enableMinimization" ; echo
-           echo "   NOTE: NMR Support in DivCon5.x is considered beta. In order to help improve the"
-           echo "           algorithm, if possible please send input along with divcon.log file to"
-           echo "           support@quantumbioinc.com"
-    exit 1
+    echo "WARNING: lig_${filename}.atms NOT FOUND!"
 fi
 
-if ( ${QBHOME}/bin/divcon --nmr -i lig_${filename}.mol2 --hamiltonian=mndo_nmr -I lig_${filename}.ini -O --standard -d lig_${filename}.h5 --charge=labute --screen ) ; then
-    echo ; echo "Ligand NMR Calculation Successful" ; echo
+if [ ! -e mp_${filename}.atms ] ; then
+    atmlist=`cat mp_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
+    echo "calnuc=0" > mp_${filename}.ini
+    echo "maxit=300" >> mp_${filename}.ini
+    echo "[nmr]" >> mp_${filename}.ini
+    echo "atom=${atmlist%?}" >> mp_${filename}.ini
+
+    if ( ${QBHOME}/bin/divcon --nmr -i mp_${filename}.mol2  --hamiltonian=mndo_nmr -I mp_${filename}.ini -O --standard -d mp_${filename}.h5 --charge=labute --screen ) ; then
+        echo ; echo "Complex NMR Calculation Successful" ; echo
+    else
+        echo ; echo "Complex NMR Calculation Unsuccessful - try running with --enableMinimization" ; echo
+               echo "   NOTE: NMR Support in DivCon5.x is considered beta. In order to help improve the"
+               echo "           algorithm, if possible please send input along with divcon.log file to"
+               echo "           support@quantumbioinc.com"
+        exit 1
+    fi
+
 else
-    echo ; echo "ERROR: Ligand NMR Calculation Unsuccessful - try running with --enableMinimization"
-           echo "   NOTE: NMR Support in DivCon5.x is considered beta. In order to help improve the"
-           echo "           algorithm, if possible please send input along with divcon.log file to"
-           echo "           support@quantumbioinc.com"
-    exit 1
+    echo "ERROR: mp_${filename}.atms NOT FOUND! (complex required)"
+    errorOut
 fi
 
-if ( ${QBHOME}/bin/divcon --nmr -i mp_${filename}.mol2  --hamiltonian=mndo_nmr -I mp_${filename}.ini -O --standard -d mp_${filename}.h5 --charge=labute --screen ) ; then
-    echo ; echo "Complex NMR Calculation Successful" ; echo
+if [ ! -e targ_${filename}.atms ] ; then
+    atmlist=`cat targ_${filename}.atms  | tr '\n' ' ' | sed 's/    ATOM //g'`
+    echo "calnuc=0" > targ_${filename}.ini
+    echo "maxit=300" >> targ_${filename}.ini
+    echo "[nmr]" >> targ_${filename}.ini
+    echo "atom=${atmlist%?}" >> targ_${filename}.ini
+
+    if ( ${QBHOME}/bin/divcon --nmr -i targ_${filename}.mol2  --hamiltonian=mndo_nmr -I targ_${filename}.ini -O --standard -d targ_${filename}.h5 --charge=labute --screen ) ; then
+        echo ; echo "Target NMR Calculation Successful" ; echo
+    else
+        echo ; echo "Target NMR Calculation Unsuccessful - try running with --enableMinimization" ; echo
+               echo "   NOTE: NMR Support in DivCon5.x is considered beta. In order to help improve the"
+               echo "           algorithm, if possible please send input along with divcon.log file to"
+               echo "           support@quantumbioinc.com"
+        exit 1
+    fi
+
 else
-    echo ; echo "Complex NMR Calculation Unsuccessful - try running with --enableMinimization" ; echo
-           echo "   NOTE: NMR Support in DivCon5.x is considered beta. In order to help improve the"
-           echo "           algorithm, if possible please send input along with divcon.log file to"
-           echo "           support@quantumbioinc.com"
-    exit 1
+    echo "WARNING: targ_${filename}.atms NOT FOUND!"
 fi
 
-${QBHOME}/bin/qbmoebatch -exec "qbProcessComplexLigand  ['targ_${filename}.mol2','lig_${filename}.mol2','targ_${filename}.h5','lig_${filename}.h5','mp_${filename}.h5']" -exit
+${QBHOME}/bin/qbmoebatch -exec "qbProcessComplexCSP  ['targ_${filename}.mol2','lig_${filename}.mol2','targ_${filename}.h5','lig_${filename}.h5','mp_${filename}.h5']" -exit
+
