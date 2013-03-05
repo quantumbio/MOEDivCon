@@ -323,6 +323,108 @@ global function qb_NMRScore [recmol, ligmol, perfile, coreopts, appopts,
 endfunction
 
 // QuantumBio h5 Java/SVL interface functions
+
+function __db_ImportASCII_DetectOptions;
+function __db_ImportASCII_ReadFile;
+function db_ImportASCII;
+function db_Open;
+function db_Close;
+
+global function qb_cLetter chainid
+    return fext cName chainid;
+endfunction
+
+local function FindAtoms values
+
+    local interestResidue = Residues [] | qb_cLetter rChain Residues [] == token values.Chain and rUID Residues[] == values.Sequence;
+
+    if isnull interestResidue then
+        return [];
+    endif
+
+    local interestAtoms = cat rAtoms interestResidue;
+
+    local centeredAtom = interestAtoms | aName interestAtoms == token values.'Centered Atom';
+    local heavyAtoms = interestAtoms | aPrioCIP interestAtoms == aPrioCIP centeredAtom;
+ 
+    local boundAtoms = cat aBonds heavyAtoms;
+    local protonAtoms = boundAtoms | aElement boundAtoms == 'H';
+    
+    return cat [heavyAtoms,protonAtoms];
+endfunction
+
+local function writeElementList[outpat,atoms]
+    local atmlist = sort aNumber uniq atoms;
+    local outfile = twrite ['{}.atms',fbase ftail outpat];
+    write ['INFO: Writing {} atom(s) to file {}\n', length atmlist, outfile];
+    if not isnull atmlist then
+        local fileHDL = fopenw outfile;
+        local atmID;
+        for atmID in atmlist loop
+            fwrite [fileHDL,'    ATOM {}\n',atmID];
+        endloop
+        fclose fileHDL;
+    else
+        fdelete outfile;
+    endif
+
+endfunction
+
+// MOE requires a MDB with which to work in subsequent steps.
+//  This function will translate the user-provided CSV file (of same "format" as Pipeline) to that MDB file.
+local function NMRCSVtoMDB opt
+
+    db_Close db_Open [opt.db_file,'create'];
+    opt = __db_ImportASCII_DetectOptions opt;
+    opt = __db_ImportASCII_ReadFile opt;
+    opt.types = ['char','char','int','char','float','float','float','float','float','float'];
+    db_ImportASCII opt;
+    return opt;
+
+endfunction
+
+function _Atoms;
+
+global function qbProcessCSVNMR opt
+    local INDEFAULTS;
+    INDEFAULTS.db_file = twrite['{}-DELETE.mdb',fbase opt.ascii_file];
+
+    opt = NMRCSVtoMDB tagcat[opt, INDEFAULTS];
+
+    local mdbKey = db_Open [opt.db_file,'read'];
+    local entryKeys = db_Entries mdbKey;
+    local tmpEntryKey, values, runAtoms;
+
+    runAtoms = [];
+    oDestroy Chains[];
+    oSetCollection ['Receptor',cat oAtoms ReadAuto[opt.targ_file]];
+    for tmpEntryKey in entryKeys loop
+        runAtoms = uniq cat [runAtoms, FindAtoms db_Read [mdbKey,tmpEntryKey]];
+    endloop
+    writeElementList [opt.targ_file,join[runAtoms,_Atoms '$$receptor']];
+
+    runAtoms = [];
+    oDestroy Chains[];
+    oSetCollection ['Ligand',cat oAtoms ReadAuto[opt.lig_file]];
+    for tmpEntryKey in entryKeys loop
+        runAtoms = uniq cat [runAtoms, FindAtoms db_Read [mdbKey,tmpEntryKey]];
+    endloop
+    writeElementList [opt.lig_file,join[runAtoms,_Atoms '$$ligand']];
+
+    runAtoms = [];
+    oDestroy Chains[];
+    oSetCollection ['Receptor',cat oAtoms ReadAuto[opt.targ_file]];
+    oSetCollection ['Ligand',cat oAtoms ReadAuto[opt.lig_file]];
+    for tmpEntryKey in entryKeys loop
+        runAtoms = uniq cat [runAtoms, FindAtoms db_Read [mdbKey,tmpEntryKey]];
+    endloop
+    writeElementList [opt.cmplx_file,runAtoms];
+
+    db_Close [mdbKey];
+    fdelete opt.db_file;
+
+endfunction
+
 function qbRetrieveNMRAverages;
 function qbListModels;
 
@@ -410,3 +512,5 @@ global function qbProcessComplexCSP[targetfile,ligandfile,targeth5,ligandh5,comp
         endif
     endloop
 endfunction
+
+
