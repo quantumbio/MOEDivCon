@@ -374,7 +374,6 @@ endfunction
 //  This function will translate the user-provided CSV file (of same "format" as Pipeline) to that MDB file.
 local function NMRCSVtoMDB opt
 
-    db_Close db_Open [opt.db_file,'create'];
     opt = __db_ImportASCII_DetectOptions opt;
     opt = __db_ImportASCII_ReadFile opt;
     opt.types = ['char','char','int','char','float','float','float','float','float','float'];
@@ -389,7 +388,9 @@ global function qbProcessCSVNMR opt
     local INDEFAULTS;
     INDEFAULTS.db_file = twrite['{}-DELETE.mdb',fbase opt.ascii_file];
 
-    opt = NMRCSVtoMDB tagcat[opt, INDEFAULTS];
+    opt = tagcat[opt, INDEFAULTS];
+    db_Close db_Open [opt.db_file,'create'];
+    opt = NMRCSVtoMDB opt;
 
     local mdbKey = db_Open [opt.db_file,'read'];
     local entryKeys = db_Entries mdbKey;
