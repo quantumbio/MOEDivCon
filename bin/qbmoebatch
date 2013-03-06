@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MOEBIN=`which moebatch`
+export MOEBIN=`which moebatch`
 
 if [ -z "$MOEBIN" ] ; then
   echo "ERROR: Unable to find MOEbatch. Please set PATH according to MOE documentation."

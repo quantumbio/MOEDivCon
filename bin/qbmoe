@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MOEBIN=`which moe`
+export MOEBIN=`which moe`
 
 if [ -z "$MOEBIN" ] ; then
   echo "ERROR: Unable to find MOE. Please set PATH according to MOE documentation."
