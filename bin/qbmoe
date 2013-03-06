@@ -28,25 +28,16 @@ fi
 . ${QBHOME}/etc/qbenv.sh
 
 # setup the MOE environment
-if [ -z "${MOE_SVL_RUNPATH}" ]; then
-    MOE_SVL_RUNPATH="${QBHOME}/svl:${HOME}/svl"; export MOE_SVL_RUNPATH
-else
-    MOE_SVL_RUNPATH="${QBHOME}/svl:$MOE_SVL_RUNPATH"; export MOE_SVL_RUNPATH
-fi
-if [ -z "${MOE_SVL_LOAD}" ]; then
-    MOE_SVL_LOAD="${QBHOME}/svl"; export MOE_SVL_LOAD
-else
-    MOE_SVL_LOAD="${QBHOME}/svl"; export MOE_SVL_LOAD
-fi
+addpath "${QBHOME}/svl" MOE_SVL_RUNPATH
+MOE_SVL_LOAD="${QBHOME}/svl"; export MOE_SVL_LOAD
 
 MOEHOME=`dirname ${MOEBIN}`
 MOEHOME=`dirname ${MOEHOME}`
-CLASSPATH=$QBHOME/${PLTFM_VER}/MOEDivcon.jar:$MOEHOME/java/svljava.jar:${CLASSPATH} ; export CLASSPATH        
-if [ -z "${SVL_CLASSPATH}" ]; then
-    SVL_CLASSPATH=$CLASSPATH ; export SVL_CLASSPATH
-else
-    SVL_CLASSPATH=$CLASSPATH:$SVL_CLASSPATH ; export SVL_CLASSPATH
-fi
+addpath "$MOEHOME/java/svljava.jar" CLASSPATH
+addpath "$QBHOME/${PLTFM_VER}/MOEDivcon.jar" CLASSPATH
+addpath ${CLASSPATH} SVL_CLASSPATH
+
+env
 
 exec "$MOEBIN" "$@"
 
