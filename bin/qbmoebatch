@@ -35,11 +35,7 @@ MOEHOME=`dirname ${MOEBIN}`
 MOEHOME=`dirname ${MOEHOME}`
 addpath "$MOEHOME/java/svljava.jar" CLASSPATH
 addpath "$QBHOME/${PLTFM_VER}/MOEDivcon.jar" CLASSPATH
-if [ -z "${SVL_CLASSPATH}" ]; then
-    SVL_CLASSPATH=$CLASSPATH ; export SVL_CLASSPATH
-else
-    SVL_CLASSPATH=$CLASSPATH:$SVL_CLASSPATH ; export SVL_CLASSPATH
-fi
+addpath ${CLASSPATH} SVL_CLASSPATH
 
 exec "$MOEBIN" "$@"
 
