@@ -11,6 +11,9 @@ global function qbRetrieveResiduePWD  arg  = jvmqb ['retrieveResiduePWD' , [arg]
 global function qbRetrieveAtomByAtomPWD  arg  = jvmqb ['retrieveAtomByAtomPWD' , [arg]  ];
 global function qbRetrieveAtomByAtomMRM  arg  = jvmqb ['retrieveAtomByAtomMRM' , [arg]  ];
 global function qbRetrieveNMRAverages  arg = jvmqb ['retrieveNMRAverages' , [arg] ];
+global function qbRetrieveDensities  arg = jvmqb ['retrieveDensities' , [arg] ];
+global function qbRetrieveEigenVectors  arg = jvmqb ['retrieveEigenVectors' , [arg] ];
+global function qbRetrieveEnergyLevels  arg = jvmqb ['retrieveEnergyLevels' , [arg] ];
 
 // The following function can be used test the new h5 
 // example:
@@ -28,20 +31,23 @@ global function qbTesth5Main [h5file]
     
     local modelTags = cat qbListModels [h5file];
     
-    write ['length modelTags.Target : {}\n', length modelTags.Target];
+    write ['length modelTags.target : {}\n', length modelTags.target];
     
-    write ['modelTags.Target: {}\n', modelTags.Target];
-    write ['modelTags.Ligand: {}\n', modelTags.Ligand];
+    write ['modelTags.target: {}\n', modelTags.target];
+    write ['modelTags.ligand: {}\n', modelTags.ligand];
     
-//    local NMRvalues=cat qbRetrieveNMRAverages [h5file,modelTags.Target];
+//    local NMRvalues=cat qbRetrieveNMRAverages [h5file,modelTags.target];
 //    write ['{}\n',NMRvalues.Index];
 //    write ['{}\n',NMRvalues.Average];
 
     print qbListModels [h5file];
-    print qbRetrieveQMScore [h5file, modelTags.Target];
-    print qbRetrieveResiduePWD [h5file, modelTags.Target];
-    print qbRetrieveAtomByAtomPWD [h5file, modelTags.Target];
-    print qbRetrieveAtomByAtomMRM [h5file, modelTags.Target];
-    print qbRetrieveNMRAverages [h5file, modelTags.Target];
+    //print qbRetrieveQMScore [h5file, modelTags.target];
+    //print qbRetrieveResiduePWD [h5file, modelTags.target];
+    //print qbRetrieveAtomByAtomPWD [h5file, modelTags.target];
+    //print qbRetrieveAtomByAtomMRM [h5file, modelTags.target];
+    //print qbRetrieveNMRAverages [h5file, modelTags.target];
+    print  qbRetrieveDensities [h5file, modelTags.target];
+    print  qbRetrieveEigenVectors [h5file, modelTags.target];
+    print  qbRetrieveEnergyLevels [h5file, modelTags.target];
 
 endfunction

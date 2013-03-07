@@ -75,6 +75,18 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             {
                 res = retrieveNMRAverages(res);
             }
+	    else if (cmd.equals("retrieveDensities"))
+            {
+                res = retrieveDensities(res);
+            }
+	    else if (cmd.equals("retrieveEigenVectors"))
+            {
+                res = retrieveEigenVectors(res);
+            }
+	    else if (cmd.equals("retrieveEnergyLevels"))
+            {
+                res = retrieveEnergyLevels(res);
+            }
 	    else {
 		throw new SVLJavaException("here Unknown command: '" + cmd + "'.");
 	    }
@@ -121,7 +133,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
     {
         String filename = var.peek(1).getTokn(1);
         String target = var.peek(1).getTokn(2);
-        H5File h5File=new H5File(filename, H5File.READ);
+        H5File h5File=new H5File(filename, H5File.WRITE);
         h5File.open();
                 String xPath="/DivCon";
                 H5Group divconGroup=(H5Group)findHDF5Object(h5File, xPath);
@@ -929,6 +941,98 @@ private SVLVar retrieveNMRAverages(SVLVar var) throws SVLJavaException, IOExcept
             }
     SVLVar data=new SVLVar(new String[]{"index", "average", "anisotropy"}, averages);
             h5File.close();
+    return new SVLVar(data);
+}
+    
+private SVLVar retrieveDensities(SVLVar var) throws SVLJavaException, IOException, Exception
+{
+    String filename = var.peek(1).getTokn(1);
+    String target = var.peek(1).getTokn(2);
+    H5File h5File=new H5File(filename, H5File.READ);
+    h5File.open();
+    String xPath="/DivCon/"+target+"/Densities";
+    H5Group nmrGroup=(H5Group)findHDF5Object(h5File, xPath);
+    SVLVar[] averages=new SVLVar[3];
+    if(nmrGroup!=null)
+    {
+        List nmrRow=nmrGroup.getMemberList();
+        for(int memberIndex=0;memberIndex<1;memberIndex++)
+        {
+            H5ScalarDS member=(H5ScalarDS)nmrRow.get(memberIndex);
+            double[] densities=(double[])member.read();
+            averages[0]=new SVLVar(Math.sqrt(densities.length));
+            averages[1]=new SVLVar(Math.sqrt(densities.length));
+            averages[2]=new SVLVar(densities);
+        }
+    }
+    else
+    {
+        averages[0]=new SVLVar(0);
+        averages[1]=new SVLVar(0);
+        averages[2]=new SVLVar();
+    }
+    SVLVar data=new SVLVar(new String[]{"rows", "cols", "densities"}, averages);
+            h5File.close();
+    return new SVLVar(data);
+}
+    
+private SVLVar retrieveEigenVectors(SVLVar var) throws SVLJavaException, IOException, Exception
+{
+    String filename = var.peek(1).getTokn(1);
+    String target = var.peek(1).getTokn(2);
+    H5File h5File=new H5File(filename, H5File.READ);
+    h5File.open();
+    String xPath="/DivCon/"+target+"/Eigenvectors";
+    H5Group nmrGroup=(H5Group)findHDF5Object(h5File, xPath);
+    SVLVar[] averages=new SVLVar[3];
+    if(nmrGroup!=null)
+    {
+        List nmrRow=nmrGroup.getMemberList();
+        for(int memberIndex=0;memberIndex<1;memberIndex++)
+        {
+            H5ScalarDS member=(H5ScalarDS)nmrRow.get(memberIndex);
+            double[] densities=(double[])member.read();
+            averages[0]=new SVLVar(Math.sqrt(densities.length));
+            averages[1]=new SVLVar(Math.sqrt(densities.length));
+            averages[2]=new SVLVar(densities);
+        }
+    }
+    else
+    {
+        averages[0]=new SVLVar(0);
+        averages[1]=new SVLVar(0);
+        averages[2]=new SVLVar();
+    }
+    SVLVar data=new SVLVar(new String[]{"rows", "cols", "eigenVectors"}, averages);
+            h5File.close();
+    return new SVLVar(data);
+}
+    
+private SVLVar retrieveEnergyLevels(SVLVar var) throws SVLJavaException, IOException, Exception
+{
+    String filename = var.peek(1).getTokn(1);
+    String target = var.peek(1).getTokn(2);
+    H5File h5File=new H5File(filename, H5File.READ);
+    h5File.open();
+//   java.lang.System.out.println("h5 opened ");
+    String xPath="/DivCon/"+target+"/Energy Levels";
+    H5Group nmrGroup=(H5Group)findHDF5Object(h5File, xPath);
+    SVLVar[] averages=new SVLVar[1];
+    if(nmrGroup!=null)
+    {
+        List nmrRow=nmrGroup.getMemberList();
+        for(int memberIndex=0;memberIndex<1;memberIndex++)
+        {
+            H5ScalarDS member=(H5ScalarDS)nmrRow.get(memberIndex);
+            averages[0]=new SVLVar((double[])member.read());
+        }
+    }
+    else
+    {
+        averages[0]=new SVLVar(new String[]{filename, target});
+    }
+    SVLVar data=new SVLVar(new String[]{"energyLevels"}, averages);
+    h5File.close();
     return new SVLVar(data);
 }
     
