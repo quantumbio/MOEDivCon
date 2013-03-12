@@ -14,6 +14,8 @@ global function qbRetrieveNMRAverages  arg = jvmqb ['retrieveNMRAverages' , [arg
 global function qbRetrieveDensities  arg = jvmqb ['retrieveDensities' , [arg] ];
 global function qbRetrieveEigenVectors  arg = jvmqb ['retrieveEigenVectors' , [arg] ];
 global function qbRetrieveEnergyLevels  arg = jvmqb ['retrieveEnergyLevels' , [arg] ];
+global function qbSetNMRAtomSelection  arg = jvmqb ['setNMRAtomSelection' , [arg] ];
+global function qbStoreModel  arg = jvmqb ['storeModel' , [arg] ];
 
 // The following function can be used test the new h5 
 // example:
@@ -46,8 +48,9 @@ global function qbTesth5Main [h5file]
     //print qbRetrieveAtomByAtomPWD [h5file, modelTags.target];
     //print qbRetrieveAtomByAtomMRM [h5file, modelTags.target];
     //print qbRetrieveNMRAverages [h5file, modelTags.target];
-    print  qbRetrieveDensities [h5file, modelTags.target];
-    print  qbRetrieveEigenVectors [h5file, modelTags.target];
-    print  qbRetrieveEnergyLevels [h5file, modelTags.target];
+    //print  qbRetrieveDensities [h5file, modelTags.target];
+    //print  qbRetrieveEigenVectors [h5file, modelTags.target];
+    //print  qbRetrieveEnergyLevels [h5file, modelTags.target];
+    qbSetNMRAtomSelection [h5file, modelTags.target, [0,1,2,10]];
 
 endfunction
