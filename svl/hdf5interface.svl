@@ -27,22 +27,22 @@ global function qbTesth5Main [h5file]
         return;
     endif
 
-    print qbListModels [h5file];
+//    print qbListModels [h5file];
     
-    write ['length {}\n', length cat qbListModels [h5file]];
+//    write ['length {}\n', length cat qbListModels [h5file]];
     
-    local modelTags = cat qbListModels [h5file];
+//    local modelTags = cat qbListModels [h5file];
     
-    write ['length modelTags.target : {}\n', length modelTags.target];
+//    write ['length modelTags.target : {}\n', length modelTags.target];
     
-    write ['modelTags.target: {}\n', modelTags.target];
-    write ['modelTags.ligand: {}\n', modelTags.ligand];
+//    write ['modelTags.target: {}\n', modelTags.target];
+//    write ['modelTags.ligand: {}\n', modelTags.ligand];
     
 //    local NMRvalues=cat qbRetrieveNMRAverages [h5file,modelTags.target];
 //    write ['{}\n',NMRvalues.Index];
 //    write ['{}\n',NMRvalues.Average];
 
-    print qbListModels [h5file];
+ //   print qbListModels [h5file];
     //print qbRetrieveQMScore [h5file, modelTags.target];
     //print qbRetrieveResiduePWD [h5file, modelTags.target];
     //print qbRetrieveAtomByAtomPWD [h5file, modelTags.target];
@@ -51,6 +51,23 @@ global function qbTesth5Main [h5file]
     //print  qbRetrieveDensities [h5file, modelTags.target];
     //print  qbRetrieveEigenVectors [h5file, modelTags.target];
     //print  qbRetrieveEnergyLevels [h5file, modelTags.target];
-    qbSetNMRAtomSelection [h5file, modelTags.target, [0,1,2,10]];
+   // qbSetNMRAtomSelection [h5file, modelTags.target, [0,1,2,10]];
 
 endfunction
+
+// Test the function to write the molecule out to a file.
+// qbmoebatch -exec "qbTestPDB2H5 ['infile.h5','some.pdb']" -exit
+
+global function qbTestPDBtoH5 [h5file,inpdb]
+    write ['{}\n',h5file];
+    if isnull h5file then
+        return;
+    endif
+
+    local tmpChains = ReadAuto inpdb;
+
+    // For format see: file:///share/apps/MOE/MOE-2012/html/moe/fcnref/extract.htm#mol_Extract
+
+    qbStoreModel [h5file, mol_Extract tmpChains];
+endfunction
+
