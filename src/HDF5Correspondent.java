@@ -15,10 +15,12 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Vector;
 import javax.swing.tree.DefaultMutableTreeNode;
+import ncsa.hdf.object.Attribute;
 import ncsa.hdf.object.Datatype;
 import ncsa.hdf.object.FileFormat;
 import ncsa.hdf.object.HObject;
 import ncsa.hdf.object.h5.H5CompoundDS;
+import ncsa.hdf.object.h5.H5Datatype;
 import ncsa.hdf.object.h5.H5Group;
 import ncsa.hdf.object.h5.H5ScalarDS;
 import ncsa.hdf.object.h5.H5File;
@@ -47,49 +49,43 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             SVLJava.print("cmd="+cmd);
 	    SVLVar res = arg.peek(2);		// its argument
             SVLJava.print("length="+res.length());
-	    if(cmd.equals("listModels" ))
+            switch(cmd)
             {
+                case "listModels":
                 res = listModels(res);
-            }
-            else if(cmd.equals("storeModel" ))
-            {
-                res = storeModel(res);
-            }
-            else if(cmd.equals("retrieveQMScore" ))
-            {
+                    break;
+                case "storeModel":
+                 res = storeModel(res);
+                    break;
+                case "retrieveQMScore":
                 res = retrieveQMScore(res);
-            }
-	    else if (cmd.equals("retrieveResiduePWD"))
-            {
+                    break;
+                case "retrieveResiduePWD":
                 res = retrieveResiduePWD(res);
-            }
-	    else if (cmd.equals("retrieveAtomByAtomPWD"))
-            {
+                    break;
+                case "retrieveAtomByAtomPWD":
                 res = retrieveAtomByAtomPWD(res);
-            }
-	    else if (cmd.equals("retrieveAtomByAtomMRM"))
-            {
+                    break;
+                case "retrieveAtomByAtomMRM":
                 res = retrieveAtomByAtomMRM(res);
-            }
-	    else if (cmd.equals("retrieveNMRAverages"))
-            {
+                    break;
+                case "retrieveNMRAverages":
                 res = retrieveNMRAverages(res);
-            }
-	    else if (cmd.equals("retrieveDensities"))
-            {
+                    break;
+                case "retrieveDensities":
                 res = retrieveDensities(res);
-            }
-	    else if (cmd.equals("retrieveEigenVectors"))
-            {
+                    break;
+                case "retrieveEigenVectors":
                 res = retrieveEigenVectors(res);
-            }
-	    else if (cmd.equals("retrieveEnergyLevels"))
-            {
+                    break;
+                case "retrieveEnergyLevels":
                 res = retrieveEnergyLevels(res);
-            }
-	    else {
+                case "setNMRAtomSelection":
+                res = setNMRAtomSelection(res);
+                    break;
+                default:
 		throw new SVLJavaException("here Unknown command: '" + cmd + "'.");
-	    }
+            }
 	    return res;
 	}
 	catch (Exception ex) {
@@ -1035,6 +1031,31 @@ private SVLVar retrieveEnergyLevels(SVLVar var) throws SVLJavaException, IOExcep
     h5File.close();
     return new SVLVar(data);
 }
+    
+    private SVLVar setNMRAtomSelection(SVLVar var) throws SVLJavaException, IOException, Exception
+    {
+        String filename = var.peek(1).getTokn(1);
+        String target = var.peek(1).getTokn(2);
+        H5File h5File=new H5File(filename, H5File.WRITE);
+        h5File.open();
+            String xPath="/DivCon/"+target+"/Selections";
+            HObject ho=findHDF5Object(h5File, xPath);
+            H5Group hObject=(H5Group)ho;
+            if(hObject!=null){
+                H5Group selectionGroup=(H5Group)h5File.createGroup("Selection", hObject);
+                long[] dims=new long[1];
+                dims[0]=var.peek(1).getInt(3);
+                H5Datatype h5Datatype=new H5Datatype(H5Datatype.CLASS_INTEGER);
+                H5ScalarDS member=(H5ScalarDS)h5File.createScalarDS("NMR Selection", selectionGroup, h5Datatype, dims, null, null, 0, 0, var.peek(1).peek(4).getInts());
+                long[] attrDims = { 1 };
+                 Attribute attr = new Attribute("Role", new H5Datatype(Datatype.CLASS_STRING, 5, -1, -1), attrDims);
+                 attr.setValue("Atoms");
+ 
+                h5File.writeAttribute(member, attr, true);
+            }
+        h5File.close();
+        return new SVLVar();
+    }
     
     protected int indexW(int i, int j)
     {
