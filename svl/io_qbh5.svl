@@ -2539,9 +2539,8 @@ local function _pdb_close [file, fnum, exe_key]
     endif
 endfunction
 
-global function pdb_Seqres2Atoms;
-local function pdb_SplitHets;
-global function pdb_GenerateImages, pdb_GenerateBiomol, pdb_CrystalContacts;
+function pdb_Seqres2Atoms;
+function pdb_GenerateImages, pdb_GenerateBiomol, pdb_CrystalContacts;
 
 global function: fread_QBH5 [file, opt]
     opt = tagcat [opt, fread_QBH5_DEFAULTS];
@@ -2706,9 +2705,10 @@ global function: fread_QBH5 [file, opt]
 
     data.mol = mol_DropExtend mol; mol = [];
 
-    if anytrue opt.split_hets then
-	data = pdb_SplitHets data;
-    endif
+// DELME
+//   if anytrue opt.split_hets then
+//	data = pdb_SplitHets data;
+//    endif
 
 	// Non-crystallographic symmetry and the biomolecules are logically
 	// mutually exclusive, but our options do not enforce that.
@@ -3321,8 +3321,6 @@ endfunction
 
 //============ global: fwrite_QBH5 and WriteQBH5 ===============================
 
-local function TidyUID;
-
 // TBD: adjust ionization here for ARG : NH2 is pdb standard, and some
 // software complains if the charge is anywhere else.
 
@@ -3418,14 +3416,15 @@ local function fwrite_QBH5_atoms [fkey, res, atoms, opt]
 	local uid = rUID r;
 	local ins = rINS r;
 
-	if length r > 1 and allfalse uid and alltrue (ins == " ") then
-	    uid = x_id r;
-	else
-	    m = not m_uniq tr [rName r, uid, ins];
-	    if anytrue m then
-		[uid, ins] = TidyUID [rName r, uid, ins, m];
-	    endif
-	endif
+// DELME
+//	if length r > 1 and allfalse uid and alltrue (ins == " ") then
+//	    uid = x_id r;
+//	else
+//	    m = not m_uniq tr [rName r, uid, ins];
+//	    if anytrue m then
+//		[uid, ins] = TidyUID [rName r, uid, ins, m];
+//	    endif
+//	endif
 
 	local aname = aName a;
 	if tok_keep [opt.hnames, 3] === 'PDB' then
