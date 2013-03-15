@@ -37,7 +37,7 @@ const PDB_WRITE_DEFAULTS = [
     force_TER:	    0		// write chains verbatim with TER recs
 ];
 
-const FREAD_PDB_DEFAULTS = [
+const fread_QBH5_DEFAULTS = [
     multi_model:	    0,  // if true, read all models in NMR (eg) files
     collate_res:	    1,  // if true, align SEQRES to ATOM res
     ignore_conect:	    1,  // if true, do not apply CONECT records
@@ -520,7 +520,7 @@ local function parse_formulas formulas
     return [names, app token formula_str, formula_vec];
 endfunction
 
-//=============== fread_PDB_header ============================================
+//=============== fread_QBH5_header ============================================
 
 // NOTE: In the RCSB data as of 2007-05-24 there are many entries that violate
 // PDB format by extending lengths of some records beyond their documented
@@ -599,7 +599,7 @@ const ATOM_RECS  = [
 ];
 const PDB_RECS = cat [TITLE_RECS, ATOM_RECS];
 
-global function fread_PDB_header [file, first_line]
+global function fread_QBH5_header [file, first_line]
     local i,x,m,n,v;
 
     local pdb, L, R, pdb_code;
@@ -880,7 +880,7 @@ global function fread_PDB_header [file, first_line]
     return [pdb, L];
 endfunction
 
-//=============== fread_PDB_model: Bonding, Chemistry, Residue types etc ======
+//=============== fread_QBH5_model: Bonding, Chemistry, Residue types etc ======
 
 const RIBOSE = [
   ['O5*','C5*','C4*','O4*','C3*','O3*','C2*','C1*','P','OP1','OP2','OP3','O2*'],
@@ -2222,7 +2222,7 @@ local function pack_chain [A, opt]
     return mol;
 endfunction
 
-// ============= global: fread_PDB_model =====================================
+// ============= global: fread_QBH5_model =====================================
 
 local function mol_RestoreOrder [chain_data, mol]
     local x1 = mol(4)(MOL_ATOM_ORDER);
@@ -2261,8 +2261,8 @@ const ANISOU_FMT = tok_cat [
     '{n:7}{n:7}{n:7}{n:7}{n:7}{n:7}{c:*2X}{t:4}{t:2}{t:2}'
 ];
 
-global function fread_PDB_model [file, first_line, opt]
-    opt = tagcat [opt, FREAD_PDB_DEFAULTS];
+global function fread_QBH5_model [file, first_line, opt]
+    opt = tagcat [opt, fread_QBH5_DEFAULTS];
 
     local fnum = file;
     if type file == 'tok' then
@@ -2508,7 +2508,7 @@ global function fread_PDB_model [file, first_line, opt]
     return model;
 endfunction
 
-//=============== global: fread_PDB & ReadPDB ================================
+//=============== global: fread_QBH5 & ReadQBH5 ================================
 
 local function _pdb_open file
     local fnum = [], exe_key = [];
@@ -2543,12 +2543,12 @@ global function pdb_Seqres2Atoms;
 local function pdb_SplitHets;
 global function pdb_GenerateImages, pdb_GenerateBiomol, pdb_CrystalContacts;
 
-global function: fread_PDB [file, opt]
-    opt = tagcat [opt, FREAD_PDB_DEFAULTS];
+global function: fread_QBH5 [file, opt]
+    opt = tagcat [opt, fread_QBH5_DEFAULTS];
 
     local [fnum, exe_key] = _pdb_open file;   // OPEN
 
-    local [data, line] = fread_PDB_header [fnum, opt.first_line];
+    local [data, line] = fread_QBH5_header [fnum, opt.first_line];
 
     if anytrue opt.header_only then	    // (obsolete - do not document)
 	_pdb_close [file, fnum, exe_key];   // CLOSE - header only
@@ -2573,7 +2573,7 @@ global function: fread_PDB [file, opt]
     opt.ctab = data.ctab;
     opt.link = data.link;
     data.first_line = [];
-    data = tagcat [data, fread_PDB_model [fnum, line, opt]];
+    data = tagcat [data, fread_QBH5_model [fnum, line, opt]];
 
     local i, v, m, attr;
 
@@ -2583,7 +2583,7 @@ global function: fread_PDB [file, opt]
 	local imodel = rep [(i = 1), mol_cCount data.mol];
 	line = data.first_line;
 	while indexof [token keep [line, 6], ['ATOM  ', 'HETATM']] loop
-	    v = fread_PDB_model [fnum, line, opt];
+	    v = fread_QBH5_model [fnum, line, opt];
 	    if not mol_rCount v.mol then break; endif;
 	    line = v.first_line;
 
@@ -2726,14 +2726,14 @@ global function: fread_PDB [file, opt]
     return data;
 endfunction
 
-global function: ReadPDB [file, opt]
-    opt = tagcat [opt, READ_PDB_DEFAULTS, FREAD_PDB_DEFAULTS];
+global function: ReadQBH5 [file, opt]
+    opt = tagcat [opt, READ_PDB_DEFAULTS, fread_QBH5_DEFAULTS];
 
     local [fnum, exe_key] = _pdb_open file;   // OPEN
     local chains = [], space_group = [], dim = [], ang = [], gotcell = 0;
 
     loop
-	local data = fread_PDB [fnum, opt];
+	local data = fread_QBH5 [fnum, opt];
 	if mol_cCount data.mol <= 0 then break; endif;
 	space_group = data.space_group;
 	[dim, ang] = split [data.unit_cell, 3];
@@ -3319,14 +3319,14 @@ local function WriteConect [fkey, atoms, atom_id]
     apt fwrite [fkey, 'CONECT{n:5}{|!n:5}\n', B(1), B(2)];
 endfunction
 
-//============ global: fwrite_PDB and WritePDB ===============================
+//============ global: fwrite_QBH5 and WriteQBH5 ===============================
 
 local function TidyUID;
 
 // TBD: adjust ionization here for ARG : NH2 is pdb standard, and some
 // software complains if the charge is anywhere else.
 
-local function fwrite_PDB_atoms [fkey, res, atoms, opt]
+local function fwrite_QBH5_atoms [fkey, res, atoms, opt]
     local i, m, x, n;
 
 	// Push the system (Get Cell Parameters first).
@@ -3497,7 +3497,7 @@ local function fwrite_PDB_atoms [fkey, res, atoms, opt]
     SystemPop [psys, csys];
 endfunction
 
-global function: fwrite_PDB [file, obj, opt]
+global function: fwrite_QBH5 [file, obj, opt]
     local i,x,n,m,v;
 
     if opt.iupac === 1 and isnull opt.hnames then
@@ -3570,1039 +3570,15 @@ global function: fwrite_PDB [file, obj, opt]
     local A_write = uniq cat oAtoms obj;
 
     if anytrue [R, A_write] then
-	fwrite_PDB_atoms [fkey, R, A_write, opt];
+	fwrite_QBH5_atoms [fkey, R, A_write, opt];
     endif
 
     fwrite [fkey, 'END\n'];
     fclose fkey;
 endfunction
 
-global function: WritePDB [filename, options]
+global function: WriteQBH5 [filename, options]
     [filename,[],options] = Write_Prompt[filename,'pdb',options];
-    fwrite_PDB [filename, Chains [], options];
+    fwrite_QBH5 [filename, Chains [], options];
 endfunction
 
-//======= Miscellaneous helpers : Seqres2Atoms, GenerateImages =================
-
-local function pdb_SplitHets data
-    local m = split [mol_rType data.mol == 'amino', mol_nRes data.mol];
-    local n = app btoc m;
-
-    local okF = (app length n == 1 or 24 > app add m or 0.50 >= app mean m);
-
-    if alltrue okF then return data; endif;  // Nothing to do
-
-    local psys = SystemPush [];
-
-    local C = mol_Create data.mol;
-    local R = cResidues C;
-    local N = app length R;
-    local A = cat cAtoms C;
-
-    m = mput [m, okF,  app one (m | okF)];
-
-    local x, i;
-    for x in x_pack not okF loop
-	local mask = not m(x);
-	local r = R(x) | mask;
-	for i = 1, length r loop
-	    local b = uniq cat oParent aBonds cat oChildren r(i);
-	    b = rNumber (b | oParent b == C(x));
-	    local rn = rNumber r(i);
-	    if rn == N(x) then
-		mask(rn) = not indexof [dec N(x), b];
-	    elseif rn == 1 then
-		mask(rn) = not indexof [2, b];
-	    else
-		mask(rn) = not andE indexof [rn + [1,-1], b];
-	    endif
-	endloop
-	if anytrue mask then
-	    local c = oCreate 0;
-	    cSetName [c, cName C(x)];
-	    cSetTag [c, cTag C(x)];
-	    oReparent [R(x) | mask, c];
-	    C(x) = cat [C(x), c];
-	endif
-    endloop
-
-    n = app length C;
-    if anytrue (1 < n) then
-	data.mol = mol_Extract (C = cat C);
-	if length data.model_num then
-	    data.model_num = stretch [data.model_num, n];
-	endif
-	if length data.chain_id then
-	    data.chain_id = stretch [data.chain_id, n];
-	endif
-
-	local idx = indexof [cat cAtoms C, A];
-
-	local a;
-	for a in join [ATOM_ATTR, tags data] loop
-	    if length data.(a) then
-		data.(a) = data.(a)[idx];
-	    endif
-	endloop
-    endif
-
-    SystemPop psys;
-
-    return data;
-endfunction
-
-// Trys to fill in missing sequence uids/ins codes in an intelligent way.
-
-local function TidyUID [uid, ins, m_fill]
-    if allfalse m_fill then
-	 return [uid, ins];
-    endif
-    if alltrue m_fill then
-	return [x_id m_fill, rep [" ", length m_fill]];
-    endif
-
-    const UID_FILL  = -9999;
-    const INS_CHARS = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    local ins_chars = uniq cat [INS_CHARS, ins];
-    local idx_ins   = x_id ins_chars;
-
-    uid | m_fill = UID_FILL;
-    ins | m_fill = " ";
-    ins = indexof [ins,  ins_chars];
-
-    local seg = btoc m_fill;
-    [uid, ins] = apt split [[uid, ins],  [seg]];
-    m_fill = app first split [m_fill, seg];
-
-    if first m_fill then
-	local idx = reverse x_id uid(1);
-	if leE keep [uid(2), 2] then idx = neg idx; endif;
-	uid(1) = first uid(2) + idx;
-	if first ins(2) === second ins(2) then
-	    ins(1) = rep [first ins(2), seg(1)];
-	endif
-    endif
-
-    function available_ins u = diff [idx_ins, (cat ins | u == cat uid)];
-
-    local i;
-    for i = 2, dec length seg loop
-	if not m_fill(i) then continue; endif;
-
-	local uidL = uid(dec i)(seg(dec i));	// last uid in left seg
-	local uidR = uid(inc i)(1);		// first uid in right seg
-	local n    = seg(i);
-
-	local j,x,c,I;
-
-	if uidL == uidR then
-	    c = available_ins uidL;
-	    uid(i) = rep [uidL, min [n, length c]];
-	    ins(i) = keep [c, n];		// leftovers dealt with later
-	    continue;				// CONTINUE
-	endif
-
-	if uidL > uidR then
-
-		// should count down to " " first, then count down to 1 XXX
-
-	    if uidR > 1 then
-		I = uniq ins(inc i);
-	    	if length I > 1 then I = 1; endif;
-	    	x = igen min [n, dec uidR];
-	    	uid(i) = put [uid(i), x - (length x - n),  uidR - reverse x];
-	    	ins(i) = put [ins(i), x - (length x - n),  I];
-	    	n = n - length x;
-	    endif
-
-		// count up from the left
-
-	    I = uniq ins(dec i);
-	    if length I > 1 then I = 1; endif;
-	    x = igen n;
-	    uid(i) = put [uid(i), x, uidL + x];
-	    ins(i) = put [ins(i), x, I];
-	    continue;				// CONTINUE
-	endif
-
-	    // UID left < UID right.
-
-	local insL = ins(dec i);	    	// ins codes in left seg
-	local insR = ins(inc i);	    	// ins codes in right seg
-
-	local uid_gap = uidR - uidL - 1;
-	x = igen min [n, uid_gap];
-
-	if uid_gap == n and last insL == first insR then
-	    I = last insL;
-	    if not indexof [I, (cat ins) | indexof [cat uid, uidL + x]] then
-		uid(i) = put [uid(i), x, uidL + x];
-		ins(i) = put [ins(i), x, I];
-		continue;			// CONTINUE
-	    endif
-	endif
-
-	I = uniq cat [keep [insL, -2], keep [insR, 2]];
-	if length I == 1 and I(1) > 1 then	// can't use insertion codes
-	    uid(i) = put [uid(i), x, uidL + x];
-	    ins(i) = put [ins(i), x, I];
-	    continue;				// CONTINUE
-	endif
-
-	if n <= uid_gap then			// don't need insertion codes
-	    if eqL keep [insL, -2] then
-		I = last insL;
-	    else
-		I = 1;
-	    endif
-	    uid(i) = put [uid(i), x, uidL + x];
-	    ins(i) = put [ins(i), x, I];
-	    continue;				// CONTINUE
-	endif
-
-	    // Count down to space.
-
-	if not (insR(1) === insR(2)) then
-	    I = insR(1);
-	    while I > 1 and n > 0 loop
-		uid(i)(n) = uidR;
-		ins(i)(n) = dec I;
-		n = dec n;
-	    endloop
-	endif
-
-	if last insL > 1 and eqL keep [insL, -2] and leL uidL then
-	    j = 1;
-	    I = last insL;
-	    while (uidL < uidR) and j <= n loop
-		uid(i)(j) = (uidL = inc uidL);
-		ins(i)(j) = I;
-		j = inc j;
-	    endloop
-	    continue;				// CONTINUE
-	endif
-
-	j = 1;
-	uid_gap = uidR - uidL - 1;
-	while n > uid_gap and uid_gap > 0 loop
-	    c = available_ins uidL;
-	    x = j + dec igen min [n - uid_gap, length c];
-	    uid(i) = put [uid(i), x, uidL];
-	    ins(i) = put [ins(i), x, keep [c, length x]];
-	    uid_gap = dec uid_gap;
-	    uidL = inc uidL;
-	    n = n - length x;
-	    j = j + length x;
-	until length x < 1
-	endloop
-
-	if n > 0 then
-	    x = dec igen n;
-	    if uid_gap == 0 then
-		c = available_ins uidL;
-		[x, c] = apt keep [[x,c], min app length [x,c]];
-		uid(i) = put [uid(i), j + x, uidL];
-		ins(i) = put [ins(i), j + x, keep [c, length x]];
-	    else
-		uid(i) = put [uid(i), j + x, uidL + x];
-	    endif
-	endif
-    endloop
-
-    if last m_fill then
-	local uprev = uid(dec length uid);
-	x = x_id last uid;
-	if length uprev > 1 and gtL uprev then x = neg x; endif;
-	uid(length uid) = last uprev + x;
-	I = uniq keep [ins(dec length ins), -2];
-	if length I == 1 then
-	    ins(length ins) = rep [I, last seg];
-	endif
-    endif
-
-    [uid, ins] = app cat [uid, ins];
-    m_fill = stretch [m_fill, seg];
-
-    local r_id = tok_cat [totok uid, '_', totok ins];
-
-	// Try to fix the clashes with insertion codes.
-
-    local m = m_fill and uid <> UID_FILL;
-    m[x_pack m] = indexof [r_id | m, r_id | not m] or not m_uniq (r_id | m);
-    for i in x_pack m loop
-	I = first available_ins uid(i);
-	if length I then
-	    ins(i) = I;
-	    r_id(i) = tok_cat [totok uid(i), '_', totok I];
-	    m(i) = 0;
-	endif
-    endloop
-
-    m = m or uid == UID_FILL;
-    uid | m = max uid + x_id pack m;
-    ins | m = 1;
-
-    return [uid, ins_chars[ins]];
-endfunction
-
-global function pdb_TidyPDBSeqNum [uid, ins, seg, mask]
-    local [U, I, m] = apt split [[uid, ins, mask], [seg]];
-
-    local i;
-    for i = 1, length seg loop
-	[U, I] = apt poke [[U, I], i, TidyUID [U(i), I(i), m(i)]];
-    endloop
-
-    return [cat U, cat I];
-endfunction
-
-local function mol_TidyUID mol
-    local [uid, ins] = [mol_rUID mol, mol_rINS mol];
-    local [seg, natoms] = [mol_nRes mol, mol_nAtoms mol];
-
-    [uid, ins] = pdb_TidyPDBSeqNum [uid, ins, seg, not natoms];
-
-    mol(3)(MOL_RES_UID)  = uid;
-    mol(3)(MOL_RES_INS)  = ins;
-
-    return mol;
-endfunction
-
-local function _CheckAlign segs
-    local [rnames, natoms, uid, ins, bonds, res_idx, idx, changeF] = segs;
-
-    local [B1, B2, B3] = bonds[idx];
-    local [X1, X2, X3] = res_idx[idx];
-    local [N1, N2, N3] = natoms[idx];
-    local [R1, R2, R3] = rnames[idx];
-    local [U1, U2, U3] = uid[idx];	// 1 prev, 2 current, 3 next
-    local [I1, I2, I3] = ins[idx];
-
-    if not (last B1 === first X3) or isnull X3 then
-	return [natoms, uid, ins, bonds, changeF];
-    endif
-
-    local okF = 0, i, j, x;
-
-    [i, j] = app length [R1, R2];
-    while (i > 1 and j > 0 and not okF) loop
-	if R1(i) <> R2(j) then break; endif
-	okF = not (B1(dec i) === X1(i));
-	[i,j] = dec [i,j];
-    endloop
-
-    if okF then
-	x = igen (length R1 - i);
-	local x1 = x + i;
-	local x2 = x + j;
-	N2[x2] = N1[x1]; N1[x1] = 0;
-	B2[x2] = B1[x2] + length x; B1[x2] = [[]];
-	U2[x2] = U1[x1];
-	I2[x2] = I1[x1];
-    else
-	local n = min [length R2, length R3];
-	x = igen n;
-	i = indexof [1,  R2[x] <> R3[x]];
-	if i > 0 then
-	    n = min [n, dec i];
-	endif
-	if n > 0 then
-	    x = igen n;
-	    n = min [n, indexof [0, apt eqL [B3[x], X3[inc x]]]];
-	    if n > 0 then
-		x = igen n;
-		N2[x] = N3[x]; N3[x] = 0;
-		B2[x] = B3[x] - X3(1) - X2(n); B3[x] = [[]];
-		U2[x] = U3[x];
-		I2[x] = I3[x];
-		okF = 1;
-	    endif
-	endif
-    endif
-
-    if okF then
-	bonds[idx]  = [B1,B2,B3];
-	uid[idx]    = [U1,U2,U3];
-	ins[idx]    = [I1,I2,I3];
-	natoms[idx] = [N1,N2,N3];
-	changeF = 1;
-    endif
-
-    return [natoms, uid, ins, bonds, changeF];
-endfunction
-
-local function mol_CheckAlignment mol
-    local R_atoms = split [mol_nAtoms mol,	mol_nRes mol];
-    local R_names = split [mol_rName mol,	mol_nRes mol];
-    local R_idx   = split [igen mol_rCount mol, mol_nRes mol];
-    local R_uid   = split [mol_rUID mol,	mol_nRes mol];
-    local R_ins   = split [mol_rINS mol,	mol_nRes mol];
-
-    local b = mol_aBnd mol || apt get [[mol_aBck mol], mol_aBnd mol];
-    local R_bond = app uniq app cat split [
-	apt get [[mol_aRnum mol], b], mol_nAtoms mol
-    ];
-    R_bond = app first (R_bond || R_bond > igen mol_rCount mol);
-    R_bond = split [R_bond, mol_nRes mol];
-
-    local i, j, changeF = 0;
-    for i = 1, length R_atoms loop
-	local N = R_atoms(i);
-	if alltrue N or allfalse N then continue; endif; // Nothing to do
-
-	local seg = btoc not N;
-
-	      N = split [N,		seg];
-	local U = split [R_uid(i),	seg];
-	local I = split [R_ins(i),	seg];
-	local R = split [R_names(i),	seg];
-	local B = split [R_bond(i),	seg];
-	local X = split [R_idx(i),	seg];
-
-	local idx = dec dec igen 3;
-	for j = 2, dec length seg loop
-	    if first N(j) then continue; endif;
-	    [N,U,I,B,changeF] = _CheckAlign [
-		R, N, U, I, B, X, idx + j, changeF
-	    ];
-	endloop
-
-	R_atoms(i) = cat N;
-	R_uid(i)   = cat U;
-	R_ins(i)   = cat I;
-	R_bond(i)  = cat B;
-    endloop
-
-    mol(3)(MOL_RES_NATOMS) = cat R_atoms;
-    mol(3)(MOL_RES_UID)    = cat R_uid;
-    mol(3)(MOL_RES_INS)    = cat R_ins;
-
-    return [mol, changeF];
-endfunction
-
-// Try to align the raw atom residues to the residues in SEQRES.
-// If we fail, try aligning the substituted sequences, first using
-// the MOD_RES records, then the SEQ_ADV records.
-
-local function align [s1, s2]
-    local S = cat [s1,s2];
-    local s = uniq S;
-    local M = 10 * (x_id s == [x_id s]);
-    local n = app length [s1,s2];
-    local x = cat split [indexof [S, s], n];
-    local key = first AlignOpen [M, 0.1, [1,2], n, [dec x, x, 0.001]];
-    while not AlignSearch key loop endloop
-    local rp = first AlignClose key;
-    return indexof split [rp, n];
-endfunction
-
-global function pdb_Seqres2Atoms [data, mol]
-    local i,x;
-
-    local seqres = untag taguniq data.seqres;	// warn if duplicates !!!
-    local modres = data.modres;
-    local seqadv = data.seqadv;
-
-    modres = modres || [not eqE modres[[1,5]]];
-    modres = modres || [andE ('' <> modres[[1,5]])];
-
-    seqadv = seqadv || [not eqE seqadv[[1,7]]];
-    seqadv = seqadv || [andE ('' <> seqadv[[1,7]])];
-
-    local C_id = app token cLetter mol_cName mol;
-
-    local nR = mol_nRes mol;
-    local nA = split [mol_nAtoms mol, nR];
-
-    local A_res_id = split [mol_rFullName mol, nR];
-    local A_res    = split [mol_rName mol, nR];
-
-    local R = A_res;
-
-    local rT = split [mol_rType mol, nR];
-    local rU = split [mol_rUID  mol, nR];
-    local rI = split [mol_rINS  mol, nR];
-
-    function check_seq [xC, xSeq, sub_table]
-	local aseq = A_res(xC);
-	local rseq = seqres(2)(xSeq);
-	if l_length sub_table then
-	    local rnew = res_name droplast sub_table;
-	    x = indexof [rnew, A_res_id(xC)];
-	    if not andE x then return 0; endif;	// error condition
-	    aseq[x] = last sub_table;
-	endif
-	if (aseq === rseq) then return 1; endif;
-
-	local rP = align [aseq, rseq];
-
-	if not  andE rP		    then return 0; endif;
-	if not (aseq === rseq[rP])  then return 0; endif;
-
-	nR(xC) = length rseq;
-	 R(xC) = put [rseq,			rP,  R(xC)];
-	nA(xC) = put [zero rseq,		rP, nA(xC)];
-
-	local rt = get [['rna','dna','amino'], tok_length rseq]; // !!!
-	rT(xC) = put [rt,			rP, rT(xC)];
-
-	rU(xC) = put [zero rseq,		rP, rU(xC)];
-	rI(xC) = put [rep [" ", length rseq],	rP, rI(xC)];
-
-	return 1;
-    endfunction
-
-    local err = rep ['', length seqres(1)];
-    local idx = indexof [seqres(1), C_id];
-    for i = 1, length idx loop
-	if not idx(i) then continue; endif;
-
-	if check_seq [idx(i), i] then continue; endif;
-
-	local c = string seqres(1)(i);
-
-	local sub_res = modres || [c == modres(2)];
-	if l_length sub_res then
-	    if check_seq [idx(i), i, sub_res [[1,3,4,5]]] then
-		continue;
-	    endif;
-	endif
-
-	sub_res = seqadv || [c == seqadv(2)];
-	if l_length sub_res  then
-	     if check_seq [idx(i), i, sub_res[[1,3,4,7]]] then
-		continue;
-	    endif;
-	endif
-
-	err(i) = C_id(idx(i));
-
-	    // Error
-    endloop
-
-	// Integrate SEQRES records with no matching chain_id.
-
-    if not andE idx then
-	seqres = seqres || [not idx];
-	local n = app length seqres(2);
-	idx = inc (rotrpoke [idx, 0] | not idx);
-	mol(2)(MOL_CHAIN_NAME) = splice [mol_cName mol, idx, 0, seqres(1)];
-	nR = splice [nR, idx, 0, n];
-
-	mol(2)(MOL_CHAIN_TAG) =
-	mol(2)(MOL_CHAIN_HEADER) = rep ['', length C_id + length n];
-
-	R  = splice [R,  idx, 0, seqres(2)];
-	nA = splice [nA, idx, 0, zero seqres(2)];
-
-	local rt_seq = rep ['amino', add n];
-	local s = cat seqres(2);
-	local nuc = tok_length s < 3;
-	rt_seq | nuc = select ['dna','rna', tok_length (s | nuc) == 2];
-
-	rT = splice [rT, idx, 0, split [rt_seq, n]];
-	rU = splice [rU, idx, 0, app igen n];
-	rI = splice [rI, idx, 0, apt rep [" ", n]];
-    endif
-
-    mol(2)(MOL_CHAIN_NRES) = nR;
-
-    mol(3)(MOL_RES_NATOMS) = cat nA;
-    mol(3)(MOL_RES_NAME)   = cat R;
-    mol(3)(MOL_RES_TYPE)   = cat rT;
-    mol(3)(MOL_RES_UID)	   = cat rU;
-    mol(3)(MOL_RES_INS)    = cat rI;
-
-    loop
-	local changeF;
-	[mol, changeF] = mol_CheckAlignment mol;
-    until not changeF
-    endloop
-
-	// Calculate reasonable UID/INS values for empty residues inserted
-	// from SEQRES.
-
-    mol = mol_TidyUID mol;
-
-    return [mol, err | err <> ''];
-endfunction
-
-global function pdb_GenerateImages data
-    if isnull data.mol then return data; endif;		    // Nothing to do
-    local mtrix = [data.mtrix1, data.mtrix2, data.mtrix3];
-    if anytrue app isnull mtrix then return data; endif;    // check for error?
-
-    mtrix = tr mtrix;
-    local i, R = [], T = [], mask = [], ID = matid 3;
-    for i = 1, length mtrix loop
-	local v = mtrix(i);
-	R(i) = apt get [v, [[2,3,4]]];
-	T(i) = apt peek [v, 5];
-	mask(i) = anytrue [
-	    R === ID, allfalse [R(i), T(i)], "1" == apt peek [v, 6]
-	];
-    endloop
-    if alltrue mask then return data; endif;		    // Nothing to do
-
-    [R,T] = [R,T] || [not mask];
-
-    local P = [mol_aPos data.mol];
-    for i = 1, length R loop
-	P(i+1) = app add (R(i) * P[1]) + T(i);
-    endloop
-
-    local C = mol_cName data.mol;
-    local I = rep [data.mol, length P];
-
-    const NCS_OP_FMT = '{t:} NCS Image {n:}';
-
-    for i = 2, length P loop
-	I(i) = mol_aSetPos [data.mol, P(i)];
-	I(i)(2)(MOL_CHAIN_NAME) = apt twrite [NCS_OP_FMT, C, i];
-    endloop
-    data.mol = mol_Cat I;
-
-    local attr;
-    for attr in ATOM_ATTR loop
-	data.(attr) = cat rep [data.(attr), length I];
-    endloop
-
-    return data;
-endfunction
-
-local function extract_BIOMT data
-    function parse_error []
-	data.error = cat [data.error, 'Error parsing BIOMT record'];
-	return data;
-    endfunction
-
-    local rem = data.remark.'350';
-    local m = m_findmatch [
-	'BIOMOLECULE: [A-Z,a-z,1-9]*', app token app trim_ws rem
-    ];
-    if allfalse m then return parse_error[]; endif;
-
-    local v = dropfirst split [rem, mtoc m];
-    local imol = rep ['', length v], biomol = rep [[], length v];
-
-    local i,j;
-    for i = 1, length v loop
-	imol(i) = first sread [v(i)(1), '{t:X}{t:}'];
-	const CHAIN_LETTER_LINE = '*APPLY *CHAINS:*?*';
-	m = m_findmatch [CHAIN_LETTER_LINE, app token v(i)];
-	biomol(i) = dropfirst split [v(i), mtoc m];
-	for j = 1, length biomol(i) loop
-	    local s = biomol (i)(j);
-
-		// Pick up the chain letters
-
-	    local lett = drop [s(1), indexof [":", s(1)]];
-	    lett = (lett | not (isspace lett or lett == ","));
-
-	    s = dropfirst s;
-	    while m_findmatch [' *AND CHAINS:*', token s(1)] loop
-		local l = drop [s(1), indexof [":", s(1)]];
-		lett = cat [lett, (l | not (isspace l or l == ","))];
-		s = dropfirst s;
-	    endloop
-
-	    local w = apt sread [s, '{t:8}{n:1}{n:4}{n:10*3}{n:}'];
-	    w = (app first w) | (app second w) >= 59;   // XXX !!! 1m4x
-	    w = tr ( (app dropfirst w) | (app first w) == 'BIOMT');
-
-	    local N = app first split [w(2), 3];
-	    local M = split [w(3), 3];
-	    local T = split [w(4), 3];
-
-	    biomol(i)(j) = [lett, N, M, T];
-	endloop
-    endloop
-
-    data.biomol = [imol, biomol];
-    return data;
-endfunction
-
-// This function replaces data.mol with a new mol that is a mol_Cat
-// of the requested biomols. data.biomol will be a flat numeric vector,
-// indicating to which chain the biomols belong.
-
-global function pdb_GenerateBiomol [data, opt]
-    if isnull data.remark.'350' or isnull data.mol then
-	return data;
-    endif					    // Nothing to do
-
-    data = extract_BIOMT data;
-    if isnull data.biomol then return data; endif;  // error parsing biomt
-    local cname = mol_cName data.mol;
-
-	// Accumulators
-
-    local imol = [], biomol = [], atom_attr = [];
-
-    opt.biomol = totok opt.biomol;
-
-    local attr;
-    local i, j, k, v = last data.biomol, I = first data.biomol;
-    for i = 1, length v loop
-	local mols = [], A = [];
-	if not anytrue (opt.biomol === 'all' or opt.biomol === I(i)) then
-	    continue;
-	endif
-	for j = 1, length v(i) loop
-	    local [c, N, M, T] = v(i)(j);
-
-	    local m = m_findmatch [tok_cat ['*.', app token c], cname];
-	    if allfalse m then continue; endif;
-
-	    const BIOMOL_OP_FMT = '{t:} BIOMT operation {n:}';
-
-	    local mol = mol_cMask [data.mol, m];
-	    local P = mol_aPos mol;
-	    local n = min [99, length M];
-	    for k = 1, n loop
-		local p = T(k) + rot3d_mvMul [M(k), P];
-		local t = apt twrite [BIOMOL_OP_FMT, mol_cName mol, N(k)];
-		mols = append [
-		    mols, poke [mol_aSetPos [mol, p], [2, MOL_CHAIN_NAME], t]
-		];
-	    endloop
-
-	    m = str_C2A [data.mol, m];
-	    for attr in ATOM_ATTR loop
-		A.(attr) = cat [A.(attr), cat rep [data.(attr) | m, n]];
-	    endloop
-	endloop
-
-	k = inc length biomol;
-	biomol(k)    = mol_Cat mols;
-	imol(k)	     = rep [I(i), mol_cCount biomol(i)];
-	atom_attr(k) =  A;
-    endloop
-
-    for attr in ATOM_ATTR loop
-	data.(attr) = cat apt tagpeek [atom_attr, attr];
-    endloop
-    data.mol    = mol_Cat biomol;
-    data.biomol = cat imol;
-
-    return data;
-endfunction
-
-//================= Crystal contacts ==========================================
-
-local function get_spg_matrix sym
-    local [S] = SpaceGroupMatrix sym;
-    return [app droplast S, app last S];
-endfunction
-
-local function spg_matmul [m, x]
-    local i, y;
-    for i = 1, 3 loop  // do matmul explicitly here, only 10 possible cases
-	if m(i) === [1, 0, 0] then
-	    y(i) = x(1);
-	elseif m(i) === [ 0, 1,  0] then
-	    y(i) = x(2);
-	elseif m(i) === [ 0, 0,  1] then
-	    y(i) = x(3);
-	elseif m(i) === [-1, 0,  0] then
-	    y(i) = -x(1);
-	elseif m(i) === [ 0, -1,  0] then
-	    y(i) = -x(2);
-	elseif m(i) === [ 0,  0, -1] then
-	    y(i) = -x(3);
-	elseif m(i) === [-1, -1, 0] then
-	    y(i) = -x(1) - x(2);
-	elseif m(i) === [ 1,  1, 0] then
-	    y(i) = x(1) + x(2);
-	elseif m(i) === [-1,  1, 0] then
-	    y(i) = -x(1) + x(2);
-	elseif m(i) === [ 1, -1, 0] then
-	    y(i) = x(1) - x(2);
-	endif
-    endloop
-    return y;
-endfunction
-
-// TBD: give auidx as well for correct special position determination.
-
-local function mol_Images [aumol, toFrac, toXYZ, ridx, Sym, Vec, rad]
-
-    local Ridx = igen mol_rCount aumol;
-    local m = m_uniq l_frank [ridx, Sym, Vec];
-    [ridx, Sym, Vec] = [ridx, Sym, Vec] || [m];
-
-    local I = l_frank [Sym, Vec];
-    local idx = x_uniq I;
-
-    local image = rep [[], length idx];
-
-    aumol(2) = append [aumol(2), igen mol_cCount aumol];
-    aumol(4) = append [aumol(4), rad];
-
-    local prox = prox_open [2 * max rad, mol_aPos aumol, rad];
-    local mask = zero first mol_aPos aumol;
-    local hv   = not mol_aLht aumol;
-
-    local i;
-    for i in idx loop
-	local [R, T] = get_spg_matrix Sym(i);
-	local mol = mol_rMask [aumol, indexof [Ridx, ridx | I(i) == I]];
-
-	local pos = mol_aPos mol;
-	local frp = append [matmul [toFrac, pos], 1];
-	pos = matmul [toXYZ, Vec(i) + T + spg_matmul [R, frp]];
-
-	local [n, x1, r2] = prox_find [prox, pos, last mol(4)];
-	if isnull n then continue; endif;
-	local x2 = stretch [x_id n, n];
-	mask[x1|r2 <= sqr 4.5 and (not mol_aLht mol)[x2] and hv[x1]] = 1;
-
-	n = app add split [n, mol_nAtoms mol];
-	n | s_min [r2, n] <= sqr 0.15 = 0;	// !!!
-	if not orE n then continue; endif;
-
-	image(i) = mol_rMask [mol_aSetPos [mol, pos], n];
-    endloop
-    prox_close prox;
-
-    if isnull (image = image | app length image) then
-	return [];
-    endif
-
-    image = mol_Cat image;
-    image = mol_rMask [image, mol_nAtoms image];
-
-    idx = last image(2);
-    I = uniq idx;
-    image = mol_DropExtend image;
-    aumol = [];
-    for i = 1, length I loop
-	aumol(i) = mol_cMask [image, idx == I(i)];
-	aumol(i)(2)(MOL_CHAIN_TAG)    = first aumol(i)(2)(MOL_CHAIN_TAG);
-	aumol(i)(2)(MOL_CHAIN_NAME)   = first aumol(i)(2)(MOL_CHAIN_NAME);
-	aumol(i)(2)(MOL_CHAIN_HEADER) = 'Crystal Contact Shell';
-	aumol(i)(2)(MOL_CHAIN_NRES)   = l_length aumol(i)(3);
-    endloop
-    aumol = mol_Cat aumol;
-    aumol = mol_cMask [aumol, mol_nRes aumol];
-
-    return [aumol, mask];
-endfunction
-
-local function periodic_pos fpos
-    local idx   = x_id first fpos;
-    local fpos1 = mod1 fpos;
-    local vec   = round (fpos - fpos1);
-
-    local p_pos = rep [[], 27], p_cell = p_pos, p_idx = p_pos, p_vec = p_pos;
-    local i;
-    for i = 1, 27 loop
-	local p = fpos1 + grid_s2m [[3,3,3], i] - 2;
-	local m = andE (abs p <= 1.5);	// within half a cell's width
-
-	p_pos(i)  = (p || [m]);
-	p_idx(i)  = idx | m;
-	p_cell(i) = rep [i, add m];
-	p_vec(i)  = vec || [m];
-    endloop
-
-    return [apt cat p_pos, cat p_idx, cat p_cell, apt cat p_vec];
-endfunction
-
-local function pack_pos [pos, toFrac, toXYZ]
-    local frp  = matmul [toFrac, pos];
-    local frp1 = mod1 frp;
-
-    return [append [frp, 1], round (frp - frp1), matmul [toXYZ, frp1]];
-endfunction
-
-local function CrystalContacts [aupos, rad, [spg, dim, ang]]
-    local symop = SPACEGROUP_SYMMETRY(indexof [spg, SPACEGROUP_NAME]);
-    local [toXYZ, toFrac] = CellMatrices [spg, dim,  ang];
-
-    local [aufrp, auvec, auppos] = pack_pos [aupos, toFrac, toXYZ];
-    local prox = prox_open [2 * max rad, auppos, rad]; auppos = aupos = [];
-
-    local cell_vec = -2 + tr (apt grid_s2m [[[3,3,3]], igen 27]);
-
-    local IDX = split [igen length rad, 1024];
-    local bucket = 2 * max rad;
-
-    symop = cat ['x,y,z', symop];
-
-    local i, m, Idx = rep [[], length symop], Sym = Idx, Vec = Idx;
-    for i = 1, length symop loop
-	local [R,T] = get_spg_matrix symop(i);
-	local X = rep [[], length IDX], V = X, S = X;
-	local I, x = 0;
-	for I in IDX loop
-	    local frp = spg_matmul [R, apt get [aufrp, [I]]] + T;
-	    local [pos, idx, Tidx, vec] = periodic_pos frp;
-	    idx = idx + dec first I;
-
-	    if symop(i) == 'x,y,z' then
-		if not add (m = Tidx <> 14) then continue; endif;
-		[pos, idx, Tidx, vec] = [
-		    pos || [m], idx | m, Tidx | m, vec || [m]
-		];
-	    endif
-
-	    local [n, x1, r2] = prox_find [prox, matmul [toXYZ, pos], rad[idx]];
-
-	    if not add (m = r2 > 0) then continue; endif
-
-	    [x1, r2] = [x1, r2] || [m];
-	    n = s_add [m, n];
-
-	    local x2 = stretch [x_id n, n];
-
-	    local t =
-		  apt get [auvec,	[x1]	    ]
-		+ apt get [cell_vec,	[Tidx[x2]]  ]
-		- apt get [vec,	    	[x2]	    ]
-	    ;
-
-	    if symop(i) == 'x,y,z' then
-		if not add (m = orE t) then continue; endif;
-		[x2, r2, t] = [x2 | m, r2 | m, t || [m]];
-	    endif
-
-	    x = inc x;
-	    X(x) = idx[x2];
-	    S(x) = rep [symop(i), length x2];
-	    V(x) = tr t;
-
-	endloop
-
-	m = m_uniq l_frank ([X,S,V] = app cat [X,S,V]);
-
-	Idx(i) = X | m;
-	Sym(i) = S | m;
-	Vec(i) = V | m;
-    endloop
-
-    prox_close prox;
-
-    m = m_uniq l_frank ([Idx, Sym, Vec] = app cat [Idx, Sym, Vec]);
-    [Idx, Sym, Vec] = [Idx, Sym, Vec] || [m];
-
-    return [toFrac, toXYZ, Idx, Sym, Vec];
-endfunction
-
-global function pdb_CrystalContacts [data, opt];
-    if isnull data.unit_cell or isnull data.space_group then 
-	return data;
-    endif
-    local [dim, ang] = split [data.unit_cell, 3];
-    local spg = crys_StandardShortGroup [data.space_group, dim, ang];
-
-    if spg == 'P1' and min dim <= 1 then
-	return data;	    // RCSB place-holder for non-crys models
-    endif
-
-    local rad = first cat [opt.crystal_contact_rad, 4.5];
-    local mol = data.mol;
-    local r = rep [0.5 * rad, mol_aCount mol];
-    local m = stretch [not mol_rSolventIonsMetals mol, mol_nAtoms mol];
-    local p = (mol_aPos mol) || [m = m and not mol_aLht mol];
-    local [toF, toXYZ, X, Sym, Vec] = CrystalContacts [p, r|m, [spg, dim, ang]];
-    p = [];
-
-    local ridx = stretch [x_id first mol(3), mol_nAtoms mol];
-    X = (ridx | m)[X]; ridx = m = [];
-
-    [mol, m] = mol_Images [mol, toF, toXYZ, X, Sym, Vec, r];
-
-	// Add to data.mol instead ?
-
-    if length mol then
-	data.crystal_shell = mol;
-	data.crystal_contacts = m;
-    endif
-
-    return data;
-endfunction
-
-//============================================================================
-
-global function pdb_ConnectAndType [mol, opt]
-    opt = tagcat [opt, FREAD_PDB_DEFAULTS];
-
-    local alt_mol = [];
-
-    local mol_data   = mol(1);
-    local chain_data = mol(2);
-
-    mol(3)(MOL_RES_STD)	    = 0;
-    mol(3)(MOL_RES_IDX)	    = x_id first mol(3);
-    mol(4)(MOL_ATOM_ORDER)  = x_id first mol(4);
-    mol(4)(MOL_ATOM_ALOC)   = rep [" ", l_length mol(4)];
-    mol(4)(MOL_ATOM_OCC)    = rep [ 1,  l_length mol(4)];
-    mol(4)(MOL_ATOM_ACTIVE) = rep [ 1,  l_length mol(4)];
-    mol(4)(MOL_ATOM_CTABH)  = rep [-1,  l_length mol(4)];
-
-    if length opt.alt_loc then
-	mol(4)(MOL_ATOM_ALOC) = opt.alt_loc;
-	if length opt.occupancy then
-	    mol(4)(MOL_ATOM_OCC) = opt.occupancy;
-	endif
-	mol = mol_AltLoc mol;
-	local mask = (
-	    mol(4)(MOL_ATOM_ALOC) == " " or
-	    str_R2A [mol, mol(3)(MOL_RES_ALOC)] == "*" or
-	    mol(4)(MOL_ATOM_ALOC) == str_R2A [mol, mol(3)(MOL_RES_ALOC)]
-	);
-	if anyfalse mask then
-	    alt_mol = mol_aMask [mol, not mask];
-	    alt_mol = mol_rMask [alt_mol, mol_nAtoms alt_mol];
-	    mol = mol_aMask [mol, mask];
-	endif
-    endif
-
-    mol = mol_StandardAttributes [mol, opt];
-    mol = mol_StandardChemistry mol;
-
-    if length opt.het_dict then
-	mol = mol_ApplyCTAB [mol, extract_600 opt.het_dict];
-    endif
-
-    mol = mol_MicroHet mol;	    // re-arranges & fills in the ACTIVE
-    mol = mol_StandardBonds mol;
-
-    if length opt.link and (anytrue opt.use_link or isnull opt.use_link) then
-	opt.use_link = 1;
-	local cn = mol_cName mol;
-	mol(2)(MOL_CHAIN_NAME) = app token cLetter cn;
-	if isnull mol(4)(MOL_ATOM_ALOC) then
-	    mol(4)(MOL_ATOM_ALOC) = rep [" ", l_length mol(4)];
-	endif
-	mol = first mol_ApplyLink [mol, opt.link, 0];
-	mol(2)(MOL_CHAIN_NAME) = cn;
-    endif
-
-    mol = mol_AutoConnect [mol, anytrue opt.use_link];
-    mol = mol_AutoType mol;
-
-    if length opt.link and (anytrue opt.use_link or isnull opt.use_link) then
-	opt.use_link = 1;
-	cn = mol_cName mol;
-	mol(2)(MOL_CHAIN_NAME) = app token cLetter cn;
-	if isnull mol(4)(MOL_ATOM_ALOC) then
-	    mol(4)(MOL_ATOM_ALOC) = rep [" ", l_length mol(4)];
-	endif
-	mol = first mol_ApplyLink [mol, opt.link, 1];
-	mol(2)(MOL_CHAIN_NAME) = cn;
-    endif
-    mol = mol_Finalize mol;
-
-    if l_length alt_mol(4) then
-	mol = mol_InsertAltMol [mol, alt_mol];
-    endif
-
-    if anytrue opt.preserve_order then
-	mol = mol_RestoreOrder [chain_data, mol];
-    endif
-    mol(1) = mol_data;
-
-    return [mol_DropExtend mol, mol(4)(MOL_ATOM_ACTIVE)];
-endfunction
