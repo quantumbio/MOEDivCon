@@ -29,6 +29,32 @@ import svljava.SVLJavaException;
 import svljava.SVLVar;
 import svljava.SVLWriter;
 import com.quantumbioinc.datacorrespondent.Correspondent;
+import com.quantumbioinc.xml.Element;
+import com.quantumbioinc.xml.Hamiltonian;
+import com.quantumbioinc.xml.bind.marshaller.DivconNamespacePrefixMapper;
+import com.quantumbioinc.xml.divcon.Atom;
+import com.quantumbioinc.xml.divcon.AtomArray;
+import com.quantumbioinc.xml.divcon.AtomType;
+import com.quantumbioinc.xml.divcon.ChargesType;
+import com.quantumbioinc.xml.divcon.Cml;
+import com.quantumbioinc.xml.divcon.DivconType;
+import com.quantumbioinc.xml.divcon.HamiltonianType;
+import com.quantumbioinc.xml.divcon.Molecule;
+import com.quantumbioinc.xml.divcon.ObjectFactory;
+import com.quantumbioinc.xml.divcon.Scalar;
+import com.quantumbioinc.xml.divcon.TotalChargeType;
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.math.BigInteger;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBElement;
+import javax.xml.bind.Marshaller;
+import javax.xml.bind.Unmarshaller;
+import ncsa.hdf.object.Group;
 
         
 /**
@@ -38,6 +64,8 @@ import com.quantumbioinc.datacorrespondent.Correspondent;
 public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
 
     private int taskID = 0;		// SVL task identifier
+    java.io.PrintStream sessionOutBuffer=null;
+    java.io.PrintStream sessionErrBuffer=null;
     
     @Override
     public SVLVar run(SVLVar arg, int tid) throws SVLJavaException
@@ -82,6 +110,8 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                 res = retrieveEnergyLevels(res);
                 case "setNMRAtomSelection":
                 res = setNMRAtomSelection(res);
+                case "retrieveHamiltonian":
+                res = retrieveHamiltonian(res);
                     break;
                 default:
 		throw new SVLJavaException("here Unknown command: '" + cmd + "'.");
@@ -129,12 +159,138 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
     {
         String filename = var.peek(1).getTokn(1);
         String target = var.peek(1).getTokn(2);
-        H5File h5File=new H5File(filename, H5File.WRITE);
+                sessionErrBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
+                sessionOutBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
+        java.lang.System.setErr(sessionErrBuffer);
+        java.lang.System.setOut(sessionOutBuffer);
+        H5File h5File = new H5File(filename, H5File.FILE_CREATE_OPEN);
+        if(h5File.exists())
+        {
+            h5File=(H5File)h5File.createInstance(filename, H5File.WRITE);
+        }
+        else
+        {
+            h5File=(H5File)h5File.createInstance(filename, H5File.CREATE);
+        }
+        System.out.println("h5File.canWrite="+h5File.canWrite());
         h5File.open();
-                String xPath="/DivCon";
-                H5Group divconGroup=(H5Group)findHDF5Object(h5File, xPath);
-                H5Group targetGroup=new H5Group(h5File, target, xPath, divconGroup);
-                divconGroup.addToMemberList(targetGroup);
+        long[] dims = {1};
+        Group targetGroup=(Group)h5File.get("DivCon/"+target);
+        if(targetGroup==null)
+        {
+            Group divconGroup=(Group)h5File.get("DivCon");
+            if(divconGroup==null)
+            {
+                divconGroup=h5File.createGroup("DivCon", null);
+            }
+            targetGroup=h5File.createGroup(target, divconGroup);
+        }
+                    ObjectFactory objectFactory=new ObjectFactory();
+                    DivconType divcon=new DivconType();
+                    divcon.setVersion("1.0");
+                    SVLVar svlMol=var.peek(1).peek(3);
+                    String[] chainNames=svlMol.peek(2).peek(1).getTokns();
+                    int[] residueCounts=svlMol.peek(2).peek(4).getInts();
+                    String[] residueNames=svlMol.peek(3).peek(1).getTokns();
+                    int[] sequences=svlMol.peek(3).peek(2).getInts();
+                    int[] atomCounts=svlMol.peek(3).peek(5).getInts();
+                    String[] symbols=svlMol.peek(4).peek(1).getTokns();
+                    String[] hybridizations=svlMol.peek(4).peek(3).getTokns();
+//                    int[] atomCounts=svlMol.peek(4).peek(5).getInts();
+                    String[] atomNames=svlMol.peek(4).peek(1).getTokns();
+                    int[] formalCharges=svlMol.peek(4).peek(2).getInts();
+                    double[] x=svlMol.peek(4).peek(10).getReals();
+                    double[] y=svlMol.peek(4).peek(11).getReals();
+                    double[] z=svlMol.peek(4).peek(12).getReals();
+                    Cml cml=objectFactory.createCml();
+                    int chainIndex=0;
+                    int residueIndex=0;
+                    int chainOffset=0;
+                    int residueOffset=0;
+                    JAXBElement<Molecule> molecule=objectFactory.createMolecule(new Molecule());
+                    JAXBElement<Molecule> submolecule=objectFactory.createMolecule(new Molecule());
+                    JAXBElement<AtomArray> atomArray=objectFactory.createAtomArray(new AtomArray());
+                    int totalCharge=0;
+                    for(int atomIndex=0;atomIndex<atomNames.length;atomIndex++)
+                    {
+                        JAXBElement<Atom> atom=objectFactory.createAtom(new Atom());
+                        atom.getValue().setElementType(symbols[atomIndex]);
+                        atom.getValue().setX3(new Double(x[atomIndex]));
+                        atom.getValue().setY3(new Double(y[atomIndex]));
+                        atom.getValue().setY3(new Double(z[atomIndex]));
+                        atom.getValue().setFormalCharge(new BigInteger(""+formalCharges[atomIndex]));
+                        totalCharge+=formalCharges[atomIndex];
+                        JAXBElement<AtomType> atomType=objectFactory.createAtomType(new AtomType());
+                        atomType.getValue().setName(atomNames[atomIndex]);
+                        atom.getValue().getAnyCmlOrAnyOrAny().add(atomType);
+                        JAXBElement<Scalar> chainID=objectFactory.createScalar(new Scalar());
+                        chainID.getValue().setTitle("chainID");
+                        chainID.getValue().setValue(chainNames[chainIndex].substring(chainNames[chainIndex].lastIndexOf('.')+1, chainNames[chainIndex].length()));
+                        atom.getValue().getAnyCmlOrAnyOrAny().add(chainID);
+                        JAXBElement<Scalar> hybridization=objectFactory.createScalar(new Scalar());
+                        hybridization.getValue().setTitle("hybridization");
+                        hybridization.getValue().setValue(hybridizations[atomIndex]);
+                        atom.getValue().getAnyCmlOrAnyOrAny().add(hybridization);
+                        atomArray.getValue().getAnyCmlOrAnyOrAny().add(atom);
+                        if(atomIndex>=atomCounts[residueIndex]+residueOffset-1)
+                        {
+                            residueOffset+=atomCounts[residueIndex];
+                            submolecule.getValue().setTitle(residueNames[residueIndex]);
+                            submolecule.getValue().getAnyCmlOrAnyOrAny().add(atomArray);
+                            JAXBElement<Scalar> sequence=objectFactory.createScalar(new Scalar());
+                            sequence.getValue().setTitle("sequence");
+                            sequence.getValue().setValue(""+sequences[residueIndex]);
+                            submolecule.getValue().getAnyCmlOrAnyOrAny().add(sequence);
+                            molecule.getValue().getAnyCmlOrAnyOrAny().add(submolecule);
+                            residueIndex++;
+                            if(residueIndex<=atomCounts.length)
+                            {
+                                atomArray=objectFactory.createAtomArray(new AtomArray());
+                                submolecule=objectFactory.createMolecule(new Molecule());
+                            }
+                            if(residueIndex>=residueCounts[chainIndex]+chainOffset)
+                            {
+                                chainOffset+=residueCounts[chainIndex];
+                                chainIndex++;
+                                molecule.getValue().setTitle(svlMol.peek(1).getTokn(1));
+                                cml.getAnyCmlOrAnyOrAny().add(molecule);
+                                if(chainIndex<=residueCounts.length)molecule=objectFactory.createMolecule(new Molecule());
+                            }
+                        }
+                    }
+                    HamiltonianType hamiltonianType=objectFactory.createHamiltonianType();
+                    hamiltonianType.setParameters("pm6");
+                    divcon.setHamiltonian(hamiltonianType);
+                    TotalChargeType totalChargeType=objectFactory.createTotalChargeType();
+                    totalChargeType.setValue(totalCharge);
+                    ChargesType chargesType=objectFactory.createChargesType();
+                    chargesType.setTotalCharge(totalChargeType);
+                    divcon.getCmlOrTargetOrLigand().add(chargesType);
+                    divcon.getCmlOrTargetOrLigand().add(cml);
+                    JAXBContext jc = JAXBContext.newInstance("com.quantumbioinc.xml.divcon");
+                    Marshaller m = jc.createMarshaller();
+                    m.setProperty(Marshaller.JAXB_SCHEMA_LOCATION, "http://quantumbioinc.com/schema/divcon /home/roger/NetBeansProjects/OOBackbone/schemas/divcon.xsd");
+                    m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+                    DivconNamespacePrefixMapper dnpm=new DivconNamespacePrefixMapper();
+                    m.setProperty("com.sun.xml.bind.namespacePrefixMapper", dnpm);
+            //Marshal object into file.
+                    ByteArrayOutputStream baos=new java.io.ByteArrayOutputStream();
+                    JAXBElement<com.quantumbioinc.xml.divcon.DivconType> jaxbOutElement=objectFactory.createDivcon(divcon);
+                    m.marshal(jaxbOutElement, baos);
+        Datatype docType=h5File.createDatatype(H5Datatype.CLASS_STRING, baos.size(), Datatype.NATIVE, Datatype.NATIVE);
+        ListIterator<HObject> li=targetGroup.getMemberList().listIterator();
+        boolean documentExists=false;
+        while(li.hasNext())
+        {
+            Object obj=li.next();
+            if(obj instanceof ncsa.hdf.object.h5.H5ScalarDS && ((ncsa.hdf.object.h5.H5ScalarDS)obj).getName().compareTo("Document")==0)
+            {
+                documentExists=true;
+                ((ncsa.hdf.object.h5.H5ScalarDS)obj).write(new String[]{baos.toString()});
+                break;
+            }
+        }
+        if(!documentExists)h5File.createScalarDS("Document", targetGroup, docType, dims, null, null, 0, new String[]{baos.toString()});
         h5File.close();
         return new SVLVar();
     }
@@ -1066,5 +1222,77 @@ private SVLVar retrieveEnergyLevels(SVLVar var) throws SVLJavaException, IOExcep
         return indw;
     }
     
-    
+private SVLVar retrieveHamiltonian(SVLVar var) throws SVLJavaException, IOException, Exception
+{
+        String target = var.peek(1).getTokn(1);
+    String hamiltonianParameterFile = var.peek(1).getTokn(2);
+    String qbHome=java.lang.System.getProperty("QBHOME");
+    if(true)return new SVLVar(qbHome);
+    File f=new File(qbHome+File.separator+"data"+File.separator+"Hamiltonian"+File.separator+hamiltonianParameterFile+".xml");
+    JAXBContext jc = JAXBContext.newInstance("com.quantumbioinc.xml.hamiltonian");
+    Unmarshaller um=jc.createUnmarshaller();
+    Hamiltonian hamiltonian=(Hamiltonian)um.unmarshal(f);
+    ListIterator<Object> listIterator = hamiltonian.getHamiltonianParams().getElementAndPair().listIterator();
+    int counter=0;
+    SVLVar[] aCore=new SVLVar[83];
+    SVLVar[] uss=new SVLVar[83];
+    SVLVar[] upp=new SVLVar[83];
+    SVLVar[] udd=new SVLVar[83];
+    SVLVar[] zetas=new SVLVar[83];
+    SVLVar[] zetap=new SVLVar[83];
+    SVLVar[] zetad=new SVLVar[83];
+    SVLVar[] zetasn=new SVLVar[83];
+    SVLVar[] zetapn=new SVLVar[83];
+    SVLVar[] zetadn=new SVLVar[83];
+    while(counter<83 && listIterator.hasNext())
+    {
+        Object obj=listIterator.next();
+        if(obj instanceof Element)
+        {
+            Element e=(Element)obj;
+            aCore[e.getNumber()-1]=new SVLVar(e.getAcore().getValue());
+            uss[e.getNumber()-1]=new SVLVar(e.getUss().getValue());
+            upp[e.getNumber()-1]=new SVLVar(e.getUpp().getValue());
+            udd[e.getNumber()-1]=new SVLVar(e.getUdd().getValue());
+            zetas[e.getNumber()-1]=new SVLVar(e.getZetas().getValue());
+            zetap[e.getNumber()-1]=new SVLVar(e.getZetap().getValue());
+            zetad[e.getNumber()-1]=new SVLVar(e.getZetad().getValue());
+            zetasn[e.getNumber()-1]=new SVLVar(e.getZetasn().getValue());
+            zetapn[e.getNumber()-1]=new SVLVar(e.getZetapn().getValue());
+            zetadn[e.getNumber()-1]=new SVLVar(e.getZetadn().getValue());
+            counter++;
+        }
+    }
+    SVLVar[] hamiltonianParameters=new SVLVar[9];
+    hamiltonianParameters[0]=new SVLVar(uss);
+    hamiltonianParameters[1]=new SVLVar(upp);
+    hamiltonianParameters[2]=new SVLVar(udd);
+    hamiltonianParameters[3]=new SVLVar(zetas);
+    hamiltonianParameters[4]=new SVLVar(zetap);
+    hamiltonianParameters[5]=new SVLVar(zetad);
+    hamiltonianParameters[6]=new SVLVar(zetasn);
+    hamiltonianParameters[7]=new SVLVar(zetapn);
+    hamiltonianParameters[8]=new SVLVar(zetadn);
+
+    SVLVar data=new SVLVar(new String[]{"Uss", "Upp", "Udd", "Zetas", "Zetap", "Zetad", "Zetasn", "Zetapn", "Zetadn"}, hamiltonianParameters);
+    return new SVLVar(data);
+}
+
+//[ '3FVA.pdb',
+//[ ['3FVA.pdb.A','3FVA.pdb.W'], ['3FVA.pdb','3FVA.pdb'], ['',''], [6,2] ], 
+//[ ['ASN','ASN','GLN','ASN','THR','PHE','HOH','HOH'], [1,2,3,4,5,6,7,8], "        ", ['amino','amino','amino','amino','amino','amino','none','none'], [16,14,17,14,14,21,3,3] ], 
+//
+//[ ['N','C','C','O','C','C','O','N','H','H','H','H','H','H','H','H','N','C','C','O','C','C','O','N','H','H','H','H','H','H','N','C','C','O','C','C','C','O','N','H','H','H','H','H','H','H','H','N','C','C','O','C','C','O','N','H','H','H','H','H','H','N','C','C','O','C','O','C','H','H','H','H','H','H','H','N','C','C','O','C','C','C','C','C','C','C','O','H','H','H','H','H','H','H','H','H','O','H','H','O','H','H'],
+//  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//  ['sp3','sp3','sp2','sp2','sp3','sp2','sp2','sp2','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp2','sp3','sp2','sp2','sp3','sp2','sp2','sp2','sp3','sp3','sp3','sp3','sp3','sp3','sp2','sp3','sp2','sp2','sp3','sp3','sp2','sp2','sp2','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp2','sp3','sp2','sp2','sp3','sp2','sp2','sp2','sp3','sp3','sp3','sp3','sp3','sp3','sp2','sp3','sp2','sp2','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp2','sp3','sp2','sp2','sp3','sp2','sp2','sp2','sp2','sp2','sp2','sp2','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3','sp3'],
+//  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//  [ [2,9,10,11], [1,3,5,12], [2,4,17], 3, [2,6,13,14], [5,7,8], 6, [6,15,16], 1, 1, 1, 2, 5, 5, 8, 8, [3,18,25], [17,19,21,26], [18,20,31], 19, [18,22,27,28], [21,23,24], 22, [22,29,30], 17, 18, 21, 21, 24, 24, [19,32,40], [31,33,35,41], [32,34,48], 33, [32,36,42,43], [35,37,44,45], [36,38,39], 37, [37,46,47], 31, 32, 35, 35, 36, 36, 39, 39, [33,49,56], [48,50,52,57], [49,51,62], 50, [49,53,58,59], [52,54,55], 53, [53,60,61], 48, 49, 52, 52, 55, 55, [50,63,69], [62,64,66,70], [63,65,76], 64, [63,67,68,71], [66,72], [66,73,74,75], 62, 63, 66, 67, 68, 68, 68, [64,77,88], [76,78,80,89], [77,79,87], 78, [77,81,90,91], [80,82,83], [81,84,92], [81,85,93], [82,86,94], [83,86,95], [84,85,96], 78, 76, 77, 80, 80, 82, 83, 84, 85, 86, [98,99], 97, 97, [101,102], 100, 100 ],
+//  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//  ['N','CA','C','O','CB','CG','OD1','ND2','H1','H2','H3','HA','HB2','HB3','HD21','HD22','N','CA','C','O','CB','CG','OD1','ND2','H','HA','HB2','HB3','HD21','HD22','N','CA','C','O','CB','CG','CD','OE1','NE2','H','HA','HB2','HB3','HG2','HG3','HE21','HE22','N','CA','C','O','CB','CG','OD1','ND2','H','HA','HB2','HB3','HD21','HD22','N','CA','C','O','CB','OG1','CG2','H','HA','HB','HG1','HG21','HG22','HG23','N','CA','C','O','CB','CG','CD1','CD2','CE1','CE2','CZ','OXT','H','HA','HB2','HB3','HD1','HD2','HE1','HE2','HZ','O','H1','H2','O','H1','H2'],
+//  [1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//  [-6.702,-7.086,-6.105,-6.086,-8.507,-9.595,-9.322,-10.845,-7.491,-6.256,-6.113,-7.06,-8.6,-8.648,-11.502,-10.997,-5.305,-4.238,-4.339,-4.46,-2.891,-2.771,-2.94,-2.553,-5.363,-4.317,-2.797,-2.179,-2.478,-2.488,-4.312,-4.492,-3.406,-3.213,-5.873,-7.049,-8.384,-8.538,-9.375,-4.19,-4.427,-5.962,-5.937,-7.077,-6.928,-10.15,-9.238,-2.688,-1.748,-2.009,-2.262,-0.299,0.697,0.899,1.318,-2.727,-1.852,-0.126,-0.172,1.895,1.144,-1.942,-1.937,-0.871,-0.674,-3.322,-3.203,-3.844,-1.899,-1.718,-3.961,-3.928,-4.699,-3.94,-3.232,-0.187,0.767,0.043,-1.185,1.92,2.818,2.559,3.889,3.379,4.703,4.446,0.644,-0.256,1.156,1.55,2.454,1.84,4.063,3.205,5.421,4.999,-4.963,-4.55,-4.857,3.229,4.206,2.873],
+//  [-0.246,-0.456,0.245,1.471,0.053,-0.823,-1.82,-0.455,-0.083,-1.029,0.509,-1.415,0.946,0.075,-0.909,0.237,-0.56,-0.059,-0.686,-1.902,-0.381,0.218,1.432,-0.63,-1.418,0.914,-1.343,-0.018,-0.334,-1.473,0.157,-0.3,0.301,1.513,0.128,-0.532,0.084,1.308,-0.766,1.005,-1.277,1.089,-0.111,-1.474,-0.424,-0.465,-1.614,-0.55,-0.074,-0.747,-1.949,-0.363,0.175,1.379,-0.718,-1.406,0.894,0.057,-1.322,-0.461,-1.555,0.035,-0.543,0.104,1.318,-0.437,-0.912,0.981,0.894,-1.495,-0.989,-0.862,1.011,1.305,1.55,-0.71,-0.2,0.142,-0.034,-1.196,-1.298,-2.231,-0.428,-2.309,-0.496,-1.433,0.627,-1.567,0.63,-2.076,-0.906,-2.814,0.209,-2.941,0.088,-1.488,1.946,2.566,2.342,1.122,1.113,1.272],
+//  [-0.738,-2.167,-3.087,-3.179,-2.45,-1.836,-1.146,-2.097,-0.215,-0.408,-0.673,-2.368,-2.082,-3.409,-1.779,-2.584,-3.78,-4.637,-6.017,-6.14,-3.992,-2.611,-2.438,-1.607,-3.769,-4.728,-3.914,-4.542,-0.803,-1.763,-7.046,-8.432,-9.31,-9.314,-8.959,-8.226,-8.604,-8.617,-8.883,-6.972,-8.472,-8.857,-9.897,-8.454,-7.27,-9.102,-8.843,-10.038,-11.048,-12.39,-12.45,-10.629,-11.625,-11.723,-12.38,-9.967,-11.16,-9.772,-10.563,-12.963,-12.287,-13.461,-14.799,-15.676,-15.627,-15.495,-16.838,-15.511,-13.442,-14.724,-15.018,-17.218,-15.947,-14.612,-15.984,-16.472,-17.457,-18.765,-18.875,-17.666,-16.478,-15.482,-16.318,-14.355,-15.202,-14.213,-19.73,-16.463,-17.111,-17.839,-18.422,-15.571,-16.973,-13.695,-15.114,-13.467,-0.298,-0.935,0.592,-20.636,-20.715,-21.537] ] ]
+
 }
