@@ -1,0 +1,786 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xlink="http://www.w3.org/1999/xlink"
+    targetNamespace="http://quantumbioinc.com/schema/hamiltonian"
+    xmlns:hamiltonian="http://quantumbioinc.com/schema/hamiltonian"
+    elementFormDefault="qualified">
+    <xs:simpleType name="algorithmType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="am1"/>
+            <xs:enumeration value="mndo"/>
+            <xs:enumeration value="mndod"/>
+            <xs:enumeration value="pm3"/>
+            <xs:enumeration value="pddgpm3"/>
+            <xs:enumeration value="pm6"/>
+            <xs:enumeration value="pm6d"/>
+            <xs:enumeration value="pm6dh2"/>
+            <xs:enumeration value="qbm1"/>
+            <xs:enumeration value="qbm1d"/>
+            <xs:enumeration value="qbm2"/>
+            <xs:enumeration value="qbm2d"/>
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:element name="acore">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="al0">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="al1">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="al2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="al3">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="al4">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="al5">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="al6">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="al7">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="al8">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="al9">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="alp">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="alpb">
+    <xs:complexType>
+      <xs:attribute name="atom2" type="xs:string" use="required" />
+      <xs:attribute name="atom1" type="xs:string" use="required" />
+      <xs:attribute name="j" type="xs:int" use="required" />
+      <xs:attribute name="i" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="betad">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="betap">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="betas">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="cp1">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="cp2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="cp3">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+ <xs:element name="cp4">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="cp5">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="cp6">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="cs1">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="cs2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="cs3">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="cs4">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+   <xs:element name="cs5">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="cs6">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="dap1">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dap2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dl1">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dl2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dl3">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dl4">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dl5">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dl6">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dp1">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dp2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dp3">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+ <xs:element name="dp4">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dp5">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dp6">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ds1">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="ds2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="ds3">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+ <xs:element name="ds4">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="ds5">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="ds6">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="eeatm">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="f0sd">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="g2sd">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="gp2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="gpp">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="gsp">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="gss">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="hamiltonian">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hamiltonian:peptide-torsion-barrier" minOccurs="1" maxOccurs="1"/>
+        <xs:element ref="hamiltonian:hamiltonian-params" minOccurs="1" maxOccurs="1"/>
+      </xs:sequence>
+      <xs:attribute name="algorithm" type="hamiltonian:algorithmType" use="required" />
+      <xs:attribute name="name" type="xs:string" use="required" />
+      <xs:attribute name="feature" type="xs:string" use="optional" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="hamiltonian-params">
+    <xs:complexType>
+      <xs:sequence maxOccurs="unbounded">
+        <xs:element ref="hamiltonian:element" minOccurs="0" maxOccurs="unbounded" />
+        <xs:element ref="hamiltonian:pair" minOccurs="0" maxOccurs="unbounded" />
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+    <xs:element name="element">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element ref="hamiltonian:Uss" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:Upp" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:Udd" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:betas" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:betap" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:betad" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:zetas" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:zetap" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:zetad" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:zetasn" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:zetapn" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:zetadn" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:alp" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dap1" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:zs" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:zp" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dap2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:gss" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:gsp" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:gpp" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:gp2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:hsp" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:pa1" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:pa2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:polvo" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:acore" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:K1" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:K2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:K3" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:K4" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:L1" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:L2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:L3" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:L4" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:M1" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:M2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:M3" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:M4" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:al0" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:al1" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:al2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:al3" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:al4" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:al5" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:al6" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:al7" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:al8" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:al9" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dl1" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dl2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dl3" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dl4" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dl5" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dl6" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:poc_" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:f0sd" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:g2sd" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:eeatm" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:hfatm" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:cdsp" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:rdsp" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:cs1" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:cs2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:cs3" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:cs4" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:cs5" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:cs6" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:cp1" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:cp2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:cp3" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:cp4" minOccurs="0" maxOccurs="1"/>
+                <xs:element ref="hamiltonian:cp5" minOccurs="0" maxOccurs="1"/>
+                <xs:element ref="hamiltonian:cp6" minOccurs="0" maxOccurs="1"/>
+                <xs:element ref="hamiltonian:ds1" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:ds2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:ds3" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:ds4" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:ds5" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:ds6" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dp1" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dp2" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dp3" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dp4" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dp5" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:dp6" minOccurs="0" maxOccurs="1" />
+                <xs:element ref="hamiltonian:sigma" minOccurs="0"/>
+                <xs:element ref="hamiltonian:sigmaO" minOccurs="0"/>
+                <xs:element ref="hamiltonian:sigmaN" minOccurs="0"/>
+            </xs:sequence>
+            <xs:attribute name="name" type="xs:string" use="required" />
+            <xs:attribute name="symbol" type="xs:string" use="required" />
+            <xs:attribute name="number" type="xs:int" use="required" />
+            <xs:attribute name="hybridization" type="xs:string" use="optional" />
+        </xs:complexType>
+    </xs:element>
+
+  <xs:element name="hfatm">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="hsp">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="K1">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="K2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="K3">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="K4">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="L1">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="L2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="L3">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="L4">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="M1">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="M2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="M3">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="M4">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="pa1">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="pa2">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="pair">
+    <xs:complexType>
+      <xs:attribute name="atom2" type="xs:string" use="required" />
+      <xs:attribute name="atom1" type="xs:string" use="required" />
+      <xs:attribute name="j" type="xs:int" use="required" />
+      <xs:attribute name="i" type="xs:int" use="required" />
+      <xs:attribute name="alpb" type="xs:double" use="optional" default="0.0" />
+      <xs:attribute name="xfac" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="peptide-torsion-barrier">
+    <xs:complexType>
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="poc_">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="polvo">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="Udd">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="Upp">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="Uss">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="xfac">
+    <xs:complexType>
+      <xs:attribute name="atom2" type="xs:string" use="required" />
+      <xs:attribute name="atom1" type="xs:string" use="required" />
+      <xs:attribute name="j" type="xs:int" use="required" />
+      <xs:attribute name="i" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="zetad">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="zetadn">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="zetap">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="zetapn">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="zetas">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="zetasn">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="zp">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="zs">
+    <xs:complexType>
+      <xs:attribute name="element-number" type="xs:int" use="required" />
+      <xs:attribute name="value" type="xs:double" use="optional" default="0.0" />
+    </xs:complexType>
+  </xs:element>
+    <xs:element name="cdsp">
+        <xs:complexType>
+            <xs:attribute name="element-number" type="xs:int"/>
+            <xs:attribute name="value" type="xs:double" default="0.0"/>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="rdsp">
+        <xs:complexType>
+            <xs:attribute name="value" type="xs:double" default="0.0"/>
+            <xs:attribute name="element-number" type="xs:int" />
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="sigma">
+        <xs:complexType>
+            <xs:attribute name="element-number" type="xs:int"/>
+            <xs:attribute name="value" type="xs:double" default="0.0"/>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="sigmaO">
+        <xs:complexType>
+            <xs:attribute name="element-number" type="xs:int"/>
+            <xs:attribute name="value" type="xs:double" default="0.0"/>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="sigmaN">
+        <xs:complexType>
+            <xs:attribute name="element-number" type="xs:int"/>
+            <xs:attribute name="value" type="xs:double" default="0.0"/>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>
+
+
+
+
+
+
