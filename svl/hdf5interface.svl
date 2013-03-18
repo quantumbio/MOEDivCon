@@ -16,6 +16,8 @@ global function qbRetrieveEigenVectors  arg = jvmqb ['retrieveEigenVectors' , [a
 global function qbRetrieveEnergyLevels  arg = jvmqb ['retrieveEnergyLevels' , [arg] ];
 global function qbSetNMRAtomSelection  arg = jvmqb ['setNMRAtomSelection' , [arg] ];
 global function qbStoreModel  arg = jvmqb ['storeModel' , [arg] ];
+global function qbRetrieveHamiltonian  arg = jvmqb ['retrieveHamiltonian' , [arg] ];
+global function qbRetrieveDefaultProgramOptions  arg = jvmqb ['retrieveDefaultProgramOptions' , [arg] ];
 
 // The following function can be used test the new h5 
 // example:
@@ -27,11 +29,11 @@ global function qbTesth5Main [h5file]
         return;
     endif
 
-//    print qbListModels [h5file];
+    print qbListModels [h5file];
     
 //    write ['length {}\n', length cat qbListModels [h5file]];
     
-//    local modelTags = cat qbListModels [h5file];
+    local modelTags = cat qbListModels [h5file];
     
 //    write ['length modelTags.target : {}\n', length modelTags.target];
     
@@ -52,6 +54,8 @@ global function qbTesth5Main [h5file]
     //print  qbRetrieveEigenVectors [h5file, modelTags.target];
     //print  qbRetrieveEnergyLevels [h5file, modelTags.target];
    // qbSetNMRAtomSelection [h5file, modelTags.target, [0,1,2,10]];
+    print  qbRetrieveHamiltonian [modelTags.target, 'pm6'];
+    print  qbRetrieveDefaultProgramOptions [];
 
 endfunction
 
@@ -68,6 +72,7 @@ global function qbTestPDBtoH5 [h5file,inpdb]
 
     // For format see: file:///share/apps/MOE/MOE-2012/html/moe/fcnref/extract.htm#mol_Extract
 
-    qbStoreModel [h5file, mol_Extract tmpChains];
+    print mol_Extract tmpChains;
+    print qbStoreModel [h5file, 'rec', mol_Extract tmpChains];
 endfunction
 
