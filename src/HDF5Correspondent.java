@@ -108,10 +108,15 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                     break;
                 case "retrieveEnergyLevels":
                 res = retrieveEnergyLevels(res);
+                    break;
                 case "setNMRAtomSelection":
                 res = setNMRAtomSelection(res);
+                    break;
                 case "retrieveHamiltonian":
                 res = retrieveHamiltonian(res);
+                    break;
+                case "retrieveDefaultProgramOptions":
+                res = retrieveDefaultProgramOptions(res);
                     break;
                 default:
 		throw new SVLJavaException("here Unknown command: '" + cmd + "'.");
@@ -1226,10 +1231,10 @@ private SVLVar retrieveHamiltonian(SVLVar var) throws SVLJavaException, IOExcept
 {
         String target = var.peek(1).getTokn(1);
     String hamiltonianParameterFile = var.peek(1).getTokn(2);
-    String qbHome=java.lang.System.getProperty("QBHOME");
-    if(true)return new SVLVar(qbHome);
+    String qbHome="/home/roger/testing-grounds/qmechanic";//java.lang.System.getProperty("QBHOME");
+//    if(true)return new SVLVar(qbHome);
     File f=new File(qbHome+File.separator+"data"+File.separator+"Hamiltonian"+File.separator+hamiltonianParameterFile+".xml");
-    JAXBContext jc = JAXBContext.newInstance("com.quantumbioinc.xml.hamiltonian");
+    JAXBContext jc = JAXBContext.newInstance("com.quantumbioinc.xml");
     Unmarshaller um=jc.createUnmarshaller();
     Hamiltonian hamiltonian=(Hamiltonian)um.unmarshal(f);
     ListIterator<Object> listIterator = hamiltonian.getHamiltonianParams().getElementAndPair().listIterator();
@@ -1250,18 +1255,31 @@ private SVLVar retrieveHamiltonian(SVLVar var) throws SVLJavaException, IOExcept
         if(obj instanceof Element)
         {
             Element e=(Element)obj;
-            aCore[e.getNumber()-1]=new SVLVar(e.getAcore().getValue());
-            uss[e.getNumber()-1]=new SVLVar(e.getUss().getValue());
-            upp[e.getNumber()-1]=new SVLVar(e.getUpp().getValue());
-            udd[e.getNumber()-1]=new SVLVar(e.getUdd().getValue());
-            zetas[e.getNumber()-1]=new SVLVar(e.getZetas().getValue());
-            zetap[e.getNumber()-1]=new SVLVar(e.getZetap().getValue());
-            zetad[e.getNumber()-1]=new SVLVar(e.getZetad().getValue());
-            zetasn[e.getNumber()-1]=new SVLVar(e.getZetasn().getValue());
-            zetapn[e.getNumber()-1]=new SVLVar(e.getZetapn().getValue());
-            zetadn[e.getNumber()-1]=new SVLVar(e.getZetadn().getValue());
+            if(e.getAcore()!=null){aCore[e.getNumber()-1]=new SVLVar(e.getAcore().getValue());}else{aCore[e.getNumber()-1]=new SVLVar();};
+            if(e.getUss()!=null){uss[e.getNumber()-1]=new SVLVar(e.getUss().getValue());}else{uss[e.getNumber()-1]=new SVLVar();};
+            if(e.getUpp()!=null){upp[e.getNumber()-1]=new SVLVar(e.getUpp().getValue());}else{upp[e.getNumber()-1]=new SVLVar();};
+            if(e.getUdd()!=null){udd[e.getNumber()-1]=new SVLVar(e.getUdd().getValue());}else{udd[e.getNumber()-1]=new SVLVar();};
+            if(e.getZetas()!=null){zetas[e.getNumber()-1]=new SVLVar(e.getZetas().getValue());}else{zetas[e.getNumber()-1]=new SVLVar();};
+            if(e.getZetap()!=null){zetap[e.getNumber()-1]=new SVLVar(e.getZetap().getValue());}else{zetap[e.getNumber()-1]=new SVLVar();};
+            if(e.getZetad()!=null){zetad[e.getNumber()-1]=new SVLVar(e.getZetad().getValue());}else{zetad[e.getNumber()-1]=new SVLVar();};
+            if(e.getZetasn()!=null){zetasn[e.getNumber()-1]=new SVLVar(e.getZetasn().getValue());}else{zetasn[e.getNumber()-1]=new SVLVar();};
+            if(e.getZetapn()!=null){zetapn[e.getNumber()-1]=new SVLVar(e.getZetapn().getValue());}else{zetapn[e.getNumber()-1]=new SVLVar();};
+            if(e.getZetadn()!=null){zetadn[e.getNumber()-1]=new SVLVar(e.getZetadn().getValue());}else{zetadn[e.getNumber()-1]=new SVLVar();};
             counter++;
         }
+    }
+    for(int index=0;index<83;index++)
+    {
+        if(aCore[index]==null)aCore[index]=new SVLVar();
+        if(uss[index]==null)uss[index]=new SVLVar();
+        if(upp[index]==null)upp[index]=new SVLVar();
+        if(udd[index]==null)udd[index]=new SVLVar();
+        if(zetas[index]==null)zetas[index]=new SVLVar();
+        if(zetap[index]==null)zetap[index]=new SVLVar();
+        if(zetad[index]==null)zetad[index]=new SVLVar();
+        if(zetasn[index]==null)zetasn[index]=new SVLVar();
+        if(zetapn[index]==null)zetapn[index]=new SVLVar();
+        if(zetadn[index]==null)zetadn[index]=new SVLVar();
     }
     SVLVar[] hamiltonianParameters=new SVLVar[9];
     hamiltonianParameters[0]=new SVLVar(uss);
@@ -1278,6 +1296,26 @@ private SVLVar retrieveHamiltonian(SVLVar var) throws SVLJavaException, IOExcept
     return new SVLVar(data);
 }
 
+private SVLVar retrieveDefaultProgramOptions(SVLVar var) throws SVLJavaException, IOException, Exception
+{
+            SVLVar[] defaultProgramOptions=new SVLVar[14];
+            defaultProgramOptions[0]=new SVLVar("pm6");
+            defaultProgramOptions[1]=new SVLVar("off");
+            defaultProgramOptions[2]=new SVLVar("off");
+            defaultProgramOptions[3]=new SVLVar("off");
+            defaultProgramOptions[4]=new SVLVar("off");
+            defaultProgramOptions[5]=new SVLVar(1.0e-8);
+            defaultProgramOptions[6]=new SVLVar("off");
+            defaultProgramOptions[7]=new SVLVar("off");
+            defaultProgramOptions[8]=new SVLVar(new double[]{});
+            defaultProgramOptions[9]=new SVLVar(new double[]{});
+            defaultProgramOptions[10]=new SVLVar("off");
+            defaultProgramOptions[11]=new SVLVar("off");
+            defaultProgramOptions[12]=new SVLVar("off");
+            defaultProgramOptions[13]=new SVLVar(1);
+    return new SVLVar(new String[]{"hamiltonian", "gradient", "opt", "freq", "decompose", "ecrit", "pwd",
+                                   "perception", "selection", "region", "test", "restart", "standard", "np"}, defaultProgramOptions);
+}
 //[ '3FVA.pdb',
 //[ ['3FVA.pdb.A','3FVA.pdb.W'], ['3FVA.pdb','3FVA.pdb'], ['',''], [6,2] ], 
 //[ ['ASN','ASN','GLN','ASN','THR','PHE','HOH','HOH'], [1,2,3,4,5,6,7,8], "        ", ['amino','amino','amino','amino','amino','amino','none','none'], [16,14,17,14,14,21,3,3] ], 
