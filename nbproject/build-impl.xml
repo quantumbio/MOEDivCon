@@ -20,6 +20,7 @@ is divided into following sections:
 
         -->
 <project xmlns:j2seproject1="http://www.netbeans.org/ns/j2se-project/1" xmlns:j2seproject3="http://www.netbeans.org/ns/j2se-project/3" xmlns:jaxrpc="http://www.netbeans.org/ns/j2se-project/jax-rpc" basedir=".." default="default" name="MOEDivcon-impl">
+    <import file="xml_binding_build.xml"/>
     <fail message="Please build using Ant 1.8.0 or higher.">
         <condition>
             <not>
@@ -901,6 +902,13 @@ is divided into following sections:
         </propertyfile>
         <antcall target="-maybe-call-dep">
             <param name="call.built.properties" value="${built-jar.properties}"/>
+            <param location="${project.ChemicalExchange}" name="call.subproject"/>
+            <param location="${project.ChemicalExchange}/build.xml" name="call.script"/>
+            <param name="call.target" value="jar"/>
+            <param name="transfer.built-jar.properties" value="${built-jar.properties}"/>
+        </antcall>
+        <antcall target="-maybe-call-dep">
+            <param name="call.built.properties" value="${built-jar.properties}"/>
             <param location="${project.HDFView}" name="call.subproject"/>
             <param location="${project.HDFView}/build.xml" name="call.script"/>
             <param name="call.target" value="jar"/>
@@ -921,7 +929,7 @@ is divided into following sections:
     <target depends="init" if="netbeans.automatic.build" name="-clean-after-automatic-build">
         <antcall target="clean"/>
     </target>
-    <target depends="init,deps-jar" name="-pre-pre-compile">
+    <target depends="init,deps-jar,jaxb-code-generation" name="-pre-pre-compile">
         <mkdir dir="${build.classes.dir}"/>
     </target>
     <target name="-pre-compile">
@@ -1393,6 +1401,13 @@ is divided into following sections:
         <propertyfile file="${built-clean.properties}">
             <entry key="${basedir}" value=""/>
         </propertyfile>
+        <antcall target="-maybe-call-dep">
+            <param name="call.built.properties" value="${built-clean.properties}"/>
+            <param location="${project.ChemicalExchange}" name="call.subproject"/>
+            <param location="${project.ChemicalExchange}/build.xml" name="call.script"/>
+            <param name="call.target" value="clean"/>
+            <param name="transfer.built-clean.properties" value="${built-clean.properties}"/>
+        </antcall>
         <antcall target="-maybe-call-dep">
             <param name="call.built.properties" value="${built-clean.properties}"/>
             <param location="${project.HDFView}" name="call.subproject"/>
