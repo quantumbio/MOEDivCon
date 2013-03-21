@@ -1299,19 +1299,19 @@ private SVLVar retrieveHamiltonian(SVLVar var) throws SVLJavaException, IOExcept
 private SVLVar retrieveDefaultProgramOptions(SVLVar var) throws SVLJavaException, IOException, Exception
 {
             SVLVar[] defaultProgramOptions=new SVLVar[14];
-            defaultProgramOptions[0]=new SVLVar("pm6");
-            defaultProgramOptions[1]=new SVLVar("off");
-            defaultProgramOptions[2]=new SVLVar("off");
-            defaultProgramOptions[3]=new SVLVar("off");
-            defaultProgramOptions[4]=new SVLVar("off");
+            defaultProgramOptions[0]=new SVLVar("pm6", true);
+            defaultProgramOptions[1]=new SVLVar("off", true);
+            defaultProgramOptions[2]=new SVLVar("off", true);
+            defaultProgramOptions[3]=new SVLVar("off", true);
+            defaultProgramOptions[4]=new SVLVar("off", true);
             defaultProgramOptions[5]=new SVLVar(1.0e-8);
-            defaultProgramOptions[6]=new SVLVar("off");
-            defaultProgramOptions[7]=new SVLVar("off");
+            defaultProgramOptions[6]=new SVLVar("off", true);
+            defaultProgramOptions[7]=new SVLVar("off", true);
             defaultProgramOptions[8]=new SVLVar(new double[]{});
             defaultProgramOptions[9]=new SVLVar(new double[]{});
-            defaultProgramOptions[10]=new SVLVar("off");
-            defaultProgramOptions[11]=new SVLVar("off");
-            defaultProgramOptions[12]=new SVLVar("off");
+            defaultProgramOptions[10]=new SVLVar("off", true);
+            defaultProgramOptions[11]=new SVLVar("off", true);
+            defaultProgramOptions[12]=new SVLVar("off", true);
             defaultProgramOptions[13]=new SVLVar(1);
     return new SVLVar(new String[]{"hamiltonian", "gradient", "opt", "freq", "decompose", "ecrit", "pwd",
                                    "perception", "selection", "region", "test", "restart", "standard", "np"}, defaultProgramOptions);
