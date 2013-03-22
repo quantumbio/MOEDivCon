@@ -383,9 +383,11 @@ local function NMRCSVtoMDB opt
 endfunction
 
 function _Atoms;
-
+function qbStoreModel;
+function qbSetNMRAtomSelection;
 global function qbProcessCSVNMR opt
     local INDEFAULTS;
+    INDEFAULTS.h5file = [];
     INDEFAULTS.db_file = twrite['{}-DELETE.mdb',fbase opt.ascii_file];
 
     opt = tagcat[opt, INDEFAULTS];
@@ -402,7 +404,12 @@ global function qbProcessCSVNMR opt
     for tmpEntryKey in entryKeys loop
         runAtoms = uniq cat [runAtoms, FindAtoms db_Read [mdbKey,tmpEntryKey]];
     endloop
-    writeElementList [opt.targ_file,join[runAtoms,_Atoms '$$receptor']];
+    if not isnull opt.h5file then
+        local model = qbStoreModel[opt.h5file,fbase opt.targ_file, mol_Extract Chains[]];   // I am assuming that the function returns a model reference that can then be used in subsequent calls.
+        qbSetNMRAtomSelection[opt.h5file,model,join[runAtoms,_Atoms '$$receptor']];         // this then stores the selection associated with the model defined in the line above.
+    else
+        writeElementList [opt.targ_file,join[runAtoms,_Atoms '$$receptor']];
+    endif
 
     runAtoms = [];
     oDestroy Chains[];
@@ -410,7 +417,12 @@ global function qbProcessCSVNMR opt
     for tmpEntryKey in entryKeys loop
         runAtoms = uniq cat [runAtoms, FindAtoms db_Read [mdbKey,tmpEntryKey]];
     endloop
-    writeElementList [opt.lig_file,join[runAtoms,_Atoms '$$ligand']];
+     if not isnull opt.h5file then
+        model = qbStoreModel[opt.h5file,fbase opt.lig_file,mol_Extract Chains[]];  // I am assuming that the function returns a model reference that can then be used in subsequent calls.
+        qbSetNMRAtomSelection[opt.h5file,model,join[runAtoms,_Atoms '$$ligand']];   // this then stores the selection associated with the model defined in the line above.
+    else
+        writeElementList [opt.lig_file,join[runAtoms,_Atoms '$$ligand']];
+    endif
 
     runAtoms = [];
     oDestroy Chains[];
@@ -419,8 +431,13 @@ global function qbProcessCSVNMR opt
     for tmpEntryKey in entryKeys loop
         runAtoms = uniq cat [runAtoms, FindAtoms db_Read [mdbKey,tmpEntryKey]];
     endloop
-    writeElementList [opt.cmplx_file,runAtoms];
-
+     if not isnull opt.h5file then
+        model = qbStoreModel[opt.h5file,twrite['{}-{}',fbase opt.targ_file,fbase opt.lig_file],mol_Extract Chains[]];  // I am assuming that the function returns a model reference that can then be used in subsequent calls.
+        qbSetNMRAtomSelection[opt.h5file,model,runAtoms];                           // this then stores the selection associated with the model defined in the line above.
+    else
+        writeElementList [opt.cmplx_file,runAtoms];
+    endif
+    
     db_Close [mdbKey];
     fdelete opt.db_file;
 
@@ -429,6 +446,7 @@ endfunction
 function qbRetrieveNMRAverages;
 function qbListModels;
 
+// TODO: I need to edit this function a little so it matches above (or vise versa)
 global function qbProcessComplexCSP[targetfile,ligandfile,targeth5,ligandh5,complexh5]
 
     if not tok_length ftype targetfile then

@@ -76,3 +76,42 @@ global function qbTestPDBtoH5 [h5file,inpdb]
     print qbStoreModel [h5file, 'rec', mol_Extract tmpChains];
 endfunction
 
+function qbProcessCSVNMR;
+
+global function qbTestNewNMRpre [h5file,inTarget,inLigand,inCSVfile]
+    write ['{}\n',h5file];
+    if isnull h5file then
+        return;
+    endif
+    
+    local inopt;
+    inopt.targ_file = inTarget;
+    inopt.lig_file = inLigand;
+    inopt.ascii_file = inCSVfile;
+    inopt.h5file = h5file;
+    
+    qbProcessCSVNMR inopt;
+
+endfunction
+
+function qbProcessComplexCSP;
+
+global function qbTestNewNMRpost [h5file,inTarget,inLigand,inCSVfile]
+
+    write ['{}\n',h5file];
+    if isnull h5file then
+        return;
+    endif
+    
+    local inopt;
+    inopt.targ_file = inTarget;
+    inopt.lig_file = inLigand;
+    inopt.ascii_file = inCSVfile;
+    inopt.h5file = h5file;
+    
+    // TODO: I plan to make this function work like the one in the qbTestNewNMRpre function, but right now they look a little different.
+    qbProcessComplexCSP [inopt.targ_file,inopt.lig_file,inopt.h5file];
+
+endfunction
+
+
