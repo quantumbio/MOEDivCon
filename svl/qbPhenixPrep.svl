@@ -131,15 +131,31 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     SystemPop sys_info;
 
     if amolHeavyCnt == cifHeavyCnt then
-        local amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
+    // first test to make sure that this works as planned.
+        sys_info = SystemPush amol;
+        local testAmol = cat Atoms[];
+        local amoli = testAmol[ pack indexof[ s_heavy_mol, oSerialNumber testAmol ]];
         local amolisorted = amoli[ x_sort x_smi_mol_heavy ];
         aSetIon[ amolisorted, ions_ordered_dict_heavy ];
-        Add_H amol;
-        amol = cat rAtoms inResidue;
-        local x_smi_mol  = aPrioSMI amol;
-        aSetName[  amol[ x_sort x_smi_mol ], name_prio ];
+        Add_H testAmol;
+        local testAtmCnt = length cat Atoms[];
+        SystemPop sys_info;
+        if testAtmCnt == length name_prio then
+            amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
+            amolisorted = amoli[ x_sort x_smi_mol_heavy ];
+            aSetIon[ amolisorted, ions_ordered_dict_heavy ];
+            Add_H amol;
+            amol = cat rAtoms inResidue;
+            local x_smi_mol  = aPrioSMI amol;
+            aSetName[  amol[ x_sort x_smi_mol ], name_prio ];
+        else
+            amol = [];
+        endif
     else
         amol = [];
+    endif
+    if isnull amol then
+        write ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. due to disagreement in atom count between CIF and PDB)\n',rName inResidue, cName rChain inResidue, rUID inResidue];
     endif
     return amol;
 endfunction
