@@ -279,7 +279,7 @@ local function qbVennStructures [targ_patt, opt, ligand_mdb]
 
 endfunction
 
-global function qbTetherMMMin [weight]
+global function qbTetherMMMin [weight,weightedAtoms]
 //    pot_Load ['$MOE/lib/mmff94x.ff'];    // switch to OPLS-AA as this will do a better job.
 
 	pot_SetCharges [];
@@ -302,9 +302,16 @@ global function qbTetherMMMin [weight]
     if anytrue m then
 	    write ['\nWARNING:  There are unparameterized atoms in the system.\n\n'];
     endif
-
+    local moveMask;
+    if isnull weightedAtoms then
+        moveMask = aAtomicNumber atoms <= 1;
+    else
+        moveMask = m_diff[Atoms[],weightedAtoms];
+    endif
+    
     local tetherWeight = rep [weight, length atoms];
-    (tetherWeight | aAtomicNumber atoms <= 1) = 0;
+ //   (tetherWeight | aAtomicNumber atoms <= 1) = 0;
+    (tetherWeight | moveMask) = 0;
     
     if weight > 0 then
         MM [    tetherWeight:    tetherWeight    ];
