@@ -532,4 +532,36 @@ global function qbProcessComplexCSP[targetfile,ligandfile,targeth5,ligandh5,comp
     endloop
 endfunction
 
+// lmw - the following function will use MOE's Solvate function in order to add waters within a certain distance of charged atoms.
+//      Once the waters are added they are optimized using a forcefield.
+function Solvate;
+function qbTetherMMMin;
+global function qbHydrateChargedAtoms[distance]
+    if isnull distance then
+        distance = 2.5;
+    endif
+
+    local chargedAtoms = cat [Atoms[] | aFCharge Atoms[] <> 0];
+    aSetSelected [chargedAtoms,1];
+    local opt = [ mode            : 'Layer',
+            shape           : 'Contour',
+            margin          : distance,
+            solvent         : 'Water',
+            delete          : '',
+            salt            : '',
+            center          : 0,
+            align           : 0,
+            updatePotential : 1,
+            clashCutoff     : 10.00,
+            wallForce       : 100.00,
+            add_H           : 1,
+            verbose         : 1
+    ];
+    local prevSolvent = _Atoms '$$solvent';
+    Solvate[chargedAtoms,opt];
+    local newSolvent = diff [_Atoms '$$solvent',prevSolvent];
+    write ['Starting Waters: {}\nWaters Added: {}\n',length cat [prevSolvent | aAtomicNumber prevSolvent > 1],length cat [newSolvent | aAtomicNumber newSolvent > 1]];
+    qbTetherMMMin[100,diff [Atoms[],newSolvent]];
+    
+endfunction
 
