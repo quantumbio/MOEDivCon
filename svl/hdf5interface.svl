@@ -16,6 +16,7 @@ global function qbRetrieveEigenVectors  arg = jvmqb ['retrieveEigenVectors' , [a
 global function qbRetrieveEnergyLevels  arg = jvmqb ['retrieveEnergyLevels' , [arg] ];
 global function qbSetNMRAtomSelection  arg = jvmqb ['setNMRAtomSelection' , [arg] ];
 global function qbStoreModel  arg = jvmqb ['storeModel' , [arg] ];
+global function qbRetrieveModel  arg = jvmqb ['retrieveModel' , [arg] ];
 global function qbRetrieveHamiltonian  arg = jvmqb ['retrieveHamiltonian' , [arg] ];
 global function qbRetrieveDefaultProgramOptions  arg = jvmqb ['retrieveDefaultProgramOptions' , [arg] ];
 
@@ -74,6 +75,7 @@ global function qbTestPDBtoH5 [h5file,inpdb]
 
     print mol_Extract tmpChains;
     print qbStoreModel [h5file, 'rec', mol_Extract tmpChains];
+    print qbRetrieveModel [h5file, 'rec'];
 endfunction
 
 function qbProcessCSVNMR;
