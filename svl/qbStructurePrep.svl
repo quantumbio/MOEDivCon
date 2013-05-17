@@ -91,26 +91,29 @@ function qbSelectWatOnRadius;
 // statics
 static wasPDB;
 
-const DEFAULTS = [
-    enableWatPart:0,        // partitions waters into each of the atoms/residues and reprotonates.
+const CORE_DEFAULTS = [
     enableStripLP:0,        // Remove LPs from file prior doing anything to the structure.
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
     enableOpt:0,            // turn on optimization
     tether_val:100,         // tethers the heavy atoms at a certain restraint.
     enableProtonate:0,      // turns on Protonate3D
     protPH:[],             // set pH in Protonate3D to default
-    protAtomList:[],        // list of atom indices to protonate
-    notProtAtomList:[],        // list of atom indices not to protonate
     enablePreciseHOH:0,     // turns on precise waters in Protonate3D (can cause LONG calc if turned on).
     enableLigFix:1,         // but fixes the ligand protonation
     enableCutWat:0,         // it will not remove all waters beyond ligand
     wat_radius:4.5,         // using this distance from ligand
     enableCropOnLig:0,      // turns off cropping target around ligand
     qmcrop_radius:0,        // acceptable distance around ligand to leave in
-    residueRenumber:0,      // renumbers the residues (not implemented)
-    renameLigand:[],        // rename ligand based upon the name of the name provided (e.g. LIG whatever)
+    renameLigand:[]        // rename ligand based upon the name of the name provided (e.g. LIG whatever)
+];
+
+const DEFAULTS = cat [CORE_DEFAULTS, [
+    enableWatPart:0,        // partitions waters into each of the atoms/residues and reprotonates.
+    protAtomList:[],        // list of atom indices to protonate
+    notProtAtomList:[],        // list of atom indices not to protonate
     printAtms:[],           // ['LIG',5.0] print the atoms within 5A of residue LIG.
     printRes:[],           // ['LIG',5.0] print the atoms within 5A of residue LIG.
+    residueRenumber:0,      // renumbers the residues (not implemented)
     hamiltonian:'pm6',     // the Hamiltonian to be used downstream
     qmApplication:[],       // the particular QM application to be used downstream
     quitonerror:0,          // by default, the run will continue even on error (not good if used in shell script)
@@ -119,6 +122,11 @@ const DEFAULTS = [
     wasPDB:0,               // option set to 1 when pdb file is read in.
     prtElementList:[]       // [['H','C'],'L'] elements to print to atom list file (such as for NMR or belly)
     					// L = ligand, T = target/receptor, [] or other = all
+]];
+
+const HYDRATE_DEFAULTS = [
+    distance:2.5,
+    enableOpt:1
 ];
 
 local function writeElementList [outpat,chains,opt]
@@ -450,6 +458,137 @@ global function qbPrepareSystem [opt]
     
 endfunction
 
+global function qbPrepareSystemPanel[]
+	local wkey = WindowCreate [
+	    name: 'shell',
+	    title: 'Prepare System',
+	    text: ['Run', 'Cancel'],
+	    onTrigger: ['return', 'exit'],
+	    bubbleHelp: [
+		'Hydrate charged atoms.',
+		'Exit without hydrating atoms.'
+	    ],
+	    
+	    Checkbox: [
+	        name: 'enableStripLP',
+	        text: 'Remove Lone Pairs',
+	        flushLeft:1,
+	        bubbleHelp: [
+		    'Remove LPs from file prior doing anything to the structure.'
+	        ]],
+
+	    Checkbox: [
+	        name: 'enableAutoPrep',
+	        text: 'Run MOE Preparation',
+	        flushLeft:1,
+	        bubbleHelp: [
+		    'Run the MOE structure preparation tool.'
+	        ]],
+
+	    Checkbox: [
+	        name: 'enableOpt',
+	        text: 'Optimize Structure',
+	        flushLeft:1,
+	        bubbleHelp: [
+		    'Optimize structure'
+	        ]],
+
+	    Text: [
+		    name: 'tether_val',
+		    type: 'real',
+		    title: 'Tether:',
+	        bubbleHelp: [
+		    'Tether the heavy atoms at a certain restraint.'
+	        ]
+	        ],
+
+	    Checkbox: [
+	        name: 'enableProtonate',
+	        text: 'Run Protonate3D',
+	        flushLeft:1,
+	        bubbleHelp: [
+		    'Automatically protonate the structure using Protonate3D.'
+	        ]],
+
+	    Text: [
+		    name: 'protPH',
+		    type: 'real',
+		    title: 'pH:',
+	        bubbleHelp: [
+		    'Set the pH value for Protonate3D.'
+	        ]
+	        ],
+
+	    Checkbox: [
+	        name: 'enablePreciseHOH',
+	        text: 'Precise HOH',
+	        flushLeft:1,
+	        bubbleHelp: [
+		    'Turns on precise waters in Protonate3D (can cause LONG calc if turned on).'
+	        ]],
+
+	    Checkbox: [
+	        name: 'enableLigFix',
+	        text: 'Keep Ligand Protonation',
+	        flushLeft:1,
+	        bubbleHelp: [
+		    'Maintain the ligand protonation as originally provided.'
+	        ]],
+
+	    Checkbox: [
+	        name: 'enableCutWat',
+	        text: 'Remove Distant Waters',
+	        flushLeft:1,
+	        bubbleHelp: [
+		    'Remove waters beyond a provided distance from the ligand.'
+	        ]],
+
+	    Text: [
+		    name: 'wat_radius',
+		    type: 'real',
+		    title: 'Radius:',
+	        bubbleHelp: [
+		    'Enter a value in A for which distant waters will be removed.'
+	        ]
+	        ],
+
+	    Checkbox: [
+	        name: 'enableCropOnLig',
+	        text: 'Crop Active Site',
+	        flushLeft:1,
+	        bubbleHelp: [
+		    'Crop the target around the ligand based on a provided radius.'
+	        ]],
+
+	    Text: [
+		    name: 'qmcrop_radius',
+		    type: 'real',
+		    title: 'Radius:',
+	        bubbleHelp: [
+		    'Crop the target based on this radius.'
+	        ]
+	        ],
+	        
+	    Text: [
+		    name: 'renameLigand',
+		    type: 'char',
+		    title: 'Rename Ligand:',
+	        bubbleHelp: [
+		    'Rename the ligand based on a new 3-letter code.'
+	        ]
+	        ]	        
+	];
+
+	WindowShow wkey;
+	WindowSetData[wkey,CORE_DEFAULTS];
+
+    local [values, trigger] = WindowWait wkey;
+	WindowDestroy wkey;
+
+	qbPrepareSystem[values];
+endfunction
+
+
 global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the function argument
     opt = tagcat[opt, DEFAULTS];
     
@@ -510,5 +649,75 @@ global function qbProcessFileGroup [targ_patt,lig_patt,opt]
         endloop
     endif
 
+endfunction
+
+// lmw - the following function will use MOE's Solvate function in order to add waters within a certain distance of charged atoms.
+//      Once the waters are added they are optimized using a forcefield.
+function Solvate;
+global function qbHydrateChargedAtoms[opt]
+    opt = tagcat[opt, HYDRATE_DEFAULTS];
+    
+    local chargedAtoms = cat [Atoms[] | aFCharge Atoms[] <> 0];
+    aSetSelected [chargedAtoms,1];
+    local solvOpt = [ mode            : 'Layer',
+            shape           : 'Contour',
+            margin          : opt.distance,
+            solvent         : 'Water',
+            delete          : '',
+            salt            : '',
+            center          : 0,
+            align           : 0,
+            updatePotential : 1,
+            clashCutoff     : 10.00,
+            wallForce       : 100.00,
+            add_H           : 1,
+            verbose         : 1
+    ];
+    local prevSolvent = _Atoms '$$solvent';
+    Solvate[chargedAtoms,solvOpt];
+    local newSolvent = diff [_Atoms '$$solvent',prevSolvent];
+    write ['Starting Waters: {}\nWaters Added: {}\n',length cat [prevSolvent | aAtomicNumber prevSolvent > 1],length cat [newSolvent | aAtomicNumber newSolvent > 1]];
+    if opt.enableOpt then
+        qbTetherMMMin[100,diff [Atoms[],newSolvent]];
+    endif
+endfunction
+
+global function qbHydrateChargedAtomsPanel[]
+	local wkey = WindowCreate [
+	    name: 'shell',
+	    title: 'Hydrate Charged Atoms',
+	    text: ['Run', 'Cancel'],
+	    onTrigger: ['return', 'exit'],
+	    bubbleHelp: [
+		'Hydrate charged atoms.',
+		'Exit without hydrating atoms.'
+	    ],
+	    
+	    Checkbox: [
+	        name: 'enableOpt',
+	        text: 'Optimize Added Waters',
+	        flushLeft:1,
+	        bubbleHelp: [
+		    'Optimize any added water molecules'
+	        ]],
+
+	    Text: [
+		    name: 'distance',
+		    type: 'real',
+		    title: 'Distance:',
+		    shortcut: ['2.5'],
+	        bubbleHelp: [
+		    'Add waters within this number of angstroms of any charged atoms.'
+	        ]
+	        ]
+	];
+
+	WindowShow wkey;
+	WindowSetData[wkey,HYDRATE_DEFAULTS];
+
+    local [values, trigger] = WindowWait wkey;
+	WindowDestroy wkey;
+
+	qbHydrateChargedAtoms[values];
 endfunction
 
