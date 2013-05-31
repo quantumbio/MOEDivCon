@@ -376,7 +376,7 @@ global function qbPrepareSystem [opt]
     endif
     
     if opt.enableAutoPrep then
-        StructurePreparation[batch_protonate3d:0];
+        StructurePreparation[disableTypes : ['Termini'],batch_protonate3d:0];
     endif
 
     local ligandAtoms = cat _Atoms '$$ligand';
@@ -659,8 +659,8 @@ global function qbHydrateChargedAtoms[opt]
     
     local chargedAtoms = cat [Atoms[] | aFCharge Atoms[] <> 0];
     aSetSelected [chargedAtoms,1];
-    local solvOpt = [ mode            : 'Layer',
-            shape           : 'Contour',
+    local solvOpt = [ mode            : 'Droplet',
+            shape           : 'Sphere',
             margin          : opt.distance,
             solvent         : 'Water',
             delete          : '',
@@ -674,7 +674,10 @@ global function qbHydrateChargedAtoms[opt]
             verbose         : 1
     ];
     local prevSolvent = _Atoms '$$solvent';
-    Solvate[chargedAtoms,solvOpt];
+    local chargedAtom;
+    for chargedAtom in chargedAtoms loop
+        Solvate[chargedAtom,solvOpt];
+    endloop
     local newSolvent = diff [_Atoms '$$solvent',prevSolvent];
     write ['Starting Waters: {}\nWaters Added: {}\n',length cat [prevSolvent | aAtomicNumber prevSolvent > 1],length cat [newSolvent | aAtomicNumber newSolvent > 1]];
     if opt.enableOpt then
