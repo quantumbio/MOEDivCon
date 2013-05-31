@@ -140,7 +140,9 @@ local function matchHydrogens[ cif_file, inResidue, root ]
         local testAmol = cat Atoms[];
         local amoli = testAmol[ pack indexof[ s_heavy_mol, oSerialNumber testAmol ]];
         local amolisorted = amoli[ x_sort x_smi_mol_heavy ];
+ write ['BEFORE: {}\n', aIon testAmol];
         aSetIon[ amolisorted, ions_ordered_dict_heavy ];
+write ['AFTER: {}\n', aIon testAmol];
         Add_H testAmol;
         local testAtmCnt = length cat Atoms[];
         SystemPop sys_info;
@@ -432,7 +434,7 @@ endfunction
 
 local function ResiduePreparation []
     local testResidues = cat
-        [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C'];
+        [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C',toupper el_Elements[]];
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
     write ['Residues to treat: {}\n', uniq rName residueList];
     return residueList;
