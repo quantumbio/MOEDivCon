@@ -128,9 +128,11 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     local name_prio = aName adict[ x_sort aPrioSMI adict ];
     m_h = (aElement Atoms[]) == 'H';
     local ion_heavy = aIon (Atoms[]| not m_h);
+    local geo_heavy = aGeometry (Atoms[]| not m_h);
     oDestroy (Atoms[] | m_h );
     aSetIon[ Atoms[], 0 ];
     local ions_ordered_dict_heavy = ion_heavy[ x_sort aPrioSMI Atoms[] ];
+    local geos_ordered_dict_heavy = geo_heavy[ x_sort aPrioSMI Atoms[] ];
     local cifHeavyCnt = length cat Atoms[];
     SystemPop sys_info;
 
@@ -140,12 +142,16 @@ local function matchHydrogens[ cif_file, inResidue, root ]
         local testAmol = cat Atoms[];
         local amoli = testAmol[ pack indexof[ s_heavy_mol, oSerialNumber testAmol ]];
         local amolisorted = amoli[ x_sort x_smi_mol_heavy ];
- write ['BEFORE: {}\n', aIon testAmol];
+write ['BEFORE: {}\n', aIon testAmol];
+write ['BEFORE: {}\n', aGeometry testAmol];
         aSetIon[ amolisorted, ions_ordered_dict_heavy ];
+        aSetGeometry[ amolisorted, geos_ordered_dict_heavy ];
 write ['AFTER: {}\n', aIon testAmol];
+write ['AFTER: {}\n', aGeometry testAmol];
         Add_H testAmol;
         local testAtmCnt = length cat Atoms[];
         SystemPop sys_info;
+write ['testAtmCnt: {}  || length name_prio: {}\n', testAtmCnt , length name_prio];
         if testAtmCnt == length name_prio then
             amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
             amolisorted = amoli[ x_sort x_smi_mol_heavy ];
@@ -155,6 +161,10 @@ write ['AFTER: {}\n', aIon testAmol];
             local x_smi_mol  = aPrioSMI amol;
             aSetName[  amol[ x_sort x_smi_mol ], name_prio ];
         else
+            amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
+            amolisorted = amoli[ x_sort x_smi_mol_heavy ];
+            aSetIon[ amolisorted, ions_ordered_dict_heavy ];
+            aSetGeometry[ amolisorted, geos_ordered_dict_heavy ];
             amol = [];
         endif
     else
