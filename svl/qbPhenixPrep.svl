@@ -305,6 +305,18 @@ local function ProtonateBasedOnCif [residueList,ciffiles]
     return fixedAtoms;
 endfunction
 
+local function RenameProtonsInOrder[inResidue]
+    local allAtoms = cat rAtoms inResidue;
+    local allPrios = aPrioSMI allAtoms;
+    local tmpAtom;
+
+    for tmpAtom in allAtoms loop
+        if aElement tmpAtom == 'H' then
+            aSetName [tmpAtom, twrite ['{}{}','H',allPrios(indexof[tmpAtom,allAtoms])]];
+        endif
+    endloop
+endfunction
+
 local function RenameBasedOnCIF [residueList,ciffiles]
     local phenixdb;
     if not isnull getenv 'PHENIX' then
@@ -338,6 +350,12 @@ local function RenameBasedOnCIF [residueList,ciffiles]
             residuesToRemove = cat [residuesToRemove, ProcessCIF[cifFile,tmpResidue]];
         else
             write ['WARNING: no CIF file found for {} residue {}:{} \n', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue];
+        endif
+        // there are ocassions due to MOE-bugs or user errors, atoms are not uniquely named.
+        local atNames = aName cat rAtoms tmpResidue | aElement cat rAtoms tmpResidue == 'H';
+        if not (length uniq atNames == length atNames) then
+            write ['WARNING: Fixed proton names for {} residue {}:{}\n', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue];
+            RenameProtonsInOrder[tmpResidue];
         endif
     endloop
     return residuesToRemove;
@@ -427,19 +445,6 @@ local function FindPeptideBreaks[inChains]
         endloop
     endloop
     
-endfunction
-
-local function RenameProtonsInOrder[inResidues]
-    local inResidue;
-    for inResidue in inResidues loop
-        local allAtoms = cat rAtoms inResidue;
-        local tmpHatom, Hcount = 0;
-        
-        for tmpHatom in cat [allAtoms | aAtomicNumber allAtoms == 1] loop
-            Hcount = Hcount + 1;
-            aSetName [tmpHatom, twrite ['{}{}','H',Hcount]];
-        endloop
-    endloop
 endfunction
 
 local function ResiduePreparation []
