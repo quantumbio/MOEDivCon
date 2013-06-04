@@ -33,11 +33,17 @@ MENU APPEND "Main"
             "QMScore Preparation..."          exec "run'qmspanel.svl'"
 #            "NMRScore..."         exec "run'nmrpanel.svl'"
 #            "NMR Perturbation..." exec "run'perturbpanel.svl'"
-	    SEPARATOR
             "PWD Visualization..."           exec "run'pwdpanel.svl'"
+            "Toolbox"               submenu "QuantumBio:Toolbox"
 	    SEPARATOR
             "Help ..."  exec "LaunchDocument'$QBHOME/doc/help.html'"	    
         ENDMENU
+ENDMENU
+
+MENU "QuantumBio:Toolbox"
+    "Standard Preparation..."       exec "qbPrepareSystemPanel[]"
+    "Hydrate Charged Atoms..."      exec "qbHydrateChargedAtomsPanel[]"
+    "Refinement Preparation..."     exec "qbPhenixPrepPanel[]"
 ENDMENU
 
 #MENU APPEND "Main:Help:Tutorials"
