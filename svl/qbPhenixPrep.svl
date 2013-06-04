@@ -541,7 +541,130 @@ global function qbPostPhenixFile [inpdbfile,trFile]
     WritePDB[twrite['{}-after.pdb',fbase inpdbfile]];
 endfunction
 
+local function cif_Window [wparent,residueList]
+    static ciffiles;
+    local wkey = WindowCreate
+    [
+        title: 'CIF Preparation',
+        name: 'panel',
+        text:   ['Run','Close'],
+ 
+        Pager : 
+        [
+            title: 'CIF Files:',
+            name: 'cifftxt',
+            Vbox:   
+            [
+                Listbox :
+                    [
+                    name: 'ciffilesBox',text: '',width:30,
+                    bubbleHelp:
+                        'If PHENIX environment variable is set per PHENIX documentation,\n'
+                        'CIF files will be used (not listed here). Additional CIF files can be chosen here.\n'
+                        'NOTE: use of external CIF files will be ATTEMPTED, but any problems will be reported.'
+                    ],
+                Button : [ name: 'browse_ciffiles', text: 'Browse...']
+            ]
+        ]
+        
+    ];
+    WindowShow wkey;
+    loop
+        local [values, trigger] = WindowWait wkey;
+        if trigger === 'browse_ciffiles' then
+            ciffiles = FilePrompt [title:'Select User CIF Files', mode:'open', filter:'*.cif', multi:1];
+            WindowSetAttr[wkey,[ciffilesBox: [text:ciffiles]]];
+        endif
+        
+        if values.panel == 'Close' then break ; endif
+        if values.panel == 'Run' then aSetSelected [ ProtonateBasedOnCif[residueList,ciffiles] ,1 ]; endif
+    endloop
+    WindowDestroy wkey;
+    
+    return ciffiles;
+    
+endfunction
+
 global function qbPhenixPrepPanel[]
+    local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
+    local cif_info = 'Finished ... ';
+    local strprep_info = 'Finished ... ';
+
+	local wkey = WindowCreate
+	[
+	    name: 'shell',
+	    title: 'Prepare System',
+	    text: ['Close'],
+	    onTrigger: ['exit'],
+	    bubbleHelp: [
+		'Close after performing above steps...'
+	    ],
+
+        Button :
+            [
+            name: 'button_selectPDB', text : 'Select PDB',
+            bubbleHelp:
+                'Read in PDB file you wish to refine.'
+            ],
+        Group :
+        [
+            Mbox:
+            [
+                columns: 2,
+                Button:
+                [
+                    title: 'CIF Preparation', name: 'button_CIFsetup', graphics: config,
+                    bubbleHelp: 'Configure and run the CIF-based preparation.'
+                ],
+                Label : [ name: 'cif_info', text: cif_info ],
+                Button:
+                [
+                    title: 'Structure Preparation', name: 'button_MOEPreparation', graphics: config,
+                    bubbleHelp: 'Configure and run the MOE-based structure preparation.'
+                ],
+                Label : [ name: 'strprep_info', text: strprep_info ]
+            ]
+        ],
+
+        Separator : [flushLeft:1],
+        	    	    
+        Button :
+            [
+            name: 'button_GenerateFiles', text : 'Generate Input Files',
+            bubbleHelp:
+                'User-provided CIF files along with PHENIX-provided CIF files can\n'
+                'be used for protonation.'
+            ]
+	    	    
+
+	];
+
+	WindowShow wkey;
+	local ciffiles;
+	local pdbfile = cTag first Chains[];
+    local residueList = ResiduePreparation[];
+    loop
+        local [values, trigger] = WindowWait wkey;
+        if trigger === 'button_CIFsetup' then
+            ciffiles = cif_Window[wkey,residueList];
+        elseif trigger === 'button_selectPDB' then
+            pdbfile = FilePrompt [title:'Select PDB File',mode:'open',filter:'*.pdb',multi:0];
+            if not isnull pdbfile then
+                InputInputFiles[pdbfile,1];
+                residueList = ResiduePreparation[];
+            endif
+        elseif trigger === 'button_MOEPreparation' then
+            run 'structprep_ui.svl';
+        elseif trigger === 'button_GenerateFiles' then
+            OutputInputFiles[residueList,ciffiles,fbase ftail pdbfile];
+        elseif trigger === 'shell' then
+            break;
+        endif
+    endloop
+    WindowDestroy wkey;
+endfunction
+
+global function qbPhenixPrepPanelOLD[]
 
 	local wkey = WindowCreate [
 	    name: 'shell',
@@ -558,19 +681,25 @@ global function qbPhenixPrepPanel[]
             bubbleHelp:
                 'Read in PDB file you wish to refine.'
             ],
-
-	    Label :
-	        [
-	        name: 'cifftxt', text: 'User-provided CIF Files:'
-	        ],
-        Listbox :
+        Pager : 
+        [
+            title: 'CIF Files:',
+            name: 'cifftxt',
+            Vbox:   
             [
-            name: 'ciffilesBox',text: '',width:30,
-            bubbleHelp:
-                'If PHENIX environment variable is set per PHENIX documentation,\n'
-                'CIF files will be used. Additional CIF files can be chosen here.'
-            ],
-        Button : [ name: 'browse_ciffiles', text: 'Browse...' ],
+                Listbox :
+                    [
+                    name: 'ciffilesBox',text: '',width:30,
+                    bubbleHelp:
+                        'If PHENIX environment variable is set per PHENIX documentation,\n'
+                        'CIF files will be used (not listed here). Additional CIF files can be chosen here.\n'
+                        'NOTE: use of external CIF files will be ATTEMPTED, but any problems will be reported.'
+                    ],
+                Button : [ name: 'browse_ciffiles', text: 'Browse...']
+            ]
+        ],
+        
+        Separator : [flushLeft:1],
         
         Button :
             [
