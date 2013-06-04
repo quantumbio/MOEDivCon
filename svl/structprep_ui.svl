@@ -587,6 +587,10 @@ static SPREP_rlib_rclass;
 
 local function _amber_ResidueLibrary lib;
     local rlib = amber_ResidueLibrary lib;
+    
+    // lmw - remove amber data that is buggy in MDB file
+    local rname = apt tagpeek [rlib,'rName'];
+    rlib = rlib | rname <> 'TRS';
 
     local std_rname = apt tagpeek [rlib, 'rName'];
     local resmol = apt tagpeek [rlib,'mol'];
