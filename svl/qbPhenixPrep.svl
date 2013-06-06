@@ -394,10 +394,11 @@ local function WriteResidue [outResidues]
     local mol = mol_Extract first outResidues;
     local pdata = SystemPush [];
     residueNamesTaken = cat [residueNamesTaken,residueName];
-    fwrite_PDB [twrite ['{}.pdb',residueName],mol_Create mol];
+    local resPDBfilename = twrite ['{}.pdb',residueName];
+    fwrite_PDB [resPDBfilename,mol_Create mol];
     SystemPop pdata;
-    write [' INFO: Use {}.pdb for residue {}\n', residueName, rName outResidues];
-
+    write [' INFO: Use {} for residue {}\n', resPDBfilename, rName outResidues];
+    return resPDBfilename;
 endfunction
 
 function GetDistanceToLigand[inResidue]
@@ -477,14 +478,16 @@ local function OutputInputFiles[residueList,ciffiles,filebase]
     data = app sort data;
     residueList = uniq residueList[x_sort data];
 
+    local resPDBfilenames;
     local tmpIndexGrp;
     for tmpIndexGrp in indicesof [uniq x_fsort data,x_fsort data] loop
-        WriteResidue[residueList[tmpIndexGrp]];
+        resPDBfilenames = uniq cat [resPDBfilenames, WriteResidue[residueList[tmpIndexGrp]]];
     endloop
 
     FindPeptideBreaks[];
-
-    WritePDB[twrite['{}-phenix.pdb',filebase],[cryst1:1]];
+    local mainPDBfilename = twrite['{}-phenix.pdb',filebase];
+    WritePDB[mainPDBfilename,[cryst1:1]];
+    return [mainPDBfilename,resPDBfilenames];
 endfunction
 
 global function qbPhenixPrep [filebase,opt,ciffiles]
@@ -499,7 +502,7 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     endif
 
     qbPrepareSystem [opt];
-    OutputInputFiles[residueList,ciffiles,filebase];
+    return OutputInputFiles[residueList,ciffiles,filebase];
 endfunction
 
 global function qbPhenixPrepFile[inpdbfile,opt,ciffiles]
@@ -539,6 +542,47 @@ global function qbPostPhenixFile [inpdbfile,trFile]
     endif
     qbPostPhenix[inpdbfile,trFile];
     WritePDB[twrite['{}-after.pdb',fbase inpdbfile]];
+endfunction
+
+// lmw - GUI window tool kit functions associated with our DivCon/Phenix MOE interface.
+
+// Creates a "Create Batch File" panel.
+// Returns the name of the proposed file if "Create" is pressed.
+// Otherwise returns null.
+// NOTE: based on dock_ui.svl available in MOE dist.
+local function BatchPanel finame
+    local wkey = WindowCreate [
+        name: 'batchwin', windowName: 'batch',
+        title: 'Phenix/DivCon: Create Batch File',
+        text: ['Create', 'Cancel'],
+        onTrigger: ['validate', 'return'],
+        Hbox: [
+            extendH: 1,
+            FSBText: [
+                name: 'batfile', len: 30,
+                title: 'Batch File:',
+                allowBlank: 0,
+                mode: 'saveAs'
+            ]
+        ],
+
+        Separator: [flushLeft: 1],
+
+        Label: [ flushLeft: 1,
+            text: 'See header of the batch file for usage information.'
+        ]
+    ];
+
+    WindowSetData [wkey, [batfile: tok_cat [finame, '_batch.sh']]];
+    WindowShow wkey;
+    local [val, trig] = WindowWait wkey;
+    WindowDestroy wkey;
+
+    if val.batchwin == 'Create' then
+        return val.batfile;
+    else
+        return [];
+    endif
 endfunction
 
 local function cif_Window [wparent,residueList]
@@ -585,29 +629,139 @@ local function cif_Window [wparent,residueList]
     
 endfunction
 
+function qb_cLetter;
+
+local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog,coreResidues]
+//    local ligmdbstr = r64_encodeln freadb ['lala.docx','char',INT_MAX];
+
+write ['DEBUG (in gen): {}\n', opt];
+
+    local shscr = fopenw batchfilename;
+    fwrite [shscr, '#!/bin/bash\n\n'];
+    fwrite [shscr, 'QBPHENIX={}/bin/qbphenix\n',getenv 'QBHOME'];
+    fwrite [shscr, 'mtzFileName={}\n', ftail opt.mtzFile];
+    fwrite [shscr, 'pdbFileName={}\n',ftail inMainPDB];
+    fwrite [shscr, 'moeLogName={}\n',ftail moeLog];
+    fwrite [shscr, 'regionRefine={}\n',opt.regionRefine];
+    fwrite [shscr, 'qmCore={}\n',opt.qmCore];
+    fwrite [shscr, 'qmBuffer={}\n',opt.qmBuffer];
+    fwrite [shscr, 'onoff_macroskip={}\n',opt.onoff_macroskip];
+    fwrite [shscr, 'macroSkip={}\n',opt.macroSkip];
+    fwrite [shscr, 'setNP={}\n',2];
+    fwrite [shscr, 'selection="{}"\n',droplast swrite['{}', apt twrite ['chain {} and resname {} and resid {},',
+        qb_cLetter rChain coreResidues, rName coreResidues, rUID coreResidues]]];
+
+    fwrite [shscr,'
+        while test $# -gt 0; do
+            case "$1" in
+                -*=*) optarg=`echo "$1" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
+                *) optarg= ;;
+            esac
+            case $1 in
+                --np=*)
+                    setNP=$optarg
+                    ;;
+            shift
+        done
+
+        function RunPhenix ()
+        {
+            if [ ! -e $QBPHENIX ] ; then
+                QBPHENIX=`which qbphenix`
+                if [ -z "${VAR-unset}" ] ; then
+                    echo "ERROR: qbphenix executable not found in PATH!"
+                    exit 1
+                fi
+            fi
+            $QBPHENIX -sfFile $mtzFileName --pdbFile $pdbFileName --selection "$selection" --protonation Skip --NP $setNP
+        }
+    '];
+    fwrite [shscr, '\nmtzFile=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.mtzFile,'char',INT_MAX]];
+    fwrite [shscr, '\'\n'];
+    fwrite [shscr, 'if [ ! -e $mtzFileName ] ; then\n'];
+    fwrite [shscr, '    echo "$mtzFile" | base64 -d > $mtzFileName\nfi\n\n'];
+
+    fwrite [shscr, '\npdbFile=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [inMainPDB,'char',INT_MAX]];
+    fwrite [shscr, '\'\n'];
+    fwrite [shscr, 'if [ ! -e pdbFileName ] ; then\n'];
+    fwrite [shscr, '    echo "$pdbFile" | base64 -d > $pdbFileName\nfi\n\n'];
+
+    local tmpLigFile;
+    for tmpLigFile in inLigPDBs loop
+        fwrite [shscr, '\n{}=\'\n',fbase ftail tmpLigFile];
+        apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
+        fwrite [shscr, '\'\n'];
+        fwrite [shscr, 'if [ ! -e {} ] ; then\n', ftail tmpLigFile];
+        fwrite [shscr, '    echo "${}" | base64 -d > {}\nfi\n\n',fbase ftail tmpLigFile,ftail tmpLigFile];
+    endloop
+    
+    fclose shscr;
+
+endfunction
+
+function mtz_Read;
+
 global function qbPhenixPrepPanel[]
     local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
     local cif_info = 'Finished ... ';
     local strprep_info = 'Finished ... ';
-
+    
+    local residueList = ResiduePreparation[];
+    local coreList = uniq aResidue cat _Atoms '$$ligand';
+    
 	local wkey = WindowCreate
 	[
-	    name: 'shell',
+	    name: 'panel',
 	    title: 'Prepare System',
-	    text: ['Close'],
-	    onTrigger: ['exit'],
+	    text: ['Run','Batch...','Close'],
+	    onTrigger: ['validate','validate','exit'],
 	    bubbleHelp: [
 		'Close after performing above steps...'
 	    ],
-
-        Button :
-            [
-            name: 'button_selectPDB', text : 'Select PDB',
-            bubbleHelp:
-                'Read in PDB file you wish to refine.'
-            ],
         Group :
         [
+            Vbox:
+            [
+                columns: 2,
+                flushLeft:1,
+                extendH:1,
+                Text:
+                [
+                    name: 'mtzFile',
+                    sensitive: 0,
+                    title: 'MTZ File:',
+                    type: 'char',
+                    extendH:1,
+                    allowBlank: 0
+                ],
+                Button:
+                [
+                    name: 'button_selectMTZ', text : 'Browse...',
+                    bubbleHelp:
+                        'Read in MTZ file you wish to use for refinement.'
+                ]
+            ],
+            Vbox:
+            [
+                columns: 2,
+                Option:
+                [
+                    name: 'column_F',
+                    title: 'SF Column:',
+                    type: 'int',
+                    bubbleHelp: 'Structure factor column within MTZ file.'
+                ],
+                Option:
+                [
+                    name: 'column_Q',
+                    title: 'Sigma Column:',
+                    type: 'int',
+                    bubbleHelp: 'Sigma column within MTZ file.'
+                ]
+            ],
+        Separator : [flushLeft:1],
             Mbox:
             [
                 columns: 2,
@@ -627,37 +781,158 @@ global function qbPhenixPrepPanel[]
         ],
 
         Separator : [flushLeft:1],
-        	    	    
-        Button :
+        
+        Group:
+        [
+            Checkbox: [ name: 'regionRefine', text: 'Region Refinement',onTrigger: 'return'],
+            Group : 
             [
-            name: 'button_GenerateFiles', text : 'Generate Input Files',
-            bubbleHelp:
-                'User-provided CIF files along with PHENIX-provided CIF files can\n'
-                'be used for protonation.'
+                Vbox:   
+                [
+                title: 'Core Residues:',
+                name: 'coreResidues',
+                    Button:
+                        [
+                            name: 'retrieveSelection', 
+                            text: 'Retrieve Selection',
+                            bubbleHelp: 'Retrieve selected residues and add to region refinement'
+                        ],
+                    Listbox :
+                        [
+                        name: 'coreResiduesBox',
+                        text: '',
+                        width:30,
+                        header: 'Chain\tRes\tUID',
+                        onTrigger: 'return',
+                        type: 'modint',
+                        multiSelect: 1,
+                        sortEnable: 1,
+                        bubbleHelp:
+                            'TO FILL IN'
+                        ]
+                ],
+                Hbox:
+                [
+                    name: 'regionSizes',
+                    columns:2,
+                    Text:
+                        [
+                            name: 'qmCore',
+                            title:  'QM Region',
+                            type:   'real',
+                            allowBlank: 0,
+                            shortcut: ['5.0','4.0','3.0','2.0','1.0','0.0'],
+                            bubbleHelp: 'Size of QM region beyond core residues noted above.'
+                        ],
+                    Text:
+                        [
+                            name: 'qmBuffer',
+                            title:  'Buffer',
+                            type:   'real',
+                            allowBlank: 0,
+                            shortcut: ['2.5','3.0','3.5','0.0'],
+                            bubbleHelp: 'Size of QM buffer beyond QM Region.'
+                        ]
+                ]
             ]
-	    	    
+        ] ,
+        Separator : [flushLeft:1],
+        
+        Vbox:
+        [
+            columns:2,
+            flushLeft:0, 
+            Checkbox: [ title: 'Skip Macrocyle', name: 'onoff_macroskip',onTrigger: 'return' ],
+            Text:
+                [
+                    name: 'macroSkip',
+                    
+                    type:   'int',
+                    allowBlank: 1,
+                    shortcut: ['1','2','3'],
+                    bubbleHelp: 
+                    'Skip the DivCon run for the specified macro cycle of the refinement.\n'
+                    'When necessary the common choice is macro_cycle_to_skip=1 for when the\n'
+                    'starting structure is of questionable quality.'
+                ]
+        ]
 
 	];
-
+	
+	local function updateCoreResidueList [coreList]
+	    return apt twrite ['{}\t{}\t{}',cName rChain coreList, rName coreList, rUID coreList];
+	endfunction
+	
+    WindowSetAttr[wkey,
+        [
+            coreResiduesBox:
+                [text : updateCoreResidueList[coreList],value: [igen length coreList]],
+            regionRefine: [value: 1],
+            qmCore: [value: 3.0],
+            qmBuffer: [value: 2.5],
+            macroSkip: [sensitive:0],
+            onoff_macroskip: [value:0]
+        ]
+    ];
+    
 	WindowShow wkey;
 	local ciffiles;
 	local pdbfile = cTag first Chains[];
-    local residueList = ResiduePreparation[];
     loop
         local [values, trigger] = WindowWait wkey;
+write ['DEBUG: {} | {}\n', values, trigger];
         if trigger === 'button_CIFsetup' then
             ciffiles = cif_Window[wkey,residueList];
-        elseif trigger === 'button_selectPDB' then
-            pdbfile = FilePrompt [title:'Select PDB File',mode:'open',filter:'*.pdb',multi:0];
-            if not isnull pdbfile then
-                InputInputFiles[pdbfile,1];
-                residueList = ResiduePreparation[];
+        elseif trigger === 'regionRefine' then
+            if values.regionRefine then
+                WindowSetAttr[wkey,[coreResidues: [sensitive:1]]];
+                WindowSetAttr[wkey,[regionSizes: [sensitive:1]]];
+            else
+                WindowSetAttr[wkey,[coreResidues: [sensitive:0]]];
+                WindowSetAttr[wkey,[regionSizes: [sensitive:0]]];
             endif
+        elseif trigger === 'onoff_macroskip' then
+            if values.onoff_macroskip then
+                WindowSetAttr[wkey,[macroSkip: [sensitive:1]]];
+            else
+                WindowSetAttr[wkey,[macroSkip: [sensitive:0]]];
+            endif
+        elseif trigger === 'coreResiduesBox' then
+            local selectedResidueID = bitshr [second values.coreResiduesBox,WMOD_NBITS];
+            if selectedResidueID > 0 then
+                Isolate [coreList(selectedResidueID),Atoms[]];
+            endif
+        elseif trigger === 'retrieveSelection' then
+            local newSelected = diff[Residues [] | rSelected Residues [],coreList];
+            local prevLenCoreList = length coreList;
+            coreList = cat [coreList, newSelected];
+            WindowSetAttr[wkey,[
+                coreResiduesBox: [
+                    text:   updateCoreResidueList[coreList],
+                    value:  [cat [first values.coreResiduesBox, igen length newSelected + prevLenCoreList]]
+                    ]]];
+        elseif trigger === 'button_selectMTZ' then
+            local tmpFile = FilePrompt [title:'Select MTZ File', mode:'open', filter:'*.mtz', multi:0];
+            local mtzContents = mtz_Read tmpFile;
+            local mtzFColumns = first mtzContents.cdata | second mtzContents.cdata == 'F';
+            local mtzQColumns = first mtzContents.cdata | second mtzContents.cdata == 'Q';
+            WindowSetAttr [wkey,
+            [
+                mtzFile:    [value:tmpFile],
+                column_F:   [text:mtzFColumns],
+                column_Q:   [text:mtzQColumns]
+            ]];
         elseif trigger === 'button_MOEPreparation' then
             run 'structprep_ui.svl';
-        elseif trigger === 'button_GenerateFiles' then
-            OutputInputFiles[residueList,ciffiles,fbase ftail pdbfile];
-        elseif trigger === 'shell' then
+        elseif trigger === 'panel' then
+            if values.(trigger) == 'Batch...' then
+                local batchname = BatchPanel fbase ftail pdbfile;
+                if not isnull batchname then
+                    local [mainPDBfilename,resPDBfilenames] = OutputInputFiles[residueList,ciffiles,fbase ftail pdbfile];
+                    local moeLog;
+                    GenerateBatchScript[values,batchname,mainPDBfilename,resPDBfilenames,moeLog,coreList[first values.coreResiduesBox]];
+                endif
+            endif
             break;
         endif
     endloop
