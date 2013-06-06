@@ -674,11 +674,25 @@ global function qbHydrateChargedAtoms[opt]
             verbose         : 1
     ];
     local prevSolvent = _Atoms '$$solvent';
+    local maxUID = max rUID Residues [];    // MOE bug where new waters ALWAS start with UID #1
     local chargedAtom;
     for chargedAtom in chargedAtoms loop
         Solvate[chargedAtom,solvOpt];
     endloop
     local newSolvent = diff [_Atoms '$$solvent',prevSolvent];
+    local firstChain = first rChain uniq aResidue newSolvent;
+    local tmpResidue;
+    for tmpResidue in uniq aResidue newSolvent loop
+        maxUID = maxUID + 1;
+        rSetUID [tmpResidue,maxUID];
+        local currentChain = rChain tmpResidue;
+        if currentChain <> firstChain then
+            oReparent [tmpResidue, firstChain];
+        endif
+        if not length cat oChildren currentChain then
+            oDestroy currentChain;
+        endif
+    endloop
     write ['Starting Waters: {}\nWaters Added: {}\n',length cat [prevSolvent | aAtomicNumber prevSolvent > 1],length cat [newSolvent | aAtomicNumber newSolvent > 1]];
     if opt.enableOpt then
         qbTetherMMMin[100,diff [Atoms[],newSolvent]];
