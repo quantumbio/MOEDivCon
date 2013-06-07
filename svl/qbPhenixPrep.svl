@@ -57,13 +57,17 @@ const PREPDEFAULTS = cat [CORE_DEFAULTS,[
     enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
 ]];
 
-local function WriteLog [line,basename,inityn]
+local function WriteLog [line,basename,state]
     static logFileName;
     local fileHandle;
-    
-    if not isnull inityn then
+
+    if isnull state then
+        state = 'none';
+    endif
+
+    if state == 'init' then
         logFileName = [];
-        line = 'qbMOE INIT LOG';
+        line = 'qbMOE INIT LOG\n\n';
     endif
     
     if isnull basename and isnull logFileName then
@@ -77,8 +81,13 @@ local function WriteLog [line,basename,inityn]
         fileHandle = fseek [fileHandle, fsize fileHandle];
     endif
     
-    fwrite [fileHandle,'{}\n', line];
-    fwrite ['{}\n', line];
+    if state == 'getname' then
+        fclose fileHandle;
+        return logFileName;
+    endif
+
+    fwrite [fileHandle,'{} --- {}', asctime[], line];
+    write ['{}', line];
     
     fclose fileHandle;
     return logFileName;
@@ -128,7 +137,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     local amol_num = uniq aMoleculeNumber amol;
     if length amol_num <> 1 or 
         length cat amol <> length cat [Atoms[] | indexof[ aMoleculeNumber Atoms[], amol_num ]] then
-        write ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. not single, complete, small molecule, residue)\n',rName inResidue, cName rChain inResidue, rUID inResidue];
+        WriteLog [ twrite ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. not single, complete, small molecule, residue)\n',rName inResidue, cName rChain inResidue, rUID inResidue] ];
         return [];
     endif
     
@@ -169,16 +178,11 @@ local function matchHydrogens[ cif_file, inResidue, root ]
         local testAmol = cat Atoms[];
         local amoli = testAmol[ pack indexof[ s_heavy_mol, oSerialNumber testAmol ]];
         local amolisorted = amoli[ x_sort x_smi_mol_heavy ];
-write ['BEFORE: {}\n', aIon testAmol];
-write ['BEFORE: {}\n', aGeometry testAmol];
         aSetIon[ amolisorted, ions_ordered_dict_heavy ];
         aSetGeometry[ amolisorted, geos_ordered_dict_heavy ];
-write ['AFTER: {}\n', aIon testAmol];
-write ['AFTER: {}\n', aGeometry testAmol];
         Add_H testAmol;
         local testAtmCnt = length cat Atoms[];
         SystemPop sys_info;
-write ['testAtmCnt: {}  || length name_prio: {}\n', testAtmCnt , length name_prio];
         if testAtmCnt == length name_prio then
             amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
             amolisorted = amoli[ x_sort x_smi_mol_heavy ];
@@ -198,7 +202,7 @@ write ['testAtmCnt: {}  || length name_prio: {}\n', testAtmCnt , length name_pri
         amol = [];
     endif
     if isnull amol then
-        write ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. due to disagreement in atom count between CIF and PDB)\n',rName inResidue, cName rChain inResidue, rUID inResidue];
+        WriteLog [twrite ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. due to disagreement in atom count between CIF and PDB)\n',rName inResidue, cName rChain inResidue, rUID inResidue]];
     endif
     return amol;
 endfunction
@@ -208,7 +212,7 @@ local function applycif[ cif_file, root, atoms ]
     local newnames = [];
     
     if ftype cif_file === '' then
-        write ['WARNING: CIF filename {} not found!\n', cif_file];
+        WriteLog[twrite ['WARNING: CIF filename {} not found!\n', cif_file]];
         return newnames;
     endif
         
@@ -264,12 +268,12 @@ local function ProcessCIF[ cif_file, inResidue ]
     local names = applycif[ cif_file, root, atoms ];
     
     if not isnull names and DoubleCheckCIFNames[inResidue,names] then
-        write [' INFO: Use  {} for residue {} {}:{}\n', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue];
+        WriteLog[twrite [' INFO: Use  {} for residue {} {}:{}\n', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
         aSetName[ atoms, names ];
         residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
         return inResidue;
     else
-        write ['WARNING: incomplete representation for {} residue {}:{}\n', rName inResidue, cName rChain inResidue, rUID inResidue];
+        WriteLog[twrite ['WARNING: incomplete representation for {} residue {}:{}\n', rName inResidue, cName rChain inResidue, rUID inResidue]];
     endif
 endfunction
 
@@ -315,7 +319,7 @@ local function ProtonateBasedOnCif [residueList,ciffiles]
         filelist = recursiveDirectoryList[tok_cat [getenv 'PHENIX', '/chem_data/']];
     endif
     if isnull cat [ciffiles,filelist] then
-        write ['NOTE: No CIF files processed for protonation.\n'];
+        WriteLog[twrite ['NOTE: No CIF files processed for protonation.\n']];
         return fixedAtoms;
     endif
     local tmpResidue;
@@ -325,7 +329,7 @@ local function ProtonateBasedOnCif [residueList,ciffiles]
             cifFile = first cat [ fabsname filelist | fbase ftail filelist == rName tmpResidue ];
         endif
         if not isnull cifFile then
-            write [' INFO: Attempting to use {} for protonation of {} residue {}:{}\n', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue];
+            WriteLog[twrite [' INFO: Attempting to use {} for protonation of {} residue {}:{}\n', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
             fixedAtoms = cat [fixedAtoms, matchHydrogens[cifFile, tmpResidue, rName tmpResidue]];
         endif
     endloop
@@ -348,19 +352,19 @@ local function RenameBasedOnCIF [residueList,ciffiles]
     local phenixdb;
     if not isnull getenv 'PHENIX' then
         phenixdb = tok_cat [getenv 'PHENIX', '/chem_data/'];
-        write ['NOTE: Using Phenix cif database found at {}\n', phenixdb];
+        WriteLog[twrite ['NOTE: Using Phenix cif database found at {}\n', phenixdb]];
     else
-        write ['\n'];
-           //            1         2         3         4         5         6         7         8
-           //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
-        write ['WARNING: In order to attempt the use of CIF-based naming, you must supply path \n'];
-        write ['         to PHENIX cif database using $PHENIX environment variable as per \n'];
-        write ['         PHENIX documentation.\n'];
+        WriteLog[twrite ['\n']];
+                     //            1         2         3         4         5         6         7         8
+                     //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
+        WriteLog[twrite ['WARNING: In order to attempt the use of CIF-based naming, you must supply path \n']];
+        WriteLog[twrite ['         to PHENIX cif database using $PHENIX environment variable as per \n']];
+        WriteLog[twrite ['         PHENIX documentation.\n']];
         if isnull ciffiles then
-            write ['\n'];
+            WriteLog[twrite ['\n']];
             return[];
         else
-            write [' NOTE: Attempting to use CIF files provided.\n\n'];
+            WriteLog[twrite [' NOTE: Attempting to use CIF files provided.\n\n']];
         endif
     endif
 
@@ -373,15 +377,15 @@ local function RenameBasedOnCIF [residueList,ciffiles]
             cifFile = first cat [ fabsname filelist | fbase ftail filelist == rName tmpResidue ];
         endif
         if not isnull cifFile then
-            write [' INFO: Attempting to use {} for {} residue {}:{}\n', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue];
+            WriteLog[twrite [' INFO: Attempting to use {} for {} residue {}:{}\n', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
             residuesToRemove = cat [residuesToRemove, ProcessCIF[cifFile,tmpResidue]];
         else
-            write ['WARNING: no CIF file found for {} residue {}:{} \n', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue];
+            WriteLog[twrite ['WARNING: no CIF file found for {} residue {}:{} \n', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
         endif
         // there are ocassions due to MOE-bugs or user errors, atoms are not uniquely named.
         local atNames = aName cat rAtoms tmpResidue | aElement cat rAtoms tmpResidue == 'H';
         if not (length uniq atNames == length atNames) then
-            write ['WARNING: Fixed proton names for {} residue {}:{}\n', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue];
+            WriteLog[twrite ['WARNING: Fixed proton names for {} residue {}:{}\n', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
             RenameProtonsInOrder[tmpResidue];
         endif
     endloop
@@ -413,7 +417,7 @@ local function WriteResidue [outResidues]
         residueName = totok [atoi newResidueName + 1];
         newResidueName = residueName;
         rSetName [outResidues, newResidueName];
-        write ['NOTE (residue name conversion): {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]];
+        WriteLog[twrite ['NOTE (residue name conversion): {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]]];
         fwrite [fileHandle, ' {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]];
         fclose fileHandle;
     endif
@@ -424,7 +428,7 @@ local function WriteResidue [outResidues]
     local resPDBfilename = twrite ['{}.pdb',residueName];
     fwrite_PDB [resPDBfilename,mol_Create mol];
     SystemPop pdata;
-    write [' INFO: Use {} for residue {}\n', resPDBfilename, rName outResidues];
+    WriteLog[twrite [' INFO: Use {} for residue {}\n', resPDBfilename, rName outResidues]];
     return resPDBfilename;
 endfunction
 
@@ -465,9 +469,9 @@ local function FindPeptideBreaks[inChains]
         local x = 1;
         while x < length residueList loop
             if not cat pro_PeptideFlags cat [residueList(x),residueList(x+1)] then
-                write ['WARNING: No Peptide Bond: {} {}:{} ({} A) and {} {}:{} ({} A)\n',
+                WriteLog[twrite ['WARNING: No Peptide Bond: {} {}:{} ({} A) and {} {}:{} ({} A)\n',
                     rName residueList(x), cName rChain residueList(x), rUID residueList(x), GetDistanceToLigand residueList(x),
-                    rName residueList(x+1), cName rChain residueList(x+1), rUID residueList(x+1),GetDistanceToLigand residueList(x+1)];
+                    rName residueList(x+1), cName rChain residueList(x+1), rUID residueList(x+1),GetDistanceToLigand residueList(x+1)]];
             endif
             x = x + 1;
         endloop
@@ -479,7 +483,7 @@ local function ResiduePreparation []
     local testResidues = cat
         [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C',toupper el_Elements[]];
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
-    write ['Residues to treat: {}\n', uniq rName residueList];
+    WriteLog[twrite ['Residues to treat: {}\n', uniq rName residueList]];
     return residueList;
 endfunction
 
@@ -555,7 +559,7 @@ global function qbPostPhenix [inpdbfile,trFile]
             local oldName = third wordsplit [line, " "];
             newName = token newName;
             oldName = token oldName;
-            write ['  INFO: rename {} to {}\n', newName, oldName];
+            WriteLog[twrite ['  INFO: rename {} to {}\n', newName, oldName]];
             rSetName [Residues [] | rName Residues [] == newName,oldName];
         endif
     endloop
@@ -639,6 +643,15 @@ local function cif_Window [wparent,residueList]
         ]
         
     ];
+    local phenixdb;
+    local cifFiles;
+    if not isnull getenv 'PHENIX' then
+        phenixdb = tok_cat [getenv 'PHENIX', '/chem_data/'];
+        local filelist = recursiveDirectoryList[phenixdb];
+        cifFiles = fabsname filelist | m_join [fbase ftail filelist,uniq rName residueList];
+    endif
+    
+    WindowSetAttr[wkey, [   ciffilesBox:    [text : cifFiles]   ]];    
     WindowShow wkey;
     loop
         local [values, trigger] = WindowWait wkey;
@@ -659,9 +672,6 @@ endfunction
 function qb_cLetter;
 
 local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog,coreResidues]
-//    local ligmdbstr = r64_encodeln freadb ['lala.docx','char',INT_MAX];
-
-write ['DEBUG (in gen): {}\n', opt];
 
     local shscr = fopenw batchfilename;
               //             1         2         3         4         5         6         7         8
@@ -757,6 +767,11 @@ write ['DEBUG (in gen): {}\n', opt];
     fwrite [shscr, '}    \n'];
     fwrite [shscr, '        \n'];
     
+    fwrite [shscr, '\nmoeLog=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [moeLog,'char',INT_MAX]];
+    fwrite [shscr, '\'\n'];
+    fwrite [shscr, 'ProcessPackageFile $moeLogName "$moeLog"\n'];
+    
     fwrite [shscr, '\nmtzFile=\'\n'];
     apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.mtzFile,'char',INT_MAX]];
     fwrite [shscr, '\'\n'];
@@ -784,23 +799,25 @@ endfunction
 function mtz_Read;
 
 global function qbPhenixPrepPanel[]
+
+    local pdbfile = cTag first Chains[];    
+    WriteLog[ [], fbase ftail pdbfile, 'init'];
+
     local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
     local cif_info = 'Finished ... ';
     local strprep_info = 'Finished ... ';
     
     local residueList = ResiduePreparation[];
     local coreList = uniq aResidue cat _Atoms '$$ligand';
-    local pdbfile = cTag first Chains[];
-    
-    WriteLog[ [], fbase ftail pdbfile, 'init'];
-    WriteLog['testme'];
+
 	local wkey = WindowCreate
 	[
 	    name: 'panel',
 	    title: 'Prepare System',
-	    text: ['Run','Batch...','Close'],
-	    onTrigger: ['validate','validate','exit'],
+	    text: ['Batch...','Close'],
+	    onTrigger: ['validate','exit'],
 	    bubbleHelp: [
+		'Generate Batch script for Phenix/DivCon...',
 		'Close after performing above steps...'
 	    ],
         Group :
@@ -962,7 +979,7 @@ global function qbPhenixPrepPanel[]
 	local ciffiles;
     loop
         local [values, trigger] = WindowWait wkey;
-write ['DEBUG: {} | {}\n', values, trigger];
+// write ['DEBUG: {} | {}\n', values, trigger];
         if trigger === 'button_CIFsetup' then
             ciffiles = cif_Window[wkey,residueList];
         elseif trigger === 'regionRefine' then
@@ -1011,8 +1028,7 @@ write ['DEBUG: {} | {}\n', values, trigger];
                 local batchname = BatchPanel fbase ftail pdbfile;
                 if not isnull batchname then
                     local [mainPDBfilename,resPDBfilenames] = OutputInputFiles[residueList,ciffiles,fbase ftail pdbfile];
-                    local moeLog;
-                    GenerateBatchScript[values,batchname,mainPDBfilename,resPDBfilenames,moeLog,coreList[first values.coreResiduesBox]];
+                    GenerateBatchScript[values,batchname,mainPDBfilename,resPDBfilenames,WriteLog[[],[],'getname'],coreList[first values.coreResiduesBox]];
                 endif
             endif
             break;
