@@ -57,6 +57,33 @@ const PREPDEFAULTS = cat [CORE_DEFAULTS,[
     enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
 ]];
 
+local function WriteLog [line,basename,inityn]
+    static logFileName;
+    local fileHandle;
+    
+    if not isnull inityn then
+        logFileName = [];
+        line = 'qbMOE INIT LOG';
+    endif
+    
+    if isnull basename and isnull logFileName then
+        logFileName = twrite ['{}.log','qbMOE'];
+        fileHandle = fopenw logFileName;
+    elseif isnull logFileName then
+        logFileName = twrite ['{}-{}.log','qbMOE', basename];
+        fileHandle = fopenw logFileName;
+    else
+        fileHandle = fopenx logFileName;
+        fileHandle = fseek [fileHandle, fsize fileHandle];
+    endif
+    
+    fwrite [fileHandle,'{}\n', line];
+    fwrite ['{}\n', line];
+    
+    fclose fileHandle;
+    return logFileName;
+endfunction
+
 // Source code between  // ===================== lines based on code provided by CCG 1/2013
 // ===================== 
 const MONLIB_CIF_DICT = [
@@ -637,6 +664,8 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
 write ['DEBUG (in gen): {}\n', opt];
 
     local shscr = fopenw batchfilename;
+              //             1         2         3         4         5         6         7         8
+              //    12345678901234567890123456789012345678901234567890123456789012345678901234567890
     fwrite [shscr, '#!/bin/bash\n\n'];
     fwrite [shscr, 'QBPHENIX={}/bin/qbphenix\n',getenv 'QBHOME'];
     fwrite [shscr, 'mtzFileName={}\n', ftail opt.mtzFile];
@@ -650,52 +679,103 @@ write ['DEBUG (in gen): {}\n', opt];
     fwrite [shscr, 'setNP={}\n',2];
     fwrite [shscr, 'selection="{}"\n',droplast swrite['{}', apt twrite ['chain {} and resname {} and resid {},',
         qb_cLetter rChain coreResidues, rName coreResidues, rUID coreResidues]]];
+    fwrite [shscr, '    \n'];
+    
+    fwrite [shscr, 'errorOut()    \n'];
+    fwrite [shscr, '{}\n',"{"];
+    fwrite [shscr, '    echo    \n'];
+    fwrite [shscr, '    echo "Usage: ./{} [--np=4]"    \n',batchfilename];
+    fwrite [shscr, '    echo     \n'];
+    fwrite [shscr, '    echo "Optional Command line arguments:"    \n'];
+    fwrite [shscr, '    echo " --help   * Show this help and exit."    \n'];
+    fwrite [shscr, '    echo " --np=#   * Number of processors in simulation."    \n'];
+    fwrite [shscr, '    echo     \n'];
+    fwrite [shscr, '    echo " see: http://www.quantumbioinc.com/support/manual-phenixdc"    \n'];
+    fwrite [shscr, '    echo     \n'];
+    fwrite [shscr, '    exit 1    \n'];
+    fwrite [shscr, '}    \n'];
+    fwrite [shscr, '        \n'];
 
-    fwrite [shscr,'
-        while test $# -gt 0; do
-            case "$1" in
-                -*=*) optarg=`echo "$1" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
-                *) optarg= ;;
-            esac
-            case $1 in
-                --np=*)
-                    setNP=$optarg
-                    ;;
-            shift
-        done
+    fwrite [shscr, 'while test $# -gt 0; do\n'];
+    fwrite [shscr, '    case "$1" in\n'];
+    fwrite [shscr, '        -*=*) optarg=`echo "$1" | sed \'s/[-_a-zA-Z0-9]*=//\'` ;;\n'];
+    fwrite [shscr, '        *) optarg= ;;\n'];
+    fwrite [shscr, '    esac\n'];
+    fwrite [shscr, '    case $1 in\n'];
+    fwrite [shscr, '        --help)    \n'];
+    fwrite [shscr, '            errorOut    \n'];
+    fwrite [shscr, '            ;;    \n'];
+    fwrite [shscr, '        --np=*) \n'];
+    fwrite [shscr, '            setNP=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        *)  \n'];
+    fwrite [shscr, '            echo "ERROR: $optarg option unknown."  \n'];
+    fwrite [shscr, '            errorOut  \n'];
+    fwrite [shscr, '    esac    \n'];
+    fwrite [shscr, '    shift   \n'];
+    fwrite [shscr, 'done    \n'];
+    fwrite [shscr, '        \n'];
+    
+    fwrite [shscr, 'function RunPhenix ()  \n'];
+    fwrite [shscr, '{}   \n',"{"];
+    fwrite [shscr, '    if [ ! -e $QBPHENIX ] ; then    \n'];
+    fwrite [shscr, '        QBPHENIX=`which qbphenix`   \n'];
+    fwrite [shscr, '        if [ -z "${}" ] ; then     \n', "{VAR}"];
+    fwrite [shscr, '            echo "ERROR: qbphenix executable not found in PATH!"    \n'];
+    fwrite [shscr, '            errorOut  \n'];
+    fwrite [shscr, '        fi  \n'];
+    fwrite [shscr, '    fi  \n'];
+    fwrite [shscr, '        \n'];
+    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation Skip --NP $setNP"\n'];
+    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \\"$selection\\" --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
+    fwrite [shscr, '    $QBPHENIX $qbphenixopt  \n'];
+    fwrite [shscr, '}   \n'];
+    fwrite [shscr, '        \n'];
 
-        function RunPhenix ()
-        {
-            if [ ! -e $QBPHENIX ] ; then
-                QBPHENIX=`which qbphenix`
-                if [ -z "${VAR-unset}" ] ; then
-                    echo "ERROR: qbphenix executable not found in PATH!"
-                    exit 1
-                fi
-            fi
-            $QBPHENIX -sfFile $mtzFileName --pdbFile $pdbFileName --selection "$selection" --protonation Skip --NP $setNP
-        }
-    '];
+    fwrite [shscr, 'function ProcessPackageFile    \n'];
+    fwrite [shscr, '{}    \n',"{"];
+    fwrite [shscr, '    outFileName=$1    \n'];
+    fwrite [shscr, '    outFile=$2    \n'];
+    fwrite [shscr, '        \n'];
+    fwrite [shscr, '    if [ ! -e $outFileName ] ; then    \n'];
+    fwrite [shscr, '        baseTranslatorTmp=`which openssl`    \n'];
+    fwrite [shscr, '        if [ ! -z "${}" ] ; then    \n', "{baseTranslatorTmp}"];
+    fwrite [shscr, '            baseTranslator="$baseTranslatorTmp base64 -d"    \n'];
+    fwrite [shscr, '        else    \n'];
+    fwrite [shscr, '            baseTranslatorTmp=`which base64`    \n'];
+    fwrite [shscr, '            if [ ! -z "${}" ] ; then    \n', "{baseTranslatorTmp}"];
+    fwrite [shscr, '                baseTranslator="$baseTranslatorTmp -d"    \n'];
+    fwrite [shscr, '            else    \n'];
+    fwrite [shscr, '                echo "ERROR: Script requires standard system installation of openssl or base64."    \n'];
+    fwrite [shscr, '                echo "   Install openssl or place $outFileName in current directory and re-run."    \n'];
+    fwrite [shscr, '                errorOut  \n'];
+    fwrite [shscr, '                exit 1    \n'];
+    fwrite [shscr, '            fi    \n'];
+    fwrite [shscr, '        fi    \n'];
+    fwrite [shscr, '        echo "$outFile" | $baseTranslator > $outFileName    \n'];
+    fwrite [shscr, '    fi    \n'];
+    fwrite [shscr, '}    \n'];
+    fwrite [shscr, '        \n'];
+    
     fwrite [shscr, '\nmtzFile=\'\n'];
     apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.mtzFile,'char',INT_MAX]];
     fwrite [shscr, '\'\n'];
-    fwrite [shscr, 'if [ ! -e $mtzFileName ] ; then\n'];
-    fwrite [shscr, '    echo "$mtzFile" | base64 -d > $mtzFileName\nfi\n\n'];
-
+    fwrite [shscr, 'ProcessPackageFile $mtzFileName "$mtzFile"\n'];
+    
     fwrite [shscr, '\npdbFile=\'\n'];
     apt fwrite [shscr, '{}\n', r64_encodeln freadb [inMainPDB,'char',INT_MAX]];
     fwrite [shscr, '\'\n'];
-    fwrite [shscr, 'if [ ! -e pdbFileName ] ; then\n'];
-    fwrite [shscr, '    echo "$pdbFile" | base64 -d > $pdbFileName\nfi\n\n'];
+    fwrite [shscr, 'ProcessPackageFile $pdbFileName "$pdbFile"\n'];
 
     local tmpLigFile;
     for tmpLigFile in inLigPDBs loop
         fwrite [shscr, '\n{}=\'\n',fbase ftail tmpLigFile];
         apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
         fwrite [shscr, '\'\n'];
-        fwrite [shscr, 'if [ ! -e {} ] ; then\n', ftail tmpLigFile];
-        fwrite [shscr, '    echo "${}" | base64 -d > {}\nfi\n\n',fbase ftail tmpLigFile,ftail tmpLigFile];
+        fwrite [shscr, 'ProcessPackageFile {} "${}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
     endloop
+    
+    fwrite [shscr, 'RunPhenix\n'];
     
     fclose shscr;
 
@@ -710,7 +790,10 @@ global function qbPhenixPrepPanel[]
     
     local residueList = ResiduePreparation[];
     local coreList = uniq aResidue cat _Atoms '$$ligand';
+    local pdbfile = cTag first Chains[];
     
+    WriteLog[ [], fbase ftail pdbfile, 'init'];
+    WriteLog['testme'];
 	local wkey = WindowCreate
 	[
 	    name: 'panel',
@@ -877,7 +960,6 @@ global function qbPhenixPrepPanel[]
     
 	WindowShow wkey;
 	local ciffiles;
-	local pdbfile = cTag first Chains[];
     loop
         local [values, trigger] = WindowWait wkey;
 write ['DEBUG: {} | {}\n', values, trigger];
