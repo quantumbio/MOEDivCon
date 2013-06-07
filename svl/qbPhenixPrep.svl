@@ -622,26 +622,27 @@ local function cif_Window [wparent,residueList]
     [
         title: 'CIF Preparation',
         name: 'panel',
-        text:   ['Run','Close'],
- 
-        Pager : 
+        text:   ['Run','Cancel'],
+	    onTrigger: ['validate','return'],
+	    bubbleHelp: [
+		    'Run CIF-based atom typing and preparation.',
+		    'Cancel without running CIF-based preparation.'
+        ], 
+        Label: [ name:'phenixStatus'],
+        Vbox : 
         [
             title: 'CIF Files:',
             name: 'cifftxt',
-            Vbox:   
-            [
-                Listbox :
-                    [
-                    name: 'ciffilesBox',text: '',width:30,
-                    bubbleHelp:
-                        'If PHENIX environment variable is set per PHENIX documentation,\n'
-                        'CIF files will be used (not listed here). Additional CIF files can be chosen here.\n'
-                        'NOTE: use of external CIF files will be ATTEMPTED, but any problems will be reported.'
-                    ],
-                Button : [ name: 'browse_ciffiles', text: 'Browse...']
-            ]
+            Listbox :
+                [
+                name: 'ciffilesBox',text: '',width:30,
+                bubbleHelp:
+                    'If PHENIX environment variable is set per PHENIX documentation,\n'
+                    'CIF files will be used (not listed here). Additional CIF files can be chosen here.\n'
+                    'NOTE: use of external CIF files will be ATTEMPTED, but any problems will be reported.'
+                ],
+            Button : [ name: 'browse_ciffiles', text: 'Browse...']
         ]
-        
     ];
     local phenixdb;
     local cifFiles;
@@ -651,7 +652,14 @@ local function cif_Window [wparent,residueList]
         cifFiles = fabsname filelist | m_join [fbase ftail filelist,uniq rName residueList];
     endif
     
-    WindowSetAttr[wkey, [   ciffilesBox:    [text : cifFiles]   ]];    
+    if isnull phenixdb then
+        WindowSetAttr[wkey, [   phenixStatus: [text:'WARNING: Phenix NOT installed'] ] ];
+    else
+        WindowSetAttr[wkey, [   phenixStatus: [text:twrite ['Phenix installed at\n   {}',phenixdb] ] ] ];
+    endif
+    
+    WindowSetAttr[wkey, [   ciffilesBox:    [text : cifFiles]   ]];   
+    local success = []; 
     WindowShow wkey;
     loop
         local [values, trigger] = WindowWait wkey;
@@ -660,18 +668,21 @@ local function cif_Window [wparent,residueList]
             WindowSetAttr[wkey,[ciffilesBox: [text:ciffiles]]];
         endif
         
-        if values.panel == 'Close' then break ; endif
-        if values.panel == 'Run' then aSetSelected [ ProtonateBasedOnCif[residueList,ciffiles] ,1 ]; endif
+        if values.panel == 'Cancel' then break; endif
+        if values.panel == 'Run' then
+            aSetSelected [ ProtonateBasedOnCif[residueList,ciffiles] ,1 ]; 
+            success = 1;
+            break;
+        endif
     endloop
     WindowDestroy wkey;
-    
-    return ciffiles;
+    return [ciffiles,success];
     
 endfunction
 
 function qb_cLetter;
 
-local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog,coreResidues]
+local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog,coreResidues,ciffiles]
 
     local shscr = fopenw batchfilename;
               //             1         2         3         4         5         6         7         8
@@ -680,13 +691,15 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, 'QBPHENIX={}/bin/qbphenix\n',getenv 'QBHOME'];
     fwrite [shscr, 'mtzFileName={}\n', ftail opt.mtzFile];
     fwrite [shscr, 'pdbFileName={}\n',ftail inMainPDB];
+    fwrite [shscr, 'phenixFileName={}\n',ftail opt.phenixFile];
     fwrite [shscr, 'moeLogName={}\n',ftail moeLog];
     fwrite [shscr, 'regionRefine={}\n',opt.regionRefine];
     fwrite [shscr, 'qmCore={}\n',opt.qmCore];
     fwrite [shscr, 'qmBuffer={}\n',opt.qmBuffer];
     fwrite [shscr, 'onoff_macroskip={}\n',opt.onoff_macroskip];
     fwrite [shscr, 'macroSkip={}\n',opt.macroSkip];
-    fwrite [shscr, 'setNP={}\n',2];
+    fwrite [shscr, 'setNP={}\n',opt.setNP];
+    fwrite [shscr, 'setMem={}\n',opt.setMem];
     fwrite [shscr, 'selection="{}"\n',droplast swrite['{}', apt twrite ['chain {} and resname {} and resid {},',
         qb_cLetter rChain coreResidues, rName coreResidues, rUID coreResidues]]];
     fwrite [shscr, '    \n'];
@@ -759,7 +772,6 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '                echo "ERROR: Script requires standard system installation of openssl or base64."    \n'];
     fwrite [shscr, '                echo "   Install openssl or place $outFileName in current directory and re-run."    \n'];
     fwrite [shscr, '                errorOut  \n'];
-    fwrite [shscr, '                exit 1    \n'];
     fwrite [shscr, '            fi    \n'];
     fwrite [shscr, '        fi    \n'];
     fwrite [shscr, '        echo "$outFile" | $baseTranslator > $outFileName    \n'];
@@ -767,16 +779,23 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '}    \n'];
     fwrite [shscr, '        \n'];
     
-    fwrite [shscr, '\nmoeLog=\'\n'];
-    apt fwrite [shscr, '{}\n', r64_encodeln freadb [moeLog,'char',INT_MAX]];
-    fwrite [shscr, '\'\n'];
-    fwrite [shscr, 'ProcessPackageFile $moeLogName "$moeLog"\n'];
-    
     fwrite [shscr, '\nmtzFile=\'\n'];
     apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.mtzFile,'char',INT_MAX]];
     fwrite [shscr, '\'\n'];
     fwrite [shscr, 'ProcessPackageFile $mtzFileName "$mtzFile"\n'];
     
+    fwrite [shscr, '\nmoeLog=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [moeLog,'char',INT_MAX]];
+    fwrite [shscr, '\'\n'];
+    fwrite [shscr, 'ProcessPackageFile $moeLogName "$moeLog"\n'];
+    
+    if not isnull opt.phenixFile then
+        fwrite [shscr, '\nphenixFile=\'\n'];
+        apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.phenixFile,'char',INT_MAX]];
+        fwrite [shscr, '\'\n'];
+        fwrite [shscr, 'ProcessPackageFile $phenixFileName "$phenixFile"\n'];
+    endif
+
     fwrite [shscr, '\npdbFile=\'\n'];
     apt fwrite [shscr, '{}\n', r64_encodeln freadb [inMainPDB,'char',INT_MAX]];
     fwrite [shscr, '\'\n'];
@@ -784,6 +803,13 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
 
     local tmpLigFile;
     for tmpLigFile in inLigPDBs loop
+        fwrite [shscr, '\n{}=\'\n',fbase ftail tmpLigFile];
+        apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
+        fwrite [shscr, '\'\n'];
+        fwrite [shscr, 'ProcessPackageFile {} "${}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
+    endloop
+    
+    for tmpLigFile in ciffiles loop
         fwrite [shscr, '\n{}=\'\n',fbase ftail tmpLigFile];
         apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
         fwrite [shscr, '\'\n'];
@@ -804,9 +830,20 @@ global function qbPhenixPrepPanel[]
     WriteLog[ [], fbase ftail pdbfile, 'init'];
 
     local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
-    local cif_info = 'Finished ... ';
-    local strprep_info = 'Finished ... ';
+    local cif_info = 'Warning: no CIFs entered';
     
+    local strprep_info;
+    local totalAtomCnt = length cat Atoms[];
+    local hAtomCnt = length cat [Atoms [] | aElement Atoms[] == 'H'];
+    local hPercent = hAtomCnt/totalAtomCnt;
+    const hCutOff = 0.40;
+    if hCutOff > hPercent then
+        strprep_info = twrite['Warning: only {}% of atoms are protons',100*hPercent];
+    else
+        strprep_info = twrite['Not performed.'];
+    endif
+    write ['{} | {} \n', length  strprep_info, strprep_info];
+        
     local residueList = ResiduePreparation[];
     local coreList = uniq aResidue cat _Atoms '$$ligand';
 
@@ -814,11 +851,13 @@ global function qbPhenixPrepPanel[]
 	[
 	    name: 'panel',
 	    title: 'Prepare System',
-	    text: ['Batch...','Close'],
-	    onTrigger: ['validate','exit'],
+	    windowName: 'PhenixDivConPanel',
+	    text: ['Help','Batch...','Cancel'],
+	    onTrigger: ['return','validate','exit'],
 	    bubbleHelp: [
+	    'Help, Guidelines, and Support',
 		'Generate Batch script for Phenix/DivCon...',
-		'Close after performing above steps...'
+		'Cancel without creating Phenix/DivCon run script.'
 	    ],
         Group :
         [
@@ -830,7 +869,7 @@ global function qbPhenixPrepPanel[]
                 Text:
                 [
                     name: 'mtzFile',
-                    sensitive: 0,
+                    sensitive: 1,
                     title: 'MTZ File:',
                     type: 'char',
                     extendH:1,
@@ -918,7 +957,7 @@ global function qbPhenixPrepPanel[]
                     Text:
                         [
                             name: 'qmCore',
-                            title:  'QM Region',
+                            title:  'QM Region (A): ',
                             type:   'real',
                             allowBlank: 0,
                             shortcut: ['5.0','4.0','3.0','2.0','1.0','0.0'],
@@ -927,7 +966,7 @@ global function qbPhenixPrepPanel[]
                     Text:
                         [
                             name: 'qmBuffer',
-                            title:  'Buffer',
+                            title:  'Buffer (A): ',
                             type:   'real',
                             allowBlank: 0,
                             shortcut: ['2.5','3.0','3.5','0.0'],
@@ -937,26 +976,78 @@ global function qbPhenixPrepPanel[]
             ]
         ] ,
         Separator : [flushLeft:1],
-        
-        Vbox:
+        Mbox:
         [
             columns:2,
-            flushLeft:0, 
-            Checkbox: [ title: 'Skip Macrocyle', name: 'onoff_macroskip',onTrigger: 'return' ],
-            Text:
+            Hbox:
+            [
+                columns:1,
+                flushLeft:0, 
+                Text:
                 [
-                    name: 'macroSkip',
-                    
-                    type:   'int',
-                    allowBlank: 1,
-                    shortcut: ['1','2','3'],
+                        name: 'macroCount',
+                        title: 'Total Macrocycles: ',
+                        type:   'int',
+                        allowBlank: 0,
+                        shortcut: ['1','2','3','4','5'],
+                        bubbleHelp: 'Phenix will run this number of macrocycles before convergence.'
+                ],
+                Checkbox: 
+                [ 
+                    title: 'Skip First Macrocyle: ', 
+                    name: 'onoff_macroskip',
                     bubbleHelp: 
-                    'Skip the DivCon run for the specified macro cycle of the refinement.\n'
-                    'When necessary the common choice is macro_cycle_to_skip=1 for when the\n'
-                    'starting structure is of questionable quality.'
+                        'QM will not be used for the first macrocycle in order to address\n'
+                        'starting structures of questionable quality.'
                 ]
+            ],
+            Hbox:
+            [
+                columns:1,
+                flushLeft:0, 
+                Text:
+                    [
+                        name: 'setNP',
+                        title: 'Cores: ',
+                        type:   'int',
+                        allowBlank: 0,
+                        shortcut: ['1','2','4','8','16'],
+                        bubbleHelp: 'The QM calculation is fully threaded for multiple processors.'
+                    ],
+                Text:
+                    [
+                        name: 'setMem',
+                        title: 'Memory (GB): ',
+                        type:   'int',
+                        allowBlank: 0,
+                        shortcut: ['1','2','4','8','16'],
+                        bubbleHelp: 'Generally, the more memory the better with larger QM regions.'
+                    ]
+            ]
+        ],
+        Hbox:
+        [
+            columns: 2,
+            flushLeft:1,
+            extendH:1,
+            Text:
+            [
+                name: 'phenixFile',
+                sensitive: 1,
+                title: 'Phenix File:',
+                type: 'char',
+                extendH:1,
+                allowBlank: 1,
+                bubbleHelp:
+                    '(Optional) Provide a Phenix Configuration/Scenario file.'
+            ],
+            Button:
+            [
+                name: 'button_selectPhenix', text : 'Browse...',
+                bubbleHelp:
+                    '(Optional) Provide a Phenix Configuration/Scenario file.'
+            ]
         ]
-
 	];
 	
 	local function updateCoreResidueList [coreList]
@@ -970,18 +1061,39 @@ global function qbPhenixPrepPanel[]
             regionRefine: [value: 1],
             qmCore: [value: 3.0],
             qmBuffer: [value: 2.5],
-            macroSkip: [sensitive:0],
+            setNP: [value:2],
+            setMem: [value:2],
+            macroCount: [value:3],
             onoff_macroskip: [value:0]
         ]
     ];
     
 	WindowShow wkey;
-	local ciffiles;
+	local ciffiles, success;
+	local tmpFile;
     loop
         local [values, trigger] = WindowWait wkey;
 // write ['DEBUG: {} | {}\n', values, trigger];
         if trigger === 'button_CIFsetup' then
-            ciffiles = cif_Window[wkey,residueList];
+            [ciffiles,success] = cif_Window[wkey,residueList];
+            if isnull success then
+                WindowSetAttr[wkey,[cif_info: [text:cif_info]]];
+            else
+                WindowSetAttr[wkey,[cif_info: [text:'Finished with CIF preparation']]];
+            endif
+        elseif trigger === 'button_MOEPreparation' then
+            local before_run = length cat Atoms[];
+            run ['structprep_ui.svl'];
+            totalAtomCnt = length cat Atoms[];
+            hAtomCnt = length cat [Atoms [] | aElement Atoms[] == 'H'];
+            hPercent = hAtomCnt/totalAtomCnt;
+            if hCutOff > hPercent then
+                WindowSetAttr[wkey,[strprep_info: [text:twrite['Warning: only {}% of atoms are protons', 100*hPercent]]]];
+            elseif before_run == totalAtomCnt then
+                WindowSetAttr[wkey,[strprep_info: [text:'Note: no change in structure.']]];
+            else
+                WindowSetAttr[wkey,[strprep_info: [text:'Finished with MOE preparation']]];
+            endif
         elseif trigger === 'regionRefine' then
             if values.regionRefine then
                 WindowSetAttr[wkey,[coreResidues: [sensitive:1]]];
@@ -989,12 +1101,6 @@ global function qbPhenixPrepPanel[]
             else
                 WindowSetAttr[wkey,[coreResidues: [sensitive:0]]];
                 WindowSetAttr[wkey,[regionSizes: [sensitive:0]]];
-            endif
-        elseif trigger === 'onoff_macroskip' then
-            if values.onoff_macroskip then
-                WindowSetAttr[wkey,[macroSkip: [sensitive:1]]];
-            else
-                WindowSetAttr[wkey,[macroSkip: [sensitive:0]]];
             endif
         elseif trigger === 'coreResiduesBox' then
             local selectedResidueID = bitshr [second values.coreResiduesBox,WMOD_NBITS];
@@ -1011,119 +1117,34 @@ global function qbPhenixPrepPanel[]
                     value:  [cat [first values.coreResiduesBox, igen length newSelected + prevLenCoreList]]
                     ]]];
         elseif trigger === 'button_selectMTZ' then
-            local tmpFile = FilePrompt [title:'Select MTZ File', mode:'open', filter:'*.mtz', multi:0];
-            local mtzContents = mtz_Read tmpFile;
-            local mtzFColumns = first mtzContents.cdata | second mtzContents.cdata == 'F';
-            local mtzQColumns = first mtzContents.cdata | second mtzContents.cdata == 'Q';
-            WindowSetAttr [wkey,
-            [
-                mtzFile:    [value:tmpFile],
-                column_F:   [text:mtzFColumns],
-                column_Q:   [text:mtzQColumns]
-            ]];
-        elseif trigger === 'button_MOEPreparation' then
-            run 'structprep_ui.svl';
+            tmpFile = FilePrompt [title:'Select MTZ File', mode:'open', filter:'*.mtz', multi:0];
+            if not isnull tmpFile then
+                local mtzContents = mtz_Read tmpFile;
+                local mtzFColumns = first mtzContents.cdata | second mtzContents.cdata == 'F';
+                local mtzQColumns = first mtzContents.cdata | second mtzContents.cdata == 'Q';
+                WindowSetAttr [wkey,
+                [
+                    mtzFile:    [value:tmpFile],
+                    column_F:   [text:mtzFColumns],
+                    column_Q:   [text:mtzQColumns]
+                ]];
+            endif
+        elseif trigger === 'button_selectPhenix' then
+            tmpFile = FilePrompt [title:'Select Phenix File', mode:'open', filter:'*', multi:0];
+            if not isnull tmpFile then
+                WindowSetAttr [wkey,[ phenixFile:    [value:tmpFile] ]];
+            endif
         elseif trigger === 'panel' then
             if values.(trigger) == 'Batch...' then
                 local batchname = BatchPanel fbase ftail pdbfile;
                 if not isnull batchname then
                     local [mainPDBfilename,resPDBfilenames] = OutputInputFiles[residueList,ciffiles,fbase ftail pdbfile];
-                    GenerateBatchScript[values,batchname,mainPDBfilename,resPDBfilenames,WriteLog[[],[],'getname'],coreList[first values.coreResiduesBox]];
+                    GenerateBatchScript[values,batchname,mainPDBfilename,resPDBfilenames,WriteLog[[],[],'getname'],coreList[first values.coreResiduesBox],ciffiles];
+                    break;
                 endif
+            elseif values.(trigger) == 'Help' then
+                LaunchDocument '$QBHOME/doc/help-refine.html';
             endif
-            break;
-        endif
-    endloop
-    WindowDestroy wkey;
-endfunction
-
-global function qbPhenixPrepPanelOLD[]
-
-	local wkey = WindowCreate [
-	    name: 'shell',
-	    title: 'Prepare System',
-	    text: ['Close'],
-	    onTrigger: ['exit'],
-	    bubbleHelp: [
-		'Close after performing above steps...'
-	    ],
-
-        Button :
-            [
-            name: 'button_selectPDB', text : 'Select PDB',
-            bubbleHelp:
-                'Read in PDB file you wish to refine.'
-            ],
-        Pager : 
-        [
-            title: 'CIF Files:',
-            name: 'cifftxt',
-            Vbox:   
-            [
-                Listbox :
-                    [
-                    name: 'ciffilesBox',text: '',width:30,
-                    bubbleHelp:
-                        'If PHENIX environment variable is set per PHENIX documentation,\n'
-                        'CIF files will be used (not listed here). Additional CIF files can be chosen here.\n'
-                        'NOTE: use of external CIF files will be ATTEMPTED, but any problems will be reported.'
-                    ],
-                Button : [ name: 'browse_ciffiles', text: 'Browse...']
-            ]
-        ],
-        
-        Separator : [flushLeft:1],
-        
-        Button :
-            [
-            name: 'button_cifProtonation', text : 'CIF Protonation',
-            bubbleHelp:
-                'User-provided CIF files along with PHENIX-provided CIF files can\n'
-                'be used for protonation.'
-            ],
-
-        Button :
-            [
-            name: 'button_MOEPreparation', text : 'MOE-based Preparation',
-            bubbleHelp:
-                'User-provided CIF files along with PHENIX-provided CIF files can\n'
-                'be used for protonation.'
-            ],
-	    	    
-        Button :
-            [
-            name: 'button_GenerateFiles', text : 'Generate Input Files',
-            bubbleHelp:
-                'User-provided CIF files along with PHENIX-provided CIF files can\n'
-                'be used for protonation.'
-            ]
-	    	    
-
-	];
-
-	WindowShow wkey;
-	local ciffiles;
-	local pdbfile = cTag first Chains[];
-    local residueList = ResiduePreparation[];
-    loop
-        local [values, trigger] = WindowWait wkey;
-        if trigger === 'browse_ciffiles' then
-            ciffiles = FilePrompt [title:'Select User CIF Files',mode:'open',filter:'*.cif',multi:1];
-            WindowSetAttr[wkey,[ciffilesBox: [text:ciffiles]]];
-        elseif trigger === 'button_selectPDB' then
-            pdbfile = FilePrompt [title:'Select PDB File',mode:'open',filter:'*.pdb',multi:0];
-            if not isnull pdbfile then
-                InputInputFiles[pdbfile,1];
-                residueList = ResiduePreparation[];
-            endif
-        elseif trigger === 'button_cifProtonation' then
-            aSetSelected [ ProtonateBasedOnCif[residueList,ciffiles] ,1 ];
-        elseif trigger === 'button_MOEPreparation' then
-            run 'structprep_ui.svl';
-        elseif trigger === 'button_GenerateFiles' then
-            OutputInputFiles[residueList,ciffiles,fbase ftail pdbfile];
-        elseif trigger === 'shell' then
-            break;
         endif
     endloop
     WindowDestroy wkey;
