@@ -74,7 +74,7 @@ local function WriteLog [line,basename,state]
         logFileName = twrite ['{}.log','qbMOE'];
         fileHandle = fopenw logFileName;
     elseif isnull logFileName then
-        logFileName = twrite ['{}-{}.log','qbMOE', basename];
+        logFileName = twrite ['{}-{}.log',basename,'qbMOE'];
         fileHandle = fopenw logFileName;
     else
         fileHandle = fopenx logFileName;
@@ -577,6 +577,163 @@ endfunction
 
 // lmw - GUI window tool kit functions associated with our DivCon/Phenix MOE interface.
 
+
+function qb_cLetter;
+
+local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog,ciffiles]
+
+    local shscr = fopenw batchfilename;
+              //             1         2         3         4         5         6         7         8
+              //    12345678901234567890123456789012345678901234567890123456789012345678901234567890
+    fwrite [shscr, '#!/bin/bash\n\n'];
+    fwrite [shscr, 'QBPHENIX={}/bin/qbphenix\n',getenv 'QBHOME'];
+    fwrite [shscr, 'mtzFileName={}\n', ftail opt.mtzFile];
+    fwrite [shscr, 'pdbFileName={}\n',ftail inMainPDB];
+    fwrite [shscr, 'phenixFileName={}\n',ftail opt.phenix_success.phenixFile];
+    local allKeys,allValues;
+    if not isnull opt.phenix_success.phenixOptions then
+        allKeys = first untag opt.phenix_success.phenixOptions;
+        allValues = second untag opt.phenix_success.phenixOptions;
+        fwrite [shscr, 'phenixOptions="{}"\n',apt twrite ['{}={}',allKeys, allValues]];
+    else
+        fwrite [shscr, 'phenixOptions=\n'];
+    endif
+    
+    fwrite [shscr, 'moeLogName={}\n',ftail moeLog];
+    fwrite [shscr, 'regionRefine={}\n',opt.regionRefine];
+    fwrite [shscr, 'qmCore={}\n',opt.qmCore];
+    fwrite [shscr, 'qmBuffer={}\n',opt.qmBuffer];
+    fwrite [shscr, 'onoff_macroskip={}\n',opt.onoff_macroskip];
+    fwrite [shscr, 'macroSkip={}\n',opt.macroSkip];
+    fwrite [shscr, 'setNP={}\n',opt.setNP];
+    fwrite [shscr, 'setMem={}\n',opt.setMem];
+    fwrite [shscr, 'macroCount={}\n',opt.macroCount];
+    fwrite [shscr, 'selection="{}"\n',droplast swrite['{}', apt twrite ['chain {} and resname {} and resid {},',
+        qb_cLetter rChain opt.coreList, rName opt.coreList, rUID opt.coreList]]];
+    fwrite [shscr, 'labelList="{}"\n',opt.labelList];
+    fwrite [shscr, '    \n'];
+    
+    fwrite [shscr, 'errorOut()    \n'];
+    fwrite [shscr, '{}\n',"{"];
+    fwrite [shscr, '    echo    \n'];
+    fwrite [shscr, '    echo "Usage: ./{} [--np=4]"    \n',batchfilename];
+    fwrite [shscr, '    echo     \n'];
+    fwrite [shscr, '    echo "Optional Command line arguments:"    \n'];
+    fwrite [shscr, '    echo " --help   * Show this help and exit."    \n'];
+    fwrite [shscr, '    echo " --np=#   * Number of processors in simulation."    \n'];
+    fwrite [shscr, '    echo     \n'];
+    fwrite [shscr, '    echo " see: http://www.quantumbioinc.com/support/manual-phenixdc"    \n'];
+    fwrite [shscr, '    echo     \n'];
+    fwrite [shscr, '    exit 1    \n'];
+    fwrite [shscr, '}    \n'];
+    fwrite [shscr, '        \n'];
+
+    fwrite [shscr, 'while test $# -gt 0; do\n'];
+    fwrite [shscr, '    case "$1" in\n'];
+    fwrite [shscr, '        -*=*) optarg=`echo "$1" | sed \'s/[-_a-zA-Z0-9]*=//\'` ;;\n'];
+    fwrite [shscr, '        *) optarg= ;;\n'];
+    fwrite [shscr, '    esac\n'];
+    fwrite [shscr, '    case $1 in\n'];
+    fwrite [shscr, '        --help)    \n'];
+    fwrite [shscr, '            errorOut    \n'];
+    fwrite [shscr, '            ;;    \n'];
+    fwrite [shscr, '        --np=*) \n'];
+    fwrite [shscr, '            setNP=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        *)  \n'];
+    fwrite [shscr, '            echo "ERROR: $optarg option unknown."  \n'];
+    fwrite [shscr, '            errorOut  \n'];
+    fwrite [shscr, '    esac    \n'];
+    fwrite [shscr, '    shift   \n'];
+    fwrite [shscr, 'done    \n'];
+    fwrite [shscr, '        \n'];
+    
+    fwrite [shscr, 'function RunPhenix ()  \n'];
+    fwrite [shscr, '{}   \n',"{"];
+    fwrite [shscr, '    if [ ! -e $QBPHENIX ] ; then    \n'];
+    fwrite [shscr, '        QBPHENIX=`which qbphenix`   \n'];
+    fwrite [shscr, '        if [ -z "${}" ] ; then     \n', "{QBPHENIX}"];
+    fwrite [shscr, '            echo "ERROR: qbphenix executable not found in PATH!"    \n'];
+    fwrite [shscr, '            errorOut  \n'];
+    fwrite [shscr, '        fi  \n'];
+    fwrite [shscr, '    fi  \n'];
+    fwrite [shscr, '        \n'];
+    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation Skip --NP $setNP -m ${}gb --ncycles macroCount --labels \\"$labelList\\""\n','{setMem}'];
+    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \\"$selection\\" --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
+    fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
+    fwrite [shscr, '    if [ -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
+    fwrite [shscr, '    if [ -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \\"$phenixOptions\\""  ;   fi    \n',"{phenixOptions}"];
+    fwrite [shscr, '    $QBPHENIX $qbphenixopt  \n'];
+    fwrite [shscr, '}   \n'];
+    fwrite [shscr, '        \n'];
+
+    fwrite [shscr, 'function ProcessPackageFile    \n'];
+    fwrite [shscr, '{}    \n',"{"];
+    fwrite [shscr, '    outFileName=$1    \n'];
+    fwrite [shscr, '    outFile=$2    \n'];
+    fwrite [shscr, '        \n'];
+    fwrite [shscr, '    if [ ! -e $outFileName ] ; then    \n'];
+    fwrite [shscr, '        baseTranslatorTmp=`which openssl`    \n'];
+    fwrite [shscr, '        if [ ! -z "${}" ] ; then    \n', "{baseTranslatorTmp}"];
+    fwrite [shscr, '            baseTranslator="$baseTranslatorTmp base64 -d"    \n'];
+    fwrite [shscr, '        else    \n'];
+    fwrite [shscr, '            baseTranslatorTmp=`which base64`    \n'];
+    fwrite [shscr, '            if [ ! -z "${}" ] ; then    \n', "{baseTranslatorTmp}"];
+    fwrite [shscr, '                baseTranslator="$baseTranslatorTmp -d"    \n'];
+    fwrite [shscr, '            else    \n'];
+    fwrite [shscr, '                echo "ERROR: Script requires standard system installation of openssl or base64."    \n'];
+    fwrite [shscr, '                echo "   Install openssl or place $outFileName in current directory and re-run."    \n'];
+    fwrite [shscr, '                errorOut  \n'];
+    fwrite [shscr, '            fi    \n'];
+    fwrite [shscr, '        fi    \n'];
+    fwrite [shscr, '        echo "$outFile" | $baseTranslator > $outFileName    \n'];
+    fwrite [shscr, '    fi    \n'];
+    fwrite [shscr, '}    \n'];
+    fwrite [shscr, '        \n'];
+    
+    fwrite [shscr, '\nmtzFile=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.mtzFile,'char',INT_MAX]];
+    fwrite [shscr, '\'\n'];
+    fwrite [shscr, 'ProcessPackageFile $mtzFileName "$mtzFile"\n'];
+    
+    fwrite [shscr, '\nmoeLog=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [moeLog,'char',INT_MAX]];
+    fwrite [shscr, '\'\n'];
+    fwrite [shscr, 'ProcessPackageFile $moeLogName "$moeLog"\n'];
+    
+    if not isnull opt.phenix_success.phenixFile then
+        fwrite [shscr, '\nphenixFile=\'\n'];
+        apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.phenix_success.phenixFile,'char',INT_MAX]];
+        fwrite [shscr, '\'\n'];
+        fwrite [shscr, 'ProcessPackageFile $phenixFileName "$phenixFile"\n'];
+    endif
+
+    fwrite [shscr, '\npdbFile=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [inMainPDB,'char',INT_MAX]];
+    fwrite [shscr, '\'\n'];
+    fwrite [shscr, 'ProcessPackageFile $pdbFileName "$pdbFile"\n'];
+
+    local tmpLigFile;
+    for tmpLigFile in inLigPDBs loop
+        fwrite [shscr, '\n{}=\'\n',fbase ftail tmpLigFile];
+        apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
+        fwrite [shscr, '\'\n'];
+        fwrite [shscr, 'ProcessPackageFile {} "${}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
+    endloop
+    
+    for tmpLigFile in ciffiles loop
+        fwrite [shscr, '\n{}=\'\n',fbase ftail tmpLigFile];
+        apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
+        fwrite [shscr, '\'\n'];
+        fwrite [shscr, 'ProcessPackageFile {} "${}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
+    endloop
+    
+    fwrite [shscr, 'RunPhenix\n'];
+    
+    fclose shscr;
+
+endfunction
+
 // Creates a "Create Batch File" panel.
 // Returns the name of the proposed file if "Create" is pressed.
 // Otherwise returns null.
@@ -635,7 +792,7 @@ local function cif_Window [wparent,residueList]
             name: 'cifftxt',
             Listbox :
                 [
-                name: 'ciffilesBox',text: '',width:30,
+                name: 'ciffilesBox',text: '',
                 bubbleHelp:
                     'If PHENIX environment variable is set per PHENIX documentation,\n'
                     'CIF files will be used (not listed here). Additional CIF files can be chosen here.\n'
@@ -655,7 +812,7 @@ local function cif_Window [wparent,residueList]
     if isnull phenixdb then
         WindowSetAttr[wkey, [   phenixStatus: [text:'WARNING: Phenix NOT installed'] ] ];
     else
-        WindowSetAttr[wkey, [   phenixStatus: [text:twrite ['Phenix installed at\n   {}',phenixdb] ] ] ];
+        WindowSetAttr[wkey, [   phenixStatus: [text:twrite ['Using Phenix installed at\n   {}',getenv 'PHENIX'] ] ] ];
     endif
     
     WindowSetAttr[wkey, [   ciffilesBox:    [text : cifFiles]   ]];   
@@ -663,16 +820,16 @@ local function cif_Window [wparent,residueList]
     WindowShow wkey;
     loop
         local [values, trigger] = WindowWait wkey;
-        if trigger === 'browse_ciffiles' then
+        if trigger === 'panel' then
+            if values.panel == 'Cancel' then break; endif
+            if values.panel == 'Run' then
+                aSetSelected [ ProtonateBasedOnCif[residueList,ciffiles] ,1 ]; 
+                success = 1;
+                break;
+            endif        
+        elseif trigger === 'browse_ciffiles' then
             ciffiles = FilePrompt [title:'Select User CIF Files', mode:'open', filter:'*.cif', multi:1];
             WindowSetAttr[wkey,[ciffilesBox: [text:ciffiles]]];
-        endif
-        
-        if values.panel == 'Cancel' then break; endif
-        if values.panel == 'Run' then
-            aSetSelected [ ProtonateBasedOnCif[residueList,ciffiles] ,1 ]; 
-            success = 1;
-            break;
         endif
     endloop
     WindowDestroy wkey;
@@ -680,145 +837,164 @@ local function cif_Window [wparent,residueList]
     
 endfunction
 
-function qb_cLetter;
+local function phenix_Window [wparent]
 
-local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog,coreResidues,ciffiles]
+    static ciffiles;
+    local wkey = WindowCreate
+    [
+        title: 'Phenix-specific Settings',
+        name: 'panel',
+        text:   ['OK','Cancel'],
+	    onTrigger: ['validate','return'],
+	    bubbleHelp: [
+		    'Return Phenix-specific configuration settings.',
+		    'Cancel.'
+        ], 
+        Label: [ name:'phenixStatus'],
+        Group:
+        [
+            Group : 
+            [
+                Vbox:   
+                [
+                    Listbox :
+                        [
+                        name: 'phenixOptionBox',
+                        header: 'Option\tValue',
+                        onTrigger: 'return',
+                        type: 'modint',
+                        multiSelect: 2,
+                        sortEnable: 1,
+                        resizeH: 1,
+//                        headerMessage:'Phenix Options:',
+                        bubbleHelp:
+                            'TO FILL IN'
+                        ]
+                ],
+                Hbox:
+                [
+                    columns:4,
+                    Text:
+                        [
+                            name: 'optionKey',
+                            emptyText:  'Phenix Option',
+                            type:   'char',
+                            len:    25,
+                            allowBlank: 1,
+                            bubbleHelp: 'Enter Phenix command line argument.'
+                        ],
+                    Text:
+                        [
+                            name: 'optionValue',
+                            emptyText:  'Value',
+                            type:   'char',
+                            len:    5,
+                            allowBlank: 1,
+                            bubbleHelp: 'Enter value for Phenix command line argument.'
+                        ],
+                    Button:
+                        [
+                            name: 'optAddButton',
+                            text: 'Add',
+                            bubbleHelp: 'Add entered option to list.'
+                        ],
+                    Button:
+                        [
+                            name: 'optDeleteButton',
+                            text: 'Delete',
+                            bubbleHelp: 'Add selected option from list.'
+                        ]
 
-    local shscr = fopenw batchfilename;
-              //             1         2         3         4         5         6         7         8
-              //    12345678901234567890123456789012345678901234567890123456789012345678901234567890
-    fwrite [shscr, '#!/bin/bash\n\n'];
-    fwrite [shscr, 'QBPHENIX={}/bin/qbphenix\n',getenv 'QBHOME'];
-    fwrite [shscr, 'mtzFileName={}\n', ftail opt.mtzFile];
-    fwrite [shscr, 'pdbFileName={}\n',ftail inMainPDB];
-    fwrite [shscr, 'phenixFileName={}\n',ftail opt.phenixFile];
-    fwrite [shscr, 'moeLogName={}\n',ftail moeLog];
-    fwrite [shscr, 'regionRefine={}\n',opt.regionRefine];
-    fwrite [shscr, 'qmCore={}\n',opt.qmCore];
-    fwrite [shscr, 'qmBuffer={}\n',opt.qmBuffer];
-    fwrite [shscr, 'onoff_macroskip={}\n',opt.onoff_macroskip];
-    fwrite [shscr, 'macroSkip={}\n',opt.macroSkip];
-    fwrite [shscr, 'setNP={}\n',opt.setNP];
-    fwrite [shscr, 'setMem={}\n',opt.setMem];
-    fwrite [shscr, 'selection="{}"\n',droplast swrite['{}', apt twrite ['chain {} and resname {} and resid {},',
-        qb_cLetter rChain coreResidues, rName coreResidues, rUID coreResidues]]];
-    fwrite [shscr, '    \n'];
-    
-    fwrite [shscr, 'errorOut()    \n'];
-    fwrite [shscr, '{}\n',"{"];
-    fwrite [shscr, '    echo    \n'];
-    fwrite [shscr, '    echo "Usage: ./{} [--np=4]"    \n',batchfilename];
-    fwrite [shscr, '    echo     \n'];
-    fwrite [shscr, '    echo "Optional Command line arguments:"    \n'];
-    fwrite [shscr, '    echo " --help   * Show this help and exit."    \n'];
-    fwrite [shscr, '    echo " --np=#   * Number of processors in simulation."    \n'];
-    fwrite [shscr, '    echo     \n'];
-    fwrite [shscr, '    echo " see: http://www.quantumbioinc.com/support/manual-phenixdc"    \n'];
-    fwrite [shscr, '    echo     \n'];
-    fwrite [shscr, '    exit 1    \n'];
-    fwrite [shscr, '}    \n'];
-    fwrite [shscr, '        \n'];
+                ]
+            ]
+        ] ,
+        Separator : [flushLeft:1],
 
-    fwrite [shscr, 'while test $# -gt 0; do\n'];
-    fwrite [shscr, '    case "$1" in\n'];
-    fwrite [shscr, '        -*=*) optarg=`echo "$1" | sed \'s/[-_a-zA-Z0-9]*=//\'` ;;\n'];
-    fwrite [shscr, '        *) optarg= ;;\n'];
-    fwrite [shscr, '    esac\n'];
-    fwrite [shscr, '    case $1 in\n'];
-    fwrite [shscr, '        --help)    \n'];
-    fwrite [shscr, '            errorOut    \n'];
-    fwrite [shscr, '            ;;    \n'];
-    fwrite [shscr, '        --np=*) \n'];
-    fwrite [shscr, '            setNP=$optarg   \n'];
-    fwrite [shscr, '            ;;  \n'];
-    fwrite [shscr, '        *)  \n'];
-    fwrite [shscr, '            echo "ERROR: $optarg option unknown."  \n'];
-    fwrite [shscr, '            errorOut  \n'];
-    fwrite [shscr, '    esac    \n'];
-    fwrite [shscr, '    shift   \n'];
-    fwrite [shscr, 'done    \n'];
-    fwrite [shscr, '        \n'];
-    
-    fwrite [shscr, 'function RunPhenix ()  \n'];
-    fwrite [shscr, '{}   \n',"{"];
-    fwrite [shscr, '    if [ ! -e $QBPHENIX ] ; then    \n'];
-    fwrite [shscr, '        QBPHENIX=`which qbphenix`   \n'];
-    fwrite [shscr, '        if [ -z "${}" ] ; then     \n', "{VAR}"];
-    fwrite [shscr, '            echo "ERROR: qbphenix executable not found in PATH!"    \n'];
-    fwrite [shscr, '            errorOut  \n'];
-    fwrite [shscr, '        fi  \n'];
-    fwrite [shscr, '    fi  \n'];
-    fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation Skip --NP $setNP"\n'];
-    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \\"$selection\\" --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
-    fwrite [shscr, '    $QBPHENIX $qbphenixopt  \n'];
-    fwrite [shscr, '}   \n'];
-    fwrite [shscr, '        \n'];
-
-    fwrite [shscr, 'function ProcessPackageFile    \n'];
-    fwrite [shscr, '{}    \n',"{"];
-    fwrite [shscr, '    outFileName=$1    \n'];
-    fwrite [shscr, '    outFile=$2    \n'];
-    fwrite [shscr, '        \n'];
-    fwrite [shscr, '    if [ ! -e $outFileName ] ; then    \n'];
-    fwrite [shscr, '        baseTranslatorTmp=`which openssl`    \n'];
-    fwrite [shscr, '        if [ ! -z "${}" ] ; then    \n', "{baseTranslatorTmp}"];
-    fwrite [shscr, '            baseTranslator="$baseTranslatorTmp base64 -d"    \n'];
-    fwrite [shscr, '        else    \n'];
-    fwrite [shscr, '            baseTranslatorTmp=`which base64`    \n'];
-    fwrite [shscr, '            if [ ! -z "${}" ] ; then    \n', "{baseTranslatorTmp}"];
-    fwrite [shscr, '                baseTranslator="$baseTranslatorTmp -d"    \n'];
-    fwrite [shscr, '            else    \n'];
-    fwrite [shscr, '                echo "ERROR: Script requires standard system installation of openssl or base64."    \n'];
-    fwrite [shscr, '                echo "   Install openssl or place $outFileName in current directory and re-run."    \n'];
-    fwrite [shscr, '                errorOut  \n'];
-    fwrite [shscr, '            fi    \n'];
-    fwrite [shscr, '        fi    \n'];
-    fwrite [shscr, '        echo "$outFile" | $baseTranslator > $outFileName    \n'];
-    fwrite [shscr, '    fi    \n'];
-    fwrite [shscr, '}    \n'];
-    fwrite [shscr, '        \n'];
-    
-    fwrite [shscr, '\nmtzFile=\'\n'];
-    apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.mtzFile,'char',INT_MAX]];
-    fwrite [shscr, '\'\n'];
-    fwrite [shscr, 'ProcessPackageFile $mtzFileName "$mtzFile"\n'];
-    
-    fwrite [shscr, '\nmoeLog=\'\n'];
-    apt fwrite [shscr, '{}\n', r64_encodeln freadb [moeLog,'char',INT_MAX]];
-    fwrite [shscr, '\'\n'];
-    fwrite [shscr, 'ProcessPackageFile $moeLogName "$moeLog"\n'];
-    
-    if not isnull opt.phenixFile then
-        fwrite [shscr, '\nphenixFile=\'\n'];
-        apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.phenixFile,'char',INT_MAX]];
-        fwrite [shscr, '\'\n'];
-        fwrite [shscr, 'ProcessPackageFile $phenixFileName "$phenixFile"\n'];
+        Hbox:
+        [
+            columns: 2,
+            flushLeft:1,
+            extendH:1,
+            Text:
+            [
+                name: 'phenixFile',
+                sensitive: 1,
+                title: 'Phenix File:',
+                type: 'char',
+                extendH:1,
+                allowBlank: 1,
+                bubbleHelp:
+                    '(Optional) Provide a Phenix Configuration/Scenario file.\n'
+                    'Phenix/DivCon has been fully tested and deployed with default\n'
+                    '  Phenix options. Changes to these defaults may lead to\n'
+                    '  unexpected behavior.'
+            ],
+            Button:
+            [
+                name: 'button_selectPhenix', text : 'Browse...',
+                bubbleHelp:
+                    '(Optional) Provide a Phenix Configuration/Scenario file.\n'
+                    'Phenix/DivCon has been fully tested and deployed with default\n'
+                    '  Phenix options. Changes to these defaults may lead to\n'
+                    '  unexpected behavior.'
+            ]
+        ]
+    ];
+    local phenixdb;
+    local cifFiles;
+    if not isnull getenv 'PHENIX' then
+        phenixdb = tok_cat [getenv 'PHENIX'];
     endif
-
-    fwrite [shscr, '\npdbFile=\'\n'];
-    apt fwrite [shscr, '{}\n', r64_encodeln freadb [inMainPDB,'char',INT_MAX]];
-    fwrite [shscr, '\'\n'];
-    fwrite [shscr, 'ProcessPackageFile $pdbFileName "$pdbFile"\n'];
-
-    local tmpLigFile;
-    for tmpLigFile in inLigPDBs loop
-        fwrite [shscr, '\n{}=\'\n',fbase ftail tmpLigFile];
-        apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
-        fwrite [shscr, '\'\n'];
-        fwrite [shscr, 'ProcessPackageFile {} "${}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
+    
+    if isnull phenixdb then
+        WindowSetAttr[wkey, [   phenixStatus: [text:'WARNING: Phenix NOT installed'] ] ];
+    else
+        WindowSetAttr[wkey, [   phenixStatus: [text:twrite ['Using Phenix installed at\n   {}',phenixdb] ] ] ];
+    endif
+    
+    local success = []; 
+    local tmpFile;
+    local phenixOptions;
+    local allKeys, allValues;
+    WindowShow wkey;
+    loop
+        local [values, trigger] = WindowWait wkey;
+        if trigger === 'panel' then
+            if values.panel == 'Cancel' then break; endif
+            if values.panel == 'OK' then
+                values.phenixOptions = phenixOptions;
+                success = values;
+                break;
+            endif
+        elseif trigger === 'button_selectPhenix' then
+            tmpFile = FilePrompt [title:'Select Phenix File', mode:'open', filter:'*', multi:0];
+            if not isnull tmpFile then
+                WindowSetAttr [wkey,[ phenixFile:    [value:tmpFile] ]];
+            endif
+        elseif trigger === 'optAddButton' then
+            if not isnull values.optionKey and not isnull values.optionValue then
+                phenixOptions.(values.optionKey) = values.optionValue;
+                allKeys = first untag phenixOptions;
+                allValues = second untag phenixOptions;
+                WindowSetAttr[wkey,[ phenixOptionBox: [ text:   apt twrite ['{}\t{}',allKeys, allValues] ]]];
+            endif        
+        elseif trigger === 'optDeleteButton' then
+            phenixOptions = diff [phenixOptions, phenixOptions[first values.phenixOptionBox]];
+            allKeys = first untag phenixOptions;
+            allValues = second untag phenixOptions;
+            WindowSetAttr[wkey,[ phenixOptionBox: [ text:   apt twrite ['{}\t{}',allKeys, allValues] ]]];
+        elseif trigger === 'phenixOptionBox' then
+            local selectedOptionID = bitshr [second values.phenixOptionBox,WMOD_NBITS];
+            if selectedOptionID > 0 then
+                 WindowSetAttr[wkey,[
+                    optionKey:      [value:first untag phenixOptions[selectedOptionID]],
+                    optionValue:    [value:second untag phenixOptions[selectedOptionID]]
+                    ]];
+            endif
+        endif        
     endloop
-    
-    for tmpLigFile in ciffiles loop
-        fwrite [shscr, '\n{}=\'\n',fbase ftail tmpLigFile];
-        apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
-        fwrite [shscr, '\'\n'];
-        fwrite [shscr, 'ProcessPackageFile {} "${}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
-    endloop
-    
-    fwrite [shscr, 'RunPhenix\n'];
-    
-    fclose shscr;
+    WindowDestroy wkey;
+    return success;
 
 endfunction
 
@@ -831,6 +1007,7 @@ global function qbPhenixPrepPanel[]
 
     local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
     local cif_info = 'Warning: no CIFs entered';
+    local phenix_info = 'Status: Phenix configuration not provided.';
     
     local strprep_info;
     local totalAtomCnt = length cat Atoms[];
@@ -842,7 +1019,6 @@ global function qbPhenixPrepPanel[]
     else
         strprep_info = twrite['Not performed.'];
     endif
-    write ['{} | {} \n', length  strprep_info, strprep_info];
         
     local residueList = ResiduePreparation[];
     local coreList = uniq aResidue cat _Atoms '$$ligand';
@@ -934,7 +1110,7 @@ global function qbPhenixPrepPanel[]
                         [
                             name: 'retrieveSelection', 
                             text: 'Retrieve Selection',
-                            bubbleHelp: 'Retrieve selected residues and add to region refinement'
+                            bubbleHelp: 'Retrieve selected residues and add to region refinement.'
                         ],
                     Listbox :
                         [
@@ -986,7 +1162,7 @@ global function qbPhenixPrepPanel[]
                 Text:
                 [
                         name: 'macroCount',
-                        title: 'Total Macrocycles: ',
+                        title: 'Macrocycle Count: ',
                         type:   'int',
                         allowBlank: 0,
                         shortcut: ['1','2','3','4','5'],
@@ -1008,7 +1184,7 @@ global function qbPhenixPrepPanel[]
                 Text:
                     [
                         name: 'setNP',
-                        title: 'Cores: ',
+                        title: 'Processor Count: ',
                         type:   'int',
                         allowBlank: 0,
                         shortcut: ['1','2','4','8','16'],
@@ -1025,29 +1201,16 @@ global function qbPhenixPrepPanel[]
                     ]
             ]
         ],
-        Hbox:
-        [
-            columns: 2,
-            flushLeft:1,
-            extendH:1,
-            Text:
+            Mbox:
             [
-                name: 'phenixFile',
-                sensitive: 1,
-                title: 'Phenix File:',
-                type: 'char',
-                extendH:1,
-                allowBlank: 1,
-                bubbleHelp:
-                    '(Optional) Provide a Phenix Configuration/Scenario file.'
-            ],
-            Button:
-            [
-                name: 'button_selectPhenix', text : 'Browse...',
-                bubbleHelp:
-                    '(Optional) Provide a Phenix Configuration/Scenario file.'
+                columns: 2,
+                Button:
+                [
+                    title: 'Phenix Configuration', name: 'button_PhenixSetup', graphics: config,
+                    bubbleHelp: '(Optional) Provide Phenix-specific settings for the refinement.'
+                ],
+                Label : [ name: 'phenix_info', text: phenix_info ]
             ]
-        ]
 	];
 	
 	local function updateCoreResidueList [coreList]
@@ -1069,7 +1232,7 @@ global function qbPhenixPrepPanel[]
     ];
     
 	WindowShow wkey;
-	local ciffiles, success;
+	local ciffiles, success, phenix_success;
 	local tmpFile;
     loop
         local [values, trigger] = WindowWait wkey;
@@ -1129,17 +1292,22 @@ global function qbPhenixPrepPanel[]
                     column_Q:   [text:mtzQColumns]
                 ]];
             endif
-        elseif trigger === 'button_selectPhenix' then
-            tmpFile = FilePrompt [title:'Select Phenix File', mode:'open', filter:'*', multi:0];
-            if not isnull tmpFile then
-                WindowSetAttr [wkey,[ phenixFile:    [value:tmpFile] ]];
+        elseif trigger === 'button_PhenixSetup' then
+            phenix_success = phenix_Window[wkey];
+            if isnull phenix_success then
+                WindowSetAttr[wkey,[phenix_info: [text:phenix_info]]];
+            else
+                WindowSetAttr[wkey,[phenix_info: [text:'Finished with Phenix Configuration']]];
             endif
         elseif trigger === 'panel' then
             if values.(trigger) == 'Batch...' then
                 local batchname = BatchPanel fbase ftail pdbfile;
                 if not isnull batchname then
                     local [mainPDBfilename,resPDBfilenames] = OutputInputFiles[residueList,ciffiles,fbase ftail pdbfile];
-                    GenerateBatchScript[values,batchname,mainPDBfilename,resPDBfilenames,WriteLog[[],[],'getname'],coreList[first values.coreResiduesBox],ciffiles];
+                    values.coreList = coreList[first values.coreResiduesBox];
+                    values.labelList = twrite['{},{}',mtzFColumns[values.column_F],mtzQColumns[values.column_Q]];
+                    values.phenix_success = phenix_success;
+                    GenerateBatchScript[values,batchname,mainPDBfilename,resPDBfilenames,WriteLog[[],[],'getname'],ciffiles];
                     break;
                 endif
             elseif values.(trigger) == 'Help' then
