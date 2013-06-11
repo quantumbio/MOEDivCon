@@ -674,11 +674,11 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '        fi  \n'];
     fwrite [shscr, '    fi  \n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation Skip --NP $setNP --m ${}gb --ncycles macroCount --labels \'$labelList\'"\n','{setMem}'];
+    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation Skip --NP $setNP --m ${}gb --ncycles $macroCount --labels \'$labelList\'"\n','{setMem}'];
     fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
     fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
-    fwrite [shscr, '    if [ -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
-    fwrite [shscr, '    if [ -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
+    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
+    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
     fwrite [shscr, '    eval $QBPHENIX $qbphenixopt  \n'];
     fwrite [shscr, '}   \n'];
     fwrite [shscr, '        \n'];
@@ -731,17 +731,17 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
 
     local tmpLigFile;
     for tmpLigFile in inLigPDBs loop
-        fwrite [shscr, '\n{}=\'\n',fbase ftail tmpLigFile];
+        fwrite [shscr, '\nF{}=\'\n',fbase ftail tmpLigFile];
         apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
         fwrite [shscr, '\'\n'];
-        fwrite [shscr, 'ProcessPackageFile {} "${}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
+        fwrite [shscr, 'ProcessPackageFile {} "$F{}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
     endloop
     
     for tmpLigFile in ciffiles loop
-        fwrite [shscr, '\n{}=\'\n',fbase ftail tmpLigFile];
+        fwrite [shscr, '\nF{}=\'\n',fbase ftail tmpLigFile];
         apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
         fwrite [shscr, '\'\n'];
-        fwrite [shscr, 'ProcessPackageFile {} "${}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
+        fwrite [shscr, 'ProcessPackageFile {} "$F{}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
     endloop
     
     fwrite [shscr, 'RunPhenix\n'];
