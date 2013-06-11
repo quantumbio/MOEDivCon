@@ -526,6 +526,7 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     if not qbCheckLicense[] then
         return;
     endif
+    WriteLog[ [], filebase, 'init'];
     local residueList = ResiduePreparation[];
     
     if opt.enableCIFprotons then
