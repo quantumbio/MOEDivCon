@@ -587,6 +587,12 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
               //    12345678901234567890123456789012345678901234567890123456789012345678901234567890
     fwrite [shscr, '#!/bin/bash\n\n'];
     fwrite [shscr, 'QBPHENIX={}/bin/qbphenix\n',getenv 'QBHOME'];
+    
+    if not isnull getenv 'PHENIX' then
+        fwrite [shscr, 'QBPHENIX_ENV={}/phenix_env.sh\n',getenv 'PHENIX'];
+    else
+        fwrite [shscr, 'QBPHENIX_ENV=\n'];
+    endif
     fwrite [shscr, 'mtzFileName={}\n', ftail opt.mtzFile];
     fwrite [shscr, 'pdbFileName={}\n',ftail inMainPDB];
     fwrite [shscr, 'phenixFileName={}\n',ftail opt.phenix_success.phenixFile];
@@ -603,8 +609,7 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, 'regionRefine={}\n',opt.regionRefine];
     fwrite [shscr, 'qmCore={}\n',opt.qmCore];
     fwrite [shscr, 'qmBuffer={}\n',opt.qmBuffer];
-    fwrite [shscr, 'onoff_macroskip={}\n',opt.onoff_macroskip];
-    fwrite [shscr, 'macroSkip={}\n',opt.macroSkip];
+    fwrite [shscr, 'macroSkip={}\n',opt.onoff_macroskip];
     fwrite [shscr, 'setNP={}\n',opt.setNP];
     fwrite [shscr, 'setMem={}\n',opt.setMem];
     fwrite [shscr, 'macroCount={}\n',opt.macroCount];
@@ -650,6 +655,14 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     
     fwrite [shscr, 'function RunPhenix ()  \n'];
     fwrite [shscr, '{}   \n',"{"];
+    fwrite [shscr, '    if [ -z "${}" ] ; then  \n', "{PHENIX}"];
+    fwrite [shscr, '        if [ -e $QBPHENIX_ENV ] ; then      \n'];
+    fwrite [shscr, '            source $QBPHENIX_ENV            \n'];
+    fwrite [shscr, '        fi          \n'];
+    fwrite [shscr, '    else            \n'];
+    fwrite [shscr, '        echo "ERROR: Phenix must be installed as per its documentation."\n'];
+    fwrite [shscr, '        errorOut  \n'];
+    fwrite [shscr, '    fi          \n'];
     fwrite [shscr, '    if [ ! -e $QBPHENIX ] ; then    \n'];
     fwrite [shscr, '        QBPHENIX=`which qbphenix`   \n'];
     fwrite [shscr, '        if [ -z "${}" ] ; then     \n', "{QBPHENIX}"];
@@ -658,12 +671,12 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '        fi  \n'];
     fwrite [shscr, '    fi  \n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation Skip --NP $setNP -m ${}gb --ncycles macroCount --labels \\"$labelList\\""\n','{setMem}'];
-    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \\"$selection\\" --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
+    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation Skip --NP $setNP -m ${}gb --ncycles macroCount --labels \'$labelList\'"\n','{setMem}'];
+    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
     fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
     fwrite [shscr, '    if [ -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
-    fwrite [shscr, '    if [ -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \\"$phenixOptions\\""  ;   fi    \n',"{phenixOptions}"];
-    fwrite [shscr, '    $QBPHENIX $qbphenixopt  \n'];
+    fwrite [shscr, '    if [ -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
+    fwrite [shscr, '    eval $QBPHENIX $qbphenixopt  \n'];
     fwrite [shscr, '}   \n'];
     fwrite [shscr, '        \n'];
 
