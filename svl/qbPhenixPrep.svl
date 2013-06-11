@@ -674,7 +674,7 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '        fi  \n'];
     fwrite [shscr, '    fi  \n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation Skip --NP $setNP -m ${}gb --ncycles macroCount --labels \'$labelList\'"\n','{setMem}'];
+    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation Skip --NP $setNP --m ${}gb --ncycles macroCount --labels \'$labelList\'"\n','{setMem}'];
     fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
     fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
     fwrite [shscr, '    if [ -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
@@ -882,7 +882,6 @@ local function phenix_Window [wparent]
                         multiSelect: 2,
                         sortEnable: 1,
                         resizeH: 1,
-//                        headerMessage:'Phenix Options:',
                         bubbleHelp:
                             'TO FILL IN'
                         ]
@@ -1062,7 +1061,7 @@ global function qbPhenixPrepPanel[]
                 [
                     name: 'mtzFile',
                     sensitive: 1,
-                    title: 'MTZ File:',
+                    title: 'MTZ/SF File:',
                     type: 'char',
                     extendH:1,
                     allowBlank: 0
@@ -1071,7 +1070,7 @@ global function qbPhenixPrepPanel[]
                 [
                     name: 'button_selectMTZ', text : 'Browse...',
                     bubbleHelp:
-                        'Read in MTZ file you wish to use for refinement.'
+                        'Read in structure factor file (MTZ or CIF/SF) you wish to use for refinement.'
                 ]
             ],
             Vbox:
@@ -1243,7 +1242,9 @@ global function qbPhenixPrepPanel[]
             setNP: [value:2],
             setMem: [value:2],
             macroCount: [value:3],
-            onoff_macroskip: [value:0]
+            onoff_macroskip: [value:0],
+            column_F:   [sensitive:0],
+            column_Q:   [sensitive:0]
         ]
     ];
     
@@ -1296,17 +1297,24 @@ global function qbPhenixPrepPanel[]
                     value:  [cat [first values.coreResiduesBox, igen length newSelected + prevLenCoreList]]
                     ]]];
         elseif trigger === 'button_selectMTZ' then
-            tmpFile = FilePrompt [title:'Select MTZ File', mode:'open', filter:'*.mtz', multi:0];
+            tmpFile = FilePrompt [title:'Select Structure Factor File', mode:'open', filter:'', multi:0];
             if not isnull tmpFile then
-                local mtzContents = mtz_Read tmpFile;
-                local mtzFColumns = first mtzContents.cdata | second mtzContents.cdata == 'F';
-                local mtzQColumns = first mtzContents.cdata | second mtzContents.cdata == 'Q';
                 WindowSetAttr [wkey,
                 [
                     mtzFile:    [value:tmpFile],
-                    column_F:   [text:mtzFColumns],
-                    column_Q:   [text:mtzQColumns]
-                ]];
+                    column_F:   [text:'',sensitive:0],
+                    column_Q:   [text:'',sensitive:0]
+                 ]];              
+                if fext tmpFile == 'mtz' then
+                    local mtzContents = mtz_Read tmpFile;
+                    local mtzFColumns = first mtzContents.cdata | second mtzContents.cdata == 'F';
+                    local mtzQColumns = first mtzContents.cdata | second mtzContents.cdata == 'Q';
+                    WindowSetAttr [wkey,
+                    [
+                        column_F:   [text:mtzFColumns, sensitive:1],
+                        column_Q:   [text:mtzQColumns, sensitive:1]
+                    ]];
+                endif
             endif
         elseif trigger === 'button_PhenixSetup' then
             phenix_success = phenix_Window[wkey];
