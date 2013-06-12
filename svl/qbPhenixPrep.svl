@@ -526,7 +526,7 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     if not qbCheckLicense[] then
         return;
     endif
-    WriteLog[ [], filebase, 'init'];
+    WriteLog[ [], twrite ['{}-phenix',filebase], 'init'];
     local residueList = ResiduePreparation[];
     
     if opt.enableCIFprotons then
@@ -1053,7 +1053,7 @@ function mtz_Read;
 global function qbPhenixPrepPanel[]
 
     local pdbfile = cTag first Chains[];    
-    WriteLog[ [], fbase ftail pdbfile, 'init'];
+    WriteLog[ [], twrite ['{}-phenix',fbase ftail pdbfile], 'init'];
 
     local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
     local cif_info = 'Warning: no CIFs entered';
