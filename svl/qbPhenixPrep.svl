@@ -619,14 +619,25 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, 'labelList="{}"\n',opt.labelList];
     fwrite [shscr, '    \n'];
     
+                        //             1         2         3         4         5         6         7         8
+                        //    12345678901234567890123456789012345678901234567890123456789012345678901234567890
     fwrite [shscr, 'errorOut()    \n'];
     fwrite [shscr, '{}\n',"{"];
+    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then regionNote="E"  ; else  regionNote="D" ;   fi    \n'];    
+    fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then cycleNote="D"  ; else  cycleNote="E" ;   fi    \n'];
     fwrite [shscr, '    echo    \n'];
     fwrite [shscr, '    echo "Usage: ./{} [--np=4]"    \n',batchfilename];
     fwrite [shscr, '    echo     \n'];
     fwrite [shscr, '    echo "Optional Command line arguments:"    \n'];
-    fwrite [shscr, '    echo " --help   * Show this help and exit."    \n'];
-    fwrite [shscr, '    echo " --np=#   * Number of processors in simulation."    \n'];
+    fwrite [shscr, '    echo " --help           * Show this help and exit.           "\n'];
+    fwrite [shscr, '    echo " --np=#           * Number of processors in simulation.           Current: $setNP"\n'];
+    fwrite [shscr, '    echo " --m=#            * Amount of memory to use in GB.                Current: $setMem"\n'];
+    fwrite [shscr, '    echo " --qmCore=#       * QM Region size (beyond core residue).         Current: $qmCore"\n'];
+    fwrite [shscr, '    echo " --qmBuffer=#     * QM Buffer size (beyond core region).          Current: $qmBuffer"\n'];
+    fwrite [shscr, '    echo " --macroCount=#   * Number of macrocyles to run until refined.    Current: $macroCount"\n'];
+    fwrite [shscr, '    echo     \n'];
+    fwrite [shscr, '    echo " --enable|disable-region  * Enable/Disable region refinement.     Current: $regionNote"\n'];
+    fwrite [shscr, '    echo " --enable|disable-mcycle  * Enable/Disable QM on first macrocycle.Current: $cycleNote"\n'];
     fwrite [shscr, '    echo     \n'];
     fwrite [shscr, '    echo " see: http://www.quantumbioinc.com/support/manual-phenixdc"    \n'];
     fwrite [shscr, '    echo     \n'];
@@ -645,6 +656,30 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '            ;;    \n'];
     fwrite [shscr, '        --np=*) \n'];
     fwrite [shscr, '            setNP=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --m=*) \n'];
+    fwrite [shscr, '            setMem=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --qmCore=*) \n'];
+    fwrite [shscr, '            qmCore=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --qmBuffer=*) \n'];
+    fwrite [shscr, '            qmBuffer=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --macroCount=*) \n'];
+    fwrite [shscr, '            macroCount=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --disable-region) \n'];
+    fwrite [shscr, '            regionRefine=0   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --enable-region) \n'];
+    fwrite [shscr, '            regionRefine=1   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --diable-mcycle) \n'];
+    fwrite [shscr, '            macroSkip=1   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --enable-mcycle) \n'];
+    fwrite [shscr, '            macroSkip=0   \n'];
     fwrite [shscr, '            ;;  \n'];
     fwrite [shscr, '        *)  \n'];
     fwrite [shscr, '            echo "ERROR: $optarg option unknown."  \n'];
@@ -674,7 +709,7 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '        fi  \n'];
     fwrite [shscr, '    fi  \n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation Skip --NP $setNP --m ${}gb --ncycles $macroCount --labels \'$labelList\'"\n','{setMem}'];
+    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation PostMOE --NP $setNP --m ${}gb --ncycles $macroCount --labels \'$labelList\'"\n','{setMem}'];
     fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
     fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
