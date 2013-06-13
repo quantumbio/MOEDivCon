@@ -76,6 +76,13 @@ local function WriteLog [line,basename,state]
     elseif isnull logFileName then
         logFileName = twrite ['{}-{}.log',basename,'qbMOE'];
         fileHandle = fopenw logFileName;
+    elseif not isnull basename and not isnull logFileName then
+        local newFilename = twrite ['{}-{}.log',basename,'qbMOE'];
+        frename [logFileName,newFilename];
+        line = append [line, twrite ['Log file renamed from {} to {}', logFileName, newFilename]];
+        logFileName = newFilename;
+        fileHandle = fopenx logFileName;
+        fileHandle = fseek [fileHandle, fsize fileHandle];
     else
         fileHandle = fopenx logFileName;
         fileHandle = fseek [fileHandle, fsize fileHandle];
@@ -85,9 +92,11 @@ local function WriteLog [line,basename,state]
         fclose fileHandle;
         return logFileName;
     endif
-
-    fwrite [fileHandle,'{} --- {}', asctime[], line];
-    write ['{}', line];
+    local tmpLine;
+    for tmpLine in line loop
+        fwrite [fileHandle,'{} --- {}\n', asctime[], tmpLine];
+        write ['{}\n', tmpLine];
+    endloop
     
     fclose fileHandle;
     return logFileName;
@@ -137,7 +146,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     local amol_num = uniq aMoleculeNumber amol;
     if length amol_num <> 1 or 
         length cat amol <> length cat [Atoms[] | indexof[ aMoleculeNumber Atoms[], amol_num ]] then
-        WriteLog [ twrite ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. not single, complete, small molecule, residue)\n',rName inResidue, cName rChain inResidue, rUID inResidue] ];
+        WriteLog [ twrite ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. not single, complete, small molecule, residue)',rName inResidue, cName rChain inResidue, rUID inResidue] ];
         return [];
     endif
     
@@ -203,7 +212,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
         amol = [];
     endif
     if isnull amol then
-        WriteLog [twrite ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. due to disagreement in atom count between CIF and PDB)\n',rName inResidue, cName rChain inResidue, rUID inResidue]];
+        WriteLog [twrite ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. due to disagreement in atom count between CIF and PDB)',rName inResidue, cName rChain inResidue, rUID inResidue]];
     endif
     return amol;
 endfunction
@@ -213,7 +222,7 @@ local function applycif[ cif_file, root, atoms ]
     local newnames = [];
     
     if ftype cif_file === '' then
-        WriteLog[twrite ['WARNING: CIF filename {} not found!\n', cif_file]];
+        WriteLog[twrite ['WARNING: CIF filename {} not found!', cif_file]];
         return newnames;
     endif
         
@@ -269,12 +278,12 @@ local function ProcessCIF[ cif_file, inResidue ]
     local names = applycif[ cif_file, root, atoms ];
     
     if not isnull names and DoubleCheckCIFNames[inResidue,names] then
-        WriteLog[twrite [' INFO: Use  {} for residue {} {}:{}\n', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
+        WriteLog[twrite [' INFO: Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
         aSetName[ atoms, names ];
         residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
         return inResidue;
     else
-        WriteLog[twrite ['WARNING: incomplete representation for {} residue {}:{}\n', rName inResidue, cName rChain inResidue, rUID inResidue]];
+        WriteLog[twrite ['WARNING: incomplete representation for {} residue {}:{}', rName inResidue, cName rChain inResidue, rUID inResidue]];
     endif
 endfunction
 
@@ -320,7 +329,7 @@ local function ProtonateBasedOnCif [residueList,ciffiles]
         filelist = recursiveDirectoryList[tok_cat [getenv 'PHENIX', '/chem_data/']];
     endif
     if isnull cat [ciffiles,filelist] then
-        WriteLog[twrite ['NOTE: No CIF files processed for protonation.\n']];
+        WriteLog[twrite ['NOTE: No CIF files processed for protonation.']];
         return fixedAtoms;
     endif
     local tmpResidue;
@@ -330,7 +339,7 @@ local function ProtonateBasedOnCif [residueList,ciffiles]
             cifFile = first cat [ fabsname filelist | fbase ftail filelist == rName tmpResidue ];
         endif
         if not isnull cifFile then
-            WriteLog[twrite [' INFO: Attempting to use {} for protonation of {} residue {}:{}\n', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
+            WriteLog[twrite [' INFO: Attempting to use {} for protonation of {} residue {}:{}', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
             fixedAtoms = cat [fixedAtoms, matchHydrogens[cifFile, tmpResidue, rName tmpResidue]];
         endif
     endloop
@@ -353,19 +362,18 @@ local function RenameBasedOnCIF [residueList,ciffiles]
     local phenixdb;
     if not isnull getenv 'PHENIX' then
         phenixdb = tok_cat [getenv 'PHENIX', '/chem_data/'];
-        WriteLog[twrite ['NOTE: Using Phenix cif database found at {}\n', phenixdb]];
+        WriteLog[twrite ['NOTE: Using Phenix cif database found at {}', phenixdb]];
     else
-        WriteLog[twrite ['\n']];
                      //            1         2         3         4         5         6         7         8
                      //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
-        WriteLog[twrite ['WARNING: In order to attempt the use of CIF-based naming, you must supply path \n']];
-        WriteLog[twrite ['         to PHENIX cif database using $PHENIX environment variable as per \n']];
-        WriteLog[twrite ['         PHENIX documentation.\n']];
+        WriteLog[twrite ['WARNING: In order to attempt the use of CIF-based naming, you must supply path ']];
+        WriteLog[twrite ['         to PHENIX cif database using $PHENIX environment variable as per ']];
+        WriteLog[twrite ['         PHENIX documentation.']];
         if isnull ciffiles then
-            WriteLog[twrite ['\n']];
+            WriteLog[twrite [' ']];
             return[];
         else
-            WriteLog[twrite [' NOTE: Attempting to use CIF files provided.\n\n']];
+            WriteLog[twrite [' NOTE: Attempting to use CIF files provided.']];
         endif
     endif
 
@@ -378,15 +386,15 @@ local function RenameBasedOnCIF [residueList,ciffiles]
             cifFile = first cat [ fabsname filelist | fbase ftail filelist == rName tmpResidue ];
         endif
         if not isnull cifFile then
-            WriteLog[twrite [' INFO: Attempting to use {} for {} residue {}:{}\n', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
+            WriteLog[twrite [' INFO: Attempting to use {} for {} residue {}:{}', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
             residuesToRemove = cat [residuesToRemove, ProcessCIF[cifFile,tmpResidue]];
         else
-            WriteLog[twrite ['WARNING: no CIF file found for {} residue {}:{} \n', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
+            WriteLog[twrite ['WARNING: no CIF file found for {} residue {}:{} ', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
         endif
         // there are ocassions due to MOE-bugs or user errors, atoms are not uniquely named.
         local atNames = aName cat rAtoms tmpResidue | aElement cat rAtoms tmpResidue == 'H';
         if not (length uniq atNames == length atNames) then
-            WriteLog[twrite ['WARNING: Fixed proton names for {} residue {}:{}\n', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
+            WriteLog[twrite ['WARNING: Fixed proton names for {} residue {}:{}', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
             RenameProtonsInOrder[tmpResidue];
         endif
     endloop
@@ -418,7 +426,7 @@ local function WriteResidue [outResidues]
         residueName = totok [atoi newResidueName + 1];
         newResidueName = residueName;
         rSetName [outResidues, newResidueName];
-        WriteLog[twrite ['NOTE (residue name conversion): {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]]];
+        WriteLog[twrite ['NOTE (residue name conversion): {} = {} < {} >', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]]];
         fwrite [fileHandle, ' {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]];
         fclose fileHandle;
     endif
@@ -429,7 +437,7 @@ local function WriteResidue [outResidues]
     local resPDBfilename = twrite ['{}.pdb',residueName];
     fwrite_PDB [resPDBfilename,mol_Create mol];
     SystemPop pdata;
-    WriteLog[twrite [' INFO: Use {} for residue {}\n', resPDBfilename, rName outResidues]];
+    WriteLog[twrite [' INFO: Use {} for residue {}', resPDBfilename, rName outResidues]];
     return resPDBfilename;
 endfunction
 
@@ -470,7 +478,7 @@ local function FindPeptideBreaks[inChains]
         local x = 1;
         while x < length residueList loop
             if not cat pro_PeptideFlags cat [residueList(x),residueList(x+1)] then
-                WriteLog[twrite ['WARNING: No Peptide Bond: {} {}:{} ({} A) and {} {}:{} ({} A)\n',
+                WriteLog[twrite ['WARNING: No Peptide Bond: {} {}:{} ({} A) and {} {}:{} ({} A)',
                     rName residueList(x), cName rChain residueList(x), rUID residueList(x), GetDistanceToLigand residueList(x),
                     rName residueList(x+1), cName rChain residueList(x+1), rUID residueList(x+1),GetDistanceToLigand residueList(x+1)]];
             endif
@@ -484,7 +492,7 @@ local function ResiduePreparation []
     local testResidues = cat
         [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C',toupper el_Elements[]];
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
-    WriteLog[twrite ['Residues to treat: {}\n', uniq rName residueList]];
+    WriteLog[twrite ['Residues to treat: {}', uniq rName residueList]];
     return residueList;
 endfunction
 
@@ -561,7 +569,7 @@ global function qbPostPhenix [inpdbfile,trFile]
             local oldName = third wordsplit [line, " "];
             newName = token newName;
             oldName = token oldName;
-            WriteLog[twrite ['  INFO: rename {} to {}\n', newName, oldName]];
+            WriteLog[twrite ['  INFO: rename {} to {}', newName, oldName]];
             rSetName [Residues [] | rName Residues [] == newName,oldName];
         endif
     endloop
@@ -1060,7 +1068,16 @@ function StructurePreparationGUI;
 
 global function qbPhenixPrepPanel[]
 
-    local pdbfile = cTag first Chains[];    
+// this function requires that the user already have a PDB file open and ready to run.
+    if isnull Atoms[] then
+        Warning 'Error:\nUse File->Open to open a molecule of interest\nprior to attempting refinement.';
+        return;
+    endif
+
+    local pdbfile = cTag first Chains[];
+    if isnull pdbfile then
+        pdbfile = 'unknown.pdb';
+    endif
     WriteLog[ [], twrite ['{}-phenix',fbase ftail pdbfile], 'init'];
 
     local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
@@ -1096,6 +1113,24 @@ global function qbPhenixPrepPanel[]
 	    ],
         Group :
         [
+            Vbox:
+            [
+                columns: 1,
+                flushLeft: 1,
+                extendH: 1,
+                Text:
+                [
+                    name: 'baseName',
+                    sensitive: 1,
+                    title: 'Base Filename:',
+                    type: 'char',
+                    extendH: 1,
+                    allowBlank: 0,
+                    bubbleHelp:
+                        'Choose base filename for use in refinement. Note: any spaces will be replaced with underscores.'
+                ]
+            ],
+        Separator : [flushLeft:1],
             Vbox:
             [
                 columns: 2,
@@ -1316,7 +1351,8 @@ global function qbPhenixPrepPanel[]
             macroCount: [value:3],
             onoff_macroskip: [value:0],
             column_F:   [sensitive:0],
-            column_Q:   [sensitive:0]
+            column_Q:   [sensitive:0],
+            baseName:   [value:fbase ftail pdbfile]
         ]
     ];
     
@@ -1410,6 +1446,10 @@ global function qbPhenixPrepPanel[]
             endif
         elseif trigger === 'panel' then
             if values.(trigger) == 'Batch...' then
+                local baseNameString = swrite ['{}', values.baseName];
+                baseNameString[cat indicesof[" ",baseNameString]] = "_";
+                values.baseName = token baseNameString;
+                WindowSetAttr[wkey, [ baseName:   [value:values.baseName]  ]];
                 local message = [];
                 if isnull cif_success then
                     message = 'CIF preparation was not executed.\n\n';
@@ -1429,13 +1469,14 @@ global function qbPhenixPrepPanel[]
                 if not isnull message then
                     message = twrite ['WARNING!\n\n{}Continue?\n',message];
                     if NoYes message then 
-                        batchname = BatchPanel fbase ftail pdbfile;
+                        batchname = BatchPanel values.baseName;
                     endif
                 else
-                    batchname = BatchPanel fbase ftail pdbfile;
+                    batchname = BatchPanel values.baseName;
                 endif
                 if not isnull batchname then
-                    local [mainPDBfilename,resPDBfilenames] = OutputInputFiles[residueList,ciffiles,fbase ftail pdbfile];
+                    WriteLog[twrite ['Creating {}',batchname],twrite ['{}-phenix',values.baseName]];
+                    local [mainPDBfilename,resPDBfilenames] = OutputInputFiles[residueList,ciffiles,values.baseName];
                     values.coreList = coreList[first values.coreResiduesBox];
                     values.labelList = twrite['{},{}',mtzFColumns[values.column_F],mtzQColumns[values.column_Q]];
                     values.phenix_success = phenix_success;
