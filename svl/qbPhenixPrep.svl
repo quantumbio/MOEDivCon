@@ -196,6 +196,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
             amolisorted = amoli[ x_sort x_smi_mol_heavy ];
             aSetIon[ amolisorted, ions_ordered_dict_heavy ];
             aSetGeometry[ amolisorted, geos_ordered_dict_heavy ];
+            Add_H amol;
             amol = [];
         endif
     else
@@ -844,6 +845,7 @@ local function cif_Window [wparent,residueList]
             Listbox :
                 [
                 name: 'ciffilesBox',text: '',
+                width:50,
                 bubbleHelp:
                     'If PHENIX environment variable is set per PHENIX documentation,\n'
                     'CIF files will be used (not listed here). Additional CIF files can be chosen here.\n'
@@ -874,6 +876,7 @@ local function cif_Window [wparent,residueList]
         if trigger === 'panel' then
             if values.panel == 'Cancel' then break; endif
             if values.panel == 'Run' then
+                Warning 'After running CIF-based preparation,\nyou should (re-)run Protonate3D or double-check protonation.';
                 aSetSelected [ ProtonateBasedOnCif[residueList,ciffiles] ,1 ]; 
                 success = 1;
                 break;
@@ -893,7 +896,7 @@ local function phenix_Window [wparent]
     static ciffiles;
     local wkey = WindowCreate
     [
-        title: 'Phenix-specific Settings',
+        title: '(Optional) Phenix-specific Settings',
         name: 'panel',
         text:   ['OK','Cancel'],
 	    onTrigger: ['validate','return'],
@@ -918,7 +921,11 @@ local function phenix_Window [wparent]
                         sortEnable: 1,
                         resizeH: 1,
                         bubbleHelp:
-                            'TO FILL IN'
+                            'Phenix settings come in option=value pairs.\n'
+                            'The use of these settings should be done at your own risk and\n'
+                            'not all combinations have been tested in conjunctions with QM-based refinement.\n'
+                            'For a full list of available options see:\n'
+                            '   http://www.phenix-online.org/documentation/'
                         ]
                 ],
                 Hbox:
@@ -1049,6 +1056,7 @@ local function phenix_Window [wparent]
 endfunction
 
 function mtz_Read;
+function StructurePreparationGUI;
 
 global function qbPhenixPrepPanel[]
 
@@ -1060,15 +1068,16 @@ global function qbPhenixPrepPanel[]
     local phenix_info = 'Status: Phenix configuration not provided.';
     
     local strprep_info;
-    local totalAtomCnt = length cat Atoms[];
-    local hAtomCnt = length cat [Atoms [] | aElement Atoms[] == 'H'];
-    local hPercent = hAtomCnt/totalAtomCnt;
-    const hCutOff = 0.40;
-    if hCutOff > hPercent then
-        strprep_info = twrite['Warning: only {}% of atoms are protons',100*hPercent];
-    else
-        strprep_info = twrite['Not performed.'];
-    endif
+    
+    local function PercentProton []
+        local totalAtomCnt = length cat Atoms[];
+        local hAtomCnt = length cat [Atoms [] | aElement Atoms[] == 'H'];
+        return hAtomCnt/totalAtomCnt;
+    endfunction
+    
+    local hPercent = PercentProton[];
+    const hCutOff = 0.49;
+    strprep_info = twrite['Not performed and {f.1}% of atoms are protons',100*hPercent];
         
     local residueList = ResiduePreparation[];
     local coreList = uniq aResidue cat _Atoms '$$ligand';
@@ -1099,7 +1108,9 @@ global function qbPhenixPrepPanel[]
                     title: 'MTZ/SF File:',
                     type: 'char',
                     extendH:1,
-                    allowBlank: 0
+                    allowBlank: 0,
+                    bubbleHelp:
+                        'Read in structure factor file (MTZ or CIF/SF) you wish to use for refinement.'
                 ],
                 Button:
                 [
@@ -1133,15 +1144,37 @@ global function qbPhenixPrepPanel[]
                 Button:
                 [
                     title: 'CIF Preparation', name: 'button_CIFsetup', graphics: config,
-                    bubbleHelp: 'Configure and run the CIF-based preparation.'
+                    bubbleHelp: 
+                        'Configure and run the CIF-based preparation.\n'
+                        '   This function includes both user-entered CIFs and \n'
+                        '   Phenix-supplied CIF files as long as Phenix has been installed as per its documentation.'
                 ],
-                Label : [ name: 'cif_info', text: cif_info ],
+                Label : 
+                [   
+                    name: 'cif_info', text: cif_info,
+                    bubbleHelp: 
+                        'Configure and run the CIF-based preparation.\n'
+                        '   This function includes both user-entered CIFs and \n'
+                        '   Phenix-supplied CIF files as long as Phenix has been installed as per its documentation.'
+                ],
                 Button:
                 [
                     title: 'Structure Preparation', name: 'button_MOEPreparation', graphics: config,
-                    bubbleHelp: 'Configure and run the MOE-based structure preparation.'
+                    bubbleHelp: 
+                        'Configure and run the MOE-based structure preparation.\n'
+                        '   Warning, if less then 49% the atoms are protons. FIX: Run Protonate3D.\n'
+                        '   Noted, if there was no change to the structure before and after structure preparation.\n'
+                        '   Noted, if not performed.'
                 ],
-                Label : [ name: 'strprep_info', text: strprep_info ]
+                Label :
+                [ 
+                    name: 'strprep_info', text: strprep_info, 
+                    bubbleHelp: 
+                        'Configure and run the MOE-based structure preparation.\n'
+                        '   Warning, if less then 40% the atoms are protons. FIX: Run Protonate3D.\n'
+                        '   Noted, if there was no change to the structure before and after structure preparation.\n'
+                        '   Noted, if not performed.'
+                ]
             ]
         ],
 
@@ -1160,7 +1193,7 @@ global function qbPhenixPrepPanel[]
                         [
                             name: 'retrieveSelection', 
                             text: 'Retrieve Selection',
-                            bubbleHelp: 'Retrieve selected residues and add to region refinement.'
+                            bubbleHelp: 'Retrieve selected residues and add them to region refinement.'
                         ],
                     Listbox :
                         [
@@ -1173,7 +1206,11 @@ global function qbPhenixPrepPanel[]
                         multiSelect: 1,
                         sortEnable: 1,
                         bubbleHelp:
-                            'TO FILL IN'
+                            'This list of residues automatically includes ligand(s), cofactor(s), and metals.\n'
+                            '   All selected residues will be included as core residues in the QM Region Refinement.\n'
+                            '   To remove a residue from the list, simply unselect it.\n'
+                            '   The list may be expanded by selecting additional residues in the MOE window and \n'
+                            '   pressing the Retrieve Selection button above.'
                         ]
                 ],
                 Hbox:
@@ -1284,31 +1321,44 @@ global function qbPhenixPrepPanel[]
     ];
     
 	WindowShow wkey;
-	local ciffiles, success, phenix_success;
+	local ciffiles;
+	local cif_success = [], phenix_success = [],ran_protonate = 0,ran_structprep = 0,structprep_changed = 0;
 	local tmpFile;
     loop
         local [values, trigger] = WindowWait wkey;
 // write ['DEBUG: {} | {}\n', values, trigger];
         if trigger === 'button_CIFsetup' then
-            [ciffiles,success] = cif_Window[wkey,residueList];
-            if isnull success then
+            [ciffiles,cif_success] = cif_Window[wkey,residueList];
+            if isnull cif_success then
                 WindowSetAttr[wkey,[cif_info: [text:cif_info]]];
             else
                 WindowSetAttr[wkey,[cif_info: [text:'Finished with CIF preparation']]];
             endif
         elseif trigger === 'button_MOEPreparation' then
             local before_run = length cat Atoms[];
-            run ['structprep_ui.svl'];
-            totalAtomCnt = length cat Atoms[];
-            hAtomCnt = length cat [Atoms [] | aElement Atoms[] == 'H'];
-            hPercent = hAtomCnt/totalAtomCnt;
+            StructurePreparationGUI[cmd:'interactive'];
+            ran_structprep = 1;
+            sleep 2.0;      // needs a couple of seconds to init StructurePrep function
+            WindowShow [wkey, 0];
+            while WindowKey 'Structure Preparation' loop
+                sleep 0.15;
+                if WindowKey 'Protonate3D' then
+                    ran_protonate = 1;
+                endif
+            endloop
+            hPercent = PercentProton[];
+            local after_run = length cat Atoms[];
             if hCutOff > hPercent then
                 WindowSetAttr[wkey,[strprep_info: [text:twrite['Warning: only {}% of atoms are protons', 100*hPercent]]]];
-            elseif before_run == totalAtomCnt then
+            elseif before_run == after_run then
                 WindowSetAttr[wkey,[strprep_info: [text:'Note: no change in structure.']]];
+                structprep_changed = 0;
             else
-                WindowSetAttr[wkey,[strprep_info: [text:'Finished with MOE preparation']]];
+                WindowSetAttr[wkey,[strprep_info: [text:'MOE preparation Ran']]];
+                structprep_changed = 1;
+                
             endif
+            WindowShow[wkey,1];
         elseif trigger === 'regionRefine' then
             if values.regionRefine then
                 WindowSetAttr[wkey,[coreResidues: [sensitive:1]]];
@@ -1360,7 +1410,30 @@ global function qbPhenixPrepPanel[]
             endif
         elseif trigger === 'panel' then
             if values.(trigger) == 'Batch...' then
-                local batchname = BatchPanel fbase ftail pdbfile;
+                local message = [];
+                if isnull cif_success then
+                    message = 'CIF preparation was not executed.\n\n';
+                endif
+                if isnull phenix_success then
+                    message = twrite ['{}Phenix configuration was not executed.\n\n',message];
+                endif
+                if not ran_protonate then
+                    message = twrite ['{}Protonate3D was not executed during this session.\n\n',message];
+                endif
+                if not ran_structprep then
+                    message = twrite ['{}Structure preparation was not executed during this session.\n\n',message];
+                elseif not structprep_changed then
+                    message = twrite ['{}Structure preparation was executed, but no changes were observed in structure.\n\n',message];
+                endif
+                local batchname = [];
+                if not isnull message then
+                    message = twrite ['WARNING!\n\n{}Continue?\n',message];
+                    if NoYes message then 
+                        batchname = BatchPanel fbase ftail pdbfile;
+                    endif
+                else
+                    batchname = BatchPanel fbase ftail pdbfile;
+                endif
                 if not isnull batchname then
                     local [mainPDBfilename,resPDBfilenames] = OutputInputFiles[residueList,ciffiles,fbase ftail pdbfile];
                     values.coreList = coreList[first values.coreResiduesBox];
