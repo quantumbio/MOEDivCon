@@ -78,6 +78,7 @@ local function WriteLog [line,basename,state]
         fileHandle = fopenw logFileName;
     elseif not isnull basename and not isnull logFileName then
         local newFilename = twrite ['{}-{}.log',basename,'qbMOE'];
+        fdelete newFilename;
         frename [logFileName,newFilename];
         line = append [line, twrite ['Log file renamed from {} to {}', logFileName, newFilename]];
         logFileName = newFilename;
