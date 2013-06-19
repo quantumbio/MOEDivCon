@@ -325,12 +325,24 @@ local function GetRNamesFromCIF[ciffiles,tmpResidue]
     return [];
 endfunction
 
+local function GetCIFileFromList [filelist, tmpResidue]
+    local cifFile = [];
+    if isnull cifFile then
+        cifFile = first cat [ fabsname filelist | fbase ftail filelist == rName tmpResidue ];
+    endif
+    if isnull cifFile then
+        cifFile = first cat [ fabsname filelist | fbase ftail filelist == twrite ['data_{}',rName tmpResidue] ];
+    endif
+    return cifFile;
+endfunction
+
 local function ProtonateBasedOnCif [residueList,ciffiles]
     local filelist = [];
     local fixedAtoms;
     if not isnull getenv 'PHENIX' then
         filelist = recursiveDirectoryList[tok_cat [getenv 'PHENIX', '/chem_data/']];
     endif
+
     if isnull cat [ciffiles,filelist] then
         WriteLog[twrite ['NOTE: No CIF files processed for protonation.']];
         return fixedAtoms;
@@ -339,7 +351,7 @@ local function ProtonateBasedOnCif [residueList,ciffiles]
     for tmpResidue in residueList loop
         local cifFile = GetRNamesFromCIF[ciffiles,tmpResidue];
         if isnull cifFile then
-            cifFile = first cat [ fabsname filelist | fbase ftail filelist == rName tmpResidue ];
+            cifFile = GetCIFileFromList [filelist,tmpResidue];
         endif
         if not isnull cifFile then
             WriteLog[twrite [' INFO: Attempting to use {} for protonation of {} residue {}:{}', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
@@ -386,7 +398,7 @@ local function RenameBasedOnCIF [residueList,ciffiles]
     for tmpResidue in residueList loop
         local cifFile = GetRNamesFromCIF[ciffiles,tmpResidue];
         if isnull cifFile then
-            cifFile = first cat [ fabsname filelist | fbase ftail filelist == rName tmpResidue ];
+            cifFile = GetCIFileFromList [filelist,tmpResidue];
         endif
         if not isnull cifFile then
             WriteLog[twrite [' INFO: Attempting to use {} for {} residue {}:{}', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
@@ -870,7 +882,11 @@ local function cif_Window [wparent,residueList]
     if not isnull getenv 'PHENIX' then
         phenixdb = tok_cat [getenv 'PHENIX', '/chem_data/'];
         local filelist = recursiveDirectoryList[phenixdb];
-        cifFiles = fabsname filelist | m_join [fbase ftail filelist,uniq rName residueList];
+        local tmpResidue;
+        for tmpResidue in residueList loop
+            cifFiles = cat [cifFiles, GetCIFileFromList [filelist,tmpResidue]];
+        endloop
+
     endif
     
     if isnull phenixdb then
