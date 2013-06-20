@@ -125,7 +125,7 @@ global function qbGetResidueOnRadius [Batoms,radius,tmpChains]
     else
         allatms = cat cAtoms tmpChains;
     endif
-    local nearatms = cat rAtoms aResidue qbNearby [allatms, Batoms, radius];
+    local nearatms = uniq cat rAtoms aResidue qbNearby [allatms, Batoms, radius];
     return nearatms;
 
 endfunction
