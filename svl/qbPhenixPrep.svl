@@ -1084,6 +1084,7 @@ endfunction
 
 function mtz_Read;
 function StructurePreparationGUI;
+function qbGetResidueOnRadius;
 
 global function qbPhenixPrepPanel[]
 
@@ -1270,24 +1271,36 @@ global function qbPhenixPrepPanel[]
                 Hbox:
                 [
                     name: 'regionSizes',
-                    columns:2,
+                    columns:4,
                     Text:
                         [
                             name: 'qmCore',
                             title:  'QM Region (A): ',
                             type:   'real',
+                            onTrigger: 'return',
                             allowBlank: 0,
                             shortcut: ['5.0','4.0','3.0','2.0','1.0','0.0'],
                             bubbleHelp: 'Size of QM region beyond core residues noted above.'
+                        ],
+                    Button:
+                        [
+                            name: 'button_ShowRegionAtoms', text: '?', font: 'mediumBold',
+                            bubbleHelp: 'Displays the approximate number of atoms that will be treated quantum mechanically.'
                         ],
                     Text:
                         [
                             name: 'qmBuffer',
                             title:  'Buffer (A): ',
                             type:   'real',
+                            onTrigger: 'return',
                             allowBlank: 0,
                             shortcut: ['2.5','3.0','3.5','0.0'],
                             bubbleHelp: 'Size of QM buffer beyond QM Region.'
+                        ],
+                    Button:
+                        [
+                            name: 'button_ShowBufferAtoms', text: '?', font: 'mediumBold',
+                            bubbleHelp: 'Displays the approximate number of atoms that will be treated quantum mechanically.'
                         ]
                 ]
             ]
@@ -1327,6 +1340,7 @@ global function qbPhenixPrepPanel[]
                         name: 'setNP',
                         title: 'Processor Count: ',
                         type:   'int',
+                        onTrigger: 'return',
                         allowBlank: 0,
                         shortcut: ['1','2','4','8','16'],
                         bubbleHelp: 'The QM calculation is fully threaded for multiple processors.'
@@ -1335,13 +1349,24 @@ global function qbPhenixPrepPanel[]
                     [
                         name: 'setMem',
                         title: 'Memory (GB): ',
-                        type:   'int',
+                        type:   'real',
+                        onTrigger: 'return',
                         allowBlank: 0,
                         shortcut: ['1','2','4','8','16'],
                         bubbleHelp: 'Generally, the more memory the better with larger QM regions.'
                     ]
             ]
         ],
+            Mbox:
+            [
+                columns: 2,
+                Button:
+                [
+                    title: 'Atom Count', name: 'button_ShowAtomCount', text: '?', font: 'mediumBold',
+                    bubbleHelp: 'Displays the approximate number of atoms that will be treated quantum mechanically.'
+                ],
+                Label : [ name: 'atomcount_info' ]
+            ],
             Mbox:
             [
                 columns: 2,
@@ -1358,6 +1383,45 @@ global function qbPhenixPrepPanel[]
 	    return apt twrite ['{}\t{}\t{}',cName rChain coreList, rName coreList, rUID coreList];
 	endfunction
 	
+    local function calcMemoryRequirementsInGB [allAtoms,values]
+        local memory = length allAtoms;
+        if memory < 1000 then
+            memory = 1000;
+        endif
+        return ceil(((memory/1000) + 0.5)*10) / 10;
+    endfunction
+
+	local function updateAtomCount [wkey, values, coreList]
+	    local atomList;
+	    local qmCoreAtoms;
+	    local qmBufferAtoms;
+	    if not values.regionRefine then
+	        atomList = Atoms[];
+	    else
+	        qmCoreAtoms = qbGetResidueOnRadius[cat rAtoms coreList[first values.coreResiduesBox],values.qmCore];
+	        qmBufferAtoms = diff [qbGetResidueOnRadius[qmCoreAtoms,values.qmBuffer],qmCoreAtoms];
+	        atomList = uniq cat [qmCoreAtoms,qmBufferAtoms];
+        endif
+	    WindowSetAttr[wkey, 
+	    [ 
+	        atomcount_info: [text:twrite ['{} QM atoms ({} residues)',length cat atomList,length uniq aResidue cat atomList]]
+	        
+	    ]];
+	    return [atomList,qmCoreAtoms,qmBufferAtoms];
+	endfunction
+	
+	local function highlightAtoms [wkey, values, trigger, coreList]
+	    local [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount [wkey, values, coreList];
+	    aSetSelected [Atoms[], 0];
+	    if trigger === 'button_ShowRegionAtoms' then
+            aSetSelected [qmCoreAtoms, 1];
+        elseif trigger === 'button_ShowBufferAtoms' then
+            aSetSelected [qmBufferAtoms,1];
+        elseif trigger === 'button_ShowAtomCount' then
+            aSetSelected [allAtoms,1];
+        endif
+    endfunction
+    	
     WindowSetAttr[wkey,
         [
             coreResiduesBox:
@@ -1374,14 +1438,21 @@ global function qbPhenixPrepPanel[]
             baseName:   [value:fbase ftail pdbfile]
         ]
     ];
+    local values, trigger, allAtoms,qmCoreAtoms,qmBufferAtoms;
+    local ynMemIsSet = 0;
+    values = WindowValues wkey;
+    [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
+    local memory = calcMemoryRequirementsInGB[allAtoms,values];
+    WindowSetAttr[wkey, [ setMem: [value:memory] ]];
+    WindowSetAttr[wkey, [ setMem: [bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
     
 	WindowShow wkey;
 	local ciffiles;
 	local cif_success = [], phenix_success = [],ran_protonate = 0,ran_structprep = 0,structprep_changed = 0;
 	local tmpFile;
     loop
-        local [values, trigger] = WindowWait wkey;
-// write ['DEBUG: {} | {}\n', values, trigger];
+        [values, trigger] = WindowWait wkey;
+//  write ['DEBUG: {} | {}\n', values, trigger];
         if trigger === 'button_CIFsetup' then
             [ciffiles,cif_success] = cif_Window[wkey,residueList];
             if isnull cif_success then
@@ -1389,6 +1460,10 @@ global function qbPhenixPrepPanel[]
             else
                 WindowSetAttr[wkey,[cif_info: [text:'Finished with CIF preparation']]];
             endif
+        elseif trigger === 'button_ShowAtomCount' 
+                or trigger === 'button_ShowRegionAtoms' 
+                or trigger === 'button_ShowBufferAtoms' then
+            highlightAtoms [wkey, values, trigger, coreList];
         elseif trigger === 'button_MOEPreparation' then
             local before_run = length cat Atoms[];
             StructurePreparationGUI[cmd:'interactive'];
@@ -1470,20 +1545,31 @@ global function qbPhenixPrepPanel[]
                 values.baseName = token baseNameString;
                 WindowSetAttr[wkey, [ baseName:   [value:values.baseName]  ]];
                 local message = [];
+                
                 if isnull cif_success then
                     message = 'CIF preparation was not executed.\n\n';
                 endif
+                
                 if isnull phenix_success then
                     message = twrite ['{}Phenix configuration was not executed.\n\n',message];
                 endif
+                
                 if not ran_protonate then
                     message = twrite ['{}Protonate3D was not executed during this session.\n\n',message];
                 endif
+                
                 if not ran_structprep then
                     message = twrite ['{}Structure preparation was not executed during this session.\n\n',message];
                 elseif not structprep_changed then
                     message = twrite ['{}Structure preparation was executed, but no changes were observed in structure.\n\n',message];
                 endif
+                
+                [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
+                memory = calcMemoryRequirementsInGB [allAtoms,values];
+                if values.setMem < memory then
+                    message = twrite ['{}Memory request is less then recommended amount of {} GB.\n\n',message,memory];
+                endif
+
                 local batchname = [];
                 if not isnull message then
                     message = twrite ['WARNING!\n\n{}Continue?\n',message];
@@ -1506,6 +1592,21 @@ global function qbPhenixPrepPanel[]
                 LaunchDocument '$QBHOME/doc/help-refine.html';
             endif
         endif
+        if trigger === 'setMem' then
+            [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
+            memory = calcMemoryRequirementsInGB [allAtoms,values];
+            ynMemIsSet = 1;
+            if values.setMem < memory then
+                Warning twrite ['WARNING: Memory request is less then recommended amount of {} GB',memory];
+            endif
+        else
+            [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
+            if not ynMemIsSet then
+                WindowSetAttr[wkey, [ setMem: [value:calcMemoryRequirementsInGB[allAtoms,values]] ]];
+            endif
+        endif
+        memory = calcMemoryRequirementsInGB [allAtoms,values];
+        WindowSetAttr[wkey, [ setMem: [bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
     endloop
     WindowDestroy wkey;
 endfunction
