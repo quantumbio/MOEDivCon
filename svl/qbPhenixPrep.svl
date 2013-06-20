@@ -1115,9 +1115,13 @@ global function qbPhenixPrepPanel[]
     local hPercent = PercentProton[];
     const hCutOff = 0.49;
     strprep_info = twrite['Not performed and {f.1}% of atoms are protons',100*hPercent];
-        
+
     local residueList = ResiduePreparation[];
-    local coreList = uniq aResidue cat _Atoms '$$ligand';
+
+    local testResidues = cat
+        [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C'];
+    local coreList = uniq (Residues[] | m_join [rName Residues [], testResidues] == 0);
+//    local coreList = uniq aResidue cat _Atoms '$$ligand';
 
 	local wkey = WindowCreate
 	[
@@ -1384,11 +1388,36 @@ global function qbPhenixPrepPanel[]
 	endfunction
 	
     local function calcMemoryRequirementsInGB [allAtoms,values]
-        local memory = length allAtoms;
-        if memory < 1000 then
-            memory = 1000;
+    
+        local qmResidues = uniq cat aResidue allAtoms;
+        local fullMatrixSize = 0;
+        local tmpResidue;
+        if length allAtoms > 700 then
+            for tmpResidue in qmResidues loop
+                local subsystemAtoms = qbGetResidueOnRadius[cat rAtoms tmpResidue,5.0,allAtoms];
+                local matrixSize = 
+                (
+                    (1 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms] == 1)) +
+                    (4 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms] == 2)) +
+                    (9 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms]  > 2))
+                );
+                fullMatrixSize = fullMatrixSize + (matrixSize * matrixSize);
+            endloop
+        else
+            fullMatrixSize = 
+            (
+                (1 * add (ELEMENT_ROW[el_Protons aElement allAtoms] == 1)) +
+                (4 * add (ELEMENT_ROW[el_Protons aElement allAtoms] == 2)) +
+                (9 * add (ELEMENT_ROW[el_Protons aElement allAtoms]  > 2))
+            );
         endif
-        return (ceil(((memory/1000) + 0.5)*10) / 10) + ((values.setNP - 1) * 0.100);
+        fullMatrixSize = (fullMatrixSize * 5) * 8;
+        return (ceil((fullMatrixSize/1024/1024/1024)*10) / 10) + ((values.setNP - 1) * 0.100);
+//        local memory = length allAtoms;
+//        if memory < 1000 then
+//            memory = 1000;
+//        endif
+//        return (ceil(((memory/1000) + 0.5)*10) / 10) + ((values.setNP - 1) * 0.100);
     endfunction
 
 	local function updateAtomCount [wkey, values, coreList]
