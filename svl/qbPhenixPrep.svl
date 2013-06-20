@@ -1122,7 +1122,7 @@ global function qbPhenixPrepPanel[]
 	local wkey = WindowCreate
 	[
 	    name: 'panel',
-	    title: 'Prepare System',
+	    title: 'Phenix/DivCon Preparation',
 	    windowName: 'PhenixDivConPanel',
 	    text: ['Help','Batch...','Cancel'],
 	    onTrigger: ['return','validate','exit'],
@@ -1388,7 +1388,7 @@ global function qbPhenixPrepPanel[]
         if memory < 1000 then
             memory = 1000;
         endif
-        return ceil(((memory/1000) + 0.5)*10) / 10;
+        return (ceil(((memory/1000) + 0.5)*10) / 10) + ((values.setNP - 1) * 0.100);
     endfunction
 
 	local function updateAtomCount [wkey, values, coreList]
