@@ -420,7 +420,10 @@ endfunction
 local function WriteResidue [outResidues]
     local fileHandle;
     static newResidueName;
-    if isnull newResidueName then newResidueName = '100'; endif;
+    if isnull newResidueName then
+        fdelete transFileName;
+        newResidueName = '100'; 
+    endif;
     local residueName = toupper rName first outResidues;
     if length pack indexof [residueNamesTaken,residueName] then
         fileHandle = fopenx transFileName;
@@ -733,11 +736,12 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '        fi  \n'];
     fwrite [shscr, '    fi  \n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation PostMOE --NP $setNP --m ${}gb --ncycles $macroCount --labels \'$labelList\'"\n','{setMem}'];
+    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation PostMOE --NP $setNP --m ${}gb --ncycles $macroCount "\n','{setMem}'];
     fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
     fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
+    fwrite [shscr, '    if [ ! -z "${}" ] ; then    --labels \'$labelList\'"  ;   fi    \n',"{labelList}"];
     fwrite [shscr, '    eval $QBPHENIX $qbphenixopt  \n'];
     fwrite [shscr, '}   \n'];
     fwrite [shscr, '        \n'];
@@ -802,6 +806,13 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
         fwrite [shscr, '\'\n'];
         fwrite [shscr, 'ProcessPackageFile {} "$F{}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
     endloop
+    
+    if first fstat transFileName <> '' then
+        fwrite [shscr, '\ntranslationFile=\'\n'];
+        apt fwrite [shscr, '{}\n', r64_encodeln freadb [transFileName,'char',INT_MAX]];
+        fwrite [shscr, '\'\n'];
+        fwrite [shscr, 'ProcessPackageFile transFileName "$translationFile"\n'];
+    endif
     
     fwrite [shscr, 'RunPhenix\n'];
     
@@ -1119,9 +1130,8 @@ global function qbPhenixPrepPanel[]
     local residueList = ResiduePreparation[];
 
     local testResidues = cat
-        [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C'];
+        [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C','SO4'];
     local coreList = uniq (Residues[] | m_join [rName Residues [], testResidues] == 0);
-//    local coreList = uniq aResidue cat _Atoms '$$ligand';
 
 	local wkey = WindowCreate
 	[
@@ -1366,6 +1376,17 @@ global function qbPhenixPrepPanel[]
                 columns: 2,
                 Button:
                 [
+                    title: 'Phenix Configuration', name: 'button_PhenixSetup', graphics: config,
+                    bubbleHelp: '(Optional) Provide Phenix-specific settings for the refinement.'
+                ],
+                Label : [ name: 'phenix_info', text: phenix_info ]
+            ],
+            Separator : [flushLeft:1],
+            Mbox:
+            [
+                columns: 2,
+                Button:
+                [
                     title: 'Atom Count', name: 'button_ShowAtomCount', text: '?', font: 'mediumBold',
                     bubbleHelp: 'Displays the approximate number of atoms that will be treated quantum mechanically.'
                 ],
@@ -1376,18 +1397,67 @@ global function qbPhenixPrepPanel[]
                 columns: 2,
                 Button:
                 [
-                    title: 'Phenix Configuration', name: 'button_PhenixSetup', graphics: config,
-                    bubbleHelp: '(Optional) Provide Phenix-specific settings for the refinement.'
+                    title: 'Warnings', name: 'button_ShowWarnings', text: '?', font: 'mediumBold',
+                    bubbleHelp: 'If there are any warnings, they will appear here.'
                 ],
-                Label : [ name: 'phenix_info', text: phenix_info ]
+                Label : [ name: 'warning_info' ]
             ]
 	];
 	
 	local function updateCoreResidueList [coreList]
 	    return apt twrite ['{}\t{}\t{}',cName rChain coreList, rName coreList, rUID coreList];
 	endfunction
+    
+    local function ShowWarnings [wkey,trigger,values,status,allAtoms]
+    
+            local message = [];
+            
+            local alt_atoms = cat app oGetCollection findmatch ['PDB_ALTLOC_[A-Z,a-z,0-9]', oCollections[]];
+            local commonAtoms = join [alt_atoms,allAtoms];
+            if not isnull commonAtoms then
+                local inResidues = uniq cat aResidue commonAtoms;
+                message = twrite ['Residues {} have alternative conformations.\nDisorder in the QM Region is not supported at this time and will be removed at runtime\n(e.g. highest occupied or "A" conformation will be included in QM calculation).\n\n',
+                    apt twrite ['{}:{}:{}',cName rChain inResidues, rName inResidues, rUID inResidues]];
+            endif
+            
+            if isnull status.cif_success then
+                message = twrite['{}CIF preparation was not executed.\n\n',message];
+            endif
+            
+            if isnull status.phenix_success then
+                message = twrite ['{}Phenix configuration was not executed.\n\n',message];
+            endif
+            
+            if not status.ran_protonate then
+                message = twrite ['{}Protonate3D was not executed during this session.\n\n',message];
+            endif
+            
+            if not status.ran_structprep then
+                message = twrite ['{}Structure preparation was not executed during this session.\n\n',message];
+            elseif not status.structprep_changed then
+                message = twrite ['{}Structure preparation was executed, but no changes were observed in structure.\n\n',message];
+            endif
+            
+            if values.setMem < status.memory then
+                message = twrite ['{}Memory request is less then recommended amount of {} GB.\n\n',message,status.memory];
+            endif
+            
+            if not isnull message then
+                message = twrite ['WARNING(S):\n\n{}',message];
+                WindowSetAttr[wkey, [ warning_info: [text:'Click to see detailed warnings', foreground:'red']   ]];
+                if trigger === 'inbatch' then
+                    message = twrite ['{}Continue?\n',message];
+                    return NoYes message;
+                elseif trigger === 'button_ShowWarnings' then
+                    Warning message;
+                endif
+            else
+                WindowSetAttr[wkey, [ warning_info: [text:'None']   ]];
+            endif
+            return 1;
+    endfunction
 	
-    local function calcMemoryRequirementsInGB [allAtoms,values]
+    local function CalcMemoryRequirementsInGB [wkey,allAtoms,values]
     
         local qmResidues = uniq cat aResidue allAtoms;
         local fullMatrixSize = 0;
@@ -1412,7 +1482,9 @@ global function qbPhenixPrepPanel[]
             );
         endif
         fullMatrixSize = (fullMatrixSize * 5) * 8;
-        return (ceil((fullMatrixSize/1024/1024/1024)*10) / 10) + ((values.setNP - 1) * 0.100);
+        local memory = (ceil((fullMatrixSize/1024/1024/1024)*10) / 10) + ((values.setNP - 1) * 0.100);
+        WindowSetAttr[wkey, [ setMem: [shortcut: [twrite['{}',memory],'1','2','4','8','16'],bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
+        return memory;
 //        local memory = length allAtoms;
 //        if memory < 1000 then
 //            memory = 1000;
@@ -1433,8 +1505,7 @@ global function qbPhenixPrepPanel[]
         endif
 	    WindowSetAttr[wkey, 
 	    [ 
-	        atomcount_info: [text:twrite ['{} QM atoms ({} residues)',length cat atomList,length uniq aResidue cat atomList]]
-	        
+	        atomcount_info: [text:twrite ['{} QM atoms ({} residues)',length cat atomList,length uniq aResidue cat atomList]]	        
 	    ]];
 	    return [atomList,qmCoreAtoms,qmBufferAtoms];
 	endfunction
@@ -1471,20 +1542,25 @@ global function qbPhenixPrepPanel[]
     local ynMemIsSet = 0;
     values = WindowValues wkey;
     [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
-    local memory = calcMemoryRequirementsInGB[allAtoms,values];
-    WindowSetAttr[wkey, [ setMem: [value:memory] ]];
-    WindowSetAttr[wkey, [ setMem: [bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
+	local status;
+	status.cif_success = []; status.phenix_success = [];status.ran_protonate = 0;status.ran_structprep = 0;status.structprep_changed = 0;
+
+    status.memory = CalcMemoryRequirementsInGB[wkey,allAtoms,values];
+    WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
+    
+    ShowWarnings [wkey,trigger,values,status,allAtoms];
     
 	WindowShow wkey;
 	local ciffiles;
-	local cif_success = [], phenix_success = [],ran_protonate = 0,ran_structprep = 0,structprep_changed = 0;
 	local tmpFile;
     loop
         [values, trigger] = WindowWait wkey;
 //  write ['DEBUG: {} | {}\n', values, trigger];
         if trigger === 'button_CIFsetup' then
-            [ciffiles,cif_success] = cif_Window[wkey,residueList];
-            if isnull cif_success then
+            local tmpcif_success;
+            [ciffiles,tmpcif_success] = cif_Window[wkey,residueList];
+            status.cif_success = tmpcif_success;
+            if isnull status.cif_success then
                 WindowSetAttr[wkey,[cif_info: [text:cif_info]]];
             else
                 WindowSetAttr[wkey,[cif_info: [text:'Finished with CIF preparation']]];
@@ -1496,13 +1572,13 @@ global function qbPhenixPrepPanel[]
         elseif trigger === 'button_MOEPreparation' then
             local before_run = length cat Atoms[];
             StructurePreparationGUI[cmd:'interactive'];
-            ran_structprep = 1;
+            status.ran_structprep = 1;
             sleep 2.0;      // needs a couple of seconds to init StructurePrep function
             WindowShow [wkey, 0];
             while WindowKey 'Structure Preparation' loop
                 sleep 0.15;
                 if WindowKey 'Protonate3D' then
-                    ran_protonate = 1;
+                    status.ran_protonate = 1;
                 endif
             endloop
             hPercent = PercentProton[];
@@ -1511,11 +1587,10 @@ global function qbPhenixPrepPanel[]
                 WindowSetAttr[wkey,[strprep_info: [text:twrite['Warning: only {}% of atoms are protons', 100*hPercent]]]];
             elseif before_run == after_run then
                 WindowSetAttr[wkey,[strprep_info: [text:'Note: no change in structure.']]];
-                structprep_changed = 0;
+                status.structprep_changed = 0;
             else
                 WindowSetAttr[wkey,[strprep_info: [text:'MOE preparation Ran']]];
-                structprep_changed = 1;
-                
+                status.structprep_changed = 1;
             endif
             WindowShow[wkey,1];
         elseif trigger === 'regionRefine' then
@@ -1561,8 +1636,8 @@ global function qbPhenixPrepPanel[]
                 endif
             endif
         elseif trigger === 'button_PhenixSetup' then
-            phenix_success = phenix_Window[wkey];
-            if isnull phenix_success then
+            status.phenix_success = phenix_Window[wkey];
+            if isnull status.phenix_success then
                 WindowSetAttr[wkey,[phenix_info: [text:phenix_info]]];
             else
                 WindowSetAttr[wkey,[phenix_info: [text:'Finished with Phenix Configuration']]];
@@ -1573,47 +1648,18 @@ global function qbPhenixPrepPanel[]
                 baseNameString[cat indicesof[" ",baseNameString]] = "_";
                 values.baseName = token baseNameString;
                 WindowSetAttr[wkey, [ baseName:   [value:values.baseName]  ]];
-                local message = [];
                 
-                if isnull cif_success then
-                    message = 'CIF preparation was not executed.\n\n';
-                endif
-                
-                if isnull phenix_success then
-                    message = twrite ['{}Phenix configuration was not executed.\n\n',message];
-                endif
-                
-                if not ran_protonate then
-                    message = twrite ['{}Protonate3D was not executed during this session.\n\n',message];
-                endif
-                
-                if not ran_structprep then
-                    message = twrite ['{}Structure preparation was not executed during this session.\n\n',message];
-                elseif not structprep_changed then
-                    message = twrite ['{}Structure preparation was executed, but no changes were observed in structure.\n\n',message];
-                endif
-                
-                [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
-                memory = calcMemoryRequirementsInGB [allAtoms,values];
-                if values.setMem < memory then
-                    message = twrite ['{}Memory request is less then recommended amount of {} GB.\n\n',message,memory];
-                endif
-
                 local batchname = [];
-                if not isnull message then
-                    message = twrite ['WARNING!\n\n{}Continue?\n',message];
-                    if NoYes message then 
-                        batchname = BatchPanel values.baseName;
-                    endif
-                else
+                if ShowWarnings [wkey,'inbatch',values,status,allAtoms] then
                     batchname = BatchPanel values.baseName;
                 endif
+
                 if not isnull batchname then
                     WriteLog[twrite ['Creating {}',batchname],twrite ['{}-phenix',values.baseName]];
                     local [mainPDBfilename,resPDBfilenames] = OutputInputFiles[residueList,ciffiles,values.baseName];
                     values.coreList = coreList[first values.coreResiduesBox];
                     values.labelList = twrite['{},{}',mtzFColumns[values.column_F],mtzQColumns[values.column_Q]];
-                    values.phenix_success = phenix_success;
+                    values.phenix_success = status.phenix_success;
                     GenerateBatchScript[values,batchname,mainPDBfilename,resPDBfilenames,WriteLog[[],[],'getname'],ciffiles];
                     break;
                 endif
@@ -1621,21 +1667,17 @@ global function qbPhenixPrepPanel[]
                 LaunchDocument '$QBHOME/doc/help-refine.html';
             endif
         endif
+        [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
+        status.memory = CalcMemoryRequirementsInGB [wkey,allAtoms,values];
         if trigger === 'setMem' then
-            [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
-            memory = calcMemoryRequirementsInGB [allAtoms,values];
             ynMemIsSet = 1;
-            if values.setMem < memory then
-                Warning twrite ['WARNING: Memory request is less then recommended amount of {} GB',memory];
+            if values.setMem < status.memory then
+                Warning twrite ['WARNING: Memory request is less then recommended amount of {} GB',status.memory];
             endif
-        else
-            [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
-            if not ynMemIsSet then
-                WindowSetAttr[wkey, [ setMem: [value:calcMemoryRequirementsInGB[allAtoms,values]] ]];
-            endif
+        elseif not ynMemIsSet then
+            WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
         endif
-        memory = calcMemoryRequirementsInGB [allAtoms,values];
-        WindowSetAttr[wkey, [ setMem: [bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
+        ShowWarnings [wkey,trigger,WindowValues wkey,status,allAtoms];
     endloop
     WindowDestroy wkey;
 endfunction
