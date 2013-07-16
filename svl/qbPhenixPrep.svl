@@ -741,7 +741,7 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
-    fwrite [shscr, '    if [ ! -z "${}" ] ; then    --labels \'$labelList\'"  ;   fi    \n',"{labelList}"];
+    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="--labels \'$labelList\'"  ;   fi    \n',"{labelList}"];
     fwrite [shscr, '    eval $QBPHENIX $qbphenixopt  \n'];
     fwrite [shscr, '}   \n'];
     fwrite [shscr, '        \n'];
@@ -1099,6 +1099,10 @@ function qbGetResidueOnRadius;
 
 global function qbPhenixPrepPanel[]
 
+	if WindowShow ['PhenixDivConPanel', 1] then
+	    return;
+	endif
+	
 // this function requires that the user already have a PDB file open and ready to run.
     if isnull Atoms[] then
         Warning 'Error:\nUse File->Open to open a molecule of interest\nprior to attempting refinement.';
