@@ -126,7 +126,8 @@ const DEFAULTS = cat [CORE_DEFAULTS, [
 
 const HYDRATE_DEFAULTS = [
     distance:2.5,
-    enableOpt:1
+    enableOpt:1,
+    enablePocket:0
 ];
 
 local function writeElementList [outpat,chains,opt]
@@ -658,6 +659,10 @@ global function qbHydrateChargedAtoms[opt]
     opt = tagcat[opt, HYDRATE_DEFAULTS];
     
     local chargedAtoms = cat [Atoms[] | aFCharge Atoms[] <> 0];
+    
+    if opt.enablePocket == 0 then
+        chargedAtoms = diff [chargedAtoms,uniq cat [_Atoms '$$pocket',_Atoms '$$ligand'] ];
+    endif
     aSetSelected [chargedAtoms,1];
     local solvOpt = [ mode            : 'Droplet',
             shape           : 'Sphere',
@@ -716,7 +721,8 @@ global function qbHydrateChargedAtomsPanel[]
 	        flushLeft:1,
 	        bubbleHelp: [
 		    'Optimize any added water molecules'
-	        ]],
+	        ]
+	    ],
 
 	    Text: [
 		    name: 'distance',
@@ -726,7 +732,16 @@ global function qbHydrateChargedAtomsPanel[]
 	        bubbleHelp: [
 		    'Add waters within this number of angstroms of any charged atoms.'
 	        ]
+        ],
+
+	    Checkbox: [
+	        name: 'enablePocket',
+	        text: 'Include Pocket Atoms',
+	        flushLeft:1,
+	        bubbleHelp: [
+		    'Include pocket atoms in the list of charged atoms.'
 	        ]
+	    ]
 	];
 
 	WindowShow wkey;
