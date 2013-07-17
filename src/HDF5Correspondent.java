@@ -102,8 +102,11 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                 case "retrieveAtomByAtomMRM":
                 res = retrieveAtomByAtomMRM(res);
                     break;
-                case "retrieveNMRAverages":
-                res = retrieveNMRAverages(res);
+                case "retrieveNMRScore":
+                res = retrieveNMRScore(res);
+                    break;
+                case "retrieveChemicalShifts":
+                res = retrieveChemicalShifts(res);
                     break;
                 case "retrieveDensities":
                 res = retrieveDensities(res);
@@ -151,8 +154,15 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             String xPath="/DivCon/"+targetList.get(index)+"/QM Score";
             HObject ho=findHDF5Object(h5File, xPath);
             H5CompoundDS hObject=(H5CompoundDS)ho;
+            String nmrXPath="/DivCon/"+targetList.get(index)+"/NMR Score";
+            HObject nmrHO=findHDF5Object(h5File, nmrXPath);
+            H5CompoundDS nmrHObject=(H5CompoundDS)nmrHO;
             if(hObject!=null){
                 Vector o=(Vector)hObject.getData();
+                individuals[1]=new SVLVar((String[])o.elementAt(0));
+            }
+            else if(nmrHObject!=null){
+                Vector o=(Vector)nmrHObject.getData();
                 individuals[1]=new SVLVar((String[])o.elementAt(0));
             }
             else
@@ -1280,44 +1290,165 @@ private SVLVar retrieveAtomByAtomMRM(SVLVar var) throws SVLJavaException, IOExce
     }
 }
     
-private SVLVar retrieveNMRAverages(SVLVar var) throws SVLJavaException, IOException, Exception
+private SVLVar retrieveNMRScore(SVLVar var) throws SVLJavaException, IOException, Exception
 {
     String filename = var.peek(1).getTokn(1);
     String target = var.peek(1).getTokn(2);
     H5File h5File=new H5File(filename, H5File.READ);
     h5File.open();
-                    String xPath="/DivCon/"+target+"/NMR Matrices";
-                    H5Group nmrGroup=(H5Group)findHDF5Object(h5File, xPath);
-            SVLVar[] averages=new SVLVar[3];
-            if(nmrGroup!=null)
+        String xPath="/DivCon/"+target+"/NMR Score";
+        HObject ho=findHDF5Object(h5File, xPath);
+        H5CompoundDS hObject=(H5CompoundDS)ho;
+        if(hObject==null) throw new SVLJavaException("NMR Score does not exist for: '" + target + "'.");
+        hObject.init();
+        hObject.clear();
+        hObject.setMemberSelection(true);
+        Vector o=(Vector)hObject.getData();
+        String[] dimNames=hObject.getDimNames();
+    SVLVar[] data=new SVLVar[hObject.getMemberCount()];
+        for(int index=0;index<hObject.getMemberCount();index++)
+        {
+            hObject.selectMember(index);
+            if(index==0)
             {
-                List nmrRow=nmrGroup.getMemberList();
-                for(int memberIndex=0;memberIndex<5;memberIndex++)
+                for(int columnIndex=0;columnIndex<hObject.getSelectedMemberCount();columnIndex++)
                 {
-                    H5ScalarDS member=(H5ScalarDS)nmrRow.get(memberIndex);
-                    if(member.getName().compareTo("Selected Indices")==0)
-                    {
-                        averages[0]=new SVLVar((int[])member.read());
-                    }
-                    else if(member.getName().compareTo("Average")==0)
-                    {
-                        averages[1]=new SVLVar((double[])member.read());
-                    }
-                    else if(member.getName().compareTo("Anisotropy")==0)
-                    {
-                        averages[2]=new SVLVar((double[])member.read());
-                    }
+                    Datatype dt=hObject.getSelectedMemberTypes()[columnIndex];
+                    //insertIntoCell((columnIndex+1), (index+1), hObject.getMemberNames()[columnIndex], xSpreadsheet, "F");
                 }
+                String[] rowData=(String[])o.elementAt(index);
+                data[index]=new SVLVar(rowData);
+//                for(int columnIndex=0;columnIndex<rowData.length;columnIndex++)
+//                {
+//                    //scores[columnIndex]=(double)rowData[columnIndex];
+//                }
             }
             else
             {
-                averages[0]=new SVLVar();
-                averages[1]=new SVLVar();
-                averages[2]=new SVLVar();
+                //double[] scores = new double[11];
+                double[] rowData=(double[])o.elementAt(index);
+                data[index]=new SVLVar(rowData);
+//                for(int columnIndex=0;columnIndex<rowData.length;columnIndex++)
+//                {
+//                    scores[columnIndex]=(double)rowData[columnIndex];
+//                }
             }
-    SVLVar data=new SVLVar(new String[]{"index", "average", "anisotropy"}, averages);
+        }
             h5File.close();
     return new SVLVar(data);
+}
+    
+private SVLVar retrieveChemicalShifts(SVLVar var) throws SVLJavaException, IOException, Exception
+{
+    sessionErrBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
+    sessionOutBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
+    java.lang.System.setErr(sessionErrBuffer);
+    java.lang.System.setOut(sessionOutBuffer);
+    String filename = var.peek(1).getTokn(1);
+    String target = var.peek(1).getTokn(2);
+    String ligand="";
+    if(var.peek(1).length()>2)
+    {
+        ligand = var.peek(1).getTokn(3);
+        //if(true) return new SVLVar("retrieveAtomByAtomPWD "+ligand);
+    }
+    H5File h5File=new H5File(filename, H5File.READ);
+    h5File.open();
+        String xPath="/DivCon/"+target+"/NMR Matrices";
+        HObject ho=findHDF5Object(h5File, xPath);
+        if(ho==null) return new SVLVar();
+    if(ligand.length()>0)
+    {
+        xPath="/DivCon/"+target+"/NMR Matrices/"+ligand;
+        ho=findHDF5Object(h5File, xPath);
+        H5CompoundDS hObject=(H5CompoundDS)ho;
+        if(hObject==null) throw new SVLJavaException("NMR Score does not exist for: '" + target + "'.");
+        hObject.init();
+        hObject.clear();
+        hObject.setMemberSelection(true);
+        Vector o=(Vector)hObject.getData();
+        String[] dimNames=hObject.getDimNames();
+        SVLVar[] chemicalShiftData=new SVLVar[hObject.getMemberCount()];
+        for(int index=0;index<hObject.getMemberCount();index++)
+        {
+            hObject.selectMember(index);
+            if(index==0)
+            {
+                for(int columnIndex=0;columnIndex<hObject.getSelectedMemberCount();columnIndex++)
+                {
+                    Datatype dt=hObject.getSelectedMemberTypes()[columnIndex];
+                    //insertIntoCell((columnIndex+1), (index+1), hObject.getMemberNames()[columnIndex], xSpreadsheet, "F");
+                }
+                int[] indexData=(int[])o.elementAt(index);
+                for(int indexIndex=0;indexIndex<indexData.length;indexIndex++)
+                {
+                    indexData[indexIndex]+=1;
+                }
+                chemicalShiftData[index]=new SVLVar(indexData);
+//                for(int columnIndex=0;columnIndex<rowData.length;columnIndex++)
+//                {
+//                    //scores[columnIndex]=(double)rowData[columnIndex];
+//                }
+            }
+            else
+            {
+                //double[] scores = new double[11];
+                double[] rowData=(double[])o.elementAt(index);
+                chemicalShiftData[index]=new SVLVar(rowData);
+//                for(int columnIndex=0;columnIndex<rowData.length;columnIndex++)
+//                {
+//                    scores[columnIndex]=(double)rowData[columnIndex];
+//                }
+            }
+        }
+        
+           SVLVar data=new SVLVar(new String[]{"Index", "Bound Shift", "Unbound Shift", "Exp Bound Shift", "Exp Unbound Shift"}, chemicalShiftData);
+            h5File.close();
+    return new SVLVar(data);
+    }
+    else
+    {
+    SVLVar[] data=new SVLVar[((H5Group)ho).getNumberOfMembersInFile()];
+//        List pwdMembers=hObject.getMemberList();
+//        for(int index=0;index<hObject.getNumberOfMembersInFile();index++)
+//        {
+//            H5Group pwdGroup=(H5Group)pwdMembers.get(index);
+//            SVLVar[] chemicalShiftsDataset=new SVLVar[pwdGroup.getNumberOfMembersInFile()+1];
+//            if(chemicalShiftsDataset.length!=5) throw new SVLJavaException("pwd set wrong size: " + chemicalShiftsDataset.length + ".");
+//            List pwdRow=pwdGroup.getMemberList();
+//            chemicalShiftsDataset[0]=new SVLVar(pwdGroup.getName());
+//            for(int memberIndex=0;memberIndex<4;memberIndex++)
+//            {
+//                H5ScalarDS member=(H5ScalarDS)pwdRow.get(memberIndex);
+//                if(member.getName().compareTo("Bound Shift")==0)
+//                {
+//                    chemicalShiftsDataset[1]=new SVLVar((int[])member.read());
+//                }
+//                else if(member.getName().compareTo("Unbound Shift")==0)
+//                {
+//                    chemicalShiftsDataset[2]=new SVLVar((int[])member.read());
+//                }
+//                else if(member.getName().compareTo("Exp Bound Shift")==0)
+//                {
+//                    chemicalShiftsDataset[3]=new SVLVar(member.readBytes());
+//                }
+//                else
+//                {
+//                    chemicalShiftsDataset[4]=new SVLVar((double[])member.read());
+//                }
+//            }
+////            pwdDataset[1]=new SVLVar((int[])sequenceA.read());
+////            H5ScalarDS sequenceB=(H5ScalarDS)pwdRow.get(1);
+////            pwdDataset[2]=new SVLVar((int[])sequenceB.read());
+////            H5ScalarDS sequenceValues=(H5ScalarDS)pwdRow.get(2);
+////            pwdDataset[3]=new SVLVar((double[])sequenceValues.read());
+////            H5ScalarDS sequenceLabels=(H5ScalarDS)pwdRow.get(3);
+////            pwdDataset[4]=new SVLVar(sequenceLabels.readBytes());
+//            data[index]=new SVLVar(new String[]{"name", "Bound Shift", "Unbound Shift", "Exp Bound Shift", "Exp Unbound Shift"}, chemicalShiftsDataset);
+//        }
+            h5File.close();
+    return new SVLVar(data);
+    }
 }
     
 private SVLVar retrieveDensities(SVLVar var) throws SVLJavaException, IOException, Exception

@@ -10,7 +10,8 @@ global function qbRetrieveQMScore  arg = jvmqb ['retrieveQMScore' , [arg] ];
 global function qbRetrieveResiduePWD  arg  = jvmqb ['retrieveResiduePWD' , [arg]  ];
 global function qbRetrieveAtomByAtomPWD  arg  = jvmqb ['retrieveAtomByAtomPWD' , [arg]  ];
 global function qbRetrieveAtomByAtomMRM  arg  = jvmqb ['retrieveAtomByAtomMRM' , [arg]  ];
-global function qbRetrieveNMRAverages  arg = jvmqb ['retrieveNMRAverages' , [arg] ];
+global function qbRetrieveNMRScore  arg = jvmqb ['retrieveNMRScore' , [arg] ];
+global function qbRetrieveChemicalShifts  arg = jvmqb ['retrieveChemicalShifts' , [arg] ];
 global function qbRetrieveDensities  arg = jvmqb ['retrieveDensities' , [arg] ];
 global function qbRetrieveEigenVectors  arg = jvmqb ['retrieveEigenVectors' , [arg] ];
 global function qbRetrieveEnergyLevels  arg = jvmqb ['retrieveEnergyLevels' , [arg] ];
@@ -50,13 +51,14 @@ global function qbTesth5Main [h5file]
     //print qbRetrieveResiduePWD [h5file, modelTags.target];
     //print qbRetrieveAtomByAtomPWD [h5file, modelTags.target];
     //print qbRetrieveAtomByAtomMRM [h5file, modelTags.target];
-    //print qbRetrieveNMRAverages [h5file, modelTags.target];
+    print qbRetrieveNMRScore [h5file, modelTags.target];
+    print qbRetrieveChemicalShifts [h5file, modelTags.target, 'Wildtype'];
     //print  qbRetrieveDensities [h5file, modelTags.target];
     //print  qbRetrieveEigenVectors [h5file, modelTags.target];
     //print  qbRetrieveEnergyLevels [h5file, modelTags.target];
    // qbSetNMRAtomSelection [h5file, modelTags.target, [0,1,2,10]];
-    print  qbRetrieveHamiltonian [modelTags.target, 'pm6'];
-    print  qbRetrieveDefaultProgramOptions [];
+   // print  qbRetrieveHamiltonian [modelTags.target, 'pm6'];
+   // print  qbRetrieveDefaultProgramOptions [];
 
 endfunction
 
