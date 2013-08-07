@@ -655,7 +655,7 @@ endfunction
 // lmw - the following function will use MOE's Solvate function in order to add waters within a certain distance of charged atoms.
 //      Once the waters are added they are optimized using a forcefield.
 function Solvate;
-global function qbHydrateChargedAtoms[opt]
+local function qbHydrateChargedAtoms[opt]
     opt = tagcat[opt, HYDRATE_DEFAULTS];
     
     local chargedAtoms = cat [Atoms[] | aFCharge Atoms[] <> 0];
@@ -702,6 +702,19 @@ global function qbHydrateChargedAtoms[opt]
     if opt.enableOpt then
         qbTetherMMMin[100,diff [Atoms[],newSolvent]];
     endif
+endfunction
+
+// example: qbmoebatch -exec "run ['qbStructurePrep.svl',['mp_1B0B.mol2',[distance:3.0,enableOpt:0,enablePocket:0] ],'qbHydrateChargedAtomsFile']" -exit
+global function qbHydrateChargedAtomsFile[inpdbfile,opt]
+    if isnull inpdbfile then
+        write ['ERROR: input file required to use this function\n'];
+        return;
+    endif
+    opt = tagcat[opt, HYDRATE_DEFAULTS];
+    oDestroy Chains[];
+    ReadAuto [inpdbfile];
+    qbHydrateChargedAtoms [opt];
+    WriteAuto [twrite['{}-hyd_{}.{}', fbase inpdbfile, opt.distance, fext inpdbfile]];
 endfunction
 
 global function qbHydrateChargedAtomsPanel[]
