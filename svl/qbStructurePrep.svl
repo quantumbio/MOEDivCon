@@ -714,7 +714,9 @@ global function qbHydrateChargedAtomsFile[inpdbfile,opt]
     oDestroy Chains[];
     ReadAuto [inpdbfile];
     qbHydrateChargedAtoms [opt];
-    WriteAuto [twrite['{}-hyd_{}.{}', fbase inpdbfile, opt.distance, fext inpdbfile]];
+    local outfile = twrite['{}-hyd_{}.{}', fbase inpdbfile, opt.distance, fext inpdbfile];
+    write ['Outfile: {}\n', outfile];
+    WriteAuto [outfile];
 endfunction
 
 global function qbHydrateChargedAtomsPanel[]
