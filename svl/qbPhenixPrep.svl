@@ -568,6 +568,9 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
 
     qbPrepareSystem [opt];
     harmonize_H[];
+
+    // set the occupancy based upon the occupancy of the heavy atom to which the proton is bound.
+    aSetOccupancy [Atoms [] | aAtomicNumber Atoms[] == 1, aOccupancy aBonds Atoms [] | aAtomicNumber Atoms [] == 1];
     return WriteInputFiles[residueList,ciffiles,filebase];
 endfunction
 
