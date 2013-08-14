@@ -33,11 +33,17 @@ function pro_PeptideFlags;
 
 function CIF_fread_cif_all;
 function cif_ExtractInfo;
+function mtz_Read;
+function StructurePreparationGUI;
+
+function harmonize_H;
 
 // QB tool box
 function qbPrepareSystem;
 function qbCorrectAtomNames;
 function qbCheckLicense;
+function qbGetResidueOnRadius;
+function qb_cLetter;
 
 // statics
 static transFileName;
@@ -514,7 +520,7 @@ local function ResiduePreparation []
     return residueList;
 endfunction
 
-local function InputInputFiles[inpdbfile,forceUseElement]
+local function ReadInputFiles[inpdbfile,forceUseElement]
     oDestroy Chains[];
     local tmpIn;
     tmpIn.alt_loc = 1;
@@ -523,7 +529,7 @@ local function InputInputFiles[inpdbfile,forceUseElement]
     return length ReadPDB[inpdbfile,tmpIn];
 endfunction
 
-local function OutputInputFiles[residueList,ciffiles,filebase]
+local function WriteInputFiles[residueList,ciffiles,filebase]
     // address a MOE-ism that renames HIS residues based on protonation
     rSetName [cat [Residues [] | rName Residues [] == 'HIP'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
@@ -561,12 +567,13 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     endif
 
     qbPrepareSystem [opt];
-    return OutputInputFiles[residueList,ciffiles,filebase];
+    harmonize_H[];
+    return WriteInputFiles[residueList,ciffiles,filebase];
 endfunction
 
 global function qbPhenixPrepFile[inpdbfile,opt,ciffiles]
     opt = tagcat[opt, PREPDEFAULTS];
-    if not InputInputFiles[inpdbfile,opt.forceUseElement] then
+    if not ReadInputFiles[inpdbfile,opt.forceUseElement] then
         return;
     endif
 
@@ -604,9 +611,6 @@ global function qbPostPhenixFile [inpdbfile,trFile]
 endfunction
 
 // lmw - GUI window tool kit functions associated with our DivCon/Phenix MOE interface.
-
-
-function qb_cLetter;
 
 local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog,ciffiles]
 
@@ -1092,10 +1096,6 @@ local function phenix_Window [wparent]
     return success;
 
 endfunction
-
-function mtz_Read;
-function StructurePreparationGUI;
-function qbGetResidueOnRadius;
 
 global function qbPhenixPrepPanel[]
 
@@ -1660,7 +1660,7 @@ global function qbPhenixPrepPanel[]
 
                 if not isnull batchname then
                     WriteLog[twrite ['Creating {}',batchname],twrite ['{}-phenix',values.baseName]];
-                    local [mainPDBfilename,resPDBfilenames] = OutputInputFiles[residueList,ciffiles,values.baseName];
+                    local [mainPDBfilename,resPDBfilenames] = WriteInputFiles[residueList,ciffiles,values.baseName];
                     values.coreList = coreList[first values.coreResiduesBox];
                     values.labelList = twrite['{},{}',mtzFColumns[values.column_F],mtzQColumns[values.column_Q]];
                     values.phenix_success = status.phenix_success;
