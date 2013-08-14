@@ -70,14 +70,35 @@ global function qbTestPDBtoH5 [h5file,inpdb]
     if isnull h5file then
         return;
     endif
-
+    oDestroy Chains[];
     local tmpChains = ReadAuto inpdb;
 
     // For format see: file:///share/apps/MOE/MOE-2012/html/moe/fcnref/extract.htm#mol_Extract
 
-    print mol_Extract tmpChains;
-    print qbStoreModel [h5file, 'rec', mol_Extract tmpChains];
-    print qbRetrieveModel [h5file, 'rec'];
+    local oldmol = mol_Extract tmpChains;
+    
+    print oldmol;
+    print qbStoreModel [h5file, 'rec', oldmol];
+    local newmol = qbRetrieveModel [h5file, 'rec'];
+    print "TEST\n";
+    print newmol;
+  return;  
+    oDestroy Chains[];
+    
+    print "COMPARISON ======";
+    
+    write ['lengths: {} | {} \n', length oldmol, length newmol];
+    write ['lengths: {} | {} || {} | {}\n', length oldmol(1), length newmol(1), oldmol(1), newmol(1)];
+    write ['lengths: {} | {} \n', length oldmol(2), length newmol(2)];
+    write ['lengths: {} | {} \n', length oldmol(3), length newmol(3)];
+    write ['lengths: {} | {} \n', length oldmol(4), length newmol(4)];
+
+    print "COMPARISON ======";
+    mol_Create newmol;
+    local outfile = twrite['{}-new.{}', fbase inpdb,fext inpdb];
+    write ['Outfile: {}\n', outfile];
+    WriteAuto [outfile];
+
 endfunction
 
 function qbProcessCSVNMR;

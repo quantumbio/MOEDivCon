@@ -1,0 +1,178 @@
+#svl
+
+// function provided by CCG (M. Drummond) - July 2013.
+// The function will protonate alternative atoms to match the protonation states of the primary atoms.
+
+global function harmonize_H []
+
+    local sets = sort oCollections [];
+
+    // Only want the PDB_ALTLOC sets, if any
+    sets = sets | apt tok_keep [sets, 11] == 'PDB_ALTLOC_';
+    if length sets == 0 then
+	print 'Exiting, no alternates found'; exit[];
+    endif
+    local altatoms = app oGetCollection sets;
+    local altres = sort uniq cat oParent altatoms;
+
+    // Bail out (for now, fix later) if there are more than two alternates
+    if length sets > 2 then
+	exit 'Multiple alternates cannot yet be addressed, sorry';
+    endif
+
+    // Define which ALTLOC is active and which is inert
+    local setone, settwo, activealtloc, inertaltloc;
+    setone = add aInert oGetCollection sets(1);
+    settwo = add aInert oGetCollection sets(2);
+    if setone < settwo then
+	activealtloc = sets(1); oSetCollection [activealtloc, []];
+	inertaltloc = sets(2); oSetCollection [inertaltloc, []];
+    else
+	activealtloc = sets(2); oSetCollection [activealtloc, []];
+	inertaltloc = sets(1); oSetCollection [inertaltloc, []];
+    endif;
+	
+    // Divvy up alternate atoms by residue and loop by these residues
+    local i = 1;
+    while i <= length altres loop
+	local res = altatoms || oParent altatoms == altres(i);
+	local inert = cat (res || aInert res == 1);
+	local active = cat (res || aInert res == 0);
+
+	// Hydrogens aren't part of ALTLOC sets, so grab them
+	inert = cat cat append [inert, aBonds inert ||
+	    (aElement aBonds inert == 'H')];
+	active = cat cat append [active, aBonds active ||
+	    (aElement aBonds active == 'H')];
+
+	// Sometimes there are atoms in a residue that are common to both
+	// ALTLOC sets, and so they're not in either, but instead are in the
+	// "base" residue (i.e., HIS vs. AHIS or BHIS).  Make sure both
+	// active and inert sets have copies of the common heavy atoms.
+	local allatoms = cat rAtoms uniq cat oParent res;
+	local allhvyatoms = allatoms | aElement allatoms <> 'H';
+	local missing = diff [allhvyatoms, cat [active,inert]];
+	local mbonds = aBonds missing;
+	local m_mbonds = eqE [rUID oParent mbonds, rUID altres(i)];
+	mbonds = mbonds || m_mbonds == 1;
+
+	local cmissinert = mol_Create mol_Extract missing;
+	local cmissactive = mol_Create mol_Extract missing;
+	local missinert = cat cAtoms cmissinert;
+	local missactive = cat cAtoms cmissactive;
+	missinert = missinert | aElement missinert <> 'H';
+	missactive = missactive | aElement missactive <> 'H';
+	inert = cat append [inert, missinert];
+	active = cat append [active, missactive];
+	apt oReparent [missinert, altres(i)];
+	apt oReparent [missactive, altres(i)];
+
+	local newmissi = inert | apt add eqE
+	    [[aName inert], aName missing] == 1;
+	local newmissa = active | apt add eqE
+	    [[aName active], aName missing] == 1;
+	local xmbondsi = apt x_join [[aName inert], aName mbonds];
+	local xmbondsa = apt x_join [[aName active], aName mbonds];
+	local newmbondsi = apt get [[inert], xmbondsi];
+	local newmbondsa = apt get [[active], xmbondsa];
+
+	apt Bond [newmissi, newmbondsi];
+	apt Bond [newmissa, newmbondsa];
+	local dupes = diff [allatoms, cat [inert, active]];
+	local dupenames = aName dupes;
+	oDestroy [cmissinert, cmissactive, dupes];
+	aSetInert [cat [inert, aBonds inert], 1];
+
+	// If the active backbone geometry came from the HIS/AHIS/BHIS procedure
+	// above, then the active backbone (but not the inert backbone) has to
+	// be connected to the rest of the protein
+	if length uniq cat oParent aBonds active == 1 then
+	    local prores = cat cResidues uniq oParent oParent active;
+	    local nextres = prores | rUID prores == rUID altres(i) + 1;
+	    local prevres = prores | rUID prores == rUID altres(i) - 1;
+	    Bond [active | aName active == 'C',
+		cat rAtoms nextres | cat aName rAtoms nextres == 'N'];
+	    Bond [active | aName active == 'N',
+		cat rAtoms prevres | cat aName rAtoms prevres == 'C'];
+	    local reprot = m_join [aName active, dupenames];
+	    Add_H [active | reprot == 1];
+	    active = diff [cat rAtoms altres(i), inert];
+	endif
+
+	// For inert, add in backbone hydrogens by matching active's H pattern.
+	// For unconnected C and N terminii, delete H standing in for bonds to
+	// the rest of the protein.  For consistency, make sure all inert
+	// alternates are disconnected.
+	local interm = [inert | aName inert == 'N', inert | aName inert == 'C'];
+	local resbonds = aBonds interm;
+	local match = neE [oParent resbonds, oParent interm];
+	Unbond [interm[1]||match[1], resbonds[1]||match[1]];
+	Unbond [interm[2]||match[2], resbonds[2]||match[2]];
+	oDestroy (inert | aBackbone inert == 1 and aElement inert == 'H');
+	inert = inert | oValid inert == 1; // Remove deleted obj_keys
+	local activeorder = rank aName (active | aBackbone active == 1
+	    and aElement active <> 'H');
+	local bbactive = perm [active | aBackbone active == 1
+	    and aElement active <> 'H', activeorder];
+	local activegeo = aGeometry bbactive;
+	local activeion = aIon bbactive;
+	local activelp = aHintLP bbactive;
+	local inertorder = rank aName (inert | aBackbone inert == 1);
+	local bbinert = perm [inert | aBackbone inert == 1, inertorder];
+	aSetGeometry [bbinert, activegeo];
+	aSetIon [bbinert, activeion];
+	aSetHintLP [bbinert, activelp];
+	Add_H bbinert;
+	inert = sortuniq cat cat [inert, aBonds inert];
+	oDestroy (inert | aName inert == 'H');
+	inert = inert | oValid inert == 1; // Remove deleted obj_keys
+	oDestroy (inert | aName inert == 'H1');
+	inert = inert | oValid inert == 1; // Remove deleted obj_keys
+	aSetName [inert | aName inert == 'H2', 'H'];
+	aSetInert [inert, 1];
+
+	// Now the side chains.  Find all atoms bonded to sidechain hydrogens
+	// and make sure the inert alternate matches the active alternate.
+	local scinertH = inert |
+	    (aElement inert == 'H' and aBackbone inert == 0);
+	local scactiveH = active |
+	    (aElement active == 'H' and aBackbone active == 0);
+	local ineigh = sort aName aBonds scinertH;
+	local aneigh = sort aName aBonds scactiveH;
+	if add tok_hash ineigh == add tok_hash aneigh then
+	    oSetCollection [activealtloc, cat
+		[oGetCollection activealtloc, active]];
+	    oSetCollection [inertaltloc, cat
+		[oGetCollection inertaltloc, inert]];
+	    
+	// If the inert alternate's sidechain hydrogens don't match the
+	// active's, then strip all inert sidechain hydrogens and make the
+	// sidechain protonation state match the active alternate's protonation
+	// state.
+	else
+	    oDestroy (inert | aBackbone inert == 0 and aElement inert == 'H');
+	    inert = inert | oValid inert == 1; // Remove deleted obj_keys
+	    activeorder = rank aName (active | aBackbone active == 0
+		and aElement active <> 'H');
+	    local scactive = perm [active | (aBackbone active == 0
+		and aElement active <> 'H'), activeorder];
+	    activegeo = aGeometry scactive;
+	    activeion = aIon scactive;
+	    activelp = aHintLP scactive;
+	    inertorder = rank aName (inert | aBackbone inert == 0);
+	    local scinert = perm [inert | aBackbone inert == 0, inertorder];
+	    aSetGeometry [scinert, activegeo];
+	    aSetIon [scinert, activeion];
+	    aSetHintLP [scinert, activelp];
+	    Add_H scinert;
+	    inert = diff [cat rAtoms altres(i), active];
+	    oSetCollection [activealtloc, cat
+		[oGetCollection activealtloc, active]];
+	    oSetCollection [inertaltloc, cat
+		[oGetCollection inertaltloc, inert]];
+	endif
+	i = i + 1;
+    endloop
+endfunction
+#eof
+
