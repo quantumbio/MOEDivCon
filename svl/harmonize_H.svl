@@ -10,7 +10,7 @@ global function harmonize_H []
     // Only want the PDB_ALTLOC sets, if any
     sets = sets | apt tok_keep [sets, 11] == 'PDB_ALTLOC_';
     if length sets == 0 then
-	print 'Exiting, no alternates found'; exit[];
+	print 'Exiting, no alternates found'; return[];
     endif
     local altatoms = app oGetCollection sets;
     local altres = sort uniq cat oParent altatoms;
