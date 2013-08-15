@@ -451,7 +451,7 @@ local function WriteResidue [outResidues]
         newResidueName = residueName;
         rSetName [outResidues, newResidueName];
         WriteLog[twrite ['NOTE (residue name conversion): {} = {} < {} >', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]]];
-        fwrite [fileHandle, ' {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]];
+        fwrite [fileHandle, ' {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',qb_cLetter rChain outResidues,rUID outResidues]];
         fclose fileHandle;
     endif
 
