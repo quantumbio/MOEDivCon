@@ -1,103 +1,165 @@
 #svl
-
-// function provided by CCG (M. Drummond) - July 2013.
-// The function will protonate alternative atoms to match the protonation states of the primary atoms.
+//	harmonize_h.svl Correct protonation state of crystallographic alternates
+//
+//
+//	16-aug-2013 (md) Placeholder heavy atoms are not kept
+//	29-jul-2013 (md) created
+//
+//
+//  DESCRIPTION:
+//
+//	When a crystal structure is loaded and alternate occupancies are shown,
+//	commands like adding Hydrogens, correcting HCount in Structure Prep,
+//	Add_H [], etc. adds spurious hydrogen atoms, as these alternates are
+//	not truly connected to the rest of the receptor.  This script will
+//	make the protonation state of all alternate residues mirror the
+//	protonation state of the "main" alternate.
+//
+//  USAGE:
+//
+//	1.  Save the SVL to your hard drive
+//	2.  Load the function e.g. using the MOE | File | Open panel
+//	3.  Load a PDB, being sure to choose to display Alternates
+//	4.  Obtain the proper protonation state of the main Alternate
+//	    (e.g. with Structure Prep and/or Protonate3D)
+//	5.  In an SVL window, type:
+//	    harmonize_H []
+//
+// COPYRIGHT (C) 2013 CHEMICAL COMPUTING GROUP INC.  ALL RIGHTS RESERVED.
+//
+// PERMISSION TO USE, COPY, MODIFY AND DISTRIBUTE THIS SOFTWARE IS HEREBY
+// GRANTED PROVIDED THAT: (1) UNMODIFIED OR FUNCTIONALLY EQUIVALENT CODE
+// DERIVED FROM THIS SOFTWARE MUST CONTAIN THIS NOTICE; (2) ALL CODE DERIVED
+// FROM THIS SOFTWARE MUST ACKNOWLEDGE THE AUTHOR(S) AND INSTITUTION(S); (3)
+// THE NAMES OF THE AUTHOR(S) AND INSTITUTION(S) NOT BE USED IN ADVERTISING
+// OR PUBLICITY PERTAINING TO THE DISTRIBUTION OF THE SOFTWARE WITHOUT
+// SPECIFIC, WRITTEN PRIOR PERMISSION; (4) ALL CODE DERIVED FROM THIS SOFTWARE
+// BE EXECUTED WITH THE MOLECULAR OPERATING ENVIRONMENT (MOE) LICENSED FROM
+// CHEMICAL COMPUTING GROUP INC.
+//
+// CHEMICAL COMPUTING GROUP INC. DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS
+// SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS,
+// AND IN NO EVENT SHALL CHEMICAL COMPUTING GROUP INC. BE LIABLE FOR ANY
+// SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+// RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF
+// CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 global function harmonize_H []
 
+    local allinerth = Atoms[] | aElement Atoms[] == 'H' and aInert Atoms[] == 1;
+    oDestroy allinerth;
+    local initallhvyatoms = Atoms[] | aAtomicNumber Atoms[] <> 1;
     local sets = sort oCollections [];
 
     // Only want the PDB_ALTLOC sets, if any
     sets = sets | apt tok_keep [sets, 11] == 'PDB_ALTLOC_';
     if length sets == 0 then
-	print 'Exiting, no alternates found'; return[];
+	return 'Exiting, no alternates found';
     endif
-    local altatoms = app oGetCollection sets;
-    local altres = sort uniq cat oParent altatoms;
 
-    // Bail out (for now, fix later) if there are more than two alternates
+    // Active ALTLOC set is the one with the most active atoms.  "Master"
+    // Inert set is the ALTLOC set with the most atoms (besides Active).
+    // All other sets are "Leftover" and will be treated after Active and Inert.  
+    local allatoms = app oGetCollection sets;
+    local actives = allatoms || aInert allatoms == 0;
+    local numactives = app length actives;
+    local natoms = app length allatoms;
+    local aindex = x_max numactives;
+    local activealtloc = sets(aindex);
+    natoms(aindex) = 0;
+    local iindex = x_max natoms;
+    local inertaltloc = sets(iindex);
+ 
     if length sets > 2 then
-	exit 'Multiple alternates cannot yet be addressed, sorry';
+	local leftovers = sets | sets <> activealtloc and sets <> inertaltloc;
     endif
 
-    // Define which ALTLOC is active and which is inert
-    local setone, settwo, activealtloc, inertaltloc;
-    setone = add aInert oGetCollection sets(1);
-    settwo = add aInert oGetCollection sets(2);
-    if setone < settwo then
-	activealtloc = sets(1); oSetCollection [activealtloc, []];
-	inertaltloc = sets(2); oSetCollection [inertaltloc, []];
-    else
-	activealtloc = sets(2); oSetCollection [activealtloc, []];
-	inertaltloc = sets(1); oSetCollection [inertaltloc, []];
-    endif;
-	
     // Divvy up alternate atoms by residue and loop by these residues
+    local altatoms = app oGetCollection [activealtloc, inertaltloc];
+    altatoms = altatoms || aClassRLS altatoms == 'rec';
+    local altres = sort uniq cat oParent altatoms;
     local i = 1;
     while i <= length altres loop
+
 	local res = altatoms || oParent altatoms == altres(i);
 	local inert = cat (res || aInert res == 1);
 	local active = cat (res || aInert res == 0);
 
-	// Hydrogens aren't part of ALTLOC sets, so grab them
-	inert = cat cat append [inert, aBonds inert ||
-	    (aElement aBonds inert == 'H')];
+	// Hydrogens aren't part of ALTLOC sets, so grab them.
 	active = cat cat append [active, aBonds active ||
 	    (aElement aBonds active == 'H')];
 
 	// Sometimes there are atoms in a residue that are common to both
 	// ALTLOC sets, and so they're not in either, but instead are in the
 	// "base" residue (i.e., HIS vs. AHIS or BHIS).  Make sure both
-	// active and inert sets have copies of the common heavy atoms.
-	local allatoms = cat rAtoms uniq cat oParent res;
+	// active and inert sets have copies of the common heavy atoms, to
+	// prevent addition of spurious hydrogens.
+	allatoms = cat rAtoms uniq cat oParent res;
+	allatoms = diff [allatoms, cat app oGetCollection leftovers];
 	local allhvyatoms = allatoms | aElement allatoms <> 'H';
-	local missing = diff [allhvyatoms, cat [active,inert]];
-	local mbonds = aBonds missing;
-	local m_mbonds = eqE [rUID oParent mbonds, rUID altres(i)];
-	mbonds = mbonds || m_mbonds == 1;
+	local missing = diff [allhvyatoms, cat [active, inert]];
+	local hactive = active | aElement active <> 'H';
 
-	local cmissinert = mol_Create mol_Extract missing;
-	local cmissactive = mol_Create mol_Extract missing;
-	local missinert = cat cAtoms cmissinert;
-	local missactive = cat cAtoms cmissactive;
-	missinert = missinert | aElement missinert <> 'H';
-	missactive = missactive | aElement missactive <> 'H';
-	inert = cat append [inert, missinert];
-	active = cat append [active, missactive];
-	apt oReparent [missinert, altres(i)];
-	apt oReparent [missactive, altres(i)];
+	if isnull missing == 1 then
+	    if length hactive <> length inert then
+		// Nothing missing because active has full complement of
+		// atoms, but inert does not.  Make both have full complement.
+		local newmissing = diff [aName hactive, aName inert];
+		local missmask = m_join [aName hactive, newmissing];
+		missing = hactive | missmask;
+		missing = missing | aElement missing <> 'H';
+		local order = rank aName missing;
+		missing = perm [missing, order];
+		local mbonds = aBonds missing;
+		local m_mbonds = eqE [rUID oParent mbonds, rUID altres(i)];
+		mbonds = mbonds || m_mbonds == 1;
 
-	local newmissi = inert | apt add eqE
-	    [[aName inert], aName missing] == 1;
-	local newmissa = active | apt add eqE
-	    [[aName active], aName missing] == 1;
-	local xmbondsi = apt x_join [[aName inert], aName mbonds];
-	local xmbondsa = apt x_join [[aName active], aName mbonds];
-	local newmbondsi = apt get [[inert], xmbondsi];
-	local newmbondsa = apt get [[active], xmbondsa];
+		local cmissinert = mol_Create mol_Extract missing;
+		local missinert = cat cAtoms cmissinert;
+		order = rank aName missinert;
+		missinert = perm [missinert, order];
+		inert = cat append [inert, missinert];
+		order = rank aName inert;
+		inert = perm [inert, order];
+		apt oReparent [missinert, altres(i)];
+		local newmissi = inert | apt add eqE
+		    [[aName inert], aName missinert] == 1;
+		local xmbondsi = apt x_join [[aName inert], aName mbonds];
+		local newmbondsi = apt get [[inert], xmbondsi];
+		apt Bond [newmissi, newmbondsi];
+	    endif
+	elseif isnull missing == 0 then
+	    // There's a "base" residue -- move its atoms to active, and make
+	    // copies of the missing atoms for inert.
+	    active = cat [active, missing];
+	    newmissing = diff [aName active, aName inert];
+	    missmask = m_join [aName active, newmissing];
+	    missing = active | missmask;
+	    missing = missing | aElement missing <> 'H';
+	    order = rank aName missing;
+	    missing = perm [missing, order];
+	    mbonds = aBonds missing;
+	    m_mbonds = eqE [rUID oParent mbonds, rUID altres(i)];
+	    mbonds = mbonds || m_mbonds == 1;
 
-	apt Bond [newmissi, newmbondsi];
-	apt Bond [newmissa, newmbondsa];
-	local dupes = diff [allatoms, cat [inert, active]];
-	local dupenames = aName dupes;
-	oDestroy [cmissinert, cmissactive, dupes];
-	aSetInert [cat [inert, aBonds inert], 1];
-
-	// If the active backbone geometry came from the HIS/AHIS/BHIS procedure
-	// above, then the active backbone (but not the inert backbone) has to
-	// be connected to the rest of the protein
-	if length uniq cat oParent aBonds active == 1 then
-	    local prores = cat cResidues uniq oParent oParent active;
-	    local nextres = prores | rUID prores == rUID altres(i) + 1;
-	    local prevres = prores | rUID prores == rUID altres(i) - 1;
-	    Bond [active | aName active == 'C',
-		cat rAtoms nextres | cat aName rAtoms nextres == 'N'];
-	    Bond [active | aName active == 'N',
-		cat rAtoms prevres | cat aName rAtoms prevres == 'C'];
-	    local reprot = m_join [aName active, dupenames];
-	    Add_H [active | reprot == 1];
-	    active = diff [cat rAtoms altres(i), inert];
+	    cmissinert = mol_Create mol_Extract missing;
+	    missinert = cat cAtoms cmissinert;
+	    order = rank aName missinert;
+	    missinert = perm [missinert, order];
+	    inert = cat append [inert, missinert];
+	    order = rank aName inert;
+	    inert = perm [inert, order];
+	    apt oReparent [missinert, altres(i)];
+	    newmissi = inert | apt add eqE
+		[[aName inert], aName missinert] == 1;
+	    xmbondsi = apt x_join [[aName inert], aName mbonds];
+	    newmbondsi = apt get [[inert], xmbondsi];
+	    apt Bond [newmissi, newmbondsi];
 	endif
+
+	oDestroy [cmissinert];
+	aSetInert [cat [inert, aBonds inert], 1];
 
 	// For inert, add in backbone hydrogens by matching active's H pattern.
 	// For unconnected C and N terminii, delete H standing in for bonds to
@@ -122,7 +184,9 @@ global function harmonize_H []
 	aSetGeometry [bbinert, activegeo];
 	aSetIon [bbinert, activeion];
 	aSetHintLP [bbinert, activelp];
+	local beforeadd = Atoms[];
 	Add_H bbinert;
+
 	inert = sortuniq cat cat [inert, aBonds inert];
 	oDestroy (inert | aName inert == 'H');
 	inert = inert | oValid inert == 1; // Remove deleted obj_keys
@@ -161,11 +225,13 @@ global function harmonize_H []
 	    activelp = aHintLP scactive;
 	    inertorder = rank aName (inert | aBackbone inert == 0);
 	    local scinert = perm [inert | aBackbone inert == 0, inertorder];
+
 	    aSetGeometry [scinert, activegeo];
 	    aSetIon [scinert, activeion];
 	    aSetHintLP [scinert, activelp];
+	    beforeadd = Atoms[];
 	    Add_H scinert;
-	    inert = diff [cat rAtoms altres(i), active];
+	    inert = sortuniq cat cat [inert, aBonds inert];
 	    oSetCollection [activealtloc, cat
 		[oGetCollection activealtloc, active]];
 	    oSetCollection [inertaltloc, cat
@@ -173,6 +239,90 @@ global function harmonize_H []
 	endif
 	i = i + 1;
     endloop
-endfunction
-#eof
 
+    // Now take care of the leftover residues -- pattern their atoms after Inert
+    // counterpart, if it exists, or the Active counterpart otherwise.
+    local nleft = length leftovers;
+    local totalleftatoms = cat app oGetCollection leftovers;
+    i = 1;
+    while (i <= nleft) loop
+	local allleftatoms = oGetCollection leftovers(i);
+	local allleftres = uniq oParent allleftatoms;
+	local j = 1;
+	while (j <= length allleftres) loop
+	    local leftatoms = allleftatoms | oParent allleftatoms ==
+		allleftres(j);
+	    local matchleft = oGetCollection inertaltloc | oParent
+		oGetCollection inertaltloc == allleftres(j);
+	    if isnull matchleft then
+		matchleft = oGetCollection activealtloc | oParent
+		oGetCollection activealtloc == allleftres(j);
+	    endif
+
+	    local sch = matchleft | aBackbone matchleft == 0
+		and aElement matchleft == 'H';
+	    matchleft = diff [matchleft, sch];
+	    order = rank aName matchleft;
+	    matchleft = perm [matchleft, order];
+	    local matchbonds = aBonds matchleft;
+	    local matchmask = m_join [aName matchleft, aName leftatoms];
+	    local matchedatoms = matchleft | matchmask;
+	    local copyatoms = diff [matchleft, matchedatoms];
+	    local pastedchain = mol_Create mol_Extract copyatoms;
+	    local pastedatoms = cat cAtoms pastedchain;
+	    local newresatoms = cat [leftatoms, pastedatoms];
+	    order = rank aName newresatoms;
+	    newresatoms = perm [newresatoms, order];
+	    apt oReparent [newresatoms, allleftres(j)];
+	    oDestroy pastedchain;
+	    local bondindex = apt x_join [[aName newresatoms],aName matchbonds];
+	    local tobond = apt get [[newresatoms], bondindex];
+	    apt Bond [newresatoms, tobond];
+
+	    local newgeo = aGeometry matchleft;
+	    local newion = aIon matchleft;
+	    local newhint = aHintLP matchleft;
+	    aSetGeometry [newresatoms, newgeo];
+	    aSetIon [newresatoms, newion];
+	    aSetHintLP [newresatoms, newhint];
+	    Add_H [newresatoms | aBackbone newresatoms == 0];
+	    newresatoms = cat [newresatoms, cat aBonds newresatoms];
+	    local addtoleft = diff [newresatoms, totalleftatoms];
+	    addtoleft = diff [addtoleft,
+		cat [oGetCollection activealtloc, oGetCollection inertaltloc]];
+	    oSetCollection [leftovers(i), cat [oGetCollection leftovers(i),
+		addtoleft]];
+	    aSetInert [oGetCollection leftovers(i), 1];
+	    j = j + 1;   
+	endloop
+	i = i + 1;
+    endloop
+
+    // Strip out all the placeholder heavy atoms that were duplicated to
+    // fulfill valence
+    local finalallhvyatoms = Atoms[] | aAtomicNumber Atoms[] <> 1;
+    local killatoms = diff [finalallhvyatoms, initallhvyatoms];
+    local killh = cat aBonds killatoms;
+    killh = killh | aAtomicNumber killh == 1;
+    killatoms = cat [killatoms, killh];
+    oDestroy killatoms;
+
+    // Make sure N-terminii are all patterned after N-terminii protonation state
+    // of active
+    local NT = '[CX3](~[O])~[CX4]~[N+]';
+    local term = cat sm_MatchAtoms [NT, cat app oGetCollection sets];
+    local acterm = term | aInert term == 0 and aElement term == 'N';
+    local inertterm = term | aInert term == 1 and aElement term == 'N';
+    local geoterm = aGeometry acterm;
+    local ionterm = aIon acterm;
+    local hintterm = aHintLP acterm;
+    aSetGeometry [inertterm, geoterm];
+    aSetIon [inertterm, ionterm];
+    aSetHintLP [inertterm, hintterm];
+    Add_H inertterm;
+
+    // Make hydrogen occupancies equal to the occupancies of the heavy atoms
+    // to which they are bonded
+    aSetOccupancy [Atoms [] | aAtomicNumber Atoms[] == 1,
+	aOccupancy aBonds Atoms [] | aAtomicNumber Atoms [] == 1];
+endfunction
