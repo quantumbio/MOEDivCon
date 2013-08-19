@@ -125,9 +125,11 @@ const DEFAULTS = cat [CORE_DEFAULTS, [
 ]];
 
 const HYDRATE_DEFAULTS = [
+    calctype:1,
     distance:2.5,
     enableOpt:1,
-    enablePocket:0
+    enablePocket:0,
+    onlySolvExposed:1
 ];
 
 local function writeElementList [outpat,chains,opt]
@@ -655,15 +657,8 @@ endfunction
 // lmw - the following function will use MOE's Solvate function in order to add waters within a certain distance of charged atoms.
 //      Once the waters are added they are optimized using a forcefield.
 function Solvate;
-local function qbHydrateChargedAtoms[opt]
-    opt = tagcat[opt, HYDRATE_DEFAULTS];
-    
-    local chargedAtoms = cat [Atoms[] | aFCharge Atoms[] <> 0];
-    
-    if opt.enablePocket == 0 then
-        chargedAtoms = diff [chargedAtoms,uniq cat [_Atoms '$$pocket',_Atoms '$$ligand'] ];
-    endif
-    aSetSelected [chargedAtoms,1];
+local function HydrateChargedAtoms[opt,chargedAtoms]
+
     local solvOpt = [ mode            : 'Droplet',
             shape           : 'Sphere',
             margin          : opt.distance,
@@ -700,12 +695,203 @@ local function qbHydrateChargedAtoms[opt]
     endloop
     write ['Starting Waters: {}\nWaters Added: {}\n',length cat [prevSolvent | aAtomicNumber prevSolvent > 1],length cat [newSolvent | aAtomicNumber newSolvent > 1]];
     if opt.enableOpt then
-        qbTetherMMMin[100,diff [Atoms[],newSolvent]];
+        qbTetherMMMin[1000,diff [Atoms[],newSolvent]];
+    endif
+
+endfunction
+
+function pro_Mutate;
+local function MutateSurfaceChargeResidues [opt,chargedAtoms]
+
+    local chargedResidues = uniq cat aResidue chargedAtoms;
+    write ['Mutating {} residues.\n', length chargedResidues];
+    pro_Mutate [chargedResidues,'ALA'];
+    
+endfunction
+
+local function NeutralizeSurfaceChargedAtoms [opt,chargedAtoms]
+
+// following functions (between =========) from $MOE/lib/svl/run/builder.svl - MOE v2012.10
+//      ==============
+    local function aColumn akeys
+        if not isflat akeys then return app aColumn akeys; endif
+        return el_spValence aElement akeys;
+    endfunction
+    local function aPiCount atoms
+        if not isflat atoms then return app aPiCount atoms; endif
+        return app add dec aBondOrder atoms;
+    endfunction
+    local function aLightBondCount atoms
+        if not isflat atoms then return app aLightBondCount atoms; endif
+        return app add aIsLight aBonds atoms;
+    endfunction
+    local function aLightHCount atoms
+        local nbr = cat aBonds atoms;
+        return s_add [aIsLight nbr and aElement nbr == 'H', aBondCount atoms];
+    endfunction
+    local function aHeavyBondCount atoms = (
+        aBondCount atoms - aLightBondCount atoms
+    );
+    local function HeavyFC [col, hav, npi] = select [
+        (col    ) - (hav + npi),
+        (col - 8) + (hav + npi),
+        col < 4
+    ];
+    // aIsExplicitH returns 1 if an atom is expected to be in explicit hydrogens
+    // mode.  This means that there are explicit hydrogens in the residue.
+    local function aIsExplicitH atoms
+        if not isflat atoms then return app aIsExplicitH atoms; endif
+        local mask = aIsLight atoms;
+        local idx = x_pack not mask;
+        mask[idx] = app orE aIsLight rAtoms aResidue atoms[idx];
+        return mask;
+    endfunction
+    local function aIsAPO akeys
+        if not isflat akeys then return app aIsAPO akeys; endif
+        return m_findmatch ['A*', aName akeys];
+    endfunction
+    // aLightBonds returns the light bonds in order of atomic number with
+    // attachement points at the end.  Hydrogens are first; lone paris last.
+    local function aLightBonds atoms
+        local nbr = aBonds atoms;
+        nbr = nbr || aIsLight nbr;
+        nbr = apt get [ nbr, app x_sort aIsAPO nbr ];
+        nbr = apt get [ nbr, app x_sort neg aAtomicNumber nbr ];
+        return nbr;
+    endfunction
+    // SetCharge assigns the ionization state of atoms.  Modify the requested
+    // charge so that the atom will not change rows and is reasonable.
+    local function action_SetCharge [akeys, new_q]
+        local idx, mask;
+        local changed = [];
+
+	    // Unit extend the input argument and then handle the special
+	    // cases: replace neutral terminal light atoms with the parent
+	    // key (at the end of the list).  Then retain the unique atoms.
+
+        [akeys,new_q] = uext [akeys, new_q];	// unit extend
+        new_q = maxE [-36, minE [36, new_q]];	// just in case
+
+        if orE (mask = aIsLight akeys and not aIon akeys) then
+	    akeys = cat [akeys | not mask, aBonds (akeys | mask)];
+	    new_q = cat [new_q | not mask, new_q | mask];
+        endif
+
+        [akeys,new_q] = [akeys,new_q] || [m_uniq akeys];
+        [akeys,new_q] = [akeys,new_q] || [aIon akeys <> new_q];
+
+	    // Isolated lone pair atoms may get any charge at all.
+	    // Other LP atoms can be neutralized always.
+	    // Otherwise, remove the lone pair atoms.
+
+        mask = (
+	        aAtomicNumber akeys == 0
+	    and (not aBondCount akeys or new_q == 0)
+        );
+        if length (idx = x_pack mask) then
+	    aSetIon [akeys[idx], new_q];
+	    akeys = akeys | not mask;
+        endif
+
+        [akeys,new_q] = [akeys,new_q] || [aAtomicNumber akeys > 0];
+
+	    // Adjust the charge to the minimum or maximum permitted by the
+	    // element so that it does not change rows.  We cannot make
+	    // more positive charge than the elements valence electrons.
+	    // For row 1 and the p block, we can only add negative charge
+	    // to the extent that we have hydrogens to remove.  Transition
+	    // metals are permitted more negation.
+
+        local Z = aAtomicNumber akeys;
+        local col = aColumn akeys;
+        local npi = aPiCount akeys;
+        local impH = aHCount akeys - aExplicitHCount akeys;
+        local nH = aLightHCount akeys + impH;
+        local nQ = aHeavyBondCount akeys;
+
+        new_q = minE [ new_q, maxE [0, el_Valence aElement akeys - nQ - npi] ];
+        new_q = maxE [ new_q, Z - [2,10,18,36,54,72][ELEMENT_ROW[Z]] ];
+
+        idx = x_pack (Z <= 2 or col >= 3);
+        new_q[idx] = maxE [new_q[idx], -nH[idx]];
+
+        idx = x_pack (col < 4);
+        new_q[idx] = minE [HeavyFC [col[idx], nQ[idx], npi[idx]], new_q[idx]];
+
+        idx = x_pack (col > 4);
+        new_q[idx] = maxE [HeavyFC [col[idx], nQ[idx], npi[idx]], new_q[idx]];
+
+        local hintlp = (npi == 1) and (orE eqE [[col-new_q],[3,5]]);
+
+        local geom = aGeometry akeys;		// fix hybridization
+        geom[x_pack (geom == 'sp2' and aColumn akeys >= 3 and not npi)] = 'sp3';
+
+	    // Perform the ionization change (and other required changes)
+
+        [akeys,new_q,geom,hintlp] = [akeys,new_q,geom,hintlp] || [
+	       new_q <> aIon akeys
+	    or geom <> aGeometry akeys
+	    or hintlp <> aHintLP akeys
+        ];
+
+        local expH = aIsExplicitH akeys;
+        local delH = aLightBonds (akeys | geom <> aGeometry akeys);
+
+        aSetIon      [akeys, new_q ];
+        aSetHintLP   [akeys, hintlp];
+        aSetGeometry [akeys, geom  ];
+
+        oDestroy delH;
+        [akeys,expH] = [akeys,expH] || [ oType akeys == 'atom' ];
+
+        Add_H (akeys | expH);
+    endfunction
+//      ==============
+    local startAtoms = Atoms[];
+    action_SetCharge [chargedAtoms, 0];
+    local addedAtoms = diff [Atoms[],startAtoms];
+    write ['Atoms Added (NET): {}\n', length addedAtoms];
+    if opt.enableOpt == 1 then
+        qbTetherMMMin[1000,Atoms [] | aAtomicNumber Atoms [] > 1];
     endif
 endfunction
 
-// example: qbmoebatch -exec "run ['qbStructurePrep.svl',['mp_1B0B.mol2',[distance:3.0,enableOpt:0,enablePocket:0] ],'qbHydrateChargedAtomsFile']" -exit
-global function qbHydrateChargedAtomsFile[inpdbfile,opt]
+function _SelectA;      // defined in $MOE/lib/menu.svl
+function AtomSurfaceArea;
+global function qbFixChargedAtoms[opt]
+    opt = tagcat[opt, HYDRATE_DEFAULTS];
+    local chargedAtoms = cat [Atoms[] | aFCharge Atoms[] <> 0];
+    
+    // make sure we only get the exposed charged atoms. (it would be great if we had a function that did not rely on selection)
+    if opt.onlySolvExposed == 1 then
+        aSetSelected [Atoms[],0];
+        _SelectA 'aExposed';
+        local exposedAtoms = Atoms [] | aSelected Atoms[];
+        chargedAtoms = join [exposedAtoms,chargedAtoms];
+    endif
+    if opt.enablePocket == 0 then
+        chargedAtoms = diff [chargedAtoms,uniq cat [_Atoms '$$pocket',_Atoms '$$ligand'] ];
+    endif
+    aSetSelected [Atoms[],0];
+    aSetSelected [chargedAtoms,1];
+    
+    write ['Charge (before):    {}\n', add aFCharge Atoms[]];
+    write ['    To Be Fixed Atoms:  {}\n', length chargedAtoms];
+    write ['    Charged Atoms:      {}\n', length cat [Atoms[] | aFCharge Atoms[] <> 0]];
+    if opt.calctype == 1 then
+        NeutralizeSurfaceChargedAtoms [opt,chargedAtoms];
+    elseif opt.calctype == 2 then
+        HydrateChargedAtoms[opt,chargedAtoms];
+    elseif opt.calctype == 3 then
+        MutateSurfaceChargeResidues [opt,chargedAtoms];
+    endif
+    write ['Charge (after):     {}\n', add aFCharge Atoms[]];
+    write ['    To Be Fixed Atoms:  {}\n', length chargedAtoms];
+    write ['    Charged Atoms:      {}\n', length cat [Atoms[] | aFCharge Atoms[] <> 0]];
+endfunction
+
+// example: qbmoebatch -exec "run ['qbStructurePrep.svl',['mp_1B0B.mol2',[distance:3.0,enableOpt:0,enablePocket:0] ],'qbFixChargedAtomsFile']" -exit
+global function qbFixChargedAtomsFile[inpdbfile,opt]
     if isnull inpdbfile then
         write ['ERROR: input file required to use this function\n'];
         return;
@@ -713,23 +899,38 @@ global function qbHydrateChargedAtomsFile[inpdbfile,opt]
     opt = tagcat[opt, HYDRATE_DEFAULTS];
     oDestroy Chains[];
     ReadAuto [inpdbfile];
-    qbHydrateChargedAtoms [opt];
+    qbFixChargedAtoms [opt];
     local outfile = twrite['{}-hyd_{}.{}', fbase inpdbfile, opt.distance, fext inpdbfile];
     write ['Outfile: {}\n', outfile];
     WriteAuto [outfile];
 endfunction
 
-global function qbHydrateChargedAtomsPanel[]
+global function qbFixChargedAtomsPanel[]
 	local wkey = WindowCreate [
 	    name: 'shell',
-	    title: 'Hydrate Charged Atoms',
+	    title: 'Fix Charged Atoms',
 	    text: ['Run', 'Cancel'],
 	    onTrigger: ['return', 'exit'],
 	    bubbleHelp: [
-		'Hydrate charged atoms.',
-		'Exit without hydrating atoms.'
+		'Fix charged atoms.',
+		'Exit without fixing atoms.'
 	    ],
-	    
+        Radio : [
+	        name	: 'calctype',
+	        margin	: 1,
+	        columns	: 3,
+	        type	: 'int',
+	        flushLeft	: 1,
+	        extendH	: 1,
+	        onTrigger	: 'return',
+	        font	: 'mediumBold',
+	        text	: ['Neutralize','Hydrate','Mutate'],
+	        bubbleHelp	: 
+	            ['Neutralize charged atoms (add/subtract H).',
+	                'Add explicit waters within certain certain distance of charged atoms.',
+	                'Mutate charged residues to neutral ALA.']
+	    ],
+
 	    Checkbox: [
 	        name: 'enableOpt',
 	        text: 'Optimize Added Waters',
@@ -756,15 +957,62 @@ global function qbHydrateChargedAtomsPanel[]
 	        bubbleHelp: [
 		    'Include pocket atoms in the list of charged atoms.'
 	        ]
+	    ],
+	    Checkbox: [
+	        name: 'onlySolvExposed',
+	        text: 'Solvent Exposed',
+	        flushLeft:1,
+	        bubbleHelp: [
+		    'Only include atoms that are solvent exposed.'
+	        ]
 	    ]
 	];
 
 	WindowShow wkey;
 	WindowSetData[wkey,HYDRATE_DEFAULTS];
+    WindowSetAttr[wkey,
+    [
+        calctype:       [value:1],
+        enableOpt:      [sensitive:1,text:'Optimize Protons',bubbleHelp:'Optimize all protons in the system.'],
+        distance:       [sensitive:0],
+        enablePocket:   [sensitive:1]
+    ]];
 
-    local [values, trigger] = WindowWait wkey;
+	loop
+        local [values, trigger] = WindowWait wkey;
+  //        write ['DEBUG: {} | {}\n', values, trigger];
+
+        if trigger === 'shell' then
+            if values.shell == 'Cancel' then break ; endif
+            if values.shell == 'Run' then
+                qbFixChargedAtoms[values];
+                break;
+            endif
+        elseif trigger === 'calctype' then
+            if values.calctype == 2 then
+                WindowSetAttr[wkey,
+                [
+                    enableOpt:      [sensitive:1,text:'Optimize Added Waters',bubbleHelp:'Optimize any added water molecules.'],
+                    distance:       [sensitive:1],
+                    enablePocket:   [sensitive:1]
+                ]];
+            elseif values.calctype == 1 then
+                WindowSetAttr[wkey,
+                [
+                    enableOpt:      [sensitive:1,text:'Optimize Protons',bubbleHelp:'Optimize all protons in the system.'],
+                    distance:       [sensitive:0],
+                    enablePocket:   [sensitive:1]
+                ]];
+            elseif values.calctype == 3 then
+                WindowSetAttr[wkey,
+                [
+                    enableOpt:      [sensitive:0],
+                    distance:       [sensitive:0],
+                    enablePocket:   [sensitive:1]
+                ]];
+            endif
+        endif
+    endloop
 	WindowDestroy wkey;
-
-	qbHydrateChargedAtoms[values];
 endfunction
 

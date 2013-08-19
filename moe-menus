@@ -42,7 +42,7 @@ ENDMENU
 
 MENU "QuantumBio:Toolbox"
     "Standard Preparation..."       exec "qbPrepareSystemPanel[]"
-    "Hydrate Charged Atoms..."      exec "qbHydrateChargedAtomsPanel[]"
+    "Fix Charged Atoms..."      exec "qbFixChargedAtomsPanel[]"
     "Refinement Preparation..."     exec "qbPhenixPrepPanel[]"
 ENDMENU
 
