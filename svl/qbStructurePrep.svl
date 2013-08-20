@@ -97,6 +97,7 @@ const CORE_DEFAULTS = [
     enableOpt:0,            // turn on optimization
     tether_val:100,         // tethers the heavy atoms at a certain restraint.
     enableProtonate:0,      // turns on Protonate3D
+    pmode:'Protonate3D',    // set the mode of the protonation (e.g. Protonate3D or Add_H are acceptable).
     protPH:[],             // set pH in Protonate3D to default
     enablePreciseHOH:0,     // turns on precise waters in Protonate3D (can cause LONG calc if turned on).
     enableLigFix:1,         // but fixes the ligand protonation
@@ -129,7 +130,10 @@ const HYDRATE_DEFAULTS = [
     distance:2.5,
     enableOpt:1,
     enablePocket:0,
-    onlySolvExposed:1
+    onlySolvExposed:1,
+    exemptAtoms:1,
+    exemptDistance:5.0,
+    coreList:[]
 ];
 
 local function writeElementList [outpat,chains,opt]
@@ -428,10 +432,20 @@ global function qbPrepareSystem [opt]
         if not isnull opt.protPH then
             protOptions=[pH:opt.protPH];
         endif
+        local fixedAtoms;
         if opt.enableLigFix then
-            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,_Atoms '$$ligand',preciseWaters,protOptions];
+            fixedAtoms = _Atoms '$$ligand';
+//            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,_Atoms '$$ligand',preciseWaters,protOptions];
         else
-            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,[],preciseWaters,protOptions];
+            fixedAtoms = [];
+//            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,[],preciseWaters,protOptions];
+        endif
+        if opt.pmode == 'Add_H' then
+            Add_H diff [atomsToProtonate,fixedAtoms];
+        elseif opt.pmode == 'Protonate3D' then
+            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,fixedAtoms,preciseWaters,protOptions];
+        else
+            exit twrite ['ERROR: unknown protonation mode option {}\n', opt.pmode];
         endif
         StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0];
     endif
@@ -869,6 +883,10 @@ global function qbFixChargedAtoms[opt]
         local exposedAtoms = Atoms [] | aSelected Atoms[];
         chargedAtoms = join [exposedAtoms,chargedAtoms];
     endif
+    
+    if opt.exemptAtoms == 1 then
+        chargedAtoms = diff [chargedAtoms, uniq qbSelectResidueOnRadius[uniq cat opt.coreList, opt.exemptDistance,Chains[]]];    
+    endif
     if opt.enablePocket == 0 then
         chargedAtoms = diff [chargedAtoms,uniq cat [_Atoms '$$pocket',_Atoms '$$ligand'] ];
     endif
@@ -905,7 +923,12 @@ global function qbFixChargedAtomsFile[inpdbfile,opt]
     WriteAuto [outfile];
 endfunction
 
-global function qbFixChargedAtomsPanel[]
+function qb_cLetter;
+
+global function qbFixChargedAtomsPanel[opt]
+    opt = tagcat[opt, HYDRATE_DEFAULTS];
+    local coreList = opt.coreList;
+    
 	local wkey = WindowCreate [
 	    name: 'shell',
 	    title: 'Fix Charged Atoms',
@@ -933,17 +956,13 @@ global function qbFixChargedAtomsPanel[]
 
 	    Checkbox: [
 	        name: 'enableOpt',
-	        text: 'Optimize Added Waters',
-	        flushLeft:1,
-	        bubbleHelp: [
-		    'Optimize any added water molecules'
-	        ]
+	        flushLeft:1
 	    ],
 
 	    Text: [
 		    name: 'distance',
 		    type: 'real',
-		    title: 'Distance:',
+		    title: 'Water Distance:',
 		    shortcut: ['2.5'],
 	        bubbleHelp: [
 		    'Add waters within this number of angstroms of any charged atoms.'
@@ -952,12 +971,11 @@ global function qbFixChargedAtomsPanel[]
 
 	    Checkbox: [
 	        name: 'enablePocket',
-	        text: 'Include Pocket Atoms',
+	        text: 'Include Pocket',
 	        flushLeft:1,
-	        bubbleHelp: [
-		    'Include pocket atoms in the list of charged atoms.'
-	        ]
+	        bubbleHelp: 'Include charged pocket atoms within the group of atoms to be fixed.'
 	    ],
+	    
 	    Checkbox: [
 	        name: 'onlySolvExposed',
 	        text: 'Solvent Exposed',
@@ -965,23 +983,107 @@ global function qbFixChargedAtomsPanel[]
 	        bubbleHelp: [
 		    'Only include atoms that are solvent exposed.'
 	        ]
-	    ]
-	];
+	    ],
+	    Checkbox: 
+	    [
+	        name: 'exemptAtoms',
+	        text: 'Exempt Atoms',
+	        value: 1,
+	        onTrigger: 'return',
+	        bubbleHelp: 'Atoms (and therefore residues) within this list will be exempt from neutralization.'
+        ],
+        Group : 
+        [
+            Vbox:   
+            [
+            title: 'Core Residues:',
+            name: 'coreResidues',
+                Hbox:
+                [
+                    columns:2,
+                    Button:
+                        [
+                            name: 'retrieveSelection', 
+                            text: 'Retrieve Selection',
+                            bubbleHelp: 'Retrieve selected residues and add them to region refinement.'
+                        ]
+                ],
+                Listbox :
+                    [
+                    name: 'coreResiduesBox',
+                    text: '',
+                    width:30,
+                    header: 'Chain\tRes\tUID\tAtom',
+                    onTrigger: 'return',
+                    type: 'modint',
+                    multiSelect: 0,
+                    sortEnable: 1,
+                    bubbleHelp:
+                        'List of atoms to be exempt from stabilization (these are in addion to any atoms chosen above).'
+                    ],
+                Button:
+                    [
+                        name: 'deleteSelection', 
+                        text: 'Delete',
+                        bubbleHelp: 'Delete selected atom from the list.'
+                    ],
+	            Text: 
+	                [
+		            name: 'exemptDistance',
+		            type: 'real',
+		            title: 'Exempt Distance:',
+		            shortcut: ['2.5'],
+	                bubbleHelp: 'Atoms within this distance of any exempted atoms also will not be included in stabilization.'
+	                ]
+                
+            ]   //vbox
+        ],  // group
 
-	WindowShow wkey;
-	WindowSetData[wkey,HYDRATE_DEFAULTS];
-    WindowSetAttr[wkey,
-    [
-        calctype:       [value:1],
-        enableOpt:      [sensitive:1,text:'Optimize Protons',bubbleHelp:'Optimize all protons in the system.'],
-        distance:       [sensitive:0],
-        enablePocket:   [sensitive:1]
+	    Data : [name:'coreList']
+	];
+	local function updateCoreResidueList [coreList]
+	    return apt twrite ['{}\t{}\t{}\t{}',qb_cLetter aChain coreList, rName aResidue coreList, rUID aResidue coreList, aName coreList];
+	endfunction
+
+	WindowSetData[wkey,opt];
+	
+	local function setCalcValues [wkey,values]
+	    if isnull values then
+	        values = WindowValues wkey;
+	    endif
+        if values.calctype == 2 then
+            WindowSetAttr[wkey,
+            [
+                enableOpt:      [sensitive:1,text:'Optimize Added Waters',bubbleHelp:'Optimize any added water molecules.'],
+                distance:       [sensitive:1],
+                enablePocket:   [sensitive:1]
+            ]];
+        elseif values.calctype == 1 then
+            WindowSetAttr[wkey,
+            [
+                enableOpt:      [sensitive:1,text:'Optimize Protons',bubbleHelp:'Optimize all protons in the system.'],
+                distance:       [sensitive:0],
+                enablePocket:   [sensitive:1]
+            ]];
+        elseif values.calctype == 3 then
+            WindowSetAttr[wkey,
+            [
+                enableOpt:      [sensitive:0],
+                distance:       [sensitive:0],
+                enablePocket:   [sensitive:1]
+            ]];
+        endif
+	endfunction
+	
+    setCalcValues [wkey];
+    WindowSetAttr[wkey, [
+        coreResiduesBox: [text : updateCoreResidueList[coreList],value: [igen length coreList]]
     ]];
+    
+	WindowShow wkey;
 
 	loop
         local [values, trigger] = WindowWait wkey;
-  //        write ['DEBUG: {} | {}\n', values, trigger];
-
         if trigger === 'shell' then
             if values.shell == 'Cancel' then break ; endif
             if values.shell == 'Run' then
@@ -989,28 +1091,25 @@ global function qbFixChargedAtomsPanel[]
                 break;
             endif
         elseif trigger === 'calctype' then
-            if values.calctype == 2 then
-                WindowSetAttr[wkey,
-                [
-                    enableOpt:      [sensitive:1,text:'Optimize Added Waters',bubbleHelp:'Optimize any added water molecules.'],
-                    distance:       [sensitive:1],
-                    enablePocket:   [sensitive:1]
-                ]];
-            elseif values.calctype == 1 then
-                WindowSetAttr[wkey,
-                [
-                    enableOpt:      [sensitive:1,text:'Optimize Protons',bubbleHelp:'Optimize all protons in the system.'],
-                    distance:       [sensitive:0],
-                    enablePocket:   [sensitive:1]
-                ]];
-            elseif values.calctype == 3 then
-                WindowSetAttr[wkey,
-                [
-                    enableOpt:      [sensitive:0],
-                    distance:       [sensitive:0],
-                    enablePocket:   [sensitive:1]
-                ]];
+            setCalcValues [wkey, values];
+        elseif trigger === 'exemptAtoms' then
+            if values.exemptAtoms then
+                WindowSetAttr[wkey,[coreResidues: [sensitive:1]]];
+            else
+                WindowSetAttr[wkey,[coreResidues: [sensitive:0]]];
             endif
+        elseif trigger === 'retrieveSelection' then
+            local newSelectedList = diff[Atoms [] | aSelected Atoms [],coreList];
+            local newSelected;
+            for newSelected in newSelectedList loop
+                local prevLenCoreList = length coreList;
+                coreList = cat [coreList, newSelected];
+                WindowSetAttr[wkey,
+                [
+                    coreResiduesBox: [ text:   updateCoreResidueList[coreList], value:  [1] ],
+                    coreList : [value:coreList]
+                ]];
+            endloop
         endif
     endloop
 	WindowDestroy wkey;
