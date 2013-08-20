@@ -1,7 +1,7 @@
 #svl
 
 global function io_Is_H5 arg
-write ['in io_Is_H5\n'];
+// write ['in io_Is_H5\n'];
     if arg === [] then
     	const OPT = [readertype: 'line', nchars: 80, prio: 3];
 //        const OPT = "#qb:output";
@@ -18,7 +18,7 @@ write ['in io_Is_H5\n'];
 endfunction
 
 global function open_Op_H5Open arg
-write ['in open_Op_H5Open\n'];
+// write ['in open_Op_H5Open\n'];
     const OPEN_INFO = 'View QuantumBio results.';
     const OPT = [bubbleHelp: OPEN_INFO, defwin: 'default', mult: 0];
     
