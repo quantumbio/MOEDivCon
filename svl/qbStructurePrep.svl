@@ -930,14 +930,17 @@ global function qbFixChargedAtomsPanel[opt]
     local coreList = opt.coreList;
     
 	local wkey = WindowCreate [
-	    name: 'shell',
-	    title: 'Fix Charged Atoms',
+	    name: 'panel',
+	    title: 'Stabilize Charged Atoms',
+	    windowName: 'ChargeStabilizationPanel',
 	    text: ['Run', 'Cancel'],
-	    onTrigger: ['return', 'exit'],
+	    onTrigger: ['return', 'return'],
 	    bubbleHelp: [
 		'Fix charged atoms.',
 		'Exit without fixing atoms.'
 	    ],
+	    Group:
+	    [
         Radio : [
 	        name	: 'calctype',
 	        margin	: 1,
@@ -952,55 +955,73 @@ global function qbFixChargedAtomsPanel[opt]
 	            ['Neutralize charged atoms (add/subtract H).',
 	                'Add explicit waters within certain certain distance of charged atoms.',
 	                'Mutate charged residues to neutral ALA.']
+	    ]
 	    ],
-
-	    Checkbox: [
-	        name: 'enableOpt',
-	        flushLeft:1
-	    ],
-
-	    Text: [
-		    name: 'distance',
-		    type: 'real',
-		    title: 'Water Distance:',
-		    shortcut: ['2.5'],
-	        bubbleHelp: [
-		    'Add waters within this number of angstroms of any charged atoms.'
-	        ]
-        ],
-
-	    Checkbox: [
-	        name: 'enablePocket',
-	        text: 'Include Pocket',
-	        flushLeft:1,
-	        bubbleHelp: 'Include charged pocket atoms within the group of atoms to be fixed.'
-	    ],
-	    
-	    Checkbox: [
-	        name: 'onlySolvExposed',
-	        text: 'Solvent Exposed',
-	        flushLeft:1,
-	        bubbleHelp: [
-		    'Only include atoms that are solvent exposed.'
-	        ]
-	    ],
-	    Checkbox: 
+	    Group:
 	    [
-	        name: 'exemptAtoms',
-	        text: 'Exempt Atoms',
-	        value: 1,
-	        onTrigger: 'return',
-	        bubbleHelp: 'Atoms (and therefore residues) within this list will be exempt from neutralization.'
+	    Vbox:
+	    [
+            columns:1,
+            flushLeft:1,
+            extendH:1,
+            Text: [
+                name: 'distance',
+                type: 'real',
+                title: 'Water Distance:',
+                shortcut: ['2.5'],
+                bubbleHelp: [
+                'Add waters within this number of angstroms of any charged atoms.'
+                ]
+            ],
+
+            Checkbox: [
+                name: 'enableOpt',
+                flushLeft:1
+            ]
         ],
+        Vbox:
+	    [
+            columns:2,
+            flushLeft:1,
+            extendH:1,
+            Checkbox: [
+                name: 'enablePocket',
+                text: 'Include Pocket',
+                flushLeft:1,
+                bubbleHelp: 'Include charged pocket atoms within the group of atoms to be fixed.'
+            ],
+        
+            Checkbox: [
+                name: 'onlySolvExposed',
+                text: 'Solvent Exposed',
+                flushLeft:1,
+                bubbleHelp: [
+                'Only include atoms that are solvent exposed.'
+                ]
+            ]
+        ]
+        ],
+        Separator : [flushLeft:1],
         Group : 
         [
+        Checkbox: 
+            [
+                name: 'exemptAtoms',
+                text: 'Exempt Atoms',
+                value: 1,
+                onTrigger: 'return',
+                bubbleHelp: 'Atoms (and therefore residues) within this list will be exempt from neutralization.'
+            ],
+            Group:
+            [
             Vbox:   
             [
             title: 'Core Residues:',
             name: 'coreResidues',
-                Hbox:
+            columns:1,
+                Vbox:
                 [
-                    columns:2,
+                    columns:2,flushLeft:1,
                     Button:
                         [
                             name: 'retrieveSelection', 
@@ -1017,25 +1038,25 @@ global function qbFixChargedAtomsPanel[opt]
                     onTrigger: 'return',
                     type: 'modint',
                     multiSelect: 0,
-                    sortEnable: 1,
+                    sortEnable: 1,flushLeft:1,
                     bubbleHelp:
                         'List of atoms to be exempt from stabilization (these are in addion to any atoms chosen above).'
                     ],
                 Button:
                     [
-                        name: 'deleteSelection', 
+                        name: 'deleteSelection', flushLeft:1,
                         text: 'Delete',
                         bubbleHelp: 'Delete selected atom from the list.'
                     ],
 	            Text: 
 	                [
-		            name: 'exemptDistance',
+		            name: 'exemptDistance',flushLeft:1,
 		            type: 'real',
 		            title: 'Exempt Distance:',
 		            shortcut: ['2.5'],
 	                bubbleHelp: 'Atoms within this distance of any exempted atoms also will not be included in stabilization.'
 	                ]
-                
+            ]
             ]   //vbox
         ],  // group
 
@@ -1084,9 +1105,9 @@ global function qbFixChargedAtomsPanel[opt]
 
 	loop
         local [values, trigger] = WindowWait wkey;
-        if trigger === 'shell' then
-            if values.shell == 'Cancel' then break ; endif
-            if values.shell == 'Run' then
+        if trigger === 'panel' then
+            if values.panel == 'Cancel' then break ; endif
+            if values.panel == 'Run' then
                 qbFixChargedAtoms[values];
                 break;
             endif
@@ -1097,6 +1118,29 @@ global function qbFixChargedAtomsPanel[opt]
                 WindowSetAttr[wkey,[coreResidues: [sensitive:1]]];
             else
                 WindowSetAttr[wkey,[coreResidues: [sensitive:0]]];
+            endif
+        elseif trigger === 'deleteSelection' then
+            local selectedAtomID = first values.coreResiduesBox;
+            if not isnull selectedAtomID then
+                local newSelectedID = selectedAtomID - 1;
+                if selectedAtomID == 1 then
+                    newSelectedID = 1;
+                endif
+                local tmpMask;
+                tmpMask = m_id coreList;
+                tmpMask(selectedAtomID) = 0;
+                coreList = coreList | tmpMask;
+                local tmpexpUnbound;
+                local tmpexpBound;
+                WindowSetAttr[wkey, 
+                [
+                    coreResiduesBox: 
+                    [ 
+                        text:   updateCoreResidueList[coreList]
+                        ,value:  [newSelectedID]
+                    ]
+                ]];
+
             endif
         elseif trigger === 'retrieveSelection' then
             local newSelectedList = diff[Atoms [] | aSelected Atoms [],coreList];

@@ -1,0 +1,37 @@
+#svl
+
+global function io_Is_H5 arg
+write ['in io_Is_H5\n'];
+    if arg === [] then
+    	const OPT = [readertype: 'line', nchars: 80, prio: 3];
+//        const OPT = "#qb:output";
+    	return [
+	    ['qbio_h5', '*h5', OPT]
+	];
+    endif
+    if arg(2) === 0 or arg(2) === 1 then
+    	local line = arg(1)(1);
+	const ID = "#qb:output";
+	if line[x_id ID] === ID then return 'qbio_h5'; endif
+	return '???';
+    endif
+endfunction
+
+global function open_Op_H5Open arg
+write ['in open_Op_H5Open\n'];
+    const OPEN_INFO = 'View QuantumBio results.';
+    const OPT = [bubbleHelp: OPEN_INFO, defwin: 'default', mult: 0];
+    
+    if arg === [] then
+    	return [
+	    ['qbio_h5', 'openh5', 'Open QuantumBio Results', OPT]
+	];
+    endif
+    
+    local [name, fcode, options] = arg;
+    
+    if fcode === 'qbio_h5' then
+	//scf_ResultsPanel name;
+	// run ['scfpanel.svl', name, 'scf_ResultsPanel'];
+    endif
+endfunction
