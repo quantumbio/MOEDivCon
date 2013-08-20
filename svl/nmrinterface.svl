@@ -334,65 +334,86 @@ global function qb_cLetter chainid
     return fext cName chainid;
 endfunction
 
+// Functions necessary to find the corresponding Atoms from a QB-standard NMR CSV file
+// The QB-standard NMR CSV file stores the following information:
+//  "Chain","Residue ID","Sequence","Atom Name","Unbound ppm","Bound ppm"
+//  "A","VAL",380,"CG1",0,-0.27
+// these items point to atoms in the MOE window
 local function FindAtoms values
-
     local interestResidue = Residues [] | qb_cLetter rChain Residues [] == token values.Chain and rUID Residues[] == values.Sequence;
-
+    local expBound;
+    local expUnBound;
     if isnull interestResidue then
         return [];
     endif
 
     local interestAtoms = cat rAtoms interestResidue;
 
-    local centeredAtom = interestAtoms | aName interestAtoms == token values.'Centered Atom';
-    local heavyAtoms = interestAtoms | aPrioCIP interestAtoms == aPrioCIP centeredAtom;
- 
-    local boundAtoms = cat aBonds heavyAtoms;
-    local protonAtoms = boundAtoms | aElement boundAtoms == 'H';
-    
-    return cat [heavyAtoms,protonAtoms];
-endfunction
-
-local function writeElementList[outpat,atoms]
-    local atmlist = sort aNumber uniq atoms;
-    local outfile = twrite ['{}.atms',fbase ftail outpat];
-    write ['INFO: Writing {} atom(s) to file {}\n', length atmlist, outfile];
-    if not isnull atmlist then
-        local fileHDL = fopenw outfile;
-        local atmID;
-        for atmID in atmlist loop
-            fwrite [fileHDL,'    ATOM {}\n',atmID];
-        endloop
-        fclose fileHDL;
-    else
-        fdelete outfile;
+    local centeredAtom = interestAtoms | aName interestAtoms == token values.'Atom Name';
+    if length centeredAtom > 1 then
+        write ['ERROR: There is more then one atom of name {} in residue {}:{}\n', token values.'Atom Name', token values.Chain,values.Sequence];
+        centeredAtom = [];
     endif
-
+    expBound = values.'Bound ppm';
+    expUnBound = values.'Unbound ppm';
+    return [centeredAtom,expBound,expUnBound];
 endfunction
 
 // MOE requires a MDB with which to work in subsequent steps.
 //  This function will translate the user-provided CSV file (of same "format" as Pipeline) to that MDB file.
-local function NMRCSVtoMDB opt
+const INCSV_DEFAULTS = [
+    db_file:[],
+    ascii_file:[]
+];
 
+local function qbNMRCSVtoMDB opt
+    opt = tagcat[opt, INCSV_DEFAULTS];
+    if isnull opt.ascii_file then
+        write ['Error: opt.ascii_file not set prior to calling function\n'];
+        return [];
+    endif
+    opt.db_file = twrite['{}-DELETE.mdb',fbase opt.ascii_file];
+    db_Close db_Open [opt.db_file,'create'];
     opt = __db_ImportASCII_DetectOptions opt;
     opt = __db_ImportASCII_ReadFile opt;
-    opt.types = ['char','char','int','char','float','float','float','float','float','float'];
+    opt.types = ['char','char','int','char','float','float'];
     db_ImportASCII opt;
-    return opt;
+    // read in MDB file and return the corresponding atoms in the MOE window
+    local mdbKey = db_Open [opt.db_file,'read'];
+    local entryKeys = db_Entries mdbKey;
+    local tmpEntryKey,runAtoms,boundData,unboundData;
+    runAtoms = [];
+    for tmpEntryKey in entryKeys loop
+        local [centeredAtom,expBound,expUnBound] = FindAtoms db_Read [mdbKey,tmpEntryKey];
+        if not isnull centeredAtom then
+            boundData.(totok centeredAtom) = expBound;
+            unboundData.(totok centeredAtom) = expUnBound;
+            runAtoms = uniq cat [runAtoms,centeredAtom];
+        endif
+    endloop
+    db_Close mdbKey;
+    fdelete opt.db_file;
+    return [runAtoms,boundData,unboundData];
+endfunction
 
+global function qbGetAtomsInNMRCSV [ascii_file]
+    local opt = INCSV_DEFAULTS;
+    opt.ascii_file = ascii_file;
+    local [runAtoms,boundData,unboundData] = qbNMRCSVtoMDB opt;
+    return [runAtoms,boundData,unboundData];
 endfunction
 
 function _Atoms;
 function qbStoreModel;
 function qbSetNMRAtomSelection;
-global function qbProcessCSVNMR opt
-    local INDEFAULTS;
-    INDEFAULTS.h5file = [];
-    INDEFAULTS.db_file = twrite['{}-DELETE.mdb',fbase opt.ascii_file];
 
-    opt = tagcat[opt, INDEFAULTS];
+global function qbProcessCSVNMR opt
+    opt = tagcat[opt, INCSV_DEFAULTS];
+    opt.h5file = [];
+    opt.db_file = twrite['{}-DELETE.mdb',fbase opt.ascii_file];
+
     db_Close db_Open [opt.db_file,'create'];
-    opt = NMRCSVtoMDB opt;
+    opt = qbNMRCSVtoMDB opt;
 
     local mdbKey = db_Open [opt.db_file,'read'];
     local entryKeys = db_Entries mdbKey;
@@ -404,6 +425,23 @@ global function qbProcessCSVNMR opt
     for tmpEntryKey in entryKeys loop
         runAtoms = uniq cat [runAtoms, FindAtoms db_Read [mdbKey,tmpEntryKey]];
     endloop
+
+    local function writeElementList[outpat,atoms]
+        local atmlist = sort aNumber uniq atoms;
+        local outfile = twrite ['{}.atms',fbase ftail outpat];
+        write ['INFO: Writing {} atom(s) to file {}\n', length atmlist, outfile];
+        if not isnull atmlist then
+            local fileHDL = fopenw outfile;
+            local atmID;
+            for atmID in atmlist loop
+                fwrite [fileHDL,'    ATOM {}\n',atmID];
+            endloop
+            fclose fileHDL;
+        else
+            fdelete outfile;
+        endif
+    endfunction
+
     if not isnull opt.h5file then
         local model = qbStoreModel[opt.h5file,fbase opt.targ_file, mol_Extract Chains[]];   // I am assuming that the function returns a model reference that can then be used in subsequent calls.
         qbSetNMRAtomSelection[opt.h5file,model,join[runAtoms,_Atoms '$$receptor']];         // this then stores the selection associated with the model defined in the line above.

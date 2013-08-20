@@ -135,6 +135,12 @@ global function qbSelectResidueOnRadius [Batoms,radius,tmpChains]
     if isnull Batoms then
         return [];
     endif
+    if isnull tmpChains then
+        tmpChains = Chains[];
+    endif
+    if radius <= 0 then
+        return Batoms;
+    endif
     local nearatms = qbGetResidueOnRadius[Batoms,radius,uniq cat cAtoms tmpChains];
     aSetSelected [nearatms, 1];
     return nearatms;
