@@ -22,7 +22,7 @@
  // END COPYRIGHT
 #endif
 
-// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['3V7Y.pdb',[enableAutoPrep:0,enableProtonate:1,enableLigFix:0],['test.cif','test2.cif']],'qbPhenixPrepFile']" -exit
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['3V7Y.pdb',[enableAutoPrep:0,enableProtonate:1,enableLigFix:0,hnames:'MOE'],['test.cif','test2.cif']],'qbPhenixPrepFile']" -exit
 
 // example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C-phenix.pdb','1A2C-phenix.translation'],'qbPostPhenixFile']" -exit
 
@@ -52,8 +52,8 @@ static residueNamesTaken;
 const CORE_DEFAULTS = [
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
     enableProtonate:1,      // Turns on Protonate3D
+    hnames:'PDB v3.0',      // Sets the hnames option in the PDB writer ('PDB v3.0' is the default in MOE. Could also use 'MOE')
     pmode:'Protonate3D',    // set the mode of the protonation (e.g. Protonate3D or Add_H are acceptable).
-    enableMOEHname:0,       // if =1, do not rename protons in the PDB writer.
     protPH:7.4,              // Set pH for Protonation
     enableLigFix:0,          // Fixes the ligand protonation
     enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
