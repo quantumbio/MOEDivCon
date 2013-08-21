@@ -2,6 +2,7 @@
 //	harmonize_h.svl Correct protonation state of crystallographic alternates
 //
 //
+//	20-aug-2013 (md) Fixed final assignment into alternate sets
 //	16-aug-2013 (md) Placeholder heavy atoms are not kept
 //	29-jul-2013 (md) created
 //
@@ -57,6 +58,13 @@ global function harmonize_H []
     if length sets == 0 then
 	return 'Exiting, no alternates found';
     endif
+
+    // Get original assignment to ALTLOC set, to undo any renaming afterwards
+    local atomsetname, k = 1;
+    while (k <= length sets) loop
+	atomsetname = append [atomsetname, oGetCollection [sets(k)]];
+	k = k + 1;
+    endloop
 
     // Active ALTLOC set is the one with the most active atoms.  "Master"
     // Inert set is the ALTLOC set with the most atoms (besides Active).
@@ -320,6 +328,20 @@ global function harmonize_H []
     aSetIon [inertterm, ionterm];
     aSetHintLP [inertterm, hintterm];
     Add_H inertterm;
+
+    // If an atom was originally in a given ALTLOC set, make sure it still is.
+    // If a heavy atom wasn't originally in a given ALTLOC set, make sure it
+    // still isn't.  For hydrogens, assign them to the set of their heavy atom
+    // bonding partner.
+    local l = 1;
+    while (l <= length sets) loop
+	local addmask = m_join [Atoms [], atomsetname(l)];
+	local addtoset = Atoms [] | addmask;
+	local alsoadd = cat aBonds addtoset;
+	addtoset = cat [addtoset, alsoadd | aElement alsoadd == 'H'];
+	oSetCollection [sets(l), addtoset];
+	l = l + 1;
+    endloop    
 
     // Make hydrogen occupancies equal to the occupancies of the heavy atoms
     // to which they are bonded
