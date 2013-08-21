@@ -1,6 +1,7 @@
 #svl
 //	io_pdb.svl		Protein Data Bank format
 //
+//	21-aug-2013 (md) Do not rename any H's (see line 3314) - lmw added hname MOE option.
 //	21-feb-2013 (kk) Try use_element if element perception fails
 //	13-feb-2013 (kk) Handle multiple END records ; option to ignore
 //	13-feb-2013 (kk) Fixed multi_model line skip
@@ -2612,7 +2613,7 @@ global function fread_PDB_model [file, first_line, opt]
     atoms = tr atoms;
     anames = app string anames;
 
-    if allfalse isspace app first anames then
+    if opt.use_element >= 0 and allfalse isspace app first anames then
 	if allfalse atoms(15) then
 	    atoms(15) = app token app first anames;
 	endif
@@ -2648,13 +2649,14 @@ global function fread_PDB_model [file, first_line, opt]
 	// element column. PDB 3.2 docs say that the formal charge is not
 	// guaranteed to be correct - but we will apply it anyway. Caveat
 	// emptor.
+	// use_element == -1 forces element from name (testing)
 
-    if not anytrue opt.use_element then
+    if opt.use_element == 0 then
 	if alltrue indexof toupper [mol(4)(MOL_ATOM_ELCOL), ELEMENT_SYM] then
 	    opt.use_element = anytrue ('LP' == mol_aEle mol);
 	endif
     endif
-    if anytrue opt.use_element then
+    if opt.use_element == 1 then
 	local el = safe_element mol(4)(MOL_ATOM_ELCOL);	
 	mol(4)(MOL_ATOM_EL) = el;
 	mol(4)(MOL_ATOM_GEOM) = ele2hyb el;
@@ -2809,7 +2811,9 @@ global function: fread_PDB [file, opt]
 	opt.ignore_conect = 0;
 	opt.auto_connect = 0;
     elseif length findmatch [SRC_PDB_REMED, token data.format] then
-	opt.use_element = 1;	// remediated PDB
+	if not opt.use_element == -1 then
+	    opt.use_element = 1;	// remediated PDB
+	endif
 //	opt.use_link = 0;	// can't quite trust the links & conects yet...
 //	opt.ignore_conect = 0;
 //	opt.auto_connect = 0;
@@ -3307,7 +3311,10 @@ local function StandardizeHydrogenNames [atoms, opt]
     else
 	anames[hxt] = 'HXT';
     endif
-
+    
+    if opt.hnames === 'MOE' then
+        anames = aName atoms;	// (md) Undoing all Ken's hard work with a chainsaw
+    endif
     aSetName [atoms, anames];
 endfunction
 

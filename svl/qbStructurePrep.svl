@@ -97,6 +97,7 @@ const CORE_DEFAULTS = [
     enableOpt:0,            // turn on optimization
     tether_val:100,         // tethers the heavy atoms at a certain restraint.
     enableProtonate:0,      // turns on Protonate3D
+    enableMOEHname:0,       // if =1, do not rename protons in the PDB writer.
     pmode:'Protonate3D',    // set the mode of the protonation (e.g. Protonate3D or Add_H are acceptable).
     protPH:[],             // set pH in Protonate3D to default
     enablePreciseHOH:0,     // turns on precise waters in Protonate3D (can cause LONG calc if turned on).
@@ -200,6 +201,7 @@ local function writeMol2 [outpat,chains,opt]
         local outPDBopt = [];
         if wasPDB then outPDBopt.install_cryst = 1; endif;
         if opt.enableAmberName then outPDBopt.amber = 1; endif;
+        if opt.enableMOEHname then outPDBopt.hnames = 'MOE';
         fwrite_PDB [twrite ['{}.pdb',outpat],chains,outPDBopt];
     else
         write ['outfile: {}\n', twrite ['{}.mol2',outpat]];
