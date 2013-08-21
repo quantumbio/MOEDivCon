@@ -53,6 +53,7 @@ const CORE_DEFAULTS = [
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
     enableProtonate:1,      // Turns on Protonate3D
     pmode:'Protonate3D',    // set the mode of the protonation (e.g. Protonate3D or Add_H are acceptable).
+    enableMOEHname:0,       // if =1, do not rename protons in the PDB writer.
     protPH:7.4,              // Set pH for Protonation
     enableLigFix:0,          // Fixes the ligand protonation
     enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
