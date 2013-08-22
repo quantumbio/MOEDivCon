@@ -40,6 +40,7 @@ function qbPrepareSystem;
 function qbCorrectAtomNames;
 function qbCheckLicense;
 function qbGetResidueOnRadius;
+function qb_cLetter;
 
 // statics
 static transFileName;
@@ -105,6 +106,206 @@ local function WriteLog [line,basename,state]
     
     fclose fileHandle;
     return logFileName;
+endfunction
+
+local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
+
+    local shscr = fopenw batchfilename;
+              //             1         2         3         4         5         6         7         8
+              //    12345678901234567890123456789012345678901234567890123456789012345678901234567890
+    fwrite [shscr, '#!/bin/bash\n\n'];
+    fwrite [shscr, 'DIVCON={}/bin/divcon\n',getenv 'QBHOME'];
+
+    fwrite [shscr, 'csvFileName={}\n', ftail opt.CSVFileName];
+    fwrite [shscr, 'pdbFileName={}\n',ftail inMainPDB];
+    fwrite [shscr, 'phenixFileName={}\n',ftail opt.phenix_success.phenixFile];
+    local allKeys,allValues;
+    
+    fwrite [shscr, 'moeLogName={}\n',ftail moeLog];
+    fwrite [shscr, 'regionRefine={}\n',opt.regionRefine];
+    fwrite [shscr, 'qmCore={}\n',opt.qmCore];
+    fwrite [shscr, 'qmBuffer={}\n',opt.qmBuffer];
+    fwrite [shscr, 'macroSkip={}\n',opt.onoff_macroskip];
+    fwrite [shscr, 'setNP={}\n',opt.setNP];
+    fwrite [shscr, 'setMem={}\n',opt.setMem];
+    fwrite [shscr, 'macroCount={}\n',opt.macroCount];
+    fwrite [shscr, 'selection="{}"\n',droplast swrite['{}', apt twrite ['chain {} and resname {} and resid {},',
+        qb_cLetter rChain opt.coreList, rName opt.coreList, rUID opt.coreList]]];
+    fwrite [shscr, 'labelList="{}"\n',opt.labelList];
+    fwrite [shscr, '    \n'];
+    
+                        //             1         2         3         4         5         6         7         8
+                        //    12345678901234567890123456789012345678901234567890123456789012345678901234567890
+    fwrite [shscr, 'errorOut()    \n'];
+    fwrite [shscr, '{}\n',"{"];
+    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then regionNote="E"  ; else  regionNote="D" ;   fi    \n'];    
+    fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then cycleNote="D"  ; else  cycleNote="E" ;   fi    \n'];
+    fwrite [shscr, '    echo    \n'];
+    fwrite [shscr, '    echo "Usage: ./{} [--np=4]"    \n',batchfilename];
+    fwrite [shscr, '    echo     \n'];
+    fwrite [shscr, '    echo "Optional Command line arguments:"    \n'];
+    fwrite [shscr, '    echo " --help           * Show this help and exit.           "\n'];
+    fwrite [shscr, '    echo " --np=#           * Number of processors in simulation.           Current: $setNP"\n'];
+    fwrite [shscr, '    echo " --m=#            * Amount of memory to use in GB.                Current: $setMem"\n'];
+    fwrite [shscr, '    echo " --qmCore=#       * QM Region size (beyond core residue).         Current: $qmCore"\n'];
+    fwrite [shscr, '    echo " --qmBuffer=#     * QM Buffer size (beyond core region).          Current: $qmBuffer"\n'];
+    fwrite [shscr, '    echo " --macroCount=#   * Number of macrocyles to run until refined.    Current: $macroCount"\n'];
+    fwrite [shscr, '    echo     \n'];
+    fwrite [shscr, '    echo " --enable|disable-region  * Enable/Disable region refinement.     Current: $regionNote"\n'];
+    fwrite [shscr, '    echo " --enable|disable-mcycle  * Enable/Disable QM on first macrocycle.Current: $cycleNote"\n'];
+    fwrite [shscr, '    echo     \n'];
+    fwrite [shscr, '    echo " see: http://www.quantumbioinc.com/support/manual-phenixdc"    \n'];
+    fwrite [shscr, '    echo     \n'];
+    fwrite [shscr, '    exit 1    \n'];
+    fwrite [shscr, '}    \n'];
+    fwrite [shscr, '        \n'];
+
+    fwrite [shscr, 'while test $# -gt 0; do\n'];
+    fwrite [shscr, '    case "$1" in\n'];
+    fwrite [shscr, '        -*=*) optarg=`echo "$1" | sed \'s/[-_a-zA-Z0-9]*=//\'` ;;\n'];
+    fwrite [shscr, '        *) optarg= ;;\n'];
+    fwrite [shscr, '    esac\n'];
+    fwrite [shscr, '    case $1 in\n'];
+    fwrite [shscr, '        --help)    \n'];
+    fwrite [shscr, '            errorOut    \n'];
+    fwrite [shscr, '            ;;    \n'];
+    fwrite [shscr, '        --np=*) \n'];
+    fwrite [shscr, '            setNP=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --m=*) \n'];
+    fwrite [shscr, '            setMem=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --qmCore=*) \n'];
+    fwrite [shscr, '            qmCore=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --qmBuffer=*) \n'];
+    fwrite [shscr, '            qmBuffer=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --macroCount=*) \n'];
+    fwrite [shscr, '            macroCount=$optarg   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --disable-region) \n'];
+    fwrite [shscr, '            regionRefine=0   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --enable-region) \n'];
+    fwrite [shscr, '            regionRefine=1   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --diable-mcycle) \n'];
+    fwrite [shscr, '            macroSkip=1   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        --enable-mcycle) \n'];
+    fwrite [shscr, '            macroSkip=0   \n'];
+    fwrite [shscr, '            ;;  \n'];
+    fwrite [shscr, '        *)  \n'];
+    fwrite [shscr, '            echo "ERROR: $optarg option unknown."  \n'];
+    fwrite [shscr, '            errorOut  \n'];
+    fwrite [shscr, '    esac    \n'];
+    fwrite [shscr, '    shift   \n'];
+    fwrite [shscr, 'done    \n'];
+    fwrite [shscr, '        \n'];
+    
+    fwrite [shscr, 'function RunPhenix ()  \n'];
+    fwrite [shscr, '{}   \n',"{"];
+    fwrite [shscr, '    if [ -z "${}" ] ; then  \n', "{PHENIX}"];
+    fwrite [shscr, '        if [ -e $QBPHENIX_ENV ] ; then      \n'];
+    fwrite [shscr, '            source $QBPHENIX_ENV            \n'];
+    fwrite [shscr, '        fi          \n'];
+    fwrite [shscr, '    fi          \n'];
+    fwrite [shscr, '    if ! hash phenix.refine 2>/dev/null; then   \n'];
+    fwrite [shscr, '        echo "ERROR: Phenix must be installed as per its documentation."\n'];
+    fwrite [shscr, '        errorOut  \n'];
+    fwrite [shscr, '    fi          \n'];
+    fwrite [shscr, '    if [ ! -e $QBPHENIX ] ; then    \n'];
+    fwrite [shscr, '        if ! hash qbphenix 2>/dev/null; then   \n'];
+    fwrite [shscr, '            echo "ERROR: qbphenix executable not found in PATH!"    \n'];
+    fwrite [shscr, '            errorOut  \n'];
+    fwrite [shscr, '        else  \n'];
+    fwrite [shscr, '            QBPHENIX=`which qbphenix`  \n'];
+    fwrite [shscr, '        fi  \n'];
+    fwrite [shscr, '    fi  \n'];
+    fwrite [shscr, '        \n'];
+    fwrite [shscr, '    qbphenixopt="--sfFile $csvFileName --pdbFile $pdbFileName --protonation PostMOE --NP $setNP --m ${}gb --ncycles $macroCount "\n','{setMem}'];
+    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
+    fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
+    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
+    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
+    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="--labels \'$labelList\'"  ;   fi    \n',"{labelList}"];
+    fwrite [shscr, '    eval $QBPHENIX $qbphenixopt  \n'];
+    fwrite [shscr, '}   \n'];
+    fwrite [shscr, '        \n'];
+
+    fwrite [shscr, 'function ProcessPackageFile    \n'];
+    fwrite [shscr, '{}    \n',"{"];
+    fwrite [shscr, '    outFileName=$1    \n'];
+    fwrite [shscr, '    outFile=$2    \n'];
+    fwrite [shscr, '        \n'];
+    fwrite [shscr, '    if [ ! -e $outFileName ] ; then    \n'];
+    fwrite [shscr, '        baseTranslatorTmp=`which openssl`    \n'];
+    fwrite [shscr, '        if [ ! -z "${}" ] ; then    \n', "{baseTranslatorTmp}"];
+    fwrite [shscr, '            baseTranslator="$baseTranslatorTmp base64 -d"    \n'];
+    fwrite [shscr, '        else    \n'];
+    fwrite [shscr, '            baseTranslatorTmp=`which base64`    \n'];
+    fwrite [shscr, '            if [ ! -z "${}" ] ; then    \n', "{baseTranslatorTmp}"];
+    fwrite [shscr, '                baseTranslator="$baseTranslatorTmp -d"    \n'];
+    fwrite [shscr, '            else    \n'];
+    fwrite [shscr, '                echo "ERROR: Script requires standard system installation of openssl or base64."    \n'];
+    fwrite [shscr, '                echo "   Install openssl or place $outFileName in current directory and re-run."    \n'];
+    fwrite [shscr, '                errorOut  \n'];
+    fwrite [shscr, '            fi    \n'];
+    fwrite [shscr, '        fi    \n'];
+    fwrite [shscr, '        echo "$outFile" | $baseTranslator > $outFileName    \n'];
+    fwrite [shscr, '    fi    \n'];
+    fwrite [shscr, '}    \n'];
+    fwrite [shscr, '        \n'];
+    
+    fwrite [shscr, '\nmtzFile=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.mtzFile,'char',INT_MAX]];
+    fwrite [shscr, '\'\n'];
+    fwrite [shscr, 'ProcessPackageFile $csvFileName "$mtzFile"\n'];
+    
+    fwrite [shscr, '\nmoeLog=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [moeLog,'char',INT_MAX]];
+    fwrite [shscr, '\'\n'];
+    fwrite [shscr, 'ProcessPackageFile $moeLogName "$moeLog"\n'];
+    
+    if not isnull opt.phenix_success.phenixFile then
+        fwrite [shscr, '\nphenixFile=\'\n'];
+        apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.phenix_success.phenixFile,'char',INT_MAX]];
+        fwrite [shscr, '\'\n'];
+        fwrite [shscr, 'ProcessPackageFile $phenixFileName "$phenixFile"\n'];
+    endif
+
+    fwrite [shscr, '\npdbFile=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [inMainPDB,'char',INT_MAX]];
+    fwrite [shscr, '\'\n'];
+    fwrite [shscr, 'ProcessPackageFile $pdbFileName "$pdbFile"\n'];
+
+    local tmpLigFile;
+    for tmpLigFile in inLigPDBs loop
+        fwrite [shscr, '\nF{}=\'\n',fbase ftail tmpLigFile];
+        apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
+        fwrite [shscr, '\'\n'];
+        fwrite [shscr, 'ProcessPackageFile {} "$F{}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
+    endloop
+    
+    for tmpLigFile in ciffiles loop
+        fwrite [shscr, '\nF{}=\'\n',fbase ftail tmpLigFile];
+        apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
+        fwrite [shscr, '\'\n'];
+        fwrite [shscr, 'ProcessPackageFile {} "$F{}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
+    endloop
+    
+    if first fstat transFileName <> '' then
+        fwrite [shscr, '\ntranslationFile=\'\n'];
+        apt fwrite [shscr, '{}\n', r64_encodeln freadb [transFileName,'char',INT_MAX]];
+        fwrite [shscr, '\'\n'];
+        fwrite [shscr, 'ProcessPackageFile transFileName "$translationFile"\n'];
+    endif
+    
+    fwrite [shscr, 'RunPhenix\n'];
+    
+    fclose shscr;
+
 endfunction
 
 // Creates a "Create Batch File" panel.
@@ -231,7 +432,6 @@ endfunction
 // ============
 
 function qbGetAtomsInNMRCSV;
-function qb_cLetter;
 function qbFixChargedAtomsPanel; 
 
 global function qbNMRPrepPanel[]
@@ -374,17 +574,21 @@ global function qbNMRPrepPanel[]
                             onTrigger: 'return',
                             bubbleHelp: 'Structure factor column within MTZ file.'
                         ],
-                        Text:
+                        Vbox:
                         [
-                            name: 'posesSDF',
-                            sensitive: 0,
-                            title: 'Pose SDF Filename:',
-                            type: 'char',
-                            extendH: 1,
-                            allowBlank: 1,
-                            bubbleHelp:
-                                'Choose SDF which has the poses to be scored.'
-                        ] 
+                            columns:1,
+                            Text:
+                            [
+                                name: 'posesSDF',
+                                sensitive: 0,
+                                type: 'char',
+                                extendH: 1,
+                                allowBlank: 1,
+                                bubbleHelp:
+                                    'Choose SDF which has the poses to be scored.'
+                            ],
+                            Button : [ sensitive:0, name: 'browse_posesSDF', text: 'Browse...']
+                        ]
                     ]
                 ]
             ],
@@ -423,6 +627,7 @@ global function qbNMRPrepPanel[]
                         ]
 
                     ],
+                    Data: [name:CSVFileName],
                     Listbox :
                         [
                         name: 'coreResiduesBox',
@@ -623,7 +828,10 @@ global function qbNMRPrepPanel[]
             aSetSelected [coreList, 1];
         elseif trigger === 'ligandOptions' then
 	        local is_file = l_names(values.ligandOptions) == '$$ligfile';
-	        WindowSetAttr [wkey, [ posesSDF:        [sensitive: is_file] ]];
+	        WindowSetAttr [wkey, [ 
+	            posesSDF:           [sensitive: is_file],
+	            browse_posesSDF:    [sensitive: is_file]
+	        ]];
         elseif trigger === 'nmrscoreSwitch' then
             if values.nmrscoreSwitch then
                 WindowSetAttr[wkey,[NMRScoreOptions: [sensitive:1]]];
@@ -733,13 +941,17 @@ global function qbNMRPrepPanel[]
                     value:  [1]
                     ],
                 expUnbound: [value:unboundData.(totok coreList(1))],
-                expBound: [value:boundData.(totok coreList(1))]
+                expBound: [value:boundData.(totok coreList(1))],
+                CSVFileName: [value:tmpFile]
             ]];
         elseif trigger === 'button_FixCharge' then
             tmpCoreList = [];
             tmpCoreList.coreList = coreList;
             qbFixChargedAtomsPanel[tmpCoreList];
             WindowShow[wkey,1];
+        elseif trigger === 'browse_posesSDF' then
+            local poseFile = FilePrompt [title:'Select Pose SDF', mode:'open', filter:'*.sdf', multi:0];
+            WindowSetAttr[wkey,[posesSDF: [value:poseFile]]];
         elseif trigger === 'panel' then
             if values.(trigger) == 'Batch...' then
                 local baseNameString = swrite ['{}', values.baseName];
@@ -753,7 +965,9 @@ global function qbNMRPrepPanel[]
                 endif
 
                 if not isnull batchname then
-//                    GenerateBatchScript[values,batchname,mainPDBfilename,resPDBfilenames,WriteLog[[],[],'getname'],ciffiles];
+                    local mainPDBfilename = twrite['{}-NMR.pdb',values.baseName];
+                    WritePDB[mainPDBfilename];
+                    GenerateBatchScript[values,batchname,mainPDBfilename,values.posesSDF,WriteLog[[],[],'getname']];
                     break;
                 endif
             elseif values.(trigger) == 'Help' then
