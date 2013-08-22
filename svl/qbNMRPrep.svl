@@ -1,0 +1,777 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2013 QuantumBio Inc. and/or its affiliates.
+    
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif
+
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['3V7Y.pdb',[enableAutoPrep:0,enableProtonate:1,enableLigFix:0],['test.cif','test2.cif']],'qbPhenixPrepFile']" -exit
+
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C-phenix.pdb','1A2C-phenix.translation'],'qbPostPhenixFile']" -exit
+
+function _Atoms;
+function fwrite_PDB;
+function pro_StandardRes;
+function pro_PeptideFlags;
+function StructurePreparationGUI; 
+
+function CIF_fread_cif_all;
+function cif_ExtractInfo;
+
+// QB tool box
+function qbPrepareSystem;
+function qbCorrectAtomNames;
+function qbCheckLicense;
+function qbGetResidueOnRadius;
+
+// statics
+static transFileName;
+static residueNamesTaken;
+
+const CORE_DEFAULTS = [
+    enableAutoPrep:0,       // Run the MOE structure preparation tool.
+    enableProtonate:1,      // Turns on Protonate3D
+    protPH:7.4,              // Set pH for Protonation
+    enableLigFix:0,          // Fixes the ligand protonation
+    enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
+];
+
+const PREPDEFAULTS = cat [CORE_DEFAULTS,[
+    forceUseElement:1,         // force reading of the element in the PDB file. Not a good idea if file format broken.
+    qmApplication:[],       // Skip the DivCon tests - we will be running no matter what since this is refinement.
+    enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
+]];
+
+local function WriteLog [line,basename,state]
+    static logFileName;
+    local fileHandle;
+
+    if isnull state then
+        state = 'none';
+    endif
+
+    if state == 'init' then
+        logFileName = [];
+        line = 'qbMOE INIT LOG\n\n';
+    endif
+    
+    if isnull basename and isnull logFileName then
+        logFileName = twrite ['{}.log','qbMOE'];
+        fileHandle = fopenw logFileName;
+    elseif isnull logFileName then
+        logFileName = twrite ['{}-{}.log',basename,'qbMOE'];
+        fileHandle = fopenw logFileName;
+    elseif not isnull basename and not isnull logFileName then
+        local newFilename = twrite ['{}-{}.log',basename,'qbMOE'];
+        if newFilename <> logFileName then
+            fdelete newFilename;
+            frename [logFileName,newFilename];
+            line = append [line, twrite ['Log file renamed from {} to {}', logFileName, newFilename]];
+            logFileName = newFilename;
+        endif
+        fileHandle = fopenx logFileName;
+        fileHandle = fseek [fileHandle, fsize fileHandle];
+    else
+        fileHandle = fopenx logFileName;
+        fileHandle = fseek [fileHandle, fsize fileHandle];
+    endif
+    
+    if state == 'getname' then
+        fclose fileHandle;
+        return logFileName;
+    endif
+    local tmpLine;
+    for tmpLine in line loop
+        fwrite [fileHandle,'{} --- {}\n', asctime[], tmpLine];
+        write ['{}\n', tmpLine];
+    endloop
+    
+    fclose fileHandle;
+    return logFileName;
+endfunction
+
+// Creates a "Create Batch File" panel.
+// Returns the name of the proposed file if "Create" is pressed.
+// Otherwise returns null.
+// NOTE: based on dock_ui.svl available in MOE dist.
+local function BatchPanel finame
+    local wkey = WindowCreate [
+        name: 'batchwin', windowName: 'batch',
+        title: 'Phenix/DivCon: Create Batch File',
+        text: ['Create', 'Cancel'],
+        onTrigger: ['validate', 'return'],
+        Hbox: [
+            extendH: 1,
+            FSBText: [
+                name: 'batfile', len: 30,
+                title: 'Batch File:',
+                allowBlank: 0,
+                mode: 'saveAs'
+            ]
+        ],
+
+        Separator: [flushLeft: 1],
+
+        Label: [ flushLeft: 1,
+            text: 'See header of the batch file for usage information.'
+        ]
+    ];
+
+    WindowSetData [wkey, [batfile: tok_cat [finame, '_batch.sh']]];
+    WindowShow wkey;
+    local [val, trig] = WindowWait wkey;
+    WindowDestroy wkey;
+
+    if val.batchwin == 'Create' then
+        return val.batfile;
+    else
+        return [];
+    endif
+endfunction
+
+// code between ======== copy/paste/edit from dock_ui.svl MOE 2012
+// ============
+const SETS = tr [
+//                              S  L  R
+    [ 'Dummy Atoms',            0, 0, 0, '$$dummy'      ],
+    [ 'Ligand Atoms',           1, 1, 0, '$$ligand'     ],
+    [ 'SDF File',               0, 1, 0, '$$ligfile'    ],
+    [ 'Pocket Atoms',           0, 0, 0, '$$pocket'     ],
+    [ 'Receptor Atoms',         0, 0, 1, '$$receptor'   ],
+    [ 'Receptor+Solvent',       0, 0, 1, '$$recsolvent' ],
+    [ 'All Atoms',              0, 0, 1, '$$all'        ],
+    [ 'Selected Atoms',         1, 1, 1, '$$aselected'  ],
+    [ 'Unselected Atoms',       0, 0, 1, '$$unselected' ],
+    [ 'Selected Residue',       1, 1, 1, '$$rselected'  ],
+    [ 'Selected Chains',        0, 0, 1, '$$cselected'  ],
+    [ 'None (Wall Only)',	    0, 0, 0, '$$none'	]
+];
+
+local function StandardSetTitles what
+    if     what == 'siteset' then what = 2;             // map category
+    elseif what == 'ligset'  then what = 3;
+    elseif what == 'recset'  then what = 4;
+    else                          what = 4;
+    endif
+
+    local dynprio = SETS(what);
+    local dynset = (SETS(5)|dynprio)[x_sort pack dynprio];
+    local dyntitle = SETS(1)[indexof [dynset, SETS(5)]];
+
+    local chains = Chains [];
+    chains = chains | not m_findmatch ['[[]PRIVATE]*', cName chains];
+    local ctag = diff [uniq sort cTag chains, ''];      // chain tags
+    ctag = ctag | not m_findmatch ['DUMMY*PH4*', ctag];
+    ctag = ctag | not m_findmatch ['$*', ctag];
+
+    local sets = sortuniq oCollections [];             // named sets
+    sets = sets | not m_findmatch [['[$.]*','*~'], sets];
+
+    return [
+	cat [dyntitle, sets],
+	cat [dynset, sets]
+    ];
+endfunction
+local function StandardSet [name, visible]
+    local atoms;
+
+	// Get Active atoms. An atom will be considered as active if there
+	// is at least 1 atom which is active in the molecule.
+
+    local a_atoms = Atoms [];
+    a_atoms = split [a_atoms, mtoc m_uniq aMoleculeNumber a_atoms];
+    a_atoms = a_atoms | app orE not aInert a_atoms;
+    a_atoms = cat a_atoms;
+
+    if name == '$$ligfile' then
+	return [];
+    elseif name == '$$none' then
+	return [];
+    elseif name == '$$recsolvent' then
+	atoms = join [
+	    uniq cat [ _Atoms '$$receptor', _Atoms '$$solvent'],
+	    a_atoms
+	];
+    elseif name == '$$all' then
+	atoms = Atoms[];
+    elseif name == '$$unselected' then
+	atoms = Atoms [] | not aSelected Atoms[];
+    elseif m_findmatch ['$$*', name] then
+	atoms = join [_Atoms name, a_atoms];
+    elseif m_findmatch ['ctag$$*', name] then
+	atoms = Chains[];
+	atoms = atoms | cTag atoms == tok_drop [name, 6];
+	atoms = cat cAtoms atoms;
+    else
+	atoms = cat oAtoms oGetCollection name;
+    endif
+    if istrue visible then
+	atoms = atoms | not aHidden atoms;
+    endif
+    return join [atoms, _Atoms []]; 
+endfunction
+
+// ============
+
+function qbGetAtomsInNMRCSV;
+function qb_cLetter;
+function qbFixChargedAtomsPanel; 
+
+global function qbNMRPrepPanel[]
+
+	if WindowShow ['NMRPrepPanel', 1] then
+	    return;
+	endif
+	
+// this function requires that the user already have a PDB file open and ready to run.
+    if isnull Atoms[] then
+        Warning 'Error:\nUse File->Open to open a molecule of interest\nprior to attempting NMR Preparation.';
+        return;
+    endif
+
+    local pdbfile = cTag first Chains[];
+    if isnull pdbfile then
+        pdbfile = 'unknown.pdb';
+    endif
+
+    static s_sets, s_names, l_sets, l_names;
+    local siteatoms, ligatoms;
+
+    [s_sets, s_names] = StandardSetTitles 'siteset';
+    [l_sets, l_names] = StandardSetTitles 'ligset';
+
+    local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
+    
+    local strprep_info;
+    
+    local boundData, unboundData, setData;
+    
+    local function PercentProton []
+        local totalAtomCnt = length cat Atoms[];
+        local hAtomCnt = length cat [Atoms [] | aElement Atoms[] == 'H'];
+        return hAtomCnt/totalAtomCnt;
+    endfunction
+    
+    local hPercent = PercentProton[];
+    const hCutOff = 0.49;
+    strprep_info = twrite['Not performed and {f.1}% of atoms are protons',100*hPercent];
+
+    local coreList = [];
+    
+	local wkey = WindowCreate
+	[
+	    name: 'panel',
+	    title: 'NMR Preparation',
+	    windowName: 'NMRPrepPanel',
+	    text: ['Help','Batch...','Cancel'],
+	    onTrigger: ['return','validate','exit'],
+	    bubbleHelp: [
+	    'Help, Guidelines, and Support',
+		'Generate Batch script for Phenix/DivCon...',
+		'Cancel without creating Phenix/DivCon run script.'
+	    ],
+        Group :
+        [
+            Vbox:
+            [
+                columns: 1,
+                flushLeft: 1,
+                extendH: 1,
+                Text:
+                [
+                    name: 'baseName',
+                    sensitive: 1,
+                    title: 'Base Filename:',
+                    type: 'char',
+                    extendH: 1,
+                    allowBlank: 0,
+                    bubbleHelp:
+                        'Choose base filename for use in NMRScore. Note: any spaces will be replaced with underscores.'
+                ]
+            ],
+        Separator : [flushLeft:1],
+            Mbox:
+            [
+                columns: 2,
+                Button:
+                [
+                    title: 'Structure Preparation', name: 'button_MOEPreparation', graphics: config,
+                    bubbleHelp: 
+                        'Configure and run the MOE-based structure preparation.\n'
+                        '   Warning, if less then 49% the atoms are protons. FIX: Run Protonate3D.\n'
+                        '   Noted, if there was no change to the structure before and after structure preparation.\n'
+                        '   Noted, if not performed.'
+                ],
+                Label :
+                [ 
+                    name: 'strprep_info', text: strprep_info, 
+                    bubbleHelp: 
+                        'Configure and run the MOE-based structure preparation.\n'
+                        '   Warning, if less then 40% the atoms are protons. FIX: Run Protonate3D.\n'
+                        '   Noted, if there was no change to the structure before and after structure preparation.\n'
+                        '   Noted, if not performed.'
+                ],
+                Button:
+                [
+                    title: 'Stabilize Charge', name: 'button_FixCharge', graphics: config,
+                    bubbleHelp: '(Optional) Stabilize charged atoms/residues through various means in order to encourage convergence.\n'
+                                '   NOTE: This can be done after the NMR atoms of interest are chosen below.'
+                ],
+                Label :
+                [ 
+                    name: 'chgstabilize_info', text: '', 
+                    bubbleHelp: '(Optional) Stabilize charged atoms/residues through various means in order to encourage convergence.\n'
+                                '   NOTE: This can be done after the NMR atoms of interest are chosen below.'
+                ]
+            ]
+        ],
+
+        Separator : [flushLeft:1],
+        
+        Group:
+        [
+            Group:
+            [
+                Checkbox: [ name: 'nmrscoreSwitch', text: 'Include NMRScore',onTrigger: 'return'],
+                Vbox:
+                [
+                    name:   'NMRScoreOptions',
+                    Hbox:
+                    [
+                        columns:1,
+                        Option:
+                        [
+                            name: 'siteOptions',
+                            title: 'Site:',
+                            type: 'int',
+                            text: s_sets,
+                            onTrigger: 'return',
+                            bubbleHelp: 'Structure factor column within MTZ file.'
+                        ],
+                        Option:
+                        [
+                            name: 'ligandOptions',
+                            title: 'Ligand Poses:',
+                            type: 'int',
+                            text: l_sets,
+                            onTrigger: 'return',
+                            bubbleHelp: 'Structure factor column within MTZ file.'
+                        ],
+                        Text:
+                        [
+                            name: 'posesSDF',
+                            sensitive: 0,
+                            title: 'Pose SDF Filename:',
+                            type: 'char',
+                            extendH: 1,
+                            allowBlank: 1,
+                            bubbleHelp:
+                                'Choose SDF which has the poses to be scored.'
+                        ] 
+                    ]
+                ]
+            ],
+            Separator : [flushLeft:1],
+            Group : 
+            [
+                Vbox:   
+                [
+                title: 'NMR Atoms:',
+                name: 'coreResidues',
+                    Hbox:
+                    [
+                        columns:4,
+                        Button:
+                            [
+                                name: 'retrieveSelection', 
+                                text: 'Retrieve Selection',
+                                bubbleHelp: 'Retrieve selected residues and add them to region refinement.'
+                            ],
+                        Button:
+                            [
+                                name: 'retrieveCSV', 
+                                text: 'Retrieve CSV',
+                                bubbleHelp: 'Retrieve experimental chemical shift data from QuantumBio-standard CSV NMR file.'
+                            ],
+                        Button:
+                            [
+                                name: 'button_ShowNMRAtoms', text: '?', font: 'mediumBold',
+                                bubbleHelp: 'Displays the approximate number of atoms that will be treated quantum mechanically.'
+                            ],
+                    Button:
+                        [
+                            name: 'deleteSelection', 
+                            text: 'X', font: 'mediumBold',flushLeft: 0,
+                            bubbleHelp: 'Delete selected atom from the list.'
+                        ]
+
+                    ],
+                    Listbox :
+                        [
+                        name: 'coreResiduesBox',
+                        text: '',
+                        width:30,
+                        extendH:1,
+                        header: 'Chain\tRes\tUID\tAtom',
+                        onTrigger: 'return',
+                        type: 'modint',
+                        multiSelect: 0,
+                        sortEnable: 1,
+                        bubbleHelp:
+                            'This list of residues automatically includes ligand(s), cofactor(s), and metals.\n'
+                            '   All selected residues will be included as core residues in the QM Region Refinement.\n'
+                            '   To remove a residue from the list, simply unselect it.\n'
+                            '   The list may be expanded by selecting additional residues in the MOE window and \n'
+                            '   pressing the Retrieve Selection button above.'
+                        ]                ],
+                Hbox:
+                [
+                    name: 'expData',
+                    columns:3,
+                    Text:
+                        [
+                            name: 'expUnbound',
+                            title:  'Unbound Shift: ',
+                            type:   'real',
+                            onTrigger: 'return',
+                            allowBlank: 1,
+                            bubbleHelp: 'Experimental unbound data (ppm).'
+                        ],
+                    Text:
+                        [
+                            name: 'expBound',
+                            title:  'Bound Shift: ',
+                            type:   'real',
+                            onTrigger: 'return',
+                            allowBlank: 1,
+                            bubbleHelp: 'Experimental bound data (ppm).'
+                        ],
+                     Button:
+                        [
+                            name: 'button_SetExp', text: 'Set', font: 'mediumBold',
+                            bubbleHelp: 'Sets the experimental bound/unbound shift data.'
+                        ]
+               ]
+            ]
+        ] ,
+        Separator : [flushLeft:1],
+        Mbox:
+        [
+            columns:2,
+            flushLeft:0, 
+            Text:
+                [
+                    name: 'setNP',
+                    title: 'Processor Count: ',
+                    type:   'int',
+                    onTrigger: 'return',
+                    allowBlank: 0,
+                    shortcut: ['1','2','4','8','16'],
+                    bubbleHelp: 'The QM calculation is fully threaded for multiple processors.'
+                ],
+            Text:
+                [
+                    name: 'setMem',
+                    title: 'Memory (GB): ',
+                    type:   'real',
+                    onTrigger: 'return',
+                    allowBlank: 0,
+                    shortcut: ['1','2','4','8','16'],
+                    bubbleHelp: 'Generally, the more memory the better with larger QM regions.'
+                ]
+        ],
+        Mbox:
+        [
+            columns: 2,
+            Button:
+            [
+                title: 'Warnings', name: 'button_ShowWarnings', text: '?', font: 'mediumBold',
+                bubbleHelp: 'If there are any warnings, they will appear here.'
+            ],
+            Label : [ name: 'warning_info' ]
+        ]
+	];
+	
+	local function updateCoreResidueList [coreList]
+	    return apt twrite ['{}\t{}\t{}\t{}',qb_cLetter aChain coreList, rName aResidue coreList, rUID aResidue coreList, aName coreList];
+	endfunction
+    
+    local function ShowWarnings [wkey,trigger,values,status,allAtoms]
+    
+            local message = [];
+            
+            local alt_atoms = cat app oGetCollection findmatch ['PDB_ALTLOC_[A-Z,a-z,0-9]', oCollections[]];
+            local commonAtoms = join [alt_atoms,allAtoms];
+            if not isnull commonAtoms then
+                local inResidues = uniq cat aResidue commonAtoms;
+                message = twrite ['Residues {} have alternative conformations.\nDisorder in the QM Region is not supported at this time and will be removed at runtime\n(e.g. highest occupied or "A" conformation will be included in QM calculation).\n\n',
+                    apt twrite ['{}:{}:{}',cName rChain inResidues, rName inResidues, rUID inResidues]];
+            endif
+            
+            if not status.ran_structprep then
+                message = twrite ['{}Structure preparation was not executed during this session.\n\n',message];
+            elseif not status.structprep_changed then
+                message = twrite ['{}Structure preparation was executed, but no changes were observed in structure.\n\n',message];
+            endif
+            
+            if values.setMem < status.memory then
+                message = twrite ['{}Memory request is less then recommended amount of {} GB.\n\n',message,status.memory];
+            endif
+            
+            // update information in the window
+            WindowSetAttr[wkey, [ 
+                chgstabilize_info : [text:twrite ['There are {} charged atoms in the structure.',length (Atoms [] | aFCharge Atoms [] <> 0)] ] 
+            ]];
+            if not isnull message then
+                message = twrite ['WARNING(S):\n\n{}',message];
+                WindowSetAttr[wkey, [ warning_info: [text:'Click to see detailed warnings', foreground:'red']   ]];
+                if trigger === 'inbatch' then
+                    message = twrite ['{}Continue?\n',message];
+                    return NoYes message;
+                elseif trigger === 'button_ShowWarnings' then
+                    Warning message;
+                endif
+            else
+                WindowSetAttr[wkey, [ warning_info: [text:'None']   ]];
+            endif
+            return 1;
+    endfunction
+	 
+    local function CalcMemoryRequirementsInGB [wkey,allAtoms,values]
+    
+        local qmResidues = uniq cat aResidue allAtoms;
+        local fullMatrixSize = 0;
+        local tmpResidue;
+        if length allAtoms > 700 then
+            for tmpResidue in qmResidues loop
+                local subsystemAtoms = qbGetResidueOnRadius[cat rAtoms tmpResidue,5.0,allAtoms];
+                local matrixSize = 
+                (
+                    (1 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms] == 1)) +
+                    (4 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms] == 2)) +
+                    (9 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms]  > 2))
+                );
+                fullMatrixSize = fullMatrixSize + (matrixSize * matrixSize);
+            endloop
+        else
+            fullMatrixSize = 
+            (
+                (1 * add (ELEMENT_ROW[el_Protons aElement allAtoms] == 1)) +
+                (4 * add (ELEMENT_ROW[el_Protons aElement allAtoms] == 2)) +
+                (9 * add (ELEMENT_ROW[el_Protons aElement allAtoms]  > 2))
+            );
+        endif
+        fullMatrixSize = (fullMatrixSize * 5) * 8;
+        local memory = ceil((((fullMatrixSize/1024/1024/1024)*10) / 10) + ((values.setNP - 1) * 0.100));
+        WindowSetAttr[wkey, [ setMem: [shortcut: [twrite['{}',memory],'1','2','4','8','16'],bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
+        return memory;
+    endfunction
+
+    WindowSetAttr[wkey,[
+            coreResiduesBox:[text : updateCoreResidueList[coreList],value: [igen length coreList]],
+            setNP: [value:2],
+            baseName:   [value:fbase ftail pdbfile]
+    ] ];
+    local values, trigger;
+    local ynMemIsSet = 0;
+    values = WindowValues wkey;
+	local status;
+	status.cif_success = []; status.phenix_success = [];status.ran_protonate = 0;status.ran_structprep = 0;status.structprep_changed = 0;
+
+    status.memory = CalcMemoryRequirementsInGB[wkey,Atoms[],values];
+    WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
+    
+    ShowWarnings [wkey,trigger,values,status,Atoms[]];
+    
+	WindowShow wkey;
+	local tmpFile;
+	local selectedAtomID;
+    loop
+        [values, trigger] = WindowWait wkey;
+        
+        siteatoms = StandardSet s_names(values.siteOptions);
+        ligatoms = StandardSet l_names(values.ligandOptions);
+        
+  write ['DEBUG: {} | {}\n', values, trigger];
+        if trigger === 'expUnbound' or trigger === 'expBound' or trigger === 'button_SetExp' then
+            selectedAtomID = bitshr [second values.coreResiduesBox,WMOD_NBITS];
+            if selectedAtomID > 0 then
+                unboundData.(totok coreList(selectedAtomID)) = values.expUnbound;
+                boundData.(totok coreList(selectedAtomID)) = values.expBound;
+                setData.(totok coreList(selectedAtomID)) = 1;
+            endif
+        elseif trigger === 'button_ShowNMRAtoms' then
+            aSetSelected [coreList, 1];
+        elseif trigger === 'siteOptions' then
+            aSetSelected [coreList, 1];
+        elseif trigger === 'ligandOptions' then
+	        local is_file = l_names(values.ligandOptions) == '$$ligfile';
+	        WindowSetAttr [wkey, [ posesSDF:        [sensitive: is_file] ]];
+        elseif trigger === 'nmrscoreSwitch' then
+            if values.nmrscoreSwitch then
+                WindowSetAttr[wkey,[NMRScoreOptions: [sensitive:1]]];
+                WindowSetAttr[wkey,[expData: [sensitive:1]]];
+            else
+                WindowSetAttr[wkey,[NMRScoreOptions: [sensitive:0]]];
+                WindowSetAttr[wkey,[expData: [sensitive:0]]];
+            endif
+        elseif trigger === 'button_MOEPreparation' then
+            local before_run = length cat Atoms[];
+            StructurePreparationGUI[cmd:'interactive'];
+            status.ran_structprep = 1;
+            sleep 2.0;      // needs a couple of seconds to init StructurePrep function
+            WindowShow [wkey, 0];
+            while WindowKey 'Structure Preparation' loop
+                sleep 0.15;
+                if WindowKey 'Protonate3D' then
+                    status.ran_protonate = 1;
+                endif
+            endloop
+            hPercent = PercentProton[];
+            local after_run = length cat Atoms[];
+            if hCutOff > hPercent then
+                WindowSetAttr[wkey,[strprep_info: [text:twrite['Warning: only {}% of atoms are protons', 100*hPercent]]]];
+            elseif before_run == after_run then
+                WindowSetAttr[wkey,[strprep_info: [text:'Note: no change in structure.']]];
+                status.structprep_changed = 0;
+            else
+                WindowSetAttr[wkey,[strprep_info: [text:'MOE preparation Ran']]];
+                status.structprep_changed = 1;
+            endif
+            WindowShow[wkey,1];
+        elseif trigger === 'coreResiduesBox' then
+            selectedAtomID = bitshr [second values.coreResiduesBox,WMOD_NBITS];
+            if selectedAtomID > 0 then
+                Isolate [coreList(selectedAtomID),Atoms[]];
+                WindowSetAttr[wkey,
+                [
+                    expUnbound: [value:unboundData.(totok coreList(selectedAtomID))],
+                    expBound: [value:boundData.(totok coreList(selectedAtomID))]                
+                ]];
+            endif
+        elseif trigger === 'deleteSelection' then
+            selectedAtomID = first values.coreResiduesBox;
+            if not isnull selectedAtomID then
+                local newSelectedID = selectedAtomID - 1;
+                if selectedAtomID == 1 then
+                    newSelectedID = 1;
+                endif
+                local tmpMask;
+                tmpMask = m_id coreList;
+                tmpMask(selectedAtomID) = 0;
+                coreList = coreList | tmpMask;
+                local tmpexpUnbound;
+                local tmpexpBound;
+                if length coreList > 0 then
+                    tmpexpUnbound = unboundData.(totok coreList(newSelectedID));
+                    tmpexpBound = boundData.(totok coreList(newSelectedID));
+                else
+                    tmpexpUnbound = [];
+                    tmpexpBound = [];
+                endif
+
+                WindowSetAttr[wkey, 
+                [
+                    coreResiduesBox: 
+                    [ 
+                        text:   updateCoreResidueList[coreList]
+                        ,value:  [newSelectedID]
+                    ],
+                    expUnbound: [value:tmpexpUnbound],
+                    expBound: [value:tmpexpBound] 
+                ]];
+
+            endif
+        elseif trigger === 'retrieveSelection' then
+            local newSelectedList = diff[Atoms [] | aSelected Atoms [],coreList];
+            local newSelected;
+            for newSelected in newSelectedList loop
+                local prevLenCoreList = length coreList;
+                coreList = cat [coreList, newSelected];
+                boundData.(totok newSelected) = 0.00;
+                unboundData.(totok newSelected) = 0.00;
+                setData.(totok newSelected) = 0;
+                WindowSetAttr[wkey,
+                [
+                    coreResiduesBox: 
+                        [
+                        text:   updateCoreResidueList[coreList],
+                        value:  [1]
+                        ],
+                    expUnbound: [value:unboundData.(totok coreList(1))],
+                    expBound: [value:boundData.(totok coreList(1))]
+                ]];
+            endloop
+        elseif trigger === 'retrieveCSV' then
+            tmpFile = FilePrompt [title:'Select QuantumBio Standard NMR CSV file', mode:'open', filter:'*.csv', multi:0];
+            local [tmpCoreList,tmpBoundData,tmpUnboundData] = qbGetAtomsInNMRCSV [tmpFile];
+            boundData = uniq cat [boundData,tmpBoundData];
+            unboundData = uniq cat [unboundData,tmpUnboundData];
+            coreList = uniq cat [coreList,tmpCoreList];
+            WindowSetAttr[wkey,
+            [
+                coreResiduesBox: 
+                    [
+                    text:   updateCoreResidueList[coreList],
+                    value:  [1]
+                    ],
+                expUnbound: [value:unboundData.(totok coreList(1))],
+                expBound: [value:boundData.(totok coreList(1))]
+            ]];
+        elseif trigger === 'button_FixCharge' then
+            tmpCoreList = [];
+            tmpCoreList.coreList = coreList;
+            qbFixChargedAtomsPanel[tmpCoreList];
+            WindowShow[wkey,1];
+        elseif trigger === 'panel' then
+            if values.(trigger) == 'Batch...' then
+                local baseNameString = swrite ['{}', values.baseName];
+                baseNameString[cat indicesof[" ",baseNameString]] = "_";
+                values.baseName = token baseNameString;
+                WindowSetAttr[wkey, [ baseName:   [value:values.baseName]  ]];
+                
+                local batchname = [];
+                if ShowWarnings [wkey,'inbatch',values,status,Atoms[]] then
+                    batchname = BatchPanel values.baseName;
+                endif
+
+                if not isnull batchname then
+//                    GenerateBatchScript[values,batchname,mainPDBfilename,resPDBfilenames,WriteLog[[],[],'getname'],ciffiles];
+                    break;
+                endif
+            elseif values.(trigger) == 'Help' then
+                LaunchDocument '$QBHOME/doc/help-refine.html';
+            endif
+        endif
+        status.memory = CalcMemoryRequirementsInGB [wkey,Atoms[],values];
+        if trigger === 'setMem' then
+            ynMemIsSet = 1;
+            if values.setMem < status.memory then
+                Warning twrite ['WARNING: Memory request is less then recommended amount of {} GB',status.memory];
+            endif
+        elseif not ynMemIsSet then
+            WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
+        endif
+        ShowWarnings [wkey,trigger,WindowValues wkey,status,Atoms[]];
+    endloop
+    WindowDestroy wkey;
+endfunction
+
+#eof
