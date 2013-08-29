@@ -3311,7 +3311,6 @@ local function StandardizeHydrogenNames [atoms, opt]
     else
 	anames[hxt] = 'HXT';
     endif
-    
     if opt.hnames === 'MOE' then
         anames = aName atoms;	// (md) Undoing all Ken's hard work with a chainsaw
     endif

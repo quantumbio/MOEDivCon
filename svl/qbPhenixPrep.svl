@@ -531,7 +531,7 @@ local function ReadInputFiles[inpdbfile,forceUseElement]
     return length ReadPDB[inpdbfile,tmpIn];
 endfunction
 
-local function WriteInputFiles[residueList,ciffiles,filebase]
+local function WriteInputFiles[residueList,ciffiles,filebase,opt]
     // address a MOE-ism that renames HIS residues based on protonation
     rSetName [cat [Residues [] | rName Residues [] == 'HIP'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
@@ -552,7 +552,7 @@ local function WriteInputFiles[residueList,ciffiles,filebase]
 
     FindPeptideBreaks[];
     local mainPDBfilename = twrite['{}-phenix.pdb',filebase];
-    WritePDB[mainPDBfilename,[cryst1:1]];
+    WritePDB[mainPDBfilename,[cryst1:1,hnames:opt.hnames]];
     return [mainPDBfilename,resPDBfilenames];
 endfunction
 
@@ -561,6 +561,7 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     if not qbCheckLicense[] then
         return;
     endif
+    opt = tagcat[opt, PREPDEFAULTS];
     WriteLog[ [], twrite ['{}-phenix',filebase], 'init'];
     local residueList = ResiduePreparation[];
     
@@ -573,7 +574,7 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
 
     // set the occupancy based upon the occupancy of the heavy atom to which the proton is bound.
     aSetOccupancy [Atoms [] | aAtomicNumber Atoms[] == 1, aOccupancy aBonds Atoms [] | aAtomicNumber Atoms [] == 1];
-    return WriteInputFiles[residueList,ciffiles,filebase];
+    return WriteInputFiles[residueList,ciffiles,filebase,opt];
 endfunction
 
 global function qbPhenixPrepFile[inpdbfile,opt,ciffiles]
@@ -1665,7 +1666,7 @@ global function qbPhenixPrepPanel[]
 
                 if not isnull batchname then
                     WriteLog[twrite ['Creating {}',batchname],twrite ['{}-phenix',values.baseName]];
-                    local [mainPDBfilename,resPDBfilenames] = WriteInputFiles[residueList,ciffiles,values.baseName];
+                    local [mainPDBfilename,resPDBfilenames] = WriteInputFiles[residueList,ciffiles,values.baseName,values];
                     values.coreList = coreList[first values.coreResiduesBox];
                     values.labelList = twrite['{},{}',mtzFColumns[values.column_F],mtzQColumns[values.column_Q]];
                     values.phenix_success = status.phenix_success;
