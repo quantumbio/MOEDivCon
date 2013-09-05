@@ -751,7 +751,7 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
-    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="--labels \'$labelList\'"  ;   fi    \n',"{labelList}"];
+    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --labels \'$labelList\'"  ;   fi    \n',"{labelList}"];
     fwrite [shscr, '    eval $QBPHENIX $qbphenixopt  \n'];
     fwrite [shscr, '}   \n'];
     fwrite [shscr, '        \n'];
@@ -1563,6 +1563,8 @@ global function qbPhenixPrepPanel[]
 	WindowShow wkey;
 	local ciffiles;
 	local tmpFile;
+	local mtzFColumns = [];
+	local mtzQColumns = [];
     loop
         [values, trigger] = WindowWait wkey;
 //  write ['DEBUG: {} | {}\n', values, trigger];
@@ -1636,8 +1638,8 @@ global function qbPhenixPrepPanel[]
                  ]];              
                 if fext tmpFile == 'mtz' then
                     local mtzContents = mtz_Read tmpFile;
-                    local mtzFColumns = first mtzContents.cdata | second mtzContents.cdata == 'F';
-                    local mtzQColumns = first mtzContents.cdata | second mtzContents.cdata == 'Q';
+                    mtzFColumns = first mtzContents.cdata | second mtzContents.cdata == 'F';
+                    mtzQColumns = first mtzContents.cdata | second mtzContents.cdata == 'Q';
                     WindowSetAttr [wkey,
                     [
                         column_F:   [text:mtzFColumns, sensitive:1],
@@ -1668,7 +1670,11 @@ global function qbPhenixPrepPanel[]
                     WriteLog[twrite ['Creating {}',batchname],twrite ['{}-phenix',values.baseName]];
                     local [mainPDBfilename,resPDBfilenames] = WriteInputFiles[residueList,ciffiles,values.baseName,values];
                     values.coreList = coreList[first values.coreResiduesBox];
-                    values.labelList = twrite['{},{}',mtzFColumns[values.column_F],mtzQColumns[values.column_Q]];
+                    if fext values.mtzFile == 'mtz' then
+                        values.labelList = twrite['{},{}',mtzFColumns[values.column_F],mtzQColumns[values.column_Q]];
+                    else
+                        values.labelList = '';
+                    endif
                     values.phenix_success = status.phenix_success;
                     GenerateBatchScript[values,batchname,mainPDBfilename,resPDBfilenames,WriteLog[[],[],'getname'],ciffiles];
                     break;
