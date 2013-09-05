@@ -3276,7 +3276,7 @@ local function StandardizeHydrogenNames [atoms, opt]
 
     local hvA = aBonds H;	// attached heavy atom
 	
-	// lmw(QB) : getHeavyValence should be an approximate "drop in replacement"
+	// getHeavyValence is an approximate drop in replacement
 	//      for aHeavyValence but it will account for alternate locations.
 	//      Using the atom name as the cross reference for alternates.
 	function getHeavyValence atom
