@@ -1,7 +1,7 @@
 #svl
 //	io_pdb.svl		Protein Data Bank format
 //
-//	21-aug-2013 (md) Do not rename any H's (see line 3314) - lmw added hname MOE option.
+//	21-aug-2013 (md) lmw(QB) added alternate aware aHeavyValence
 //	21-feb-2013 (kk) Try use_element if element perception fails
 //	13-feb-2013 (kk) Handle multiple END records ; option to ignore
 //	13-feb-2013 (kk) Fixed multi_model line skip
@@ -3275,13 +3275,21 @@ local function StandardizeHydrogenNames [atoms, opt]
     local Hnum = cat app igen n;
 
     local hvA = aBonds H;	// attached heavy atom
+	
+	// lmw(QB) : getHeavyValence should be an approximate "drop in replacement"
+	//      for aHeavyValence but it will account for alternate locations.
+	//      Using the atom name as the cross reference for alternates.
+	function getHeavyValence atom
+	    local atoms = cat rAtoms aResidue atom;
+	    return max aHeavyValence (atoms | aName atoms == aName atom);
+	endfunction
 
 	// "Old" PDB always starts numbering hydrogens at 1, everybody
 	// else starts at the heavy valence, unless there is only one
 	// in which case there is no number.
-
     if not (opt.hnames === 'PDB') then
-	Hnum = Hnum + (aHeavyValence hvA == 2);
+//	Hnum = Hnum + (aHeavyValence hvA == 2);
+	Hnum = Hnum + (app getHeavyValence hvA == 2);
     endif
     Hnum = select ['', totok Hnum, 1 == stretch [n, n]];
 
@@ -3311,9 +3319,12 @@ local function StandardizeHydrogenNames [atoms, opt]
     else
 	anames[hxt] = 'HXT';
     endif
-    if opt.hnames === 'MOE' then
-        anames = aName atoms;	// (md) Undoing all Ken's hard work with a chainsaw
-    endif
+
+// lmw(QB): This option below can be deleted now because of the getHeavyValence
+//      change above.
+//    if opt.hnames === 'MOE' then
+//        anames = aName atoms;	// (md) Undoing all Ken's hard work with a chainsaw
+//    endif
     aSetName [atoms, anames];
 endfunction
 
