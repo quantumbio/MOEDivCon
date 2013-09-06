@@ -2067,33 +2067,36 @@ local function mol_InsertAltMol [mol, alt_mol]
     res = res | m;
     local atoms = oChildren res;
     local i, new_r = rep [[], length res];
-    for i = 1, length res loop
-	if anytrue (oParent aBonds atoms(i) <> res(i)) then continue; endif;
-	local alt_r = alt[indexof [atoms(i), A]];
+    
+    if 0 then
+        for i = 1, length res loop
+	    if anytrue (oParent aBonds atoms(i) <> res(i)) then continue; endif;
+	    local alt_r = alt[indexof [atoms(i), A]];
 
-	[x,m] = sam (int alt_r and not indexof [atoms(i), A1]);
-	atoms(i) = split [atoms(i)[x], mtoc m];
-	alt_r = alt_r[x|m];
+	    [x,m] = sam (int alt_r and not indexof [atoms(i), A1]);
+	    atoms(i) = split [atoms(i)[x], mtoc m];
+	    alt_r = alt_r[x|m];
 
-	if first alt_r == " " then continue; endif;
-	if not eqL app sort aName atoms(i) then continue; endif;
+	    if first alt_r == " " then continue; endif;
+	    if not eqL app sort aName atoms(i) then continue; endif;
 
-	atoms(i) = dropfirst atoms(i);
+	    atoms(i) = dropfirst atoms(i);
 
-	local C = oParent res(i);
-	local C_res = cat oChildren C;
+	    local C = oParent res(i);
+	    local C_res = cat oChildren C;
 
-	oReparent [C_res = C_res | rNumber C_res > rNumber res(i), C_temp];
-	new_r(i) = oCreate rep [C, length atoms(i)];
-	oReparent [C_res, C];
+	    oReparent [C_res = C_res | rNumber C_res > rNumber res(i), C_temp];
+	    new_r(i) = oCreate rep [C, length atoms(i)];
+	    oReparent [C_res, C];
 
-	oReparent [atoms(i), new_r(i)];
+	    oReparent [atoms(i), new_r(i)];
 
-	rSetName [new_r(i), rName res(i)];
-	rSetUID  [new_r(i),  rUID res(i)];
-	rSetINS  [new_r(i),  dropfirst alt_r];
-	rSetType [new_r(i), rType res(i)];
-    endloop
+	    rSetName [new_r(i), rName res(i)];
+	    rSetUID  [new_r(i),  rUID res(i)];
+	    rSetINS  [new_r(i),  dropfirst alt_r];
+	    rSetType [new_r(i), rType res(i)];
+        endloop
+    endif
 
     local mol_new = mol_Extract C1;
 
@@ -3320,11 +3323,6 @@ local function StandardizeHydrogenNames [atoms, opt]
 	anames[hxt] = 'HXT';
     endif
 
-// lmw(QB): This option below can be deleted now because of the getHeavyValence
-//      change above.
-//    if opt.hnames === 'MOE' then
-//        anames = aName atoms;	// (md) Undoing all Ken's hard work with a chainsaw
-//    endif
     aSetName [atoms, anames];
 endfunction
 
