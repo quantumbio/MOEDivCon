@@ -2,6 +2,7 @@
 //	harmonize_h.svl Correct protonation state of crystallographic alternates
 //
 //
+//	12-sep-2013 (md) More robust error checking
 //	20-aug-2013 (md) Fixed final assignment into alternate sets
 //	16-aug-2013 (md) Placeholder heavy atoms are not kept
 //	29-jul-2013 (md) created
@@ -73,11 +74,14 @@ global function harmonize_H []
     local actives = allatoms || aInert allatoms == 0;
     local numactives = app length actives;
     local natoms = app length allatoms;
-    local aindex = x_max numactives;
+    local aindex = x_max natoms;
     local activealtloc = sets(aindex);
     natoms(aindex) = 0;
     local iindex = x_max natoms;
     local inertaltloc = sets(iindex);
+
+    aSetInert [oGetCollection activealtloc, 0];
+    aSetInert [oGetCollection inertaltloc, 1];
  
     if length sets > 2 then
 	local leftovers = sets | sets <> activealtloc and sets <> inertaltloc;
@@ -89,10 +93,23 @@ global function harmonize_H []
     local altres = sort uniq cat oParent altatoms;
     local i = 1;
     while i <= length altres loop
-
 	local res = altatoms || oParent altatoms == altres(i);
 	local inert = cat (res || aInert res == 1);
 	local active = cat (res || aInert res == 0);
+
+	if isnull active == 1 then
+	    // There's nothing in the active -- probably a misassignment of the
+	    // active and inactive sets above.  Switch them.
+	    oSetCollection [inertaltloc,
+		diff [oGetCollection inertaltloc, inert]];
+	    oSetCollection [activealtloc,
+		diff [oGetCollection activealtloc, active]];
+	    local tmpset = active;
+	    active = inert;
+	    inert = tmpset;
+	    aSetInert [active, 0];
+	    aSetInert [inert, 1];
+	endif
 
 	// Hydrogens aren't part of ALTLOC sets, so grab them.
 	active = cat cat append [active, aBonds active ||
@@ -248,8 +265,12 @@ global function harmonize_H []
 	i = i + 1;
     endloop
 
+    aSetInert [oGetCollection activealtloc, 0];
+    aSetInert [oGetCollection inertaltloc, 1];
+
     // Now take care of the leftover residues -- pattern their atoms after Inert
     // counterpart, if it exists, or the Active counterpart otherwise.
+
     local nleft = length leftovers;
     local totalleftatoms = cat app oGetCollection leftovers;
     i = 1;
