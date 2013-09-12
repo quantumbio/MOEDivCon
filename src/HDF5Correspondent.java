@@ -29,6 +29,7 @@ import svljava.SVLJavaException;
 import svljava.SVLVar;
 import svljava.SVLWriter;
 import com.quantumbioinc.datacorrespondent.Correspondent;
+import com.quantumbioinc.operation.TopologySymmetry;
 import com.quantumbioinc.xml.Element;
 import com.quantumbioinc.xml.Hamiltonian;
 import com.quantumbioinc.xml.bind.marshaller.DivconNamespacePrefixMapper;
@@ -65,6 +66,11 @@ import ncsa.hdf.object.Group;
  */
 public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
 
+         static {
+//         System.out.println(System.getProperty("java.library.path"));
+//@todo         System.loadLibrary("JNIDivcon");
+//         System.load("/home/roger/NetBeansProjects/JNIDivcon/native/JNIDivcon/dist/Release/GNU-Linux-x86/libJNIDivcon.so");
+         }
     private int taskID = 0;		// SVL task identifier
     java.io.PrintStream sessionOutBuffer=null;
     java.io.PrintStream sessionErrBuffer=null;
@@ -99,6 +105,9 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                 case "retrieveAtomByAtomPWD":
                 res = retrieveAtomByAtomPWD(res);
                     break;
+                case "retrieveAtomByAtomDecomposition":
+                res = retrieveAtomByAtomDecomposition(res);
+                    break;
                 case "retrieveAtomByAtomMRM":
                 res = retrieveAtomByAtomMRM(res);
                     break;
@@ -125,6 +134,9 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                     break;
                 case "retrieveDefaultProgramOptions":
                 res = retrieveDefaultProgramOptions(res);
+                    break;
+                case "retrieveTopologyClassNumbers":
+                res = retrieveTopologyClassNumbers(res);
                     break;
                 default:
 		throw new SVLJavaException("here Unknown command: '" + cmd + "'.");
@@ -517,7 +529,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         atomVectors[9]=new SVLVar(jxs);
         atomVectors[10]=new SVLVar(jys);
         atomVectors[11]=new SVLVar(jzs);
-        model[0]=new SVLVar(title);
+        model[0]=new SVLVar(title, true);
         model[1]=new SVLVar(linkageVectors);
         model[2]=new SVLVar(residueVectors);
         model[3]=new SVLVar(atomVectors);
@@ -1007,6 +1019,346 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
                     pwdDataset[10]=new SVLVar(distance);
             data[index]=new SVLVar(new String[]{"name", "indexA", "indexB", "Eab", "Eabp", "Eabc", "LennardJones", "dispersion", "repulsion", "electrostatic", "distance"}, pwdDataset);
         }
+//             bufferedPWDWriter.close();       
+        h5File.close();
+    return new SVLVar(data);
+    }
+}
+    
+private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaException, IOException, Exception
+{
+                sessionErrBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
+                sessionOutBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
+        java.lang.System.setErr(sessionErrBuffer);
+        java.lang.System.setOut(sessionOutBuffer);
+    String filename = var.peek(1).getTokn(1);
+    String target = var.peek(1).getTokn(2);
+    String choice = var.peek(1).getTokn(3);
+    String ligand="";
+    if(var.peek(1).length()>3)
+    {
+        ligand = var.peek(1).getTokn(4);
+        //if(true) return new SVLVar("retrieveAtomByAtomPWD "+ligand);
+    }
+//                    FileWriter pwdOutputFile=new FileWriter("./check.pwd");
+//                    BufferedWriter bufferedPWDWriter=new BufferedWriter(pwdOutputFile);
+//                        bufferedPWDWriter.append(target+" here\n");
+//                        bufferedPWDWriter.flush();
+    H5File h5File=new H5File(filename, H5File.READ);
+    h5File.open();
+                    String xPath="/DivCon/"+target+"/Pairwise Decomposition";
+                    H5Group pwdGroup=(H5Group)findHDF5Object(h5File, xPath);
+                    xPath="/DivCon/"+target+"/"+target;
+                    H5CompoundDS hTargetCollectionObject=(H5CompoundDS)findHDF5Object(h5File, xPath);
+                    hTargetCollectionObject.selectMember(0);
+                    String[] targetAtomSymbols=(String[])((Vector)hTargetCollectionObject.read()).elementAt(0);
+                    hTargetCollectionObject.selectMember(1);
+                    String[] targetAtomNames=(String[])((Vector)hTargetCollectionObject.read()).elementAt(1);
+                    hTargetCollectionObject.selectMember(2);
+                    String[] targetResidueNames=(String[])((Vector)hTargetCollectionObject.read()).elementAt(2);
+                    hTargetCollectionObject.selectMember(5);
+                    int[] targetSequence=(int[])((Vector)hTargetCollectionObject.read()).elementAt(5);
+                    hTargetCollectionObject.selectMember(7);
+                    double[] x=(double[])((Vector)hTargetCollectionObject.read()).elementAt(7);
+                    hTargetCollectionObject.selectMember(8);
+                    double[] y=(double[])((Vector)hTargetCollectionObject.read()).elementAt(8);
+                    hTargetCollectionObject.selectMember(9);
+                    double[] z=(double[])((Vector)hTargetCollectionObject.read()).elementAt(9);
+                    hTargetCollectionObject.selectMember(12);
+                    double[] epsilon=(double[])((Vector)hTargetCollectionObject.read()).elementAt(12);
+                    hTargetCollectionObject.selectMember(13);
+                    double[] welllDepth=(double[])((Vector)hTargetCollectionObject.read()).elementAt(13);
+                    hTargetCollectionObject.selectMember(14);
+                    int[] formalCharge=(int[])((Vector)hTargetCollectionObject.read()).elementAt(14);
+                    xPath="/DivCon/"+target+"/Trajectories/Geometries/Final";
+                    H5ScalarDS trajectoryObject=(H5ScalarDS)findHDF5Object(h5File, xPath);
+                    SVLJava.print(" trajectoryObject? "+trajectoryObject);
+                    if(trajectoryObject!=null)
+                    {
+                    double[] buf= (double[])trajectoryObject.read();  
+                    long[] dims=trajectoryObject.getDims();
+                    for(int i=0;i<dims[0];i++)
+                    {
+                        x[i]=buf[i*3];
+                        y[i]=buf[i*3+1];
+                        z[i]=buf[i*3+2];
+                    }
+                    }
+                    ListIterator li=hTargetCollectionObject.getMetadata().listIterator();
+                    while(li.hasNext())
+                    {
+                        Object obj=li.next();
+                        if(obj instanceof ncsa.hdf.object.Attribute && ((ncsa.hdf.object.Attribute)obj).getName().compareTo("Total Charge")==0)
+                        {
+//                            ChargesType chargeType=new ChargesType();
+//                            TotalChargeType totalChargeType=new TotalChargeType();
+//                            chargeType.setTotalCharge(totalChargeType);
+//                            int[] tc=(int[])((ncsa.hdf.object.Attribute)obj).getValue();
+                        }
+                    }
+    if(ligand.length()>0)
+    {
+            List<HObject> ligandList=pwdGroup.getMemberList();
+            H5Group pwdTargetLigandObject=null;
+            boolean hit=false;
+            for(int index=0;index<pwdGroup.getNumberOfMembersInFile();index++)
+            {
+                pwdTargetLigandObject=(H5Group)ligandList.get(index);
+                if(pwdTargetLigandObject.getName().endsWith("-"+ligand))
+                {
+                    hit=true;
+                    break;
+                }
+            }
+            if(!hit)
+            {
+                h5File.close();
+            return new SVLVar();
+            }
+            SVLVar[] pwdDataset=new SVLVar[pwdTargetLigandObject.getNumberOfMembersInFile()+2];
+            if(pwdDataset.length!=11) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            List pwdRow=pwdTargetLigandObject.getMemberList();
+            pwdDataset[0]=new SVLVar(pwdTargetLigandObject.getName());
+            int[] targetIndex=null;
+            int[] ligandIndex=null;
+            double[] pwdValues=null;
+            H5CompoundDS pwdObject=null;
+            for(int memberIndex=0;memberIndex<3;memberIndex++)
+            {
+                H5CompoundDS member=(H5CompoundDS)pwdRow.get(memberIndex);
+                if(member.getName().compareTo("Atom A")==0)
+                {
+                    targetIndex=(int[])member.read();
+                    pwdDataset[1]=new SVLVar((int[])member.read());
+                }
+                else if(member.getName().compareTo("Atom B")==0)
+                {
+                    ligandIndex=(int[])member.read();
+                    pwdDataset[2]=new SVLVar((int[])member.read());
+                }
+                else
+                {
+                    pwdObject=(H5CompoundDS)member;
+                    pwdValues=(double[])member.read();
+                }
+            }
+                    xPath="/DivCon/"+pwdObject.getName();
+                    H5CompoundDS hLigandCollectionObject=(H5CompoundDS)findHDF5Object(h5File, xPath);
+                    hLigandCollectionObject.selectMember(0);
+                    String[] ligandAtomSymbols=(String[])((Vector)hLigandCollectionObject.read()).elementAt(0);
+                    hLigandCollectionObject.selectMember(1);
+                    String[] ligandAtomNames=(String[])((Vector)hLigandCollectionObject.read()).elementAt(1);
+                    hLigandCollectionObject.selectMember(2);
+                    String[] ligandResidueNames=(String[])((Vector)hLigandCollectionObject.read()).elementAt(2);
+                    hLigandCollectionObject.selectMember(5);
+                    int[] ligandSequence=(int[])((Vector)hLigandCollectionObject.read()).elementAt(5);
+                    hLigandCollectionObject.selectMember(7);
+                    double[] xLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(7);
+                    hLigandCollectionObject.selectMember(8);
+                    double[] yLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(8);
+                    hLigandCollectionObject.selectMember(9);
+                    double[] zLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(9);
+//                    hLigandCollectionObject.selectMember(7);
+//                    double[] epsilon=(double[])((Vector)hLigandCollectionObject.read()).elementAt(7);
+//                    hLigandCollectionObject.selectMember(8);
+//                    double[] welllDepth=(double[])((Vector)hLigandCollectionObject.read()).elementAt(8);
+//                    hLigandCollectionObject.selectMember(9);
+//                    int[] formalCharge=(int[])((Vector)hLigandCollectionObject.read()).elementAt(9);
+                    SVLJava.print(targetAtomSymbols.length+" lengths "+ligandAtomSymbols.length);
+                    ArrayList<Double> EabList=new  ArrayList<Double>();
+//                    ArrayList<Double> EabpList=new  ArrayList<Double>();
+//                    ArrayList<Double> EabcList=new  ArrayList<Double>();
+//                    ArrayList<Double> LennardJonesList=new  ArrayList<Double>();
+//                    ArrayList<Double> dispersionList=new  ArrayList<Double>();
+//                    ArrayList<Double> repulsionList=new  ArrayList<Double>();
+//                    ArrayList<Double> electrostaticList=new  ArrayList<Double>();
+                    ArrayList<Double> distanceList=new  ArrayList<Double>();
+                    
+//                        bufferedPWDWriter.append(targetIndex.length+" "+ligandIndex.length+"\n");
+                    for(int atomIndex=0;atomIndex<targetIndex.length;atomIndex++)
+                    {
+                        int ligandOffsetIndex=ligandIndex[atomIndex];
+//                        bufferedPWDWriter.append(targetIndex[atomIndex]+" "+ligandOffsetIndex+"\n");
+                        ligandOffsetIndex-=x.length;
+                        double distance=Math.sqrt(Math.pow(x[targetIndex[atomIndex]]-xLigand[ligandOffsetIndex],2)+Math.pow(y[targetIndex[atomIndex]]-yLigand[ligandOffsetIndex],2)+Math.pow(z[targetIndex[atomIndex]]-zLigand[ligandOffsetIndex],2));
+                        //if(distance<=4.0 || pwdValues[7*iw]!=0.0)
+                        EabList.add(pwdValues[7*atomIndex]);
+//                        EabpList.add(pwdValues[7*atomIndex+1]);
+//                        EabcList.add(pwdValues[7*atomIndex+2]);
+//                        LennardJonesList.add(pwdValues[7*atomIndex+3]);
+//                        dispersionList.add(pwdValues[7*atomIndex+4]);
+//                        repulsionList.add(pwdValues[7*atomIndex+5]);
+//                        electrostaticList.add(pwdValues[7*atomIndex+6]);
+                        distanceList.add(distance);
+                    }
+                    double[] Eab=new double[pwdDataset[1].length()];
+//                    double[] Eabp=new double[pwdDataset[1].length()];
+//                    double[] Eabc=new double[pwdDataset[1].length()];
+//                    double[] LennardJones=new double[pwdDataset[1].length()];
+//                    double[] dispersion=new double[pwdDataset[1].length()];
+//                    double[] repulsion=new double[pwdDataset[1].length()];
+//                    double[] electrostatic=new double[pwdDataset[1].length()];
+                    double[] distance=new double[pwdDataset[1].length()];
+                    for(int vIndex=0;vIndex<pwdDataset[1].length();vIndex++)
+                    {
+                    Eab[vIndex]=EabList.get(vIndex);
+//                    Eabp[vIndex]=EabpList.get(vIndex);
+//                    Eabc[vIndex]=EabcList.get(vIndex);
+//                    LennardJones[vIndex]=LennardJonesList.get(vIndex);
+//                    dispersion[vIndex]=dispersionList.get(vIndex);
+//                    repulsion[vIndex]=repulsionList.get(vIndex);
+//                    electrostatic[vIndex]=electrostaticList.get(vIndex);
+                    distance[vIndex]=distanceList.get(vIndex);
+                    }
+                    pwdDataset[3]=new SVLVar(Eab);
+//                    pwdDataset[4]=new SVLVar(Eabp);
+//                    pwdDataset[5]=new SVLVar(Eabc);
+//                    pwdDataset[6]=new SVLVar(LennardJones);
+//                    pwdDataset[7]=new SVLVar(dispersion);
+//                    pwdDataset[8]=new SVLVar(repulsion);
+//                    pwdDataset[9]=new SVLVar(electrostatic);
+                    pwdDataset[4]=new SVLVar(distance);
+            SVLVar data=new SVLVar(new String[]{"name", "indexA", "indexB", "Eab", "distance"}, pwdDataset);
+        h5File.close();
+    return new SVLVar(data);
+    }
+    else
+    {
+        SVLVar[] data=new SVLVar[1];
+        xPath="/DivCon/"+target+"/Pairwise Decomposition/"+choice;
+        H5CompoundDS pwdData=(H5CompoundDS)findHDF5Object(h5File, xPath);
+                    pwdData.selectMember(0);
+                    int[] indexA=(int[])((Vector)pwdData.read()).elementAt(0);
+                    pwdData.selectMember(1);
+                    int[] indexB=(int[])((Vector)pwdData.read()).elementAt(1);
+                    pwdData.selectMember(2);
+                    double[] Eab=(double[])((Vector)pwdData.read()).elementAt(2);
+            SVLVar[] pwdDataset=new SVLVar[5];
+                    pwdDataset[0]=new SVLVar(pwdGroup.getName());
+                    pwdDataset[1]=new SVLVar(indexA);
+                    pwdDataset[2]=new SVLVar(indexB);
+                    pwdDataset[3]=new SVLVar(Eab);
+                    double[] distance=new double[pwdDataset[1].length()];
+                    for(int vIndex=0;vIndex<pwdDataset[1].length();vIndex++)
+                    {
+                        distance[vIndex]=0.0;
+                    }
+                    pwdDataset[4]=new SVLVar(distance);
+            data[0]=new SVLVar(new String[]{"name", "indexA", "indexB", "Eab", "distance"}, pwdDataset);
+    
+//        for(int index=0;index<pwdGroup.getNumberOfMembersInFile();index++)
+//        {
+////                    List<HObject> ligandList=pwdGroup.getMemberList();
+////                    H5Group pwdTargetLigandObject=(H5Group)ligandList.get(index);
+//            SVLVar[] pwdDataset=new SVLVar[pwdGroup.getNumberOfMembersInFile()+2];
+//            if(pwdDataset.length!=4) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+//            List pwdRow=pwdGroup.getMemberList();
+//            pwdDataset[0]=new SVLVar(pwdGroup.getName());
+//            int[] targetIndex=null;
+//            int[] ligandIndex=null;
+//            double[] pwdValues=null;
+//            H5CompoundDS pwdObject=null;
+//            for(int memberIndex=0;memberIndex<2;memberIndex++)
+//            {
+//                H5CompoundDS member=(H5CompoundDS)pwdRow.get(memberIndex);
+//                if(member.getName().compareTo("Atom A")==0)
+//                {
+//                    member.selectMember(0);
+//                    targetIndex=(int[])((Vector)member.read()).elementAt(0);
+//                    pwdDataset[1]=new SVLVar(targetIndex);
+//                }
+//                else if(member.getName().compareTo("Atom B")==0)
+//                {
+//                    member.selectMember(1);
+//                    ligandIndex=(int[])((Vector)member.read()).elementAt(1);
+//                    ligandIndex=(int[])member.read();
+//                    pwdDataset[2]=new SVLVar((int[])member.read());
+//                }
+//                else
+//                {
+//                    member.selectMember(2);
+//                    pwdObject=(H5CompoundDS)member;
+//                    pwdValues=(double[])((Vector)member.read()).elementAt(2);
+//                }
+//            }
+//                    /*xPath="/DivCon/"+pwdObject.getName();
+//                    H5CompoundDS hLigandCollectionObject=(H5CompoundDS)findHDF5Object(h5File, xPath);
+//                    hLigandCollectionObject.selectMember(0);
+//                    String[] ligandAtomSymbols=(String[])((Vector)hLigandCollectionObject.read()).elementAt(0);
+//                    hLigandCollectionObject.selectMember(1);
+//                    String[] ligandAtomNames=(String[])((Vector)hLigandCollectionObject.read()).elementAt(1);
+//                    hLigandCollectionObject.selectMember(2);
+//                    String[] ligandResidueNames=(String[])((Vector)hLigandCollectionObject.read()).elementAt(2);
+//                    hLigandCollectionObject.selectMember(5);
+//                    int[] ligandSequence=(int[])((Vector)hLigandCollectionObject.read()).elementAt(5);
+//                    hLigandCollectionObject.selectMember(7);
+//                    double[] xLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(7);
+//                    hLigandCollectionObject.selectMember(8);
+//                    double[] yLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(8);
+//                    hLigandCollectionObject.selectMember(9);
+//                    double[] zLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(9);*/
+////                    hLigandCollectionObject.selectMember(7);
+////                    double[] epsilon=(double[])((Vector)hLigandCollectionObject.read()).elementAt(7);
+////                    hLigandCollectionObject.selectMember(8);
+////                    double[] welllDepth=(double[])((Vector)hLigandCollectionObject.read()).elementAt(8);
+////                    hLigandCollectionObject.selectMember(9);
+////                    int[] formalCharge=(int[])((Vector)hLigandCollectionObject.read()).elementAt(9);
+//                    //SVLJava.print(targetAtomSymbols.length+" lengths "+ligandAtomSymbols.length);
+//                    ArrayList<Double> EabList=new  ArrayList<Double>();
+////                    ArrayList<Double> EabpList=new  ArrayList<Double>();
+////                    ArrayList<Double> EabcList=new  ArrayList<Double>();
+////                    ArrayList<Double> LennardJonesList=new  ArrayList<Double>();
+////                    ArrayList<Double> dispersionList=new  ArrayList<Double>();
+////                    ArrayList<Double> repulsionList=new  ArrayList<Double>();
+////                    ArrayList<Double> electrostaticList=new  ArrayList<Double>();
+//                    ArrayList<Double> distanceList=new  ArrayList<Double>();
+//                    
+////                        bufferedPWDWriter.append(targetIndex.length+" "+ligandIndex.length+"\n");
+//                    for(int atomIndex=0;atomIndex<targetIndex.length;atomIndex++)
+//                    {
+//                        int ligandOffsetIndex=ligandIndex[atomIndex];
+////                        bufferedPWDWriter.append(targetIndex[atomIndex]+" "+ligandOffsetIndex+"\n");
+//                        ligandOffsetIndex-=x.length;
+//                        double distance=0.0;//Math.sqrt(Math.pow(x[targetIndex[atomIndex]]-xLigand[ligandOffsetIndex],2)+Math.pow(y[targetIndex[atomIndex]]-yLigand[ligandOffsetIndex],2)+Math.pow(z[targetIndex[atomIndex]]-zLigand[ligandOffsetIndex],2));
+//                        //if(distance<=4.0 || pwdValues[7*iw]!=0.0)
+//                        EabList.add(pwdValues[7*atomIndex]);
+////                        EabpList.add(pwdValues[7*atomIndex+1]);
+////                        EabcList.add(pwdValues[7*atomIndex+2]);
+////                        LennardJonesList.add(pwdValues[7*atomIndex+3]);
+////                        dispersionList.add(pwdValues[7*atomIndex+4]);
+////                        repulsionList.add(pwdValues[7*atomIndex+5]);
+////                        electrostaticList.add(pwdValues[7*atomIndex+6]);
+//                        distanceList.add(distance);
+//                    }
+//                    double[] Eab=new double[pwdDataset[1].length()];
+////                    double[] Eabp=new double[pwdDataset[1].length()];
+////                    double[] Eabc=new double[pwdDataset[1].length()];
+////                    double[] LennardJones=new double[pwdDataset[1].length()];
+////                    double[] dispersion=new double[pwdDataset[1].length()];
+////                    double[] repulsion=new double[pwdDataset[1].length()];
+////                    double[] electrostatic=new double[pwdDataset[1].length()];
+//                    double[] distance=new double[pwdDataset[1].length()];
+//                    for(int vIndex=0;vIndex<pwdDataset[1].length();vIndex++)
+//                    {
+//                    Eab[vIndex]=EabList.get(vIndex);
+////                    Eabp[vIndex]=EabpList.get(vIndex);
+////                    Eabc[vIndex]=EabcList.get(vIndex);
+////                    LennardJones[vIndex]=LennardJonesList.get(vIndex);
+////                    dispersion[vIndex]=dispersionList.get(vIndex);
+////                    repulsion[vIndex]=repulsionList.get(vIndex);
+////                    electrostatic[vIndex]=electrostaticList.get(vIndex);
+//                    distance[vIndex]=distanceList.get(vIndex);
+//                    }
+//                    pwdDataset[3]=new SVLVar(Eab);
+////                    pwdDataset[4]=new SVLVar(Eabp);
+////                    pwdDataset[5]=new SVLVar(Eabc);
+////                    pwdDataset[6]=new SVLVar(LennardJones);
+////                    pwdDataset[7]=new SVLVar(dispersion);
+////                    pwdDataset[8]=new SVLVar(repulsion);
+////                    pwdDataset[9]=new SVLVar(electrostatic);
+//                    pwdDataset[4]=new SVLVar(distance);
+//            data[index]=new SVLVar(new String[]{"name", "indexA", "indexB", "Eab", "distance"}, pwdDataset);
+//        }
 //             bufferedPWDWriter.close();       
         h5File.close();
     return new SVLVar(data);
@@ -1682,5 +2034,131 @@ private SVLVar retrieveDefaultProgramOptions(SVLVar var) throws SVLJavaException
 //  [-6.702,-7.086,-6.105,-6.086,-8.507,-9.595,-9.322,-10.845,-7.491,-6.256,-6.113,-7.06,-8.6,-8.648,-11.502,-10.997,-5.305,-4.238,-4.339,-4.46,-2.891,-2.771,-2.94,-2.553,-5.363,-4.317,-2.797,-2.179,-2.478,-2.488,-4.312,-4.492,-3.406,-3.213,-5.873,-7.049,-8.384,-8.538,-9.375,-4.19,-4.427,-5.962,-5.937,-7.077,-6.928,-10.15,-9.238,-2.688,-1.748,-2.009,-2.262,-0.299,0.697,0.899,1.318,-2.727,-1.852,-0.126,-0.172,1.895,1.144,-1.942,-1.937,-0.871,-0.674,-3.322,-3.203,-3.844,-1.899,-1.718,-3.961,-3.928,-4.699,-3.94,-3.232,-0.187,0.767,0.043,-1.185,1.92,2.818,2.559,3.889,3.379,4.703,4.446,0.644,-0.256,1.156,1.55,2.454,1.84,4.063,3.205,5.421,4.999,-4.963,-4.55,-4.857,3.229,4.206,2.873],
 //  [-0.246,-0.456,0.245,1.471,0.053,-0.823,-1.82,-0.455,-0.083,-1.029,0.509,-1.415,0.946,0.075,-0.909,0.237,-0.56,-0.059,-0.686,-1.902,-0.381,0.218,1.432,-0.63,-1.418,0.914,-1.343,-0.018,-0.334,-1.473,0.157,-0.3,0.301,1.513,0.128,-0.532,0.084,1.308,-0.766,1.005,-1.277,1.089,-0.111,-1.474,-0.424,-0.465,-1.614,-0.55,-0.074,-0.747,-1.949,-0.363,0.175,1.379,-0.718,-1.406,0.894,0.057,-1.322,-0.461,-1.555,0.035,-0.543,0.104,1.318,-0.437,-0.912,0.981,0.894,-1.495,-0.989,-0.862,1.011,1.305,1.55,-0.71,-0.2,0.142,-0.034,-1.196,-1.298,-2.231,-0.428,-2.309,-0.496,-1.433,0.627,-1.567,0.63,-2.076,-0.906,-2.814,0.209,-2.941,0.088,-1.488,1.946,2.566,2.342,1.122,1.113,1.272],
 //  [-0.738,-2.167,-3.087,-3.179,-2.45,-1.836,-1.146,-2.097,-0.215,-0.408,-0.673,-2.368,-2.082,-3.409,-1.779,-2.584,-3.78,-4.637,-6.017,-6.14,-3.992,-2.611,-2.438,-1.607,-3.769,-4.728,-3.914,-4.542,-0.803,-1.763,-7.046,-8.432,-9.31,-9.314,-8.959,-8.226,-8.604,-8.617,-8.883,-6.972,-8.472,-8.857,-9.897,-8.454,-7.27,-9.102,-8.843,-10.038,-11.048,-12.39,-12.45,-10.629,-11.625,-11.723,-12.38,-9.967,-11.16,-9.772,-10.563,-12.963,-12.287,-13.461,-14.799,-15.676,-15.627,-15.495,-16.838,-15.511,-13.442,-14.724,-15.018,-17.218,-15.947,-14.612,-15.984,-16.472,-17.457,-18.765,-18.875,-17.666,-16.478,-15.482,-16.318,-14.355,-15.202,-14.213,-19.73,-16.463,-17.111,-17.839,-18.422,-15.571,-16.973,-13.695,-15.114,-13.467,-0.298,-0.935,0.592,-20.636,-20.715,-21.537] ] ]
+    private SVLVar retrieveTopologyClassNumbers(SVLVar var) throws SVLJavaException, IOException, Exception
+    {
+        String target = var.peek(1).getTokn(1);
+                sessionErrBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
+                sessionOutBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
+        java.lang.System.setErr(sessionErrBuffer);
+        java.lang.System.setOut(sessionOutBuffer);
+        long[] dims = {1};
+                    ObjectFactory objectFactory=new ObjectFactory();
+                    DivconType divcon=new DivconType();
+                    divcon.setVersion("1.0");
+                    SVLVar svlMol=var.peek(1).peek(2);
+                    String[] chainNames=svlMol.peek(2).peek(1).getTokns();
+                    int[] residueCounts=svlMol.peek(2).peek(4).getInts();
+                    String[] residueNames=svlMol.peek(3).peek(1).getTokns();
+                    int[] sequences=svlMol.peek(3).peek(2).getInts();
+                    int[] atomCounts=svlMol.peek(3).peek(5).getInts();
+                    String[] symbols=svlMol.peek(4).peek(1).getTokns();
+                    String[] hybridizations=svlMol.peek(4).peek(3).getTokns();
+//                    int[] atomCounts=svlMol.peek(4).peek(5).getInts();
+                    String[] atomNames=svlMol.peek(4).peek(8).getTokns();
+                    int[] formalCharges=svlMol.peek(4).peek(2).getInts();
+                    double[] x=svlMol.peek(4).peek(10).getReals();
+                    double[] y=svlMol.peek(4).peek(11).getReals();
+                    double[] z=svlMol.peek(4).peek(12).getReals();
+                    Cml cml=objectFactory.createCml();
+                    int chainIndex=0;
+                    int residueIndex=0;
+                    int chainOffset=0;
+                    int residueOffset=0;
+                    JAXBElement<Molecule> molecule=objectFactory.createMolecule(new Molecule());
+                    JAXBElement<Molecule> submolecule=objectFactory.createMolecule(new Molecule());
+                    JAXBElement<AtomArray> atomArray=objectFactory.createAtomArray(new AtomArray());
+                    int totalCharge=0;
+                    for(int atomIndex=0;atomIndex<atomNames.length;atomIndex++)
+                    {
+                        JAXBElement<Atom> atom=objectFactory.createAtom(new Atom());
+                        atom.getValue().setElementType(symbols[atomIndex]);
+                        atom.getValue().setX3(new Double(x[atomIndex]));
+                        atom.getValue().setY3(new Double(y[atomIndex]));
+                        atom.getValue().setZ3(new Double(z[atomIndex]));
+                        atom.getValue().setFormalCharge(new BigInteger(""+formalCharges[atomIndex]));
+                        totalCharge+=formalCharges[atomIndex];
+                        JAXBElement<AtomType> atomType=objectFactory.createAtomType(new AtomType());
+                        atomType.getValue().setName(atomNames[atomIndex]);
+                        atom.getValue().getAnyCmlOrAnyOrAny().add(atomType);
+                        JAXBElement<Scalar> chainID=objectFactory.createScalar(new Scalar());
+                        chainID.getValue().setTitle("chainID");
+                        chainID.getValue().setValue(chainNames[chainIndex].substring(chainNames[chainIndex].lastIndexOf('.')+1, chainNames[chainIndex].length()));
+                        atom.getValue().getAnyCmlOrAnyOrAny().add(chainID);
+                        JAXBElement<Scalar> hybridization=objectFactory.createScalar(new Scalar());
+                        hybridization.getValue().setTitle("hybridization");
+                        hybridization.getValue().setValue(hybridizations[atomIndex]);
+                        atom.getValue().getAnyCmlOrAnyOrAny().add(hybridization);
+                        atomArray.getValue().getAnyCmlOrAnyOrAny().add(atom);
+                        if(atomIndex>=atomCounts[residueIndex]+residueOffset-1)
+                        {
+                            residueOffset+=atomCounts[residueIndex];
+                            submolecule.getValue().setTitle(residueNames[residueIndex]);
+                            submolecule.getValue().getAnyCmlOrAnyOrAny().add(atomArray);
+                            JAXBElement<Scalar> sequence=objectFactory.createScalar(new Scalar());
+                            sequence.getValue().setTitle("sequence");
+                            sequence.getValue().setValue(""+sequences[residueIndex]);
+                            submolecule.getValue().getAnyCmlOrAnyOrAny().add(sequence);
+                            molecule.getValue().getAnyCmlOrAnyOrAny().add(submolecule);
+                            residueIndex++;
+                            if(residueIndex<=atomCounts.length)
+                            {
+                                atomArray=objectFactory.createAtomArray(new AtomArray());
+                                submolecule=objectFactory.createMolecule(new Molecule());
+                            }
+                            if(residueIndex>=residueCounts[chainIndex]+chainOffset)
+                            {
+                                chainOffset+=residueCounts[chainIndex];
+                                chainIndex++;
+                                molecule.getValue().setTitle(svlMol.peek(1).getTokn(1));
+                                cml.getAnyCmlOrAnyOrAny().add(molecule);
+                                if(chainIndex<=residueCounts.length)molecule=objectFactory.createMolecule(new Molecule());
+                            }
+                        }
+                    }
+                    HamiltonianType hamiltonianType=objectFactory.createHamiltonianType();
+                    hamiltonianType.setParameters("pm6");
+                    divcon.setHamiltonian(hamiltonianType);
+                    TotalChargeType totalChargeType=objectFactory.createTotalChargeType();
+                    totalChargeType.setValue(totalCharge);
+                    ChargesType chargesType=objectFactory.createChargesType();
+                    chargesType.setTotalCharge(totalChargeType);
+                    divcon.setCharges(chargesType);
+                    divcon.getCmlOrTargetOrLigand().add(cml);
+                    JAXBContext jc = JAXBContext.newInstance("com.quantumbioinc.xml.divcon");
+                    Marshaller m = jc.createMarshaller();
+                    m.setProperty(Marshaller.JAXB_SCHEMA_LOCATION, "http://quantumbioinc.com/schema/divcon /home/roger/NetBeansProjects/OOBackbone/schemas/divcon.xsd");
+                    m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+                    DivconNamespacePrefixMapper dnpm=new DivconNamespacePrefixMapper();
+                    m.setProperty("com.sun.xml.bind.namespacePrefixMapper", dnpm);
+            //Marshal object into file.
+                    ByteArrayOutputStream baos=new java.io.ByteArrayOutputStream();
+                    JAXBElement<com.quantumbioinc.xml.divcon.DivconType> jaxbOutElement=objectFactory.createDivcon(divcon);
+                    m.marshal(jaxbOutElement, baos);
+                    TopologySymmetry topologySymmetry=new TopologySymmetry();
+                    ArrayList classNumbers=topologySymmetry.perceive(baos.toString());
+                    int[] cn=new int[classNumbers.size()];
+                    for(int index=0;index<classNumbers.size();index++)
+                    {
+                        cn[index]=(int)classNumbers.get(index);
+                    }
+//                    System.out.println("cn: "+cn.length);
+        SVLVar[] model=new SVLVar[4];
+        model[0]=svlMol.peek(1);
+        model[1]=svlMol.peek(2);
+        model[2]=svlMol.peek(3);
+        SVLVar[] atomVectors=new SVLVar[svlMol.peek(4).length()];
+        for(int index=0;index<svlMol.peek(4).length();index++)
+        {
+            atomVectors[index]=svlMol.peek(4).peek(index+1);
+        }
+        model[3]=new SVLVar(atomVectors);
+        SVLVar[] data=new SVLVar[2];
+        data[0]=new SVLVar(model);
+        SVLVar[] cnVar=new SVLVar[1];
+        cnVar[0]=new SVLVar(cn);
+        data[1]=new SVLVar(new String[]{"qbData.classNumber"},cnVar);
+        return new SVLVar(data);
+    }
+
 
 }
