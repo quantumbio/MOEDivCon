@@ -2068,6 +2068,10 @@ local function mol_InsertAltMol [mol, alt_mol]
     local atoms = oChildren res;
     local i, new_r = rep [[], length res];
     
+    // lmw - the following lines are removed because for X-ray crystallography
+    //      this is not the right solution during the write. CCG is
+    //      exploring a fix where the alt. atoms are re-merged into the same
+    //      residue when the structure is written.
     if 0 then
         for i = 1, length res loop
 	    if anytrue (oParent aBonds atoms(i) <> res(i)) then continue; endif;
