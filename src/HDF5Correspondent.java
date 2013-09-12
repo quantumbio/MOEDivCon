@@ -29,7 +29,7 @@ import svljava.SVLJavaException;
 import svljava.SVLVar;
 import svljava.SVLWriter;
 import com.quantumbioinc.datacorrespondent.Correspondent;
-import com.quantumbioinc.operation.TopologySymmetry;
+//import com.quantumbioinc.operation.TopologySymmetry;
 import com.quantumbioinc.xml.Element;
 import com.quantumbioinc.xml.Hamiltonian;
 import com.quantumbioinc.xml.bind.marshaller.DivconNamespacePrefixMapper;
@@ -2134,8 +2134,8 @@ private SVLVar retrieveDefaultProgramOptions(SVLVar var) throws SVLJavaException
                     ByteArrayOutputStream baos=new java.io.ByteArrayOutputStream();
                     JAXBElement<com.quantumbioinc.xml.divcon.DivconType> jaxbOutElement=objectFactory.createDivcon(divcon);
                     m.marshal(jaxbOutElement, baos);
-                    TopologySymmetry topologySymmetry=new TopologySymmetry();
-                    ArrayList classNumbers=topologySymmetry.perceive(baos.toString());
+//                    TopologySymmetry topologySymmetry=new TopologySymmetry();
+                    ArrayList classNumbers=new ArrayList();//topologySymmetry.perceive(baos.toString());
                     int[] cn=new int[classNumbers.size()];
                     for(int index=0;index<classNumbers.size();index++)
                     {
