@@ -1495,11 +1495,6 @@ global function qbPhenixPrepPanel[]
         local memory = (ceil((fullMatrixSize/1024/1024/1024)*10) / 10) + ((values.setNP - 1) * 0.100);
         WindowSetAttr[wkey, [ setMem: [shortcut: [twrite['{}',memory],'1','2','4','8','16'],bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
         return memory;
-//        local memory = length allAtoms;
-//        if memory < 1000 then
-//            memory = 1000;
-//        endif
-//        return (ceil(((memory/1000) + 0.5)*10) / 10) + ((values.setNP - 1) * 0.100);
     endfunction
 
 	local function updateAtomCount [wkey, values, coreList]
