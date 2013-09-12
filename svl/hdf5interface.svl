@@ -9,6 +9,7 @@ global function qbListModels  arg = jvmqb ['listModels' , [arg] ];
 global function qbRetrieveQMScore  arg = jvmqb ['retrieveQMScore' , [arg] ];
 global function qbRetrieveResiduePWD  arg  = jvmqb ['retrieveResiduePWD' , [arg]  ];
 global function qbRetrieveAtomByAtomPWD  arg  = jvmqb ['retrieveAtomByAtomPWD' , [arg]  ];
+global function qbRetrieveAtomByAtomDecomposition  arg  = jvmqb ['retrieveAtomByAtomDecomposition' , [arg]  ];
 global function qbRetrieveAtomByAtomMRM  arg  = jvmqb ['retrieveAtomByAtomMRM' , [arg]  ];
 global function qbRetrieveNMRScore  arg = jvmqb ['retrieveNMRScore' , [arg] ];
 global function qbRetrieveChemicalShifts  arg = jvmqb ['retrieveChemicalShifts' , [arg] ];
@@ -20,6 +21,7 @@ global function qbStoreModel  arg = jvmqb ['storeModel' , [arg] ];
 global function qbRetrieveModel  arg = jvmqb ['retrieveModel' , [arg] ];
 global function qbRetrieveHamiltonian  arg = jvmqb ['retrieveHamiltonian' , [arg] ];
 global function qbRetrieveDefaultProgramOptions  arg = jvmqb ['retrieveDefaultProgramOptions' , [arg] ];
+global function qbRetrieveTopologyClassNumbers  arg = jvmqb ['retrieveTopologyClassNumbers' , [arg] ];
 
 // The following function can be used test the new h5 
 // example:
@@ -49,7 +51,8 @@ global function qbTesth5Main [h5file]
  //   print qbListModels [h5file];
     //print qbRetrieveQMScore [h5file, modelTags.target];
     //print qbRetrieveResiduePWD [h5file, modelTags.target];
-    //print qbRetrieveAtomByAtomPWD [h5file, modelTags.target];
+    print qbRetrieveAtomByAtomDecomposition [h5file, modelTags.target, 'Initial'];
+    print qbRetrieveAtomByAtomDecomposition [h5file, modelTags.target, 'Final'];
     //print qbRetrieveAtomByAtomMRM [h5file, modelTags.target];
     print qbRetrieveNMRScore [h5file, modelTags.target];
     print qbRetrieveChemicalShifts [h5file, modelTags.target, 'Wildtype'];
