@@ -80,9 +80,6 @@ global function harmonize_H []
     local iindex = x_max natoms;
     local inertaltloc = sets(iindex);
 
-    aSetInert [oGetCollection activealtloc, 0];
-    aSetInert [oGetCollection inertaltloc, 1];
- 
     if length sets > 2 then
 	local leftovers = sets | sets <> activealtloc and sets <> inertaltloc;
     endif
