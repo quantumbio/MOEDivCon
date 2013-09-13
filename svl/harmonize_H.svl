@@ -2,7 +2,7 @@
 //	harmonize_h.svl Correct protonation state of crystallographic alternates
 //
 //
-//	12-sep-2013 (md) More robust error checking
+//	13-sep-2013 (md) More robust error checking; fixed ligand protonation
 //	20-aug-2013 (md) Fixed final assignment into alternate sets
 //	16-aug-2013 (md) Placeholder heavy atoms are not kept
 //	29-jul-2013 (md) created
@@ -349,6 +349,12 @@ global function harmonize_H []
     aSetIon [inertterm, ionterm];
     aSetHintLP [inertterm, hintterm];
     Add_H inertterm;
+
+    // Ligands haven't been treated yet, but they're not addressed by P3D in a
+    // sophisticated manner, so just Add_H to them
+    local ligatoms;
+    ligatoms = Atoms [] | aClassRLS Atoms []  == 'lig';
+    Add_H ligatoms;
 
     // If an atom was originally in a given ALTLOC set, make sure it still is.
     // If a heavy atom wasn't originally in a given ALTLOC set, make sure it
