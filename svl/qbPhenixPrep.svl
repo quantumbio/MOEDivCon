@@ -22,7 +22,7 @@
  // END COPYRIGHT
 #endif
 
-// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['3V7Y.pdb',[enableAutoPrep:0,enableProtonate:1,enableLigFix:0,hnames:'MOE'],['test.cif','test2.cif']],'qbPhenixPrepFile']" -exit
+// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['3V7Y.pdb',[enableAutoPrep:0,enableProtonate:1,enableLigFix:0],['test.cif','test2.cif']],'qbPhenixPrepFile']" -exit
 
 // example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C-phenix.pdb','1A2C-phenix.translation'],'qbPostPhenixFile']" -exit
 
@@ -52,7 +52,6 @@ static residueNamesTaken;
 const CORE_DEFAULTS = [
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
     enableProtonate:1,      // Turns on Protonate3D
-    hnames:'PDB v3.0',      // Sets the hnames option in the PDB writer ('PDB v3.0' is the default in MOE. Could also use 'MOE')
     pmode:'Protonate3D',    // set the mode of the protonation (e.g. Protonate3D or Add_H are acceptable).
     protPH:7.4,              // Set pH for Protonation
     enableLigFix:0,          // Fixes the ligand protonation
@@ -61,6 +60,7 @@ const CORE_DEFAULTS = [
 
 const PREPDEFAULTS = cat [CORE_DEFAULTS,[
     forceUseElement:1,         // force reading of the element in the PDB file. Not a good idea if file format broken.
+    enableAltAtoms:1,       // enable reading of alternative atoms
     qmApplication:[],       // Skip the DivCon tests - we will be running no matter what since this is refinement.
     enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
 ]];
@@ -522,12 +522,12 @@ local function ResiduePreparation []
     return residueList;
 endfunction
 
-local function ReadInputFiles[inpdbfile,forceUseElement]
+local function ReadInputFiles[inpdbfile,opt]
     oDestroy Chains[];
     local tmpIn;
-    tmpIn.alt_loc = 1;
+    tmpIn.alt_loc = opt.enableAltAtoms;
     tmpIn.install_cryst = 1;
-    tmpIn.use_element = forceUseElement;
+    tmpIn.use_element = opt.forceUseElement;
     return length ReadPDB[inpdbfile,tmpIn];
 endfunction
 
@@ -552,7 +552,7 @@ local function WriteInputFiles[residueList,ciffiles,filebase,opt]
 
     FindPeptideBreaks[];
     local mainPDBfilename = twrite['{}-phenix.pdb',filebase];
-    WritePDB[mainPDBfilename,[cryst1:1,hnames:opt.hnames]];
+    WritePDB[mainPDBfilename,[cryst1:1]];
     return [mainPDBfilename,resPDBfilenames];
 endfunction
 
@@ -579,7 +579,7 @@ endfunction
 
 global function qbPhenixPrepFile[inpdbfile,opt,ciffiles]
     opt = tagcat[opt, PREPDEFAULTS];
-    if not ReadInputFiles[inpdbfile,opt.forceUseElement] then
+    if not ReadInputFiles[inpdbfile,opt] then
         return;
     endif
 
