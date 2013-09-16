@@ -281,27 +281,13 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
     fwrite [shscr, 'ProcessPackageFile $pdbFileName "$pdbFile"\n'];
 
     local tmpLigFile;
-    for tmpLigFile in inLigPDBs loop
+    for tmpLigFile in inLigSDF loop
         fwrite [shscr, '\nF{}=\'\n',fbase ftail tmpLigFile];
         apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
         fwrite [shscr, '\'\n'];
         fwrite [shscr, 'ProcessPackageFile {} "$F{}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
     endloop
-    
-    for tmpLigFile in ciffiles loop
-        fwrite [shscr, '\nF{}=\'\n',fbase ftail tmpLigFile];
-        apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
-        fwrite [shscr, '\'\n'];
-        fwrite [shscr, 'ProcessPackageFile {} "$F{}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
-    endloop
-    
-    if first fstat transFileName <> '' then
-        fwrite [shscr, '\ntranslationFile=\'\n'];
-        apt fwrite [shscr, '{}\n', r64_encodeln freadb [transFileName,'char',INT_MAX]];
-        fwrite [shscr, '\'\n'];
-        fwrite [shscr, 'ProcessPackageFile transFileName "$translationFile"\n'];
-    endif
-    
+
     fwrite [shscr, 'RunPhenix\n'];
     
     fclose shscr;
@@ -627,7 +613,7 @@ global function qbNMRPrepPanel[]
                         ]
 
                     ],
-                    Data: [name:CSVFileName],
+                    Data: [name:'CSVFileName'],
                     Listbox :
                         [
                         name: 'coreResiduesBox',
