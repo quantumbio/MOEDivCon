@@ -445,6 +445,8 @@ global function qbPrepareSystem [opt]
             Add_H diff [atomsToProtonate,fixedAtoms];
         elseif opt.pmode == 'Protonate3D' then
             Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,fixedAtoms,preciseWaters,protOptions];
+        elseif opt.pmode == 'None' then
+            // do nothing
         else
             exit twrite ['ERROR: unknown protonation mode option {}\n', opt.pmode];
         endif
