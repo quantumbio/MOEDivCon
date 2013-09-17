@@ -537,6 +537,7 @@ local function ReadInputFiles[inpdbfile,opt]
             for altCollection in findmatch ['PDB_ALTLOC_[A-Z,a-z,0-9]', oCollections[]] loop
                 oSetCollection [altCollection, [] ];    // alt designator cleared from output
             endloop
+            aSetOccupancy [Atoms[],1.00];
         endif
     endif
     return length inchains;
