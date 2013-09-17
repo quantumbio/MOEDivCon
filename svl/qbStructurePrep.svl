@@ -416,8 +416,9 @@ global function qbPrepareSystem [opt]
     
     if opt.enableProtonate then
         local prepTypes = StructurePreparation [cmd:'_types'];
-        StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName','HCount']], batch_protonate3d:0];
-
+//        StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName','HCount']], batch_protonate3d:0];
+        StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0];
+        StructurePreparation [disableTypes : diff [prepTypes, ['HCount']], batch_protonate3d:0];
         local preciseWaters = [];
         if opt.enablePreciseHOH then
             preciseWaters = _Atoms '$$solvent';
@@ -437,10 +438,8 @@ global function qbPrepareSystem [opt]
         local fixedAtoms;
         if opt.enableLigFix then
             fixedAtoms = _Atoms '$$ligand';
-//            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,_Atoms '$$ligand',preciseWaters,protOptions];
         else
             fixedAtoms = [];
-//            Protonate3D [atomsToProtonate,atomsToProtonate,atomsToProtonate,[],preciseWaters,protOptions];
         endif
         if opt.pmode == 'Add_H' then
             Add_H diff [atomsToProtonate,fixedAtoms];
@@ -449,7 +448,7 @@ global function qbPrepareSystem [opt]
         else
             exit twrite ['ERROR: unknown protonation mode option {}\n', opt.pmode];
         endif
-        StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0];
+//        StructurePreparation [disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0];
     endif
     
     if opt.enableOpt then
