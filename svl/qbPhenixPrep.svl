@@ -48,6 +48,7 @@ function qb_cLetter;
 // statics
 static transFileName;
 static residueNamesTaken;
+static errorCifFiles;
 
 const CORE_DEFAULTS = [
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
@@ -195,6 +196,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     local geos_ordered_dict_heavy = geo_heavy[ x_sort aPrioSMI Atoms[] ];
     local cifHeavyCnt = length cat Atoms[];
     SystemPop sys_info;
+    write ['amolHeavyCnt: {} | cifHeavyCnt: {}\n', amolHeavyCnt, cifHeavyCnt];
     if amolHeavyCnt == cifHeavyCnt then
     // first test to make sure that this works as planned.
         sys_info = SystemPush amol;
@@ -227,6 +229,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     endif
     if isnull amol then
         WriteLog [twrite ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. due to disagreement in atom count between CIF and PDB)',rName inResidue, cName rChain inResidue, rUID inResidue]];
+        errorCifFiles = cat [errorCifFiles,cif_file];
     endif
     return amol;
 endfunction
@@ -297,7 +300,7 @@ local function ProcessCIF[ cif_file, inResidue ]
         residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
         return inResidue;
     else
-        WriteLog[twrite ['WARNING: incomplete representation for {} residue {}:{}', rName inResidue, cName rChain inResidue, rUID inResidue]];
+        WriteLog[twrite ['WARNING: incomplete representation in CIF for {} residue {}:{}', rName inResidue, cName rChain inResidue, rUID inResidue]];
     endif
 endfunction
 
@@ -315,6 +318,16 @@ local function recursiveDirectoryList[directory]
         endif
     endloop  
     return cat filelist;
+endfunction
+
+local function getCIFlist [directory]
+    if isnull directory then
+        if not isnull getenv 'PHENIX' then
+            directory = tok_cat [getenv 'PHENIX', '/chem_data/'];
+        endif
+    endif
+    local filelist = recursiveDirectoryList[directory];
+    return diff [cat filelist,errorCifFiles];
 endfunction
 
 local function GetRNamesFromCIF[ciffiles,tmpResidue]
@@ -350,9 +363,7 @@ endfunction
 local function ProtonateBasedOnCif [residueList,ciffiles]
     local filelist = [];
     local fixedAtoms;
-    if not isnull getenv 'PHENIX' then
-        filelist = recursiveDirectoryList[tok_cat [getenv 'PHENIX', '/chem_data/']];
-    endif
+    filelist = getCIFlist[];
 
     if isnull cat [ciffiles,filelist] then
         WriteLog[twrite ['NOTE: No CIF files processed for protonation.']];
@@ -385,10 +396,9 @@ local function RenameProtonsInOrder[inResidue]
 endfunction
 
 local function RenameBasedOnCIF [residueList,ciffiles]
-    local phenixdb;
+
     if not isnull getenv 'PHENIX' then
-        phenixdb = tok_cat [getenv 'PHENIX', '/chem_data/'];
-        WriteLog[twrite ['NOTE: Using Phenix cif database found at {}', phenixdb]];
+        WriteLog[twrite ['NOTE: Using Phenix cif database found at {}', tok_cat [getenv 'PHENIX', '/chem_data/']]];
     else
                      //            1         2         3         4         5         6         7         8
                      //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
@@ -405,7 +415,7 @@ local function RenameBasedOnCIF [residueList,ciffiles]
 
     local tmpResidue;
     local residuesToRemove;
-    local filelist = recursiveDirectoryList[phenixdb];
+    local filelist = getCIFlist[];
     for tmpResidue in residueList loop
         local cifFile = GetRNamesFromCIF[ciffiles,tmpResidue];
         if isnull cifFile then
@@ -420,7 +430,7 @@ local function RenameBasedOnCIF [residueList,ciffiles]
         // there are ocassions due to MOE-bugs or user errors, atoms are not uniquely named.
         local atNames = aName filterInert cat rAtoms tmpResidue | aElement filterInert cat rAtoms tmpResidue == 'H';
         if not (length uniq atNames == length atNames) then
-            WriteLog[twrite ['WARNING: Fixed proton names for {} residue {}:{}', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
+//            WriteLog[twrite ['WARNING: Fixed proton names for {} residue {}:{}', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
             RenameProtonsInOrder[tmpResidue];
         endif
     endloop
@@ -921,7 +931,7 @@ local function cif_Window [wparent,residueList]
     local cifFiles;
     if not isnull getenv 'PHENIX' then
         phenixdb = tok_cat [getenv 'PHENIX', '/chem_data/'];
-        local filelist = recursiveDirectoryList[phenixdb];
+        local filelist = getCIFlist[];
         local tmpResidue;
         for tmpResidue in residueList loop
             cifFiles = cat [cifFiles, GetCIFileFromList [filelist,tmpResidue]];
