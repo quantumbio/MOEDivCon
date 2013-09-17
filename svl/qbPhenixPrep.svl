@@ -556,9 +556,9 @@ local function WriteInputFiles[residueList,ciffiles,filebase,opt]
 
     transFileName = twrite['{}-phenix.translation',filebase];
     residueList = diff [residueList,RenameBasedOnCIF[residueList,ciffiles]];
-WritePDB['pre-harmonize.pdb',[cryst1:1]];
+
     harmonize_H[]; // called immediately before the files are written to address any naming issues.
-WritePDB['post-harmonize.pdb',[cryst1:1]];
+
     local data = app filterInert rAtoms residueList;
     data = app aName data;
     data = app sort data;
@@ -589,9 +589,8 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     if opt.enableCIFprotons then
         opt.notProtAtomList = aNumber ProtonateBasedOnCif[residueList,ciffiles];
     endif
-WritePDB['pre-prep.pdb',[cryst1:1]];
     qbPrepareSystem [opt];
-WritePDB['post-prep.pdb',[cryst1:1]];
+
     // set the occupancy based upon the occupancy of the heavy atom to which the proton is bound.
     aSetOccupancy [Atoms [] | aAtomicNumber Atoms[] == 1, aOccupancy aBonds Atoms [] | aAtomicNumber Atoms [] == 1];
     return WriteInputFiles[residueList,ciffiles,filebase,opt];
