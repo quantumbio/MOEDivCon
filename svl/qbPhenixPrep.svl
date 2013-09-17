@@ -539,6 +539,7 @@ local function WriteInputFiles[residueList,ciffiles,filebase,opt]
 
     transFileName = twrite['{}-phenix.translation',filebase];
     residueList = diff [residueList,RenameBasedOnCIF[residueList,ciffiles]];
+    harmonize_H[]; // called immediately before the files are written to address any naming issues.
 
     local data = app aName rAtoms residueList;
     data = app sort data;
@@ -551,6 +552,7 @@ local function WriteInputFiles[residueList,ciffiles,filebase,opt]
     endloop
 
     FindPeptideBreaks[];
+
     local mainPDBfilename = twrite['{}-phenix.pdb',filebase];
     WritePDB[mainPDBfilename,[cryst1:1]];
     return [mainPDBfilename,resPDBfilenames];
@@ -570,7 +572,6 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     endif
 
     qbPrepareSystem [opt];
-    harmonize_H[];
 
     // set the occupancy based upon the occupancy of the heavy atom to which the proton is bound.
     aSetOccupancy [Atoms [] | aAtomicNumber Atoms[] == 1, aOccupancy aBonds Atoms [] | aAtomicNumber Atoms [] == 1];
