@@ -113,6 +113,10 @@ local function WriteLog [line,basename,state]
     return logFileName;
 endfunction
 
+local function filterInert atoms
+    return diff [atoms,Atoms [] | aInert Atoms[]];
+endfunction
+
 // Source code between  // ===================== lines based on code provided by CCG 1/2013
 // ===================== 
 const MONLIB_CIF_DICT = [
@@ -153,7 +157,7 @@ endfunction
 //     state of the molecule and assign all the matching names from the
 //     dictionary.
 local function matchHydrogens[ cif_file, inResidue, root ]
-    local amol = cat rAtoms inResidue;
+    local amol = filterInert cat rAtoms inResidue;
     local amol_num = uniq aMoleculeNumber amol;
     if length amol_num <> 1 or 
         length cat amol <> length cat [Atoms[] | indexof[ aMoleculeNumber Atoms[], amol_num ]] then
@@ -191,7 +195,6 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     local geos_ordered_dict_heavy = geo_heavy[ x_sort aPrioSMI Atoms[] ];
     local cifHeavyCnt = length cat Atoms[];
     SystemPop sys_info;
-
     if amolHeavyCnt == cifHeavyCnt then
     // first test to make sure that this works as planned.
         sys_info = SystemPush amol;
@@ -208,7 +211,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
             amolisorted = amoli[ x_sort x_smi_mol_heavy ];
             aSetIon[ amolisorted, ions_ordered_dict_heavy ];
             Add_H amol;
-            amol = cat rAtoms inResidue;
+            amol = filterInert cat rAtoms inResidue;
             local x_smi_mol  = aPrioSMI amol;
             aSetName[  amol[ x_sort x_smi_mol ], name_prio ];
         else
@@ -415,7 +418,7 @@ local function RenameBasedOnCIF [residueList,ciffiles]
             WriteLog[twrite ['WARNING: no CIF file found for {} residue {}:{} ', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
         endif
         // there are ocassions due to MOE-bugs or user errors, atoms are not uniquely named.
-        local atNames = aName cat rAtoms tmpResidue | aElement cat rAtoms tmpResidue == 'H';
+        local atNames = aName filterInert cat rAtoms tmpResidue | aElement filterInert cat rAtoms tmpResidue == 'H';
         if not (length uniq atNames == length atNames) then
             WriteLog[twrite ['WARNING: Fixed proton names for {} residue {}:{}', rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
             RenameProtonsInOrder[tmpResidue];
@@ -514,9 +517,11 @@ local function FindPeptideBreaks[inChains]
     
 endfunction
 
+function Seq_NameToLetter;
 local function ResiduePreparation []
-    local testResidues = cat
-        [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C',toupper el_Elements[]];
+    local testResidues = uniq (rName Residues [] | Seq_NameToLetter rName Residues [] <> 'X');
+    testResidues = uniq cat [pro_StandardRes[], testResidues,
+        'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C',toupper el_Elements[]];
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
     WriteLog[twrite ['Residues to treat: {}', uniq rName residueList]];
     return residueList;
@@ -551,9 +556,11 @@ local function WriteInputFiles[residueList,ciffiles,filebase,opt]
 
     transFileName = twrite['{}-phenix.translation',filebase];
     residueList = diff [residueList,RenameBasedOnCIF[residueList,ciffiles]];
+WritePDB['pre-harmonize.pdb',[cryst1:1]];
     harmonize_H[]; // called immediately before the files are written to address any naming issues.
-
-    local data = app aName rAtoms residueList;
+WritePDB['post-harmonize.pdb',[cryst1:1]];
+    local data = app filterInert rAtoms residueList;
+    data = app aName data;
     data = app sort data;
     residueList = uniq residueList[x_sort data];
 
@@ -582,9 +589,9 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     if opt.enableCIFprotons then
         opt.notProtAtomList = aNumber ProtonateBasedOnCif[residueList,ciffiles];
     endif
-
+WritePDB['pre-prep.pdb',[cryst1:1]];
     qbPrepareSystem [opt];
-
+WritePDB['post-prep.pdb',[cryst1:1]];
     // set the occupancy based upon the occupancy of the heavy atom to which the proton is bound.
     aSetOccupancy [Atoms [] | aAtomicNumber Atoms[] == 1, aOccupancy aBonds Atoms [] | aAtomicNumber Atoms [] == 1];
     return WriteInputFiles[residueList,ciffiles,filebase,opt];
