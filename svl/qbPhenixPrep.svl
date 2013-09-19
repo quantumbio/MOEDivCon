@@ -61,7 +61,7 @@ const CORE_DEFAULTS = [
 
 const PREPDEFAULTS = cat [CORE_DEFAULTS,[
     forceUseElement:1,         // force reading of the element in the PDB file. Not a good idea if file format broken.
-    enableAltAtoms:1,       // enable reading of alternative atoms
+    enableAltAtoms:0,       // enable reading of alternative atoms - warning: HIGHLY EXERPERIMENTAL!
     qmApplication:[],       // Skip the DivCon tests - we will be running no matter what since this is refinement.
     enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
 ]];
@@ -256,7 +256,7 @@ local function applycif[ cif_file, root, atoms ]
 
     dict_ckeys = mol_Create mol;
     dict_akeys = cat cAtoms dict_ckeys;
-    
+
     if length dict_akeys === length atoms then
 
         local x_smi_dict = aPrioSMI dict_akeys;
@@ -279,21 +279,22 @@ endfunction
 // lmw - occasionally the MOE PDB read/writer will manipulate atom names.
 //      This function will return whether or not this is the case.
 local function DoubleCheckCIFNames[inResidue,names]
-    local mol = mol_Extract inResidue;
+    local mol = mol_Extract filterInert cat rAtoms inResidue;
     local pdata = SystemPush [];
     fwrite_PDB ['1234567890-tmp.pdb',mol_Create mol];
     local testChains = ReadPDB['1234567890-tmp.pdb'];
     fdelete '1234567890-tmp.pdb';
-    local newnames = cat aName rAtoms cResidues testChains;
+    local newnames = cat aName filterInert cat rAtoms cResidues testChains;
     SystemPop pdata;
+write ['newnames: {}\n   names: {}\n',sort newnames,sort names];
     return sort newnames === sort names;
 endfunction
 
 local function ProcessCIF[ cif_file, inResidue ]
-    local atoms = cat rAtoms inResidue;
+    local atoms = filterInert cat rAtoms inResidue;
     local root = token first wordsplit[ string ftail[ cif_file], ".cif"];
     local names = applycif[ cif_file, root, atoms ];
-    
+write ['names: {}\n', names];
     if not isnull names and DoubleCheckCIFNames[inResidue,names] then
         WriteLog[twrite [' INFO: Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
         aSetName[ atoms, names ];
@@ -384,7 +385,7 @@ local function ProtonateBasedOnCif [residueList,ciffiles]
 endfunction
 
 local function RenameProtonsInOrder[inResidue]
-    local allAtoms = cat rAtoms inResidue;
+    local allAtoms = cat filterInert rAtoms inResidue;
     local allPrios = aPrioSMI allAtoms;
     local tmpAtom;
 
@@ -483,7 +484,7 @@ endfunction
 function GetDistanceToLigand[inResidue]
 
     local ligandPositions = cat _Atoms '$$ligand';
-    local residuePosiions = cat rAtoms inResidue;
+    local residuePosiions = filterInert cat rAtoms inResidue;
     if isnull ligandPositions or isnull residuePosiions then
         return 'NONE';
     endif
@@ -559,10 +560,20 @@ local function ReadInputFiles[inpdbfile,opt]
 endfunction
 
 local function WriteInputFiles[residueList,ciffiles,filebase,opt]
+    opt = tagcat[opt, PREPDEFAULTS];    // this function is called from various locations (both GUI and non-GUI which have different opts)
     // address a MOE-ism that renames HIS residues based on protonation
     rSetName [cat [Residues [] | rName Residues [] == 'HIP'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HIE'],'HIS'];
+
+// the following lines are added inorder to delete this stuff completely prior to run.
+        if not opt.enableAltAtoms then
+            local altCollection;
+            for altCollection in findmatch ['PDB_ALTLOC_[A-Z,a-z,0-9]', oCollections[]] loop
+                oSetCollection [altCollection, [] ];    // alt designator cleared from output
+            endloop
+            aSetOccupancy [Atoms[],1.00];
+        endif
 
     transFileName = twrite['{}-phenix.translation',filebase];
     residueList = diff [residueList,RenameBasedOnCIF[residueList,ciffiles]];
@@ -642,7 +653,6 @@ global function qbPostPhenixFile [inpdbfile,trFile]
         return;
     endif
     qbPostPhenix[inpdbfile,trFile];
-    WritePDB[twrite['{}-after.pdb',fbase inpdbfile]];
 endfunction
 
 // lmw - GUI window tool kit functions associated with our DivCon/Phenix MOE interface.
@@ -1499,29 +1509,61 @@ global function qbPhenixPrepPanel[]
     local function CalcMemoryRequirementsInGB [wkey,allAtoms,values]
     
         local qmResidues = uniq cat aResidue allAtoms;
-        local fullMatrixSize = 0;
         local tmpResidue;
-        if length allAtoms > 700 then
-            for tmpResidue in qmResidues loop
-                local subsystemAtoms = qbGetResidueOnRadius[cat rAtoms tmpResidue,5.0,allAtoms];
-                local matrixSize = 
-                (
-                    (1 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms] == 1)) +
-                    (4 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms] == 2)) +
-                    (9 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms]  > 2))
+        local residuePairs;
+        
+        local function addPair [res1, res2]
+            if rNumber cat res1 > cat rNumber res2 then
+                return [res1, res2];
+            else
+                return [res2, res1];
+            endif
+        endfunction
+        local function calcAtomicOrbitals[atoms]
+                return (
+                    (1 * add (ELEMENT_ROW[el_Protons aElement atoms] == 1)) +
+                    (4 * add (ELEMENT_ROW[el_Protons aElement atoms] == 2)) +
+                    (9 * add (ELEMENT_ROW[el_Protons aElement atoms]  > 2))
                 );
-                fullMatrixSize = fullMatrixSize + (matrixSize * matrixSize);
+        endfunction
+
+        local eigenVectorSize = 0;
+        local fullMatrixSize = 0;
+        local maxAOsize = 0;
+        if length allAtoms > 700 then       // Divide and conquer calculation
+            for tmpResidue in qmResidues loop
+                local subsystemAtoms = qbGetResidueOnRadius[filterInert cat rAtoms tmpResidue,5.0,allAtoms];
+                local neighborHoodResidues = uniq aResidue cat subsystemAtoms;
+                local pair;
+                for pair in neighborHoodResidues loop
+                    residuePairs = append [ residuePairs,[addPair [tmpResidue, pair]] ];
+                endloop
+                local tmpAOSize = sqr calcAtomicOrbitals [subsystemAtoms];
+                if tmpAOSize > maxAOsize then
+                    maxAOsize = tmpAOSize;
+                endif
+                eigenVectorSize = eigenVectorSize + tmpAOSize;
+            endloop            
+            residuePairs = uniq residuePairs;
+            for pair in residuePairs loop
+                fullMatrixSize = fullMatrixSize + (5 * calcAtomicOrbitals [cat rAtoms first pair] * calcAtomicOrbitals[cat rAtoms second pair]);
             endloop
-        else
-            fullMatrixSize = 
-            (
-                (1 * add (ELEMENT_ROW[el_Protons aElement allAtoms] == 1)) +
-                (4 * add (ELEMENT_ROW[el_Protons aElement allAtoms] == 2)) +
-                (9 * add (ELEMENT_ROW[el_Protons aElement allAtoms]  > 2))
-            );
+        else                            // STANDARD or non-D&C calculation
+            fullMatrixSize = 5 * sqr calcAtomicOrbitals[cat allAtoms];
         endif
-        fullMatrixSize = (fullMatrixSize * 5) * 8;
-        local memory = (ceil((fullMatrixSize/1024/1024/1024)*10) / 10) + ((values.setNP - 1) * 0.100);
+        fullMatrixSize = fullMatrixSize * 8;   // conversion to double
+        eigenVectorSize = eigenVectorSize * 8; // conversion to double
+        maxAOsize = maxAOsize * 8;              // conversion to double
+// TODO: remove eigenVectorSize in case of Recalculate MOs every SCF - note/warning in bubble about time cost. NEED percentage equation from Josh
+//  TODO: split this off as thread OR calculate and "store" subsystemAtoms
+//  TODO: remove ability to edit memory
+//  TODO: add in a startup size for large memory cases (possible fudge as well)
+//  TODO: NMR memory * 2
+//  TODO: reengineer junk loops as apps
+//  TODO: move function to its own global function
+ 
+        local memory = (ceil ( ( (fullMatrixSize + (values.setNP * maxAOsize * 3) + eigenVectorSize)   /1024/1024/1024) *10) / 10);
+        write ['memory: {} {} {} {}\n', memory, fullMatrixSize, eigenVectorSize, maxAOsize];
         WindowSetAttr[wkey, [ setMem: [shortcut: [twrite['{}',memory],'1','2','4','8','16'],bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
         return memory;
     endfunction
@@ -1533,7 +1575,7 @@ global function qbPhenixPrepPanel[]
 	    if not values.regionRefine then
 	        atomList = Atoms[];
 	    else
-	        qmCoreAtoms = qbGetResidueOnRadius[cat rAtoms coreList[first values.coreResiduesBox],values.qmCore];
+	        qmCoreAtoms = qbGetResidueOnRadius[filterInert cat rAtoms coreList[first values.coreResiduesBox],values.qmCore];
 	        qmBufferAtoms = diff [qbGetResidueOnRadius[qmCoreAtoms,values.qmBuffer],qmCoreAtoms];
 	        atomList = uniq cat [qmCoreAtoms,qmBufferAtoms];
         endif
