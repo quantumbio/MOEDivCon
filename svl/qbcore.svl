@@ -3468,3 +3468,76 @@ global function qbCheckLicense []
     endif
 
 endfunction
+
+// lmw - 9/2013
+//  Determine the amount of memory required for a calculation.
+global function qbCalcMemoryRequirementsInGB [allAtoms,setNP]
+    
+    local qmResidues = uniq cat aResidue allAtoms;
+    local tmpResidue;
+    local residuePairs;
+    local function filterInert atoms
+        return diff [atoms,Atoms [] | aInert Atoms[]];
+    endfunction
+
+    local function addPair [res1, res2]
+        if rNumber cat res1 > cat rNumber res2 then
+            return [res1, res2];
+        else
+            return [res2, res1];
+        endif
+    endfunction
+    local function calcAtomicOrbitals[atoms]
+            return (
+                (1 * add (ELEMENT_ROW[el_Protons aElement atoms] == 1)) +
+                (4 * add (ELEMENT_ROW[el_Protons aElement atoms] == 2)) +
+                (9 * add (ELEMENT_ROW[el_Protons aElement atoms]  > 2))
+            );
+    endfunction
+
+    local eigenVectorSize = 0;
+    local fullMatrixSize = 0;
+    local maxAOsize = 0;
+    local subsystemAtoms;
+    local pos = aPos allAtoms;
+    if length allAtoms > 700 then       // Divide and conquer calculation
+        for tmpResidue in qmResidues loop
+            subsystemAtoms = [];
+            local atom;
+            for atom in filterInert uniq cat rAtoms tmpResidue loop
+                subsystemAtoms = uniq cat [subsystemAtoms,allAtoms | sqrt add sqr (apt peek [pos, cat indexof [atom, allAtoms] ] - pos) <= 5.0 ];
+            endloop
+            subsystemAtoms = uniq cat rAtoms aResidue subsystemAtoms;
+
+            local neighborHoodResidues = uniq aResidue cat subsystemAtoms;
+            local pair;
+           for pair in neighborHoodResidues loop
+               residuePairs = append [ residuePairs,[addPair [tmpResidue, pair]] ];
+           endloop
+           local tmpAOSize = sqr calcAtomicOrbitals [subsystemAtoms];
+           if tmpAOSize > maxAOsize then
+               maxAOsize = tmpAOSize;
+           endif
+           eigenVectorSize = eigenVectorSize + tmpAOSize;
+        endloop
+        write ['eigenVectorSize: {}\n', eigenVectorSize];    
+        residuePairs = uniq residuePairs;
+        for pair in residuePairs loop
+            fullMatrixSize = fullMatrixSize + (5 * calcAtomicOrbitals [cat rAtoms first pair] * calcAtomicOrbitals[cat rAtoms second pair]);
+        endloop
+    else                            // STANDARD or non-D&C calculation
+        fullMatrixSize = 5 * sqr calcAtomicOrbitals[cat allAtoms];
+    endif
+    fullMatrixSize = fullMatrixSize * 8;   // conversion to double
+    eigenVectorSize = eigenVectorSize * 8; // conversion to double
+    maxAOsize = maxAOsize * 8;              // conversion to double
+// TODO: remove eigenVectorSize in case of Recalculate MOs every SCF - note/warning in bubble about time cost. NEED percentage equation from Josh
+//  TODO: add in a startup size for large memory cases (possible fudge as well)
+//  TODO: NMR memory * 2
+//  TODO: reengineer junk loops as apps
+//  TODO: move function to its own global function
+
+    return (ceil ( ( (fullMatrixSize + (setNP * maxAOsize * 3) + eigenVectorSize)   /1024/1024/1024) *10) / 10);
+endfunction
+
+

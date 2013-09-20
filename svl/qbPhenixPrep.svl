@@ -1410,17 +1410,11 @@ global function qbPhenixPrepPanel[]
                         shortcut: ['1','2','4','8','16'],
                         bubbleHelp: 'The QM calculation is fully threaded for multiple processors.'
                     ],
-//                Text:
                 Label:
                     [
                         name: 'setMemLabel',
                         title: 'Memory (GB): ',
                         text: '--'
-//                        type:   'real',
-//                        onTrigger: 'return',
-//                        allowBlank: 0,
-//                        shortcut: ['1','2','4','8','16'],
-//                        bubbleHelp: 'Generally, the more memory the better with larger QM regions.'
                     ],Data : [name:'setMem']
             ]
         ],
@@ -1491,10 +1485,6 @@ global function qbPhenixPrepPanel[]
                 message = twrite ['{}Structure preparation was executed, but no changes were observed in structure.\n\n',message];
             endif
             
-            if values.setMem < status.memory then
-                message = twrite ['{}Memory request is less then recommended amount of {} GB.\n\n',message,status.memory];
-            endif
-            
             if not isnull message then
                 message = twrite ['WARNING(S):\n\n{}',message];
                 WindowSetAttr[wkey, [ warning_info: [text:'Click to see detailed warnings', foreground:'red']   ]];
@@ -1508,88 +1498,6 @@ global function qbPhenixPrepPanel[]
                 WindowSetAttr[wkey, [ warning_info: [text:'None']   ]];
             endif
             return 1;
-    endfunction
-	
-    local function CalcMemoryRequirementsInGB [wkey,allAtoms,values]
-        
-        local qmResidues = uniq cat aResidue allAtoms;
-        local tmpResidue;
-        local residuePairs;
-        
-        local function addPair [res1, res2]
-            if rNumber cat res1 > cat rNumber res2 then
-                return [res1, res2];
-            else
-                return [res2, res1];
-            endif
-        endfunction
-        local function calcAtomicOrbitals[atoms]
-                return (
-                    (1 * add (ELEMENT_ROW[el_Protons aElement atoms] == 1)) +
-                    (4 * add (ELEMENT_ROW[el_Protons aElement atoms] == 2)) +
-                    (9 * add (ELEMENT_ROW[el_Protons aElement atoms]  > 2))
-                );
-        endfunction
-
-        local eigenVectorSize = 0;
-        local fullMatrixSize = 0;
-        local maxAOsize = 0;
-        local subsystemAtoms;
-        static subsystemAtomsStorage;
-        if length allAtoms > 700 then       // Divide and conquer calculation
-            for tmpResidue in qmResidues loop
-//                local subsystemAtoms = qbGetResidueOnRadius[filterInert cat rAtoms tmpResidue,5.0,allAtoms];
-                if second task_fork [statics: 'share'] == 'child' then
-                    task_settitle [ task_key -1, 'getRadius'];
-                    local tmpAtoms = qbGetResidueOnRadius[filterInert cat rAtoms tmpResidue,5.0,allAtoms];
-                    local mutex = mutex_open 'subsystemAtomsStorage';
-                    mutex_lock mutex;
-                    subsystemAtomsStorage.(totok tmpResidue) = tmpAtoms;
-                    mutex_unlock mutex;
-                    mutex_close mutex;
-                    exit[];
-                endif
-            endloop
-            while length (task_keylist [] | task_title task_keylist [] == 'getRadius') > 0 loop
-                sleep 0.1;
-            endloop
-            for tmpResidue in qmResidues loop
-                subsystemAtoms = subsystemAtomsStorage.(totok tmpResidue);
-                local neighborHoodResidues = uniq aResidue cat subsystemAtoms;
-                local pair;
-                for pair in neighborHoodResidues loop
-                    residuePairs = append [ residuePairs,[addPair [tmpResidue, pair]] ];
-                endloop
-                local tmpAOSize = sqr calcAtomicOrbitals [subsystemAtoms];
-                if tmpAOSize > maxAOsize then
-                    maxAOsize = tmpAOSize;
-                endif
-                eigenVectorSize = eigenVectorSize + tmpAOSize;
-            endloop
-            write ['eigenVectorSize: {}\n', eigenVectorSize];    
-            residuePairs = uniq residuePairs;
-            for pair in residuePairs loop
-                fullMatrixSize = fullMatrixSize + (5 * calcAtomicOrbitals [cat rAtoms first pair] * calcAtomicOrbitals[cat rAtoms second pair]);
-            endloop
-        else                            // STANDARD or non-D&C calculation
-            fullMatrixSize = 5 * sqr calcAtomicOrbitals[cat allAtoms];
-        endif
-        fullMatrixSize = fullMatrixSize * 8;   // conversion to double
-        eigenVectorSize = eigenVectorSize * 8; // conversion to double
-        maxAOsize = maxAOsize * 8;              // conversion to double
-// TODO: remove eigenVectorSize in case of Recalculate MOs every SCF - note/warning in bubble about time cost. NEED percentage equation from Josh
-//  TODO: split this off as thread OR calculate and "store" subsystemAtoms
-//  TODO: remove ability to edit memory
-//  TODO: add in a startup size for large memory cases (possible fudge as well)
-//  TODO: NMR memory * 2
-//  TODO: reengineer junk loops as apps
-//  TODO: move function to its own global function
- 
-        local memory = (ceil ( ( (fullMatrixSize + (values.setNP * maxAOsize * 3) + eigenVectorSize)   /1024/1024/1024) *10) / 10);
-//        write ['memory: {} {} {} {}\n', memory, fullMatrixSize, eigenVectorSize, maxAOsize];
-//        WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',memory] ]], setMem: [value: [twrite['{}',memory]]] ]];
-//        WindowSetAttr[wkey, [ setMem: [shortcut: [twrite['{}',memory],'1','2','4','8','16'],bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
-        return memory;
     endfunction
 
 	local function updateAtomCount [wkey, values, coreList]
@@ -1647,7 +1555,7 @@ global function qbPhenixPrepPanel[]
 	
     if second task_fork [] == 'child' then
         task_settitle [ task_key -1, 'update_QBmemory'];
-        status.memory = qbCalcMemoryRequirementsInGB[wkey,allAtoms,values];
+        status.memory = qbCalcMemoryRequirementsInGB[allAtoms,values.setNP];
         WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
         ShowWarnings [wkey,trigger,values,status,allAtoms];
         exit[];
@@ -1800,18 +1708,9 @@ global function qbPhenixPrepPanel[]
                 endloop
             endif
 
-            status.memory = qbCalcMemoryRequirementsInGB [wkey,allAtoms,values];
+            status.memory = qbCalcMemoryRequirementsInGB [allAtoms,values.setNP];
             task_kill (task_keylist [] | task_title task_keylist [] == 'mem_progress');
             WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
-
-//            if trigger === 'setMem' then
-//                ynMemIsSet = 1;
-//                if values.setMem < status.memory then
-//                    Warning twrite ['WARNING: Memory request is less then recommended amount of {} GB',status.memory];
-//                endif
-//            elseif not ynMemIsSet then
-//               WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
-//            endif
             ShowWarnings [wkey,trigger,WindowValues wkey,status,allAtoms];
             exit[];
         endif
