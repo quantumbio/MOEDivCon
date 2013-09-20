@@ -1142,6 +1142,8 @@ local function phenix_Window [wparent]
 
 endfunction
 
+function qbCalcMemoryRequirementsInGB;
+
 global function qbPhenixPrepPanel[]
 
 	if WindowShow ['PhenixDivConPanel', 1] then
@@ -1408,16 +1410,18 @@ global function qbPhenixPrepPanel[]
                         shortcut: ['1','2','4','8','16'],
                         bubbleHelp: 'The QM calculation is fully threaded for multiple processors.'
                     ],
-                Text:
+//                Text:
+                Label:
                     [
-                        name: 'setMem',
+                        name: 'setMemLabel',
                         title: 'Memory (GB): ',
-                        type:   'real',
-                        onTrigger: 'return',
-                        allowBlank: 0,
-                        shortcut: ['1','2','4','8','16'],
-                        bubbleHelp: 'Generally, the more memory the better with larger QM regions.'
-                    ]
+                        text: '--'
+//                        type:   'real',
+//                        onTrigger: 'return',
+//                        allowBlank: 0,
+//                        shortcut: ['1','2','4','8','16'],
+//                        bubbleHelp: 'Generally, the more memory the better with larger QM regions.'
+                    ],Data : [name:'setMem']
             ]
         ],
             Mbox:
@@ -1507,7 +1511,7 @@ global function qbPhenixPrepPanel[]
     endfunction
 	
     local function CalcMemoryRequirementsInGB [wkey,allAtoms,values]
-    
+        
         local qmResidues = uniq cat aResidue allAtoms;
         local tmpResidue;
         local residuePairs;
@@ -1530,9 +1534,27 @@ global function qbPhenixPrepPanel[]
         local eigenVectorSize = 0;
         local fullMatrixSize = 0;
         local maxAOsize = 0;
+        local subsystemAtoms;
+        static subsystemAtomsStorage;
         if length allAtoms > 700 then       // Divide and conquer calculation
             for tmpResidue in qmResidues loop
-                local subsystemAtoms = qbGetResidueOnRadius[filterInert cat rAtoms tmpResidue,5.0,allAtoms];
+//                local subsystemAtoms = qbGetResidueOnRadius[filterInert cat rAtoms tmpResidue,5.0,allAtoms];
+                if second task_fork [statics: 'share'] == 'child' then
+                    task_settitle [ task_key -1, 'getRadius'];
+                    local tmpAtoms = qbGetResidueOnRadius[filterInert cat rAtoms tmpResidue,5.0,allAtoms];
+                    local mutex = mutex_open 'subsystemAtomsStorage';
+                    mutex_lock mutex;
+                    subsystemAtomsStorage.(totok tmpResidue) = tmpAtoms;
+                    mutex_unlock mutex;
+                    mutex_close mutex;
+                    exit[];
+                endif
+            endloop
+            while length (task_keylist [] | task_title task_keylist [] == 'getRadius') > 0 loop
+                sleep 0.1;
+            endloop
+            for tmpResidue in qmResidues loop
+                subsystemAtoms = subsystemAtomsStorage.(totok tmpResidue);
                 local neighborHoodResidues = uniq aResidue cat subsystemAtoms;
                 local pair;
                 for pair in neighborHoodResidues loop
@@ -1543,7 +1565,8 @@ global function qbPhenixPrepPanel[]
                     maxAOsize = tmpAOSize;
                 endif
                 eigenVectorSize = eigenVectorSize + tmpAOSize;
-            endloop            
+            endloop
+            write ['eigenVectorSize: {}\n', eigenVectorSize];    
             residuePairs = uniq residuePairs;
             for pair in residuePairs loop
                 fullMatrixSize = fullMatrixSize + (5 * calcAtomicOrbitals [cat rAtoms first pair] * calcAtomicOrbitals[cat rAtoms second pair]);
@@ -1563,8 +1586,9 @@ global function qbPhenixPrepPanel[]
 //  TODO: move function to its own global function
  
         local memory = (ceil ( ( (fullMatrixSize + (values.setNP * maxAOsize * 3) + eigenVectorSize)   /1024/1024/1024) *10) / 10);
-        write ['memory: {} {} {} {}\n', memory, fullMatrixSize, eigenVectorSize, maxAOsize];
-        WindowSetAttr[wkey, [ setMem: [shortcut: [twrite['{}',memory],'1','2','4','8','16'],bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
+//        write ['memory: {} {} {} {}\n', memory, fullMatrixSize, eigenVectorSize, maxAOsize];
+//        WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',memory] ]], setMem: [value: [twrite['{}',memory]]] ]];
+//        WindowSetAttr[wkey, [ setMem: [shortcut: [twrite['{}',memory],'1','2','4','8','16'],bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
         return memory;
     endfunction
 
@@ -1620,11 +1644,14 @@ global function qbPhenixPrepPanel[]
     [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
 	local status;
 	status.cif_success = []; status.phenix_success = [];status.ran_protonate = 0;status.ran_structprep = 0;status.structprep_changed = 0;
-
-    status.memory = CalcMemoryRequirementsInGB[wkey,allAtoms,values];
-    WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
-    
-    ShowWarnings [wkey,trigger,values,status,allAtoms];
+	
+    if second task_fork [] == 'child' then
+        task_settitle [ task_key -1, 'update_QBmemory'];
+        status.memory = qbCalcMemoryRequirementsInGB[wkey,allAtoms,values];
+        WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
+        ShowWarnings [wkey,trigger,values,status,allAtoms];
+        exit[];
+    endif
     
 	WindowShow wkey;
 	local ciffiles;
@@ -1750,16 +1777,44 @@ global function qbPhenixPrepPanel[]
             endif
         endif
         [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
-        status.memory = CalcMemoryRequirementsInGB [wkey,allAtoms,values];
-        if trigger === 'setMem' then
-            ynMemIsSet = 1;
-            if values.setMem < status.memory then
-                Warning twrite ['WARNING: Memory request is less then recommended amount of {} GB',status.memory];
+        
+        task_kill (task_keylist [] | task_title task_keylist [] == 'update_QBmemory');    // kill other memory update tasks
+        if second task_fork[master:'parent'] == 'child' then
+            task_settitle [ task_key -1, 'update_QBmemory'];
+            
+            if second task_fork [master:'parent'] === 'child' then          // this will give the user some feedback
+                task_settitle [ task_key -1, 'mem_progress'];
+                local loopCount = '|';
+                loop
+                    sleep 0.5;
+                    if loopCount == '|' then
+                        loopCount = '/';
+                    elseif loopCount == '/' then
+                        loopCount = '-';
+                    elseif loopCount == '-' then
+                        loopCount = '\\';
+                    elseif loopCount == '\\' then
+                        loopCount = '|';
+                    endif
+                    WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',loopCount] ]], setMem: [value: [twrite['-10']]] ]];
+                endloop
             endif
-        elseif not ynMemIsSet then
-            WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
+
+            status.memory = qbCalcMemoryRequirementsInGB [wkey,allAtoms,values];
+            task_kill (task_keylist [] | task_title task_keylist [] == 'mem_progress');
+            WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
+
+//            if trigger === 'setMem' then
+//                ynMemIsSet = 1;
+//                if values.setMem < status.memory then
+//                    Warning twrite ['WARNING: Memory request is less then recommended amount of {} GB',status.memory];
+//                endif
+//            elseif not ynMemIsSet then
+//               WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
+//            endif
+            ShowWarnings [wkey,trigger,WindowValues wkey,status,allAtoms];
+            exit[];
         endif
-        ShowWarnings [wkey,trigger,WindowValues wkey,status,allAtoms];
     endloop
     WindowDestroy wkey;
 endfunction
