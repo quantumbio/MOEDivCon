@@ -3523,8 +3523,7 @@ global function qbCalcMemoryRequirementsInGB [allAtoms,setNP]
          //   write ['subsystemAtomsSize: {} {} {} {} {} {}\n', rName tmpResidue, rUID tmpResidue, length subsystemAtoms, tmpAOSize, maxAOsize, eigenVectorSize ]; 
 
         endloop
-        write ['eigenVectorSize: {}\n', eigenVectorSize];  
-          
+
         residuePairs = uniq residuePairs;
    // write ['residuePairsSize: {}\n', length residuePairs];
         for pair in residuePairs loop
@@ -3539,10 +3538,8 @@ global function qbCalcMemoryRequirementsInGB [allAtoms,setNP]
     eigenVectorSize = eigenVectorSize * 8; // conversion to double
     maxAOsize = maxAOsize * 8;              // conversion to double
 // TODO: remove eigenVectorSize in case of Recalculate MOs every SCF - note/warning in bubble about time cost. NEED percentage equation from Josh
-//  TODO: add in a startup size for large memory cases (possible fudge as well)
 //  TODO: NMR memory * 2
 //  TODO: reengineer junk loops as apps
-//  TODO: move function to its own global function
 
 // Last part of this equation is empirical to estimate start up memory.
 //  write ['startup: {} \n',  4.3479E-6*(length allAtoms) + 0.01724  ]; 
