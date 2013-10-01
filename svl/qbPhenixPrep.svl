@@ -1182,8 +1182,8 @@ global function qbPhenixPrepPanel[]
 
     local testResidues = cat
         [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C','SO4'];
-    local coreList = uniq (Residues[] | m_join [rName Residues [], testResidues] == 0);
-
+//    local coreList = uniq (Residues[] | m_join [rName Residues [], testResidues] == 0);
+    local coreList = uniq aResidue _Atoms '$$ligand';
 	local wkey = WindowCreate
 	[
 	    name: 'panel',
