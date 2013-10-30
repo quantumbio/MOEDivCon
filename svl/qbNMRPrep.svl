@@ -114,7 +114,8 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
               //             1         2         3         4         5         6         7         8
               //    12345678901234567890123456789012345678901234567890123456789012345678901234567890
     fwrite [shscr, '#!/bin/bash\n\n'];
-    fwrite [shscr, 'DIVCON={}/bin/divcon\n',getenv 'QBHOME'];
+    fwrite [shscr, 'tmpQBHOME={}\n',getenv 'QBHOME'];
+    fwrite [shscr, 'DIVCON=qmechanic\n'];
 
     fwrite [shscr, 'csvFileName={}\n', ftail opt.CSVFileName];
     fwrite [shscr, 'pdbFileName={}\n',ftail inMainPDB];
@@ -122,13 +123,8 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
     local allKeys,allValues;
     
     fwrite [shscr, 'moeLogName={}\n',ftail moeLog];
-    fwrite [shscr, 'regionRefine={}\n',opt.regionRefine];
-    fwrite [shscr, 'qmCore={}\n',opt.qmCore];
-    fwrite [shscr, 'qmBuffer={}\n',opt.qmBuffer];
-    fwrite [shscr, 'macroSkip={}\n',opt.onoff_macroskip];
     fwrite [shscr, 'setNP={}\n',opt.setNP];
     fwrite [shscr, 'setMem={}\n',opt.setMem];
-    fwrite [shscr, 'macroCount={}\n',opt.macroCount];
     fwrite [shscr, 'selection="{}"\n',droplast swrite['{}', apt twrite ['chain {} and resname {} and resid {},',
         qb_cLetter rChain opt.coreList, rName opt.coreList, rUID opt.coreList]]];
     fwrite [shscr, 'labelList="{}"\n',opt.labelList];
@@ -147,14 +143,8 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
     fwrite [shscr, '    echo " --help           * Show this help and exit.           "\n'];
     fwrite [shscr, '    echo " --np=#           * Number of processors in simulation.           Current: $setNP"\n'];
     fwrite [shscr, '    echo " --m=#            * Amount of memory to use in GB.                Current: $setMem"\n'];
-    fwrite [shscr, '    echo " --qmCore=#       * QM Region size (beyond core residue).         Current: $qmCore"\n'];
-    fwrite [shscr, '    echo " --qmBuffer=#     * QM Buffer size (beyond core region).          Current: $qmBuffer"\n'];
-    fwrite [shscr, '    echo " --macroCount=#   * Number of macrocyles to run until refined.    Current: $macroCount"\n'];
     fwrite [shscr, '    echo     \n'];
-    fwrite [shscr, '    echo " --enable|disable-region  * Enable/Disable region refinement.     Current: $regionNote"\n'];
-    fwrite [shscr, '    echo " --enable|disable-mcycle  * Enable/Disable QM on first macrocycle.Current: $cycleNote"\n'];
-    fwrite [shscr, '    echo     \n'];
-    fwrite [shscr, '    echo " see: http://www.quantumbioinc.com/support/manual-phenixdc"    \n'];
+    fwrite [shscr, '    echo " see: http://www.quantumbioinc.com/support/"    \n'];
     fwrite [shscr, '    echo     \n'];
     fwrite [shscr, '    exit 1    \n'];
     fwrite [shscr, '}    \n'];
@@ -175,27 +165,6 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
     fwrite [shscr, '        --m=*) \n'];
     fwrite [shscr, '            setMem=$optarg   \n'];
     fwrite [shscr, '            ;;  \n'];
-    fwrite [shscr, '        --qmCore=*) \n'];
-    fwrite [shscr, '            qmCore=$optarg   \n'];
-    fwrite [shscr, '            ;;  \n'];
-    fwrite [shscr, '        --qmBuffer=*) \n'];
-    fwrite [shscr, '            qmBuffer=$optarg   \n'];
-    fwrite [shscr, '            ;;  \n'];
-    fwrite [shscr, '        --macroCount=*) \n'];
-    fwrite [shscr, '            macroCount=$optarg   \n'];
-    fwrite [shscr, '            ;;  \n'];
-    fwrite [shscr, '        --disable-region) \n'];
-    fwrite [shscr, '            regionRefine=0   \n'];
-    fwrite [shscr, '            ;;  \n'];
-    fwrite [shscr, '        --enable-region) \n'];
-    fwrite [shscr, '            regionRefine=1   \n'];
-    fwrite [shscr, '            ;;  \n'];
-    fwrite [shscr, '        --diable-mcycle) \n'];
-    fwrite [shscr, '            macroSkip=1   \n'];
-    fwrite [shscr, '            ;;  \n'];
-    fwrite [shscr, '        --enable-mcycle) \n'];
-    fwrite [shscr, '            macroSkip=0   \n'];
-    fwrite [shscr, '            ;;  \n'];
     fwrite [shscr, '        *)  \n'];
     fwrite [shscr, '            echo "ERROR: $optarg option unknown."  \n'];
     fwrite [shscr, '            errorOut  \n'];
@@ -204,25 +173,22 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
     fwrite [shscr, 'done    \n'];
     fwrite [shscr, '        \n'];
     
-    fwrite [shscr, 'function RunPhenix ()  \n'];
+    fwrite [shscr, 'function RunDivCon ()  \n'];
     fwrite [shscr, '{}   \n',"{"];
-    fwrite [shscr, '    if [ -z "${}" ] ; then  \n', "{PHENIX}"];
-    fwrite [shscr, '        if [ -e $QBPHENIX_ENV ] ; then      \n'];
-    fwrite [shscr, '            source $QBPHENIX_ENV            \n'];
-    fwrite [shscr, '        fi          \n'];
-    fwrite [shscr, '    fi          \n'];
-    fwrite [shscr, '    if ! hash phenix.refine 2>/dev/null; then   \n'];
-    fwrite [shscr, '        echo "ERROR: Phenix must be installed as per its documentation."\n'];
-    fwrite [shscr, '        errorOut  \n'];
-    fwrite [shscr, '    fi          \n'];
-    fwrite [shscr, '    if [ ! -e $QBPHENIX ] ; then    \n'];
-    fwrite [shscr, '        if ! hash qbphenix 2>/dev/null; then   \n'];
-    fwrite [shscr, '            echo "ERROR: qbphenix executable not found in PATH!"    \n'];
-    fwrite [shscr, '            errorOut  \n'];
+    fwrite [shscr, '    if [ -z "${}" ] ; then  \n', "{QBHOME}"];
+    fwrite [shscr, '        if [ -e $tmpQBHOME/etc/qbenv.sh ] ; then      \n'];
+    fwrite [shscr, '            DIVCON=$tmpQBHOME/bin/qmechanic      \n'];
+    fwrite [shscr, '        elif hash qmechanic 2>/dev/null; then   \n'];
+    fwrite [shscr, '            DIVCON=`which qmechanic`      \n'];
     fwrite [shscr, '        else  \n'];
-    fwrite [shscr, '            QBPHENIX=`which qbphenix`  \n'];
-    fwrite [shscr, '        fi  \n'];
-    fwrite [shscr, '    fi  \n'];
+    fwrite [shscr, '            echo "ERROR: DivCon not found at $tmpQBHOME"\n'];
+    fwrite [shscr, '            errorOut  \n'];
+    fwrite [shscr, '        fi          \n'];
+    fwrite [shscr, '    else  \n'];
+    fwrite [shscr, '        DIVCON=$QBHOME/bin/qmechanic      \n'];
+    fwrite [shscr, '    fi          \n'];
+    fwrite [shscr, '        \n'];
+    fwrite [shscr, '    echo "NOTE: using DivCon installed at $DIVCON\n'];
     fwrite [shscr, '        \n'];
     fwrite [shscr, '    qbphenixopt="--sfFile $csvFileName --pdbFile $pdbFileName --protonation PostMOE --NP $setNP --m ${}gb --ncycles $macroCount "\n','{setMem}'];
     fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
@@ -230,7 +196,7 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="--labels \'$labelList\'"  ;   fi    \n',"{labelList}"];
-    fwrite [shscr, '    eval $QBPHENIX $qbphenixopt  \n'];
+    fwrite [shscr, '    eval $DIVCON $qbphenixopt  \n'];
     fwrite [shscr, '}   \n'];
     fwrite [shscr, '        \n'];
 
@@ -419,6 +385,7 @@ endfunction
 
 function qbGetAtomsInNMRCSV;
 function qbFixChargedAtomsPanel; 
+function qbCalcMemoryRequirementsInGB;
 
 global function qbNMRPrepPanel[]
 
@@ -467,7 +434,8 @@ global function qbNMRPrepPanel[]
 	    title: 'NMR Preparation',
 	    windowName: 'NMRPrepPanel',
 	    text: ['Help','Batch...','Cancel'],
-	    onTrigger: ['return','validate','exit'],
+//	    onTrigger: ['return','validate','exit'],
+	    onTrigger: ['return','validate','return'],
 	    bubbleHelp: [
 	    'Help, Guidelines, and Support',
 		'Generate Batch script for Phenix/DivCon...',
@@ -530,54 +498,68 @@ global function qbNMRPrepPanel[]
         ],
 
         Separator : [flushLeft:1],
-        
-        Group:
+        Hbox:
         [
-            Group:
+            Radio : [
+                name	: 'calctype',
+                title   : 'Calculation:',
+                margin	: 1,
+                columns	: 3,
+                type	: 'int',
+                flushLeft	: 1,
+                extendH	: 1,
+                onTrigger	: 'return',
+                font	: 'mediumBold',
+                text	: ['Shift','ShiftP','NMRScore'],
+                bubbleHelp	: 
+                    ['Calculate NMR Chemical Shift (CS) on all chosen atoms.',
+                        'Calculate NMR Chemical Shift Perturbation (CSP) on all chosen atoms.',
+                        'Calculate NMRScore on all chosen atoms.']
+            ]
+	    ],
+
+        Vbox:
+        [
+            name:   'NMRScoreOptions',
+            sensitive:0,
+            Hbox:
             [
-                Checkbox: [ name: 'nmrscoreSwitch', text: 'Include NMRScore',onTrigger: 'return'],
-                Vbox:
+                Option:
                 [
-                    name:   'NMRScoreOptions',
-                    Hbox:
-                    [
-                        columns:1,
-                        Option:
-                        [
-                            name: 'siteOptions',
-                            title: 'Site:',
-                            type: 'int',
-                            text: s_sets,
-                            onTrigger: 'return',
-                            bubbleHelp: 'Structure factor column within MTZ file.'
-                        ],
-                        Option:
-                        [
-                            name: 'ligandOptions',
-                            title: 'Ligand Poses:',
-                            type: 'int',
-                            text: l_sets,
-                            onTrigger: 'return',
-                            bubbleHelp: 'Structure factor column within MTZ file.'
-                        ],
-                        Vbox:
-                        [
-                            columns:1,
-                            Text:
-                            [
-                                name: 'posesSDF',
-                                sensitive: 0,
-                                type: 'char',
-                                extendH: 1,
-                                allowBlank: 1,
-                                bubbleHelp:
-                                    'Choose SDF which has the poses to be scored.'
-                            ],
-                            Button : [ sensitive:0, name: 'browse_posesSDF', text: 'Browse...']
-                        ]
-                    ]
+                    name: 'siteOptions',
+                    title: 'Site:',
+                    type: 'int',
+                    text: s_sets,
+                    onTrigger: 'return',
+                    bubbleHelp: 'The set of atoms that defines the active site.'
                 ]
             ],
+
+            Hbox:
+            [
+                Option:
+                [
+                    name: 'ligandOptions',
+                    title: 'Ligand Poses:',
+                    type: 'int',
+                    text: l_sets,
+                    onTrigger: 'return',
+                    bubbleHelp: 'The set of atoms (or file) that defines the ligand pose to score.'
+                ]
+            ],
+            Hbox:
+            [
+                extendH: 1,
+                FSBText: 
+                [
+                    name: 'posesSDF', len: 25, extendH: 1, sensitive: 0,
+                    allowBlank: 1,
+                    bubbleHelp:
+                    'Choose SDF which has the poses to be scored.'
+                ],
+                Button: [   name: 'browse_posesSDF', text: 'Browse...', sensitive: 0    ]
+            ]
+        ],
             Separator : [flushLeft:1],
             Group : 
             [
@@ -626,10 +608,11 @@ global function qbNMRPrepPanel[]
                         multiSelect: 0,
                         sortEnable: 1,
                         bubbleHelp:
-                            'This list of residues automatically includes ligand(s), cofactor(s), and metals.\n'
-                            '   All selected residues will be included as core residues in the QM Region Refinement.\n'
-                            '   To remove a residue from the list, simply unselect it.\n'
-                            '   The list may be expanded by selecting additional residues in the MOE window and \n'
+                            'NMR Chemical shift (CS) calculations will be performed on each of these atoms.\n'
+                            '   If SHIFT is chosen, only the CSs will be calculated.\n'
+                            '   If ShiftP is chosen, the CS Perturbation (CSP) for each bound/unbound atom will be calculated.\n'
+                            '   If NMRScore is chosen, the CSP RMSD (or NMRScore) will be calculated for each atom.\n'
+                            '   The list may be expanded by selecting additional atoms in the MOE window and \n'
                             '   pressing the Retrieve Selection button above.'
                         ]                ],
                 Hbox:
@@ -660,8 +643,7 @@ global function qbNMRPrepPanel[]
                             bubbleHelp: 'Sets the experimental bound/unbound shift data.'
                         ]
                ]
-            ]
-        ] ,
+            ],
         Separator : [flushLeft:1],
         Mbox:
         [
@@ -677,16 +659,12 @@ global function qbNMRPrepPanel[]
                     shortcut: ['1','2','4','8','16'],
                     bubbleHelp: 'The QM calculation is fully threaded for multiple processors.'
                 ],
-            Text:
-                [
-                    name: 'setMem',
-                    title: 'Memory (GB): ',
-                    type:   'real',
-                    onTrigger: 'return',
-                    allowBlank: 0,
-                    shortcut: ['1','2','4','8','16'],
-                    bubbleHelp: 'Generally, the more memory the better with larger QM regions.'
-                ]
+                Label:
+                    [
+                        name: 'setMemLabel',
+                        title: 'Memory (GB): ',
+                        text: '--'
+                    ],Data : [name:'setMem']
         ],
         Mbox:
         [
@@ -722,10 +700,6 @@ global function qbNMRPrepPanel[]
                 message = twrite ['{}Structure preparation was executed, but no changes were observed in structure.\n\n',message];
             endif
             
-            if values.setMem < status.memory then
-                message = twrite ['{}Memory request is less then recommended amount of {} GB.\n\n',message,status.memory];
-            endif
-            
             // update information in the window
             WindowSetAttr[wkey, [ 
                 chgstabilize_info : [text:twrite ['There are {} charged atoms in the structure.',length (Atoms [] | aFCharge Atoms [] <> 0)] ] 
@@ -744,36 +718,6 @@ global function qbNMRPrepPanel[]
             endif
             return 1;
     endfunction
-	 
-    local function CalcMemoryRequirementsInGB [wkey,allAtoms,values]
-    
-        local qmResidues = uniq cat aResidue allAtoms;
-        local fullMatrixSize = 0;
-        local tmpResidue;
-        if length allAtoms > 700 then
-            for tmpResidue in qmResidues loop
-                local subsystemAtoms = qbGetResidueOnRadius[cat rAtoms tmpResidue,5.0,allAtoms];
-                local matrixSize = 
-                (
-                    (1 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms] == 1)) +
-                    (4 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms] == 2)) +
-                    (9 * add (ELEMENT_ROW[el_Protons aElement subsystemAtoms]  > 2))
-                );
-                fullMatrixSize = fullMatrixSize + (matrixSize * matrixSize);
-            endloop
-        else
-            fullMatrixSize = 
-            (
-                (1 * add (ELEMENT_ROW[el_Protons aElement allAtoms] == 1)) +
-                (4 * add (ELEMENT_ROW[el_Protons aElement allAtoms] == 2)) +
-                (9 * add (ELEMENT_ROW[el_Protons aElement allAtoms]  > 2))
-            );
-        endif
-        fullMatrixSize = (fullMatrixSize * 5) * 8;
-        local memory = ceil((((fullMatrixSize/1024/1024/1024)*10) / 10) + ((values.setNP - 1) * 0.100));
-        WindowSetAttr[wkey, [ setMem: [shortcut: [twrite['{}',memory],'1','2','4','8','16'],bubbleHelp: twrite ['Requested memory for calculation.\nNote: {} GB recomended.',memory] ]]];
-        return memory;
-    endfunction
 
     WindowSetAttr[wkey,[
             coreResiduesBox:[text : updateCoreResidueList[coreList],value: [igen length coreList]],
@@ -786,11 +730,45 @@ global function qbNMRPrepPanel[]
 	local status;
 	status.cif_success = []; status.phenix_success = [];status.ran_protonate = 0;status.ran_structprep = 0;status.structprep_changed = 0;
 
-    status.memory = CalcMemoryRequirementsInGB[wkey,Atoms[],values];
+	local function setCalcValues [wkey,values]
+	    if isnull values then
+	        values = WindowValues wkey;
+	    endif
+        if values.calctype == 2 then
+            WindowSetAttr[wkey,
+            [
+                NMRScoreOptions:    [sensitive:1],
+                expData:            [sensitive:0]
+            ]];
+        elseif values.calctype == 1 then
+            WindowSetAttr[wkey,
+            [
+                NMRScoreOptions:    [sensitive:0],
+                expData:            [sensitive:0]
+            ]];
+        elseif values.calctype == 3 then
+            WindowSetAttr[wkey,
+            [
+                NMRScoreOptions:    [sensitive:1],
+                expData:            [sensitive:1]
+            ]];
+        endif
+	endfunction
+	
+    setCalcValues [wkey];
+
     WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
     
     ShowWarnings [wkey,trigger,values,status,Atoms[]];
-    
+    local prevAtoms = Atoms[];;
+    if second task_fork [] == 'child' then
+        task_settitle [ task_key -1, 'update_QBmemory'];
+        status.memory = qbCalcMemoryRequirementsInGB[Atoms[],values.setNP];
+        WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
+        ShowWarnings [wkey,trigger,values,status,Atoms[]];
+        exit[];
+    endif
+
 	WindowShow wkey;
 	local tmpFile;
 	local selectedAtomID;
@@ -818,14 +796,13 @@ global function qbNMRPrepPanel[]
 	            posesSDF:           [sensitive: is_file],
 	            browse_posesSDF:    [sensitive: is_file]
 	        ]];
-        elseif trigger === 'nmrscoreSwitch' then
-            if values.nmrscoreSwitch then
-                WindowSetAttr[wkey,[NMRScoreOptions: [sensitive:1]]];
-                WindowSetAttr[wkey,[expData: [sensitive:1]]];
-            else
-                WindowSetAttr[wkey,[NMRScoreOptions: [sensitive:0]]];
-                WindowSetAttr[wkey,[expData: [sensitive:0]]];
-            endif
+        elseif trigger === 'calctype' then
+            setCalcValues [wkey, values];
+            is_file = l_names(values.ligandOptions) == '$$ligfile';
+            WindowSetAttr [wkey, [ 
+                posesSDF:           [sensitive: is_file],
+                browse_posesSDF:    [sensitive: is_file]
+            ]];
         elseif trigger === 'button_MOEPreparation' then
             local before_run = length cat Atoms[];
             StructurePreparationGUI[cmd:'interactive'];
@@ -937,7 +914,9 @@ global function qbNMRPrepPanel[]
             WindowShow[wkey,1];
         elseif trigger === 'browse_posesSDF' then
             local poseFile = FilePrompt [title:'Select Pose SDF', mode:'open', filter:'*.sdf', multi:0];
-            WindowSetAttr[wkey,[posesSDF: [value:poseFile]]];
+            if not isnull poseFile then
+                WindowSetAttr[wkey,[posesSDF: [value:poseFile]]];
+            endif
         elseif trigger === 'panel' then
             if values.(trigger) == 'Batch...' then
                 local baseNameString = swrite ['{}', values.baseName];
@@ -958,19 +937,46 @@ global function qbNMRPrepPanel[]
                 endif
             elseif values.(trigger) == 'Help' then
                 LaunchDocument '$QBHOME/doc/help-refine.html';
+            elseif values.(trigger) == 'Cancel' then
+                break;
             endif
         endif
-        status.memory = CalcMemoryRequirementsInGB [wkey,Atoms[],values];
-        if trigger === 'setMem' then
-            ynMemIsSet = 1;
-            if values.setMem < status.memory then
-                Warning twrite ['WARNING: Memory request is less then recommended amount of {} GB',status.memory];
+        
+        if not (Atoms[] === prevAtoms) then
+            prevAtoms = Atoms[];
+            task_kill (task_keylist [] | task_title task_keylist [] == 'update_QBmemory');    // kill other memory update tasks
+            if second task_fork[master:'parent'] == 'child' then
+                task_settitle [ task_key -1, 'update_QBmemory'];
+                
+                if second task_fork [master:'parent'] === 'child' then          // this will give the user some feedback
+                    task_settitle [ task_key -1, 'mem_progress'];
+                    local loopCount = '|';
+                    loop
+                        sleep 0.5;
+                        if loopCount == '|' then
+                            loopCount = '/';
+                        elseif loopCount == '/' then
+                            loopCount = '-';
+                        elseif loopCount == '-' then
+                            loopCount = '\\';
+                        elseif loopCount == '\\' then
+                            loopCount = '|';
+                        endif
+                        WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',loopCount] ]], setMem: [value: [twrite['-10']]] ]];
+                    endloop
+                    exit[];
+                endif
+
+                status.memory = qbCalcMemoryRequirementsInGB [Atoms[],values.setNP];
+                task_kill (task_keylist [] | task_title task_keylist [] == 'mem_progress');
+                WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
+                ShowWarnings [wkey,trigger,WindowValues wkey,status,Atoms[]];
+                exit[];
             endif
-        elseif not ynMemIsSet then
-            WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
         endif
-        ShowWarnings [wkey,trigger,WindowValues wkey,status,Atoms[]];
     endloop
+    // clean up some items and then close out
+    task_kill (task_keylist [] | task_title task_keylist [] == 'update_QBmemory');    // kill other memory update tasks
     WindowDestroy wkey;
 endfunction
 
