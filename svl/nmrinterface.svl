@@ -340,10 +340,11 @@ endfunction
 //  "A","VAL",380,"CG1",0,-0.27
 // these items point to atoms in the MOE window
 local function FindAtoms values
-    local interestResidue = Residues [] | qb_cLetter rChain Residues [] == token values.Chain and rUID Residues[] == values.Sequence;
+    local interestResidue = Residues [] | qb_cLetter rChain Residues [] == token values.'Chain' and rUID Residues[] == values.'Sequence';
     local expBound;
     local expUnBound;
     if isnull interestResidue then
+        write ['warning (residue not found): {} {} {}\n', values.'Chain', values.'Residue ID', values.'Sequence'];
         return [];
     endif
 
@@ -396,10 +397,47 @@ local function qbNMRCSVtoMDB opt
     return [runAtoms,boundData,unboundData];
 endfunction
 
+local function qbMDBtoNMRCSV opt
+    opt = tagcat[opt, INCSV_DEFAULTS];
+    if isnull opt.ascii_file then
+        write ['Error: opt.ascii_file not set prior to calling function\n'];
+        return [];
+    endif
+    opt.db_file = twrite['{}-DELETE.mdb',fbase opt.ascii_file];
+    db_Close db_Open [opt.db_file,'create'];
+    opt = __db_ImportASCII_DetectOptions opt;
+    opt = __db_ImportASCII_ReadFile opt;
+    opt.types = ['char','char','int','char','float','float'];
+    db_ImportASCII opt;
+    // read in MDB file and return the corresponding atoms in the MOE window
+    local mdbKey = db_Open [opt.db_file,'read'];
+    local entryKeys = db_Entries mdbKey;
+    local tmpEntryKey,runAtoms,boundData,unboundData;
+    runAtoms = [];
+    for tmpEntryKey in entryKeys loop
+        local [centeredAtom,expBound,expUnBound] = FindAtoms db_Read [mdbKey,tmpEntryKey];
+        if not isnull centeredAtom then
+            boundData.(totok centeredAtom) = expBound;
+            unboundData.(totok centeredAtom) = expUnBound;
+            runAtoms = uniq cat [runAtoms,centeredAtom];
+        endif
+    endloop
+    db_Close mdbKey;
+    fdelete opt.db_file;
+    return [runAtoms,boundData,unboundData];
+endfunction
+
 global function qbGetAtomsInNMRCSV [ascii_file]
     local opt = INCSV_DEFAULTS;
     opt.ascii_file = ascii_file;
     local [runAtoms,boundData,unboundData] = qbNMRCSVtoMDB opt;
+    return [runAtoms,boundData,unboundData];
+endfunction
+
+global function qbSendAtomsToNMRCSV [ascii_file,runAtoms,boundData,unboundData]
+    local opt = INCSV_DEFAULTS;
+    opt.ascii_file = ascii_file;
+//    local [runAtoms,boundData,unboundData] = qbMDBtoNMRCSV opt;
     return [runAtoms,boundData,unboundData];
 endfunction
 
