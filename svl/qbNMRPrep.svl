@@ -119,14 +119,16 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
 
     fwrite [shscr, 'csvFileName={}\n', ftail opt.CSVFileName];
     fwrite [shscr, 'pdbFileName={}\n',ftail inMainPDB];
-    fwrite [shscr, 'phenixFileName={}\n',ftail opt.phenix_success.phenixFile];
+    fwrite [shscr, 'h5FileName={}\n',ftail opt.phenix_success.phenixFile];
     local allKeys,allValues;
     
     fwrite [shscr, 'moeLogName={}\n',ftail moeLog];
     fwrite [shscr, 'setNP={}\n',opt.setNP];
     fwrite [shscr, 'setMem={}\n',opt.setMem];
-    fwrite [shscr, 'selection="{}"\n',droplast swrite['{}', apt twrite ['chain {} and resname {} and resid {},',
-        qb_cLetter rChain opt.coreList, rName opt.coreList, rUID opt.coreList]]];
+    if not isnull opt.siteatoms then
+        local tmpSiteResidue = uniq aResidue opt.siteatoms;
+        fwrite [shscr, 'selection="{}"\n',twrite ['/{}/{}/{}//', qb_cLetter rChain tmpSiteResidue, rName tmpSiteResidue, rUID tmpSiteResidue]];
+    endif
     fwrite [shscr, 'labelList="{}"\n',opt.labelList];
     fwrite [shscr, '    \n'];
     
@@ -190,13 +192,14 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
     fwrite [shscr, '        \n'];
     fwrite [shscr, '    echo "NOTE: using DivCon installed at $DIVCON\n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbphenixopt="--sfFile $csvFileName --pdbFile $pdbFileName --protonation PostMOE --NP $setNP --m ${}gb --ncycles $macroCount "\n','{setMem}'];
-    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
-    fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
-    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
-    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
-    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="--labels \'$labelList\'"  ;   fi    \n',"{labelList}"];
-    fwrite [shscr, '    eval $DIVCON $qbphenixopt  \n'];
+    fwrite [shscr, '    qbdivconopt="$pdbFileName $csvFileName $h5FileName -h mndo_nmr --np $setNP"'];
+    
+//    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
+//    fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
+//    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
+//    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
+    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="--nmr-selection \'$selection\'"  ;   fi    \n',"{selection}"];
+//    fwrite [shscr, '    eval $DIVCON $qbphenixopt  \n'];
     fwrite [shscr, '}   \n'];
     fwrite [shscr, '        \n'];
 
@@ -527,11 +530,21 @@ global function qbNMRPrepPanel[]
                 Option:
                 [
                     name: 'siteOptions',
-                    title: 'Site:',
+                    title: 'NMR Selection:',
                     type: 'int',
                     text: s_sets,
                     onTrigger: 'return',
-                    bubbleHelp: 'The set of atoms that defines the active site.'
+                    bubbleHelp: 'The NMR Selection that will be scored/removed prior to the pose placement.'
+                ],
+                Button:
+                    [
+                        name: 'button_ShowSelectionAtoms', text: '?', font: 'mediumBold',
+                        bubbleHelp: 'Displays the approximate number of atoms that will be treated quantum mechanically.'
+                    ],
+                Label :
+                [ 
+                    name: 'siteOptions_info', text: '', 
+                    bubbleHelp: 'NMR Selection can only include one (1) residue.'
                 ]
             ],
 
@@ -545,6 +558,17 @@ global function qbNMRPrepPanel[]
                     text: l_sets,
                     onTrigger: 'return',
                     bubbleHelp: 'The set of atoms (or file) that defines the ligand pose to score.'
+                ],
+                Button:
+                    [
+                        name: 'button_ShowLigandAtoms', text: '?', font: 'mediumBold',
+                        bubbleHelp: 'Displays the atoms that will be treated .'
+                    ],
+                Label :
+                [ 
+                    name: 'ligandOptions_info', text: '', 
+                    bubbleHelp: 'Unless SDF is chosen, the ligand atoms must be the same as the NMR Selection\n'
+                                '   and can only be a single residue.'
                 ]
             ],
             Hbox:
@@ -682,12 +706,46 @@ global function qbNMRPrepPanel[]
 	    return apt twrite ['{}\t{}\t{}\t{}',qb_cLetter aChain coreList, rName aResidue coreList, rUID aResidue coreList, aName coreList];
 	endfunction
     
-    local function ShowWarnings [wkey,trigger,values,status,allAtoms]
-    
+    local function ShowWarnings [wkey,trigger,values,status,siteatoms,ligatoms,is_file]
             local message = [];
             
+            // check the NMR Selection and Ligand poses to make sure that they are correct
+            local siteCorrect = 0;
+            local ligandCorrect = 0;
+            if (length uniq aResidue siteatoms) > 1 then
+                WindowSetAttr[wkey, [ siteOptions_info: [text:'ERROR: >1 residue', foreground:'red']   ]];
+            else
+                siteCorrect = 1;
+                WindowSetAttr[wkey, [ siteOptions_info: [text:'', foreground:'red']   ]];
+            endif
+            if (length uniq aResidue ligatoms) > 1 then
+                WindowSetAttr[wkey, [ ligandOptions_info: [text:'ERROR: >1 residue', foreground:'red']   ]];
+            else
+                ligandCorrect = 1;
+                WindowSetAttr[wkey, [ ligandOptions_info: [text:'', foreground:'red']   ]];
+            endif
+            if not is_file and not (ligatoms === siteatoms) then
+                siteCorrect = 0;
+                ligandCorrect = 0;
+	            WindowSetAttr[wkey, [ ligandOptions_info: [text:'ERROR: no match site', foreground:'red']   ]];
+	            WindowSetAttr[wkey, [ siteOptions_info: [text:'ERROR: no match ligand', foreground:'red']   ]];
+	        endif
+	        if (not is_file and not length ligatoms) then 
+                ligandCorrect = 0;
+	            WindowSetAttr[wkey, [ ligandOptions_info: [text:'ERROR: ligand empty', foreground:'red']   ]];
+            endif	        
+	        if (not length siteatoms) then
+                siteCorrect = 0;
+	            WindowSetAttr[wkey, [ siteOptions_info: [text:'ERROR: site empty', foreground:'red']   ]];
+            endif
+	        if values.calctype == 1 then
+	            siteCorrect = 1;
+                ligandCorrect = 1;
+            endif
+            WindowSetAttr [wkey, [panel: [sensitive: [1,(siteCorrect and ligandCorrect),1]]]];
+            // we dont support alternate atom positions yet
             local alt_atoms = cat app oGetCollection findmatch ['PDB_ALTLOC_[A-Z,a-z,0-9]', oCollections[]];
-            local commonAtoms = join [alt_atoms,allAtoms];
+            local commonAtoms = join [alt_atoms,Atoms[]];
             if not isnull commonAtoms then
                 local inResidues = uniq cat aResidue commonAtoms;
                 message = twrite ['Residues {} have alternative conformations.\nDisorder in the QM Region is not supported at this time and will be removed at runtime\n(e.g. highest occupied or "A" conformation will be included in QM calculation).\n\n',
@@ -758,27 +816,26 @@ global function qbNMRPrepPanel[]
     setCalcValues [wkey];
 
     WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
-    
-    ShowWarnings [wkey,trigger,values,status,Atoms[]];
-    local prevAtoms = Atoms[];;
+        
+    values = WindowValues wkey;
+    siteatoms = StandardSet s_names(values.siteOptions);
+    ligatoms = StandardSet l_names(values.ligandOptions);
+
+    local prevAtoms = Atoms[];
     if second task_fork [] == 'child' then
         task_settitle [ task_key -1, 'update_QBmemory'];
         status.memory = qbCalcMemoryRequirementsInGB[Atoms[],values.setNP];
         WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
-        ShowWarnings [wkey,trigger,values,status,Atoms[]];
         exit[];
     endif
-
+    ShowWarnings [wkey,trigger,values,status,siteatoms,ligatoms, l_names(values.ligandOptions) == '$$ligfile'];
 	WindowShow wkey;
 	local tmpFile;
 	local selectedAtomID;
+	local is_file;
     loop
         [values, trigger] = WindowWait wkey;
-        
-        siteatoms = StandardSet s_names(values.siteOptions);
-        ligatoms = StandardSet l_names(values.ligandOptions);
-        
-  write ['DEBUG: {} | {}\n', values, trigger];
+  // write ['DEBUG: {} | {}\n', values, trigger];
         if trigger === 'expUnbound' or trigger === 'expBound' or trigger === 'button_SetExp' then
             selectedAtomID = bitshr [second values.coreResiduesBox,WMOD_NBITS];
             if selectedAtomID > 0 then
@@ -788,10 +845,20 @@ global function qbNMRPrepPanel[]
             endif
         elseif trigger === 'button_ShowNMRAtoms' then
             aSetSelected [coreList, 1];
+        elseif trigger === 'button_ShowLigandAtoms' then
+            aSetSelected [ligatoms, 1];
+        elseif trigger === 'button_ShowSelectionAtoms' then
+            aSetSelected [siteatoms, 1];
         elseif trigger === 'siteOptions' then
-            aSetSelected [coreList, 1];
+            siteatoms = StandardSet s_names(values.siteOptions);
+            if l_names(values.ligandOptions) <> '$$ligfile' then
+                values.ligandOptions = indexof [s_names(values.siteOptions),l_names];
+                WindowSetAttr [wkey, [ligandOptions: [value:values.ligandOptions]]];
+                ligatoms = StandardSet l_names(values.ligandOptions);
+            endif
         elseif trigger === 'ligandOptions' then
-	        local is_file = l_names(values.ligandOptions) == '$$ligfile';
+            ligatoms = StandardSet l_names(values.ligandOptions);
+	        is_file = l_names(values.ligandOptions) == '$$ligfile';
 	        WindowSetAttr [wkey, [ 
 	            posesSDF:           [sensitive: is_file],
 	            browse_posesSDF:    [sensitive: is_file]
@@ -941,7 +1008,7 @@ global function qbNMRPrepPanel[]
                 break;
             endif
         endif
-        
+        ShowWarnings [wkey,trigger,values,status,siteatoms,ligatoms,l_names(values.ligandOptions) == '$$ligfile'];
         if not (Atoms[] === prevAtoms) then
             prevAtoms = Atoms[];
             task_kill (task_keylist [] | task_title task_keylist [] == 'update_QBmemory');    // kill other memory update tasks
@@ -966,11 +1033,9 @@ global function qbNMRPrepPanel[]
                     endloop
                     exit[];
                 endif
-
                 status.memory = qbCalcMemoryRequirementsInGB [Atoms[],values.setNP];
                 task_kill (task_keylist [] | task_title task_keylist [] == 'mem_progress');
                 WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
-                ShowWarnings [wkey,trigger,WindowValues wkey,status,Atoms[]];
                 exit[];
             endif
         endif
