@@ -192,7 +192,7 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
     fwrite [shscr, '        \n'];
     fwrite [shscr, '    echo "NOTE: using DivCon installed at $DIVCON\n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbdivconopt="$pdbFileName $csvFileName $h5FileName -h mndo_nmr --np $setNP"'];
+    fwrite [shscr, '    qbdivconopt="$pdbFileName $sdfFileName $csvFileName $h5FileName -h mndo_nmr --np $setNP --print --dc"'];
     
 //    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
 //    fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
