@@ -108,7 +108,7 @@ local function WriteLog [line,basename,state]
     return logFileName;
 endfunction
 
-local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
+local function GenerateBatchScript [opt,batchfilename]
 
     local shscr = fopenw batchfilename;
               //             1         2         3         4         5         6         7         8
@@ -117,19 +117,19 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
     fwrite [shscr, 'tmpQBHOME={}\n',getenv 'QBHOME'];
     fwrite [shscr, 'DIVCON=qmechanic\n'];
 
-    fwrite [shscr, 'csvFileName={}\n', ftail opt.CSVFileName];
-    fwrite [shscr, 'pdbFileName={}\n',ftail inMainPDB];
-    fwrite [shscr, 'h5FileName={}\n',ftail opt.phenix_success.phenixFile];
+    fwrite [shscr, 'csvFileName={}\n', twrite ['{}-NMR.csv', opt.baseName]];
+    fwrite [shscr, 'pdbFileName={}\n',twrite ['{}-NMR.pdb', opt.baseName]];
+    fwrite [shscr, 'h5FileName={}\n',twrite ['{}-NMR.h5', opt.baseName]];
+    fwrite [shscr, 'posesSDFname={}\n',ftail opt.posesSDF];
+    
     local allKeys,allValues;
     
-    fwrite [shscr, 'moeLogName={}\n',ftail moeLog];
     fwrite [shscr, 'setNP={}\n',opt.setNP];
     fwrite [shscr, 'setMem={}\n',opt.setMem];
     if not isnull opt.siteatoms then
         local tmpSiteResidue = uniq aResidue opt.siteatoms;
         fwrite [shscr, 'selection="{}"\n',twrite ['/{}/{}/{}//', qb_cLetter rChain tmpSiteResidue, rName tmpSiteResidue, rUID tmpSiteResidue]];
     endif
-    fwrite [shscr, 'labelList="{}"\n',opt.labelList];
     fwrite [shscr, '    \n'];
     
                         //             1         2         3         4         5         6         7         8
@@ -187,19 +187,16 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
     fwrite [shscr, '            errorOut  \n'];
     fwrite [shscr, '        fi          \n'];
     fwrite [shscr, '    else  \n'];
-    fwrite [shscr, '        DIVCON=$QBHOME/bin/qmechanic      \n'];
+    fwrite [shscr, '        DIVCON=$QBHOME/bin/qmechanic\n'];
     fwrite [shscr, '    fi          \n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    echo "NOTE: using DivCon installed at $DIVCON\n'];
+    fwrite [shscr, '    echo "NOTE: using DivCon installed at $DIVCON"\n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbdivconopt="$pdbFileName $sdfFileName $csvFileName $h5FileName -h mndo_nmr --np $setNP --print --dc"'];
+    fwrite [shscr, '    qbdivconopt="$pdbFileName $sdfFileName $csvFileName $h5FileName -h mndo_nmr --np $setNP --print --dc"\n'];
     
-//    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
-//    fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
-//    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
-//    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
-    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="--nmr-selection \'$selection\'"  ;   fi    \n',"{selection}"];
-//    fwrite [shscr, '    eval $DIVCON $qbphenixopt  \n'];
+    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbdivconopt="$qbdivconopt --nmr-selection \'$selection\'"  ;   fi    \n',"{selection}"];
+    fwrite [shscr, '    echo "$DIVCON $qbdivconopt"  \n'];
+    fwrite [shscr, '    eval $DIVCON $qbdivconopt  \n'];
     fwrite [shscr, '}   \n'];
     fwrite [shscr, '        \n'];
 
@@ -227,37 +224,22 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigSDF,moeLog]
     fwrite [shscr, '}    \n'];
     fwrite [shscr, '        \n'];
     
-    fwrite [shscr, '\nmtzFile=\'\n'];
-    apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.mtzFile,'char',INT_MAX]];
+    fwrite [shscr, '\ncsvFile=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [twrite ['{}-NMR.csv', opt.baseName],'char',INT_MAX]];
     fwrite [shscr, '\'\n'];
-    fwrite [shscr, 'ProcessPackageFile $csvFileName "$mtzFile"\n'];
+    fwrite [shscr, 'ProcessPackageFile $csvFileName "$csvFile"\n'];
     
-    fwrite [shscr, '\nmoeLog=\'\n'];
-    apt fwrite [shscr, '{}\n', r64_encodeln freadb [moeLog,'char',INT_MAX]];
-    fwrite [shscr, '\'\n'];
-    fwrite [shscr, 'ProcessPackageFile $moeLogName "$moeLog"\n'];
-    
-    if not isnull opt.phenix_success.phenixFile then
-        fwrite [shscr, '\nphenixFile=\'\n'];
-        apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.phenix_success.phenixFile,'char',INT_MAX]];
-        fwrite [shscr, '\'\n'];
-        fwrite [shscr, 'ProcessPackageFile $phenixFileName "$phenixFile"\n'];
-    endif
-
     fwrite [shscr, '\npdbFile=\'\n'];
-    apt fwrite [shscr, '{}\n', r64_encodeln freadb [inMainPDB,'char',INT_MAX]];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [twrite ['{}-NMR.pdb', opt.baseName],'char',INT_MAX]];
     fwrite [shscr, '\'\n'];
     fwrite [shscr, 'ProcessPackageFile $pdbFileName "$pdbFile"\n'];
 
-    local tmpLigFile;
-    for tmpLigFile in inLigSDF loop
-        fwrite [shscr, '\nF{}=\'\n',fbase ftail tmpLigFile];
-        apt fwrite [shscr, '{}\n', r64_encodeln freadb [tmpLigFile,'char',INT_MAX]];
-        fwrite [shscr, '\'\n'];
-        fwrite [shscr, 'ProcessPackageFile {} "$F{}"\n',ftail tmpLigFile,fbase ftail tmpLigFile];
-    endloop
+    fwrite [shscr, '\nSDFile=\'\n'];
+    apt fwrite [shscr, '{}\n', r64_encodeln freadb [opt.posesSDF,'char',INT_MAX]];
+    fwrite [shscr, '\'\n'];
+    fwrite [shscr, 'ProcessPackageFile $posesSDFname "$SDFile"\n'];
 
-    fwrite [shscr, 'RunPhenix\n'];
+    fwrite [shscr, '\nRunDivCon\n'];
     
     fclose shscr;
 
@@ -389,6 +371,7 @@ endfunction
 function qbGetAtomsInNMRCSV;
 function qbFixChargedAtomsPanel; 
 function qbCalcMemoryRequirementsInGB;
+function qbSendAtomsToNMRCSV;
 
 global function qbNMRPrepPanel[]
 
@@ -990,16 +973,20 @@ global function qbNMRPrepPanel[]
                 baseNameString[cat indicesof[" ",baseNameString]] = "_";
                 values.baseName = token baseNameString;
                 WindowSetAttr[wkey, [ baseName:   [value:values.baseName]  ]];
-                
+                                
                 local batchname = [];
-                if ShowWarnings [wkey,'inbatch',values,status,Atoms[]] then
+                if ShowWarnings [wkey,'inbatch',values,status,siteatoms,ligatoms, l_names(values.ligandOptions) == '$$ligfile'] then
                     batchname = BatchPanel values.baseName;
                 endif
 
                 if not isnull batchname then
-                    local mainPDBfilename = twrite['{}-NMR.pdb',values.baseName];
-                    WritePDB[mainPDBfilename];
-                    GenerateBatchScript[values,batchname,mainPDBfilename,values.posesSDF,WriteLog[[],[],'getname']];
+                    WritePDB[twrite['{}-NMR.pdb',values.baseName]];
+                    qbSendAtomsToNMRCSV[twrite['{}-NMR.csv',values.baseName],coreList,boundData,unboundData];
+                    if length uniq aResidue siteatoms == 1 then
+                        values.siteatoms = siteatoms;
+                        values.ligatoms = ligatoms;
+                    endif
+                    GenerateBatchScript[values,batchname];
                     break;
                 endif
             elseif values.(trigger) == 'Help' then
