@@ -136,8 +136,6 @@ local function GenerateBatchScript [opt,batchfilename]
                         //    12345678901234567890123456789012345678901234567890123456789012345678901234567890
     fwrite [shscr, 'errorOut()    \n'];
     fwrite [shscr, '{}\n',"{"];
-    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then regionNote="E"  ; else  regionNote="D" ;   fi    \n'];    
-    fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then cycleNote="D"  ; else  cycleNote="E" ;   fi    \n'];
     fwrite [shscr, '    echo    \n'];
     fwrite [shscr, '    echo "Usage: ./{} [--np=4]"    \n',batchfilename];
     fwrite [shscr, '    echo     \n'];
@@ -807,7 +805,7 @@ global function qbNMRPrepPanel[]
     local prevAtoms = Atoms[];
     if second task_fork [] == 'child' then
         task_settitle [ task_key -1, 'update_QBmemory'];
-        status.memory = qbCalcMemoryRequirementsInGB[Atoms[],values.setNP];
+        status.memory = 2 * qbCalcMemoryRequirementsInGB[Atoms[],values.setNP];
         WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
         exit[];
     endif
@@ -982,6 +980,10 @@ global function qbNMRPrepPanel[]
                 if not isnull batchname then
                     WritePDB[twrite['{}-NMR.pdb',values.baseName]];
                     qbSendAtomsToNMRCSV[twrite['{}-NMR.csv',values.baseName],coreList,boundData,unboundData];
+                    if values.calctype == 1 then
+                        siteatoms = [];
+                        ligatoms = [];
+                    endif
                     if length uniq aResidue siteatoms == 1 then
                         values.siteatoms = siteatoms;
                         values.ligatoms = ligatoms;
@@ -1020,7 +1022,7 @@ global function qbNMRPrepPanel[]
                     endloop
                     exit[];
                 endif
-                status.memory = qbCalcMemoryRequirementsInGB [Atoms[],values.setNP];
+                status.memory = 2 * qbCalcMemoryRequirementsInGB [Atoms[],values.setNP];
                 task_kill (task_keylist [] | task_title task_keylist [] == 'mem_progress');
                 WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
                 exit[];
