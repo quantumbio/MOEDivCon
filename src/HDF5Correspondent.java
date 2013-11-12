@@ -1648,7 +1648,7 @@ private SVLVar retrieveNMRScore(SVLVar var) throws SVLJavaException, IOException
     String target = var.peek(1).getTokn(2);
     H5File h5File=new H5File(filename, H5File.READ);
     h5File.open();
-        String xPath="/DivCon/"+target+"/NMR Score";
+        String xPath="/DivCon/"+target+"/NMR Score Class Number Average";
         HObject ho=findHDF5Object(h5File, xPath);
         H5CompoundDS hObject=(H5CompoundDS)ho;
         if(hObject==null) throw new SVLJavaException("NMR Score does not exist for: '" + target + "'.");

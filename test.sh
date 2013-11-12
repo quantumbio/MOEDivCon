@@ -5,7 +5,7 @@ function pause(){
 
 date
 
-export PROJECT_PATH=/home/roger/DivConDiscoverySuite-b1471
+export PROJECT_PATH=/home/roger/DivConDiscoverySuite-b1741
 #export JAVA_HOME=/home/roger/jdk1.7.0_25
 #export ANT_HOME=/home/roger/apache/apache-ant-1.8.4
 #export OOBACKBONE_HOME=/home/roger/NetBeansProjects/OOBackbone
@@ -29,7 +29,8 @@ cp /home/roger/NetBeansProjects/JNIDivcon/dist/JNIDivcon.jar $PROJECT_PATH/linux
 #qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Josh/abbott/x_mcl1_a1107644/x_mcl1_a1107644_protonated.pdb.h5']" -exit
 #qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/s59/Moe interface/s59.pm6.sp.xml.h5']" -exit
 #qbmoebatch -exec "qbTestPDBtoH5['./roothaan.h5', '/home/roger/NetBeansProjects/OOBackbone/tests/examples/3FVA.pdb']" -exit
-qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Cl4Y2/roothaan.h5']" -exit
+#qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Cl4Y2/roothaan.h5']" -exit
+qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Lance/1LRI/1LRI-NMR.h5']" -exit
 
 #qbmoe
 
