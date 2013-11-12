@@ -182,6 +182,7 @@ local function GenerateBatchScript [opt,batchfilename]
     fwrite [shscr, '            DIVCON=`which qmechanic`      \n'];
     fwrite [shscr, '        else  \n'];
     fwrite [shscr, '            echo "ERROR: DivCon not found at $tmpQBHOME"\n'];
+    fwrite [shscr, '            echo "      source /path/to/DivConDiscoverySuite/etc/qbenv.sh and try again."\n'];
     fwrite [shscr, '            errorOut  \n'];
     fwrite [shscr, '        fi          \n'];
     fwrite [shscr, '    else  \n'];
@@ -190,7 +191,7 @@ local function GenerateBatchScript [opt,batchfilename]
     fwrite [shscr, '        \n'];
     fwrite [shscr, '    echo "NOTE: using DivCon installed at $DIVCON"\n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbdivconopt="$pdbFileName $sdfFileName $csvFileName $h5FileName -h mndo_nmr --np $setNP --print --dc"\n'];
+    fwrite [shscr, '    qbdivconopt="$pdbFileName $posesSDFname $csvFileName $h5FileName -h mndo_nmr --np $setNP --print --dc"\n'];
     
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbdivconopt="$qbdivconopt --nmr-selection \'$selection\'"  ;   fi    \n',"{selection}"];
     fwrite [shscr, '    echo "$DIVCON $qbdivconopt"  \n'];
