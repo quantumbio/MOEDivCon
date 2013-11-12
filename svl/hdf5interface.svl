@@ -5,7 +5,7 @@ local function jvmqb arg
 endfunction
 
 
-global function qbListModels  arg = jvmqb ['listModels' , [arg] ];
+global function qbListModels  arg = cat jvmqb ['listModels' , [arg] ];
 global function qbRetrieveQMScore  arg = jvmqb ['retrieveQMScore' , [arg] ];
 global function qbRetrieveResiduePWD  arg  = jvmqb ['retrieveResiduePWD' , [arg]  ];
 global function qbRetrieveAtomByAtomPWD  arg  = jvmqb ['retrieveAtomByAtomPWD' , [arg]  ];
