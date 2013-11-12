@@ -51,8 +51,8 @@ global function qbTesth5Main [h5file]
  //   print qbListModels [h5file];
     //print qbRetrieveQMScore [h5file, modelTags.target];
     //print qbRetrieveResiduePWD [h5file, modelTags.target];
-    print qbRetrieveAtomByAtomDecomposition [h5file, modelTags.target, 'Initial'];
-    print qbRetrieveAtomByAtomDecomposition [h5file, modelTags.target, 'Final'];
+//    print qbRetrieveAtomByAtomDecomposition [h5file, modelTags.target, 'Initial'];
+//    print qbRetrieveAtomByAtomDecomposition [h5file, modelTags.target, 'Final'];
     //print qbRetrieveAtomByAtomMRM [h5file, modelTags.target];
     print qbRetrieveNMRScore [h5file, modelTags.target];
     print qbRetrieveChemicalShifts [h5file, modelTags.target, 'Wildtype'];
