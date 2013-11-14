@@ -1137,7 +1137,7 @@ global function qbNMRAnalizePanel[]
 	        ],
 	        Mbox:
 	        [
-	            columns:    2,
+	            columns:    3,
 	            Checkbox: [
 	                name    :   'showColors',
 	                title   :   '',
@@ -1145,6 +1145,14 @@ global function qbNMRAnalizePanel[]
 	                bubbleHelp: ['Color atoms based on available shift values. White means no calculated values available.']
 	            ],
 	            Label : [flushLeft:1, title: 'Color Atoms'],
+                Option:
+                [
+                    name: 'eleOptions',
+//                    title: 'SF Column:',
+                    onTrigger : 'return',
+                    type: 'char',
+                    bubbleHelp: 'Structure factor column within MTZ file.'
+                ],
 	            Checkbox: [
 	                name    :   'showLabels',
 	                title   :   '',
@@ -1164,46 +1172,57 @@ global function qbNMRAnalizePanel[]
         aSetRGB[Atoms[], rep [bytepack3 [255,255,255],length Atoms[]]];     // change all atoms to white
 
         local interestAtoms = get [Atoms[],chemicalShifts.Index];
+        local elements;
+        if values.eleOptions == 'All' then
+            elements = uniq aElement interestAtoms;
+        else
+            elements = values.eleOptions;
+        endif
         local element;
-        for element in uniq aElement interestAtoms loop
-            local interestAtomsMask = aElement interestAtoms == element;    // TODO make this an option
+        for element in elements loop
+            local interestAtomsMask = aElement interestAtoms == element;
             aSetHidden [rAtoms uniq aResidue (interestAtoms | interestAtomsMask), 0];
             local maxShift, minShift , normalizedShifts;
             if values.calctype == 1 then
                 maxShift = max (chemicalShifts.'Bound Shift' | interestAtomsMask);
                 minShift = min (chemicalShifts.'Bound Shift' | interestAtomsMask);
-                normalizedShifts = (chemicalShifts.'Bound Shift' | interestAtomsMask) / maxShift;
+                normalizedShifts = ((chemicalShifts.'Bound Shift' | interestAtomsMask) / maxShift);
             elseif values.calctype == 2 then
                 maxShift = max (chemicalShifts.'Unbound Shift' | interestAtomsMask);
                 minShift = min (chemicalShifts.'Unbound Shift' | interestAtomsMask);
-                normalizedShifts = (chemicalShifts.'Unbound Shift' | interestAtomsMask) / maxShift;
+                normalizedShifts = ((chemicalShifts.'Unbound Shift' | interestAtomsMask) / maxShift);
             elseif values.calctype == 3 then            // CSP
                 maxShift = max ((chemicalShifts.'Bound Shift' - chemicalShifts.'Unbound Shift') | interestAtomsMask);
                 minShift = min ((chemicalShifts.'Bound Shift' - chemicalShifts.'Unbound Shift') | interestAtomsMask);
-                normalizedShifts = ((chemicalShifts.'Bound Shift' - chemicalShifts.'Unbound Shift') | interestAtomsMask) / maxShift;
+                normalizedShifts = (((chemicalShifts.'Bound Shift' - chemicalShifts.'Unbound Shift') | interestAtomsMask) / maxShift);
             endif
+                write ['normalizedShifts1: {}\n',normalizedShifts];
 
-            aSetRGB[(interestAtoms | interestAtomsMask) | (normalizedShifts > 0), 
+            aSetRGB[(interestAtoms | interestAtomsMask) | (normalizedShifts >= 0), 
                     bytepack3 [
                         255,
-                        round ( (normalizedShifts | (normalizedShifts > 0))*255),
-                        round ( (normalizedShifts | (normalizedShifts > 0))*255)
+                        round ( (1 - (normalizedShifts | (normalizedShifts >= 0)))*255),
+                        round ( (1 - (normalizedShifts | (normalizedShifts >= 0)))*255)
                     ]];
+            write ['colors1: {}\n', round ( (normalizedShifts | (normalizedShifts >= 0))*255)];
             aSetRGB[(interestAtoms | interestAtomsMask) | (normalizedShifts < 0), 
                     bytepack3 [
-                        round ( (normalizedShifts | (normalizedShifts < 0))*255),
-                        round ( (normalizedShifts | (normalizedShifts < 0))*255),
+                        round ( (1 + (normalizedShifts | (normalizedShifts < 0)))*255),
+                        round ( (1 + (normalizedShifts | (normalizedShifts < 0)))*255),
                         255
                     ]];
+            write ['colors2: {}\n', round ( (normalizedShifts | (normalizedShifts < 0))*255)];
         endloop
         aSetColorBy [Atoms[],'rgb'];
     endfunction
     
     function LabelAtomsByValue[values,chemicalShifts]
-        
-        static gobj_key;
-        GDestroy gobj_key;
 
+        static gobj_key;
+
+        if not isnull gobj_key then
+            GDestroy gobj_key;
+        endif
         if values.showLabels == 0 then
             return;
         endif
@@ -1211,9 +1230,15 @@ global function qbNMRAnalizePanel[]
         gobj_key = GCreate '';
 
         local interestAtoms = get [Atoms[],chemicalShifts.Index];
+        local elements;
+        if values.eleOptions == 'All' then
+            elements = uniq aElement interestAtoms;
+        else
+            elements = values.eleOptions;
+        endif
         local element;
-        for element in uniq aElement interestAtoms loop
-            local interestAtomsMask = aElement interestAtoms == element;    // TODO make this an option
+        for element in elements loop
+            local interestAtomsMask = aElement interestAtoms == element;
             aSetHidden [rAtoms uniq aResidue (interestAtoms | interestAtomsMask), 0];
             local normalizedShifts;
             local label_token;
@@ -1230,7 +1255,14 @@ global function qbNMRAnalizePanel[]
             gobj_key = Label_Atom [interestAtoms | interestAtomsMask,(ceil (normalizedShifts * 10))/10,label_token,gobj_key];
         endloop
     endfunction
-
+    
+    function GetChemicalShifts [wkey, hdfFile, target, ligand]
+        local values = WindowValues wkey;
+        local chemicalShifts = qbRetrieveChemicalShifts [hdfFile, target, ligand];
+        local elements = cat ['All',sort uniq aElement get[Atoms [], chemicalShifts.Index]];
+        WindowSetAttr[wkey,[ eleOptions: [ text:elements ] ] ];
+        return chemicalShifts;
+    endfunction
     
     local hdfModels,chemicalShifts;
     local atomColors;
@@ -1248,6 +1280,7 @@ global function qbNMRAnalizePanel[]
                     else
                         hdfModels = qbListModels hdfFile;
                         if not isnull hdfModels.target then
+                            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, 'Wildtype'];
                             View[];
                             atomColors = aColorBy Atoms[];
                             WindowSetAttr[wkey,[completedHDF: [value:hdfFile]]];
@@ -1262,24 +1295,24 @@ global function qbNMRAnalizePanel[]
         elseif trigger === 'showColors' then
             if values.showColors == 1 then
                 atomColors = aColorBy Atoms[];
-                chemicalShifts = qbRetrieveChemicalShifts [hdfFile, hdfModels.target, 'Wildtype'];
+                chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, 'Wildtype'];
                 ColorAtomsByValue[values,chemicalShifts];
-                LabelAtomsByValue[values,chemicalShifts];
             else
                 aSetColorBy [Atoms[],atomColors];
             endif
-        elseif trigger === 'showLabels' then
-//            if values.showLabels == 1 then
-                chemicalShifts = qbRetrieveChemicalShifts [hdfFile, hdfModels.target, 'Wildtype'];
-                ColorAtomsByValue[values,chemicalShifts];
-                LabelAtomsByValue[values,chemicalShifts];
-//            else
-//                aSetColorBy [Atoms[],atomColors];
-//            endif
-        elseif trigger === 'calctype' then
-            chemicalShifts = qbRetrieveChemicalShifts [hdfFile, hdfModels.target, 'Wildtype'];
             LabelAtomsByValue[values,chemicalShifts];
+        elseif trigger === 'showLabels' then
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, 'Wildtype'];
             ColorAtomsByValue[values,chemicalShifts];
+            LabelAtomsByValue[values,chemicalShifts];
+        elseif trigger === 'calctype' then
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, 'Wildtype'];
+            ColorAtomsByValue[values,chemicalShifts];
+            LabelAtomsByValue[values,chemicalShifts];
+        elseif trigger === 'eleOptions' then
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, 'Wildtype'];
+            ColorAtomsByValue[values,chemicalShifts];
+            LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'panel' then
             if values.(trigger) == 'Close' then
                 break;
@@ -1288,6 +1321,8 @@ global function qbNMRAnalizePanel[]
             endif
         endif
     endloop
+    values.showLabels=0;
+    LabelAtomsByValue[values];
     WindowDestroy wkey;
 endfunction
 #eof
