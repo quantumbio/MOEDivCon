@@ -1035,4 +1035,259 @@ global function qbNMRPrepPanel[]
     WindowDestroy wkey;
 endfunction
 
+local function Label_Atom [atoms,labels,gobj_token,gobj_key]
+
+    if isnull atoms then
+        atoms = Atoms[];
+    endif
+    if isnull labels then
+        return;
+    endif
+    if isnull gobj_key then
+        gobj_key = GCreate '';
+    endif
+    if isnull gobj_token then
+        gobj_token = 'unknown labels';
+    endif
+    
+    GSetTitle [gobj_key,gobj_token];
+
+    local atom;
+    for atom in atoms loop
+        GText cat [gobj_key,aColor atom, aPos atom + 0.1, totok labels(cat indexof [atom, atoms])];
+    endloop
+    
+    return gobj_key;
+    
+endfunction
+
+function qbListModels;
+function qbRetrieveChemicalShifts;
+
+global function qbNMRAnalizePanel[]
+
+	if WindowShow ['NMRAnalizePanel', 1] then
+	    return;
+	endif
+
+	local wkey = WindowCreate
+	[
+	    name: 'panel',
+	    title: 'NMR Analysis',
+	    windowName: 'NMRAnalizePanel',
+	    text: ['Help','Close'],
+	    onTrigger: ['return','return'],
+	    bubbleHelp: [
+	    'Help, Guidelines, and Support',
+		'Close the analysis.'
+	    ],
+        Group :
+        [
+            Hbox:
+            [
+                extendH: 1,
+                FSBText: 
+                [
+                    name: 'completedHDF', len: 25, extendH: 1, sensitive: 1,
+                    title: 'DivCon File:',
+                    allowBlank: 0,
+                    bubbleHelp:
+                    'Choose HDF5 file from completed simulation.'
+                ],
+                Button: [   name: 'browse_HDF', text: 'Browse...', sensitive: 1    ]
+            ],
+            Separator : [flushLeft:1],
+            Hbox:
+            [
+                Listbox :
+                    [
+                    name: 'coreResiduesBox',
+                    text: '',
+                    width:30,
+                    extendH:1,
+                    header: 'Ligand\tNMRScore',
+                    onTrigger: 'return',
+                    type: 'modint',
+                    multiSelect: 0,
+                    sortEnable: 1,
+                    bubbleHelp:
+                        'If several ligands (in addition to Wildtype) were chosen with the use of an SDFile, they will be listed here.\n'
+                        '   The NMRScore will be displayed as well if experimental values were provided.'
+                    ] 
+            ],
+            Separator : [flushLeft:1],
+            Hbox:
+            [
+                Radio : [
+                    name	: 'calctype',
+                    title   : 'Calculation:',
+                    margin	: 1,
+                    columns	: 3,
+                    type	: 'int',
+                    flushLeft	: 1,
+                    extendH	: 1,
+                    onTrigger	: 'return',
+                    font	: 'mediumBold',
+                    text	: ['Bound Shift','Unbound Shift','CSP'],
+                    bubbleHelp	: 
+                        ['Display NMR Bound Chemical Shift (CS) on all chosen atoms.',
+                            'Display NMR Unbound Chemical Shift (CS) on all chosen atoms.',
+                            'Display NMR Chemical Shift Perturbation (CSP) on all chosen atoms.']
+                ]
+	        ],
+	        Mbox:
+	        [
+	            columns:    2,
+	            Checkbox: [
+	                name    :   'showColors',
+	                title   :   '',
+	                onTrigger:  'return',
+	                bubbleHelp: ['Color atoms based on available shift values. White means no calculated values available.']
+	            ],
+	            Label : [flushLeft:1, title: 'Color Atoms'],
+	            Checkbox: [
+	                name    :   'showLabels',
+	                title   :   '',
+	                onTrigger:  'return',
+	                bubbleHelp: ['Label atoms based on available shift values.']
+	            ],
+	            Label : [flushLeft:1, title: 'Label Shifts']
+	        ]
+	    ]
+    ];
+    WindowShow wkey;
+    
+    function ColorAtomsByValue[values,chemicalShifts]
+        if values.showColors == 0 then
+            return;
+        endif
+        aSetRGB[Atoms[], rep [bytepack3 [255,255,255],length Atoms[]]];     // change all atoms to white
+
+        local interestAtoms = get [Atoms[],chemicalShifts.Index];
+        local element;
+        for element in uniq aElement interestAtoms loop
+            local interestAtomsMask = aElement interestAtoms == element;    // TODO make this an option
+            aSetHidden [rAtoms uniq aResidue (interestAtoms | interestAtomsMask), 0];
+            local maxShift, minShift , normalizedShifts;
+            if values.calctype == 1 then
+                maxShift = max (chemicalShifts.'Bound Shift' | interestAtomsMask);
+                minShift = min (chemicalShifts.'Bound Shift' | interestAtomsMask);
+                normalizedShifts = (chemicalShifts.'Bound Shift' | interestAtomsMask) / maxShift;
+            elseif values.calctype == 2 then
+                maxShift = max (chemicalShifts.'Unbound Shift' | interestAtomsMask);
+                minShift = min (chemicalShifts.'Unbound Shift' | interestAtomsMask);
+                normalizedShifts = (chemicalShifts.'Unbound Shift' | interestAtomsMask) / maxShift;
+            elseif values.calctype == 3 then            // CSP
+                maxShift = max ((chemicalShifts.'Bound Shift' - chemicalShifts.'Unbound Shift') | interestAtomsMask);
+                minShift = min ((chemicalShifts.'Bound Shift' - chemicalShifts.'Unbound Shift') | interestAtomsMask);
+                normalizedShifts = ((chemicalShifts.'Bound Shift' - chemicalShifts.'Unbound Shift') | interestAtomsMask) / maxShift;
+            endif
+
+            aSetRGB[(interestAtoms | interestAtomsMask) | (normalizedShifts > 0), 
+                    bytepack3 [
+                        255,
+                        round ( (normalizedShifts | (normalizedShifts > 0))*255),
+                        round ( (normalizedShifts | (normalizedShifts > 0))*255)
+                    ]];
+            aSetRGB[(interestAtoms | interestAtomsMask) | (normalizedShifts < 0), 
+                    bytepack3 [
+                        round ( (normalizedShifts | (normalizedShifts < 0))*255),
+                        round ( (normalizedShifts | (normalizedShifts < 0))*255),
+                        255
+                    ]];
+        endloop
+        aSetColorBy [Atoms[],'rgb'];
+    endfunction
+    
+    function LabelAtomsByValue[values,chemicalShifts]
+        
+        static gobj_key;
+        GDestroy gobj_key;
+
+        if values.showLabels == 0 then
+            return;
+        endif
+
+        gobj_key = GCreate '';
+
+        local interestAtoms = get [Atoms[],chemicalShifts.Index];
+        local element;
+        for element in uniq aElement interestAtoms loop
+            local interestAtomsMask = aElement interestAtoms == element;    // TODO make this an option
+            aSetHidden [rAtoms uniq aResidue (interestAtoms | interestAtomsMask), 0];
+            local normalizedShifts;
+            local label_token;
+            if values.calctype == 1 then
+                normalizedShifts = (chemicalShifts.'Bound Shift' | interestAtomsMask);
+                label_token = 'Bound Shift Labels';
+            elseif values.calctype == 2 then
+                normalizedShifts = (chemicalShifts.'Unbound Shift' | interestAtomsMask);
+                label_token = 'Unbound Shift Labels';
+            elseif values.calctype == 3 then            // CSP
+                normalizedShifts = ((chemicalShifts.'Bound Shift' - chemicalShifts.'Unbound Shift') | interestAtomsMask);
+                label_token = 'CSP Labels';
+            endif
+            gobj_key = Label_Atom [interestAtoms | interestAtomsMask,(ceil (normalizedShifts * 10))/10,label_token,gobj_key];
+        endloop
+    endfunction
+
+    
+    local hdfModels,chemicalShifts;
+    local atomColors;
+    loop
+        local [values, trigger] = WindowWait wkey;
+        if trigger === 'browse_HDF' then
+            local hdfFile = FilePrompt [title:'Select HDF5 File', mode:'open', filter:'*.h5', multi:0];
+            if not isnull hdfFile then
+                if not (ftype twrite ['{}.pdb',fbase hdfFile] == '') then
+                    values.showLabels=0;
+                    LabelAtomsByValue[values];
+                    oDestroy Chains[];
+                    if isnull ReadAuto twrite ['{}.pdb',fbase hdfFile] then
+                        Warning [twrite ['Read error: {}.pdb',fbase hdfFile]];
+                    else
+                        hdfModels = qbListModels hdfFile;
+                        if not isnull hdfModels.target then
+                            View[];
+                            atomColors = aColorBy Atoms[];
+                            WindowSetAttr[wkey,[completedHDF: [value:hdfFile]]];
+                        else
+                            Warning [twrite ['Read error: {}',hdfFile]];
+                        endif
+                    endif
+                else
+                    Warning [twrite ['File not found: {}.pdb',fbase hdfFile]];
+                endif
+            endif
+        elseif trigger === 'showColors' then
+            if values.showColors == 1 then
+                atomColors = aColorBy Atoms[];
+                chemicalShifts = qbRetrieveChemicalShifts [hdfFile, hdfModels.target, 'Wildtype'];
+                ColorAtomsByValue[values,chemicalShifts];
+                LabelAtomsByValue[values,chemicalShifts];
+            else
+                aSetColorBy [Atoms[],atomColors];
+            endif
+        elseif trigger === 'showLabels' then
+//            if values.showLabels == 1 then
+                chemicalShifts = qbRetrieveChemicalShifts [hdfFile, hdfModels.target, 'Wildtype'];
+                ColorAtomsByValue[values,chemicalShifts];
+                LabelAtomsByValue[values,chemicalShifts];
+//            else
+//                aSetColorBy [Atoms[],atomColors];
+//            endif
+        elseif trigger === 'calctype' then
+            chemicalShifts = qbRetrieveChemicalShifts [hdfFile, hdfModels.target, 'Wildtype'];
+            LabelAtomsByValue[values,chemicalShifts];
+            ColorAtomsByValue[values,chemicalShifts];
+        elseif trigger === 'panel' then
+            if values.(trigger) == 'Close' then
+                break;
+            elseif values.(trigger) == 'Help' then
+                LaunchDocument '$QBHOME/doc/help-refine.html';
+            endif
+        endif
+    endloop
+    WindowDestroy wkey;
+endfunction
 #eof
