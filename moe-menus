@@ -45,6 +45,7 @@ MENU "QuantumBio:Toolbox"
     "Fix Charged Atoms..."      exec "qbFixChargedAtomsPanel[]"
     "Refinement Preparation..."     exec "qbPhenixPrepPanel[]"
     "NMRScore Preparation..."  exec "qbNMRPrepPanel[]"
+    "NMRScore Analysis..."  exec "qbNMRAnalizePanel[]"
 ENDMENU
 
 #MENU APPEND "Main:Help:Tutorials"
