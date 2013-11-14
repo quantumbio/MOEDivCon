@@ -1097,6 +1097,10 @@ global function qbNMRAnalizePanel[]
                 Button: [   name: 'browse_HDF', text: 'Browse...', sensitive: 1    ]
             ],
             Separator : [flushLeft:1],
+            Mbox:
+            [
+                name: 'processShifts',
+                columns: 1,
             Hbox:
             [
                 Listbox :
@@ -1161,8 +1165,12 @@ global function qbNMRAnalizePanel[]
 	            ],
 	            Label : [flushLeft:1, title: 'Label Shifts']
 	        ]
+	        ]
 	    ]
     ];
+    
+    WindowSetAttr[wkey,[ processShifts: [ sensitive:0 ] ] ];
+    
     WindowShow wkey;
     
     function ColorAtomsByValue[values,chemicalShifts]
@@ -1196,7 +1204,9 @@ global function qbNMRAnalizePanel[]
                 minShift = min ((chemicalShifts.'Bound Shift' - chemicalShifts.'Unbound Shift') | interestAtomsMask);
                 normalizedShifts = (((chemicalShifts.'Bound Shift' - chemicalShifts.'Unbound Shift') | interestAtomsMask) / maxShift);
             endif
-                write ['normalizedShifts1: {}\n',normalizedShifts];
+            if maxShift < 0 then
+                normalizedShifts = normalizedShifts * -1;
+            endif
 
             aSetRGB[(interestAtoms | interestAtomsMask) | (normalizedShifts >= 0), 
                     bytepack3 [
@@ -1204,14 +1214,13 @@ global function qbNMRAnalizePanel[]
                         round ( (1 - (normalizedShifts | (normalizedShifts >= 0)))*255),
                         round ( (1 - (normalizedShifts | (normalizedShifts >= 0)))*255)
                     ]];
-            write ['colors1: {}\n', round ( (normalizedShifts | (normalizedShifts >= 0))*255)];
+
             aSetRGB[(interestAtoms | interestAtomsMask) | (normalizedShifts < 0), 
                     bytepack3 [
                         round ( (1 + (normalizedShifts | (normalizedShifts < 0)))*255),
                         round ( (1 + (normalizedShifts | (normalizedShifts < 0)))*255),
                         255
                     ]];
-            write ['colors2: {}\n', round ( (normalizedShifts | (normalizedShifts < 0))*255)];
         endloop
         aSetColorBy [Atoms[],'rgb'];
     endfunction
@@ -1283,6 +1292,7 @@ global function qbNMRAnalizePanel[]
                             chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, 'Wildtype'];
                             View[];
                             atomColors = aColorBy Atoms[];
+                            WindowSetAttr[wkey,[ processShifts: [ sensitive:1 ] ] ];
                             WindowSetAttr[wkey,[completedHDF: [value:hdfFile]]];
                         else
                             Warning [twrite ['Read error: {}',hdfFile]];
