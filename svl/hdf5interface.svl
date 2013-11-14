@@ -1,18 +1,23 @@
 local function jvmqb arg
     local [result,code] = jvm ['HDF5Correspondent', arg];
     if code == 'error' then exit result; endif
-    return result;
+    return cat result;      // Java returns a vector-packaged result. cat de-nests packaging.
+//    return [result,code];
+ //   return jvm ['HDF5Correspondent', arg];
 endfunction
 
 
-global function qbListModels  arg = cat jvmqb ['listModels' , [arg] ];
+global function qbListModels  arg = jvmqb ['listModels' , [arg] ];
+
 global function qbRetrieveQMScore  arg = jvmqb ['retrieveQMScore' , [arg] ];
 global function qbRetrieveResiduePWD  arg  = jvmqb ['retrieveResiduePWD' , [arg]  ];
 global function qbRetrieveAtomByAtomPWD  arg  = jvmqb ['retrieveAtomByAtomPWD' , [arg]  ];
 global function qbRetrieveAtomByAtomDecomposition  arg  = jvmqb ['retrieveAtomByAtomDecomposition' , [arg]  ];
 global function qbRetrieveAtomByAtomMRM  arg  = jvmqb ['retrieveAtomByAtomMRM' , [arg]  ];
+
 global function qbRetrieveNMRScore  arg = jvmqb ['retrieveNMRScore' , [arg] ];
 global function qbRetrieveChemicalShifts  arg = jvmqb ['retrieveChemicalShifts' , [arg] ];
+
 global function qbRetrieveDensities  arg = jvmqb ['retrieveDensities' , [arg] ];
 global function qbRetrieveEigenVectors  arg = jvmqb ['retrieveEigenVectors' , [arg] ];
 global function qbRetrieveEnergyLevels  arg = jvmqb ['retrieveEnergyLevels' , [arg] ];
@@ -63,6 +68,17 @@ global function qbTesth5Main [h5file]
    // print  qbRetrieveHamiltonian [modelTags.target, 'pm6'];
    // print  qbRetrieveDefaultProgramOptions [];
 
+endfunction
+
+global function qbTestException[h5file]
+    local modelTags,return_code,result;
+    [modelTags,return_code] = qbListModels [h5file];
+    modelTags = cat modelTags;
+
+    [result, return_code] = task_call ['qbRetrieveChemicalShifts', [h5file, modelTags.target, 'Wildtype'], [creator:'blockEOK',errmsg:'ignore']];
+write ['{} | {}\n', result, return_code];
+    [result, return_code] = task_call ['qbRetrieveChemicalShifts', [h5file, modelTags.target, 'test'], [creator:'blockEOK',errmsg:'ignore']];
+write ['{} | {}\n', result, return_code];
 endfunction
 
 // Test the function to write the molecule out to a file.
