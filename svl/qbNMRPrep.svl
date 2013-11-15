@@ -193,7 +193,7 @@ local function GenerateBatchScript [opt,batchfilename]
     fwrite [shscr, '        \n'];
     fwrite [shscr, '    qbdivconopt="$pdbFileName $posesSDFname $csvFileName $h5FileName -h mndo_nmr --np $setNP --print --dc"\n'];
     
-    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbdivconopt="$qbdivconopt --nmr-selection \'$selection\'"  ;   fi    \n',"{selection}"];
+    fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbdivconopt="$qbdivconopt --ligand-selection \'$selection\'"  ;   fi    \n',"{selection}"];
     fwrite [shscr, '    echo "$DIVCON $qbdivconopt"  \n'];
     fwrite [shscr, '    eval $DIVCON $qbdivconopt  \n'];
     fwrite [shscr, '}   \n'];
@@ -911,8 +911,8 @@ global function qbNMRPrepPanel[]
                 [
                     coreResiduesBox: 
                     [ 
-                        text:   updateCoreResidueList[coreList]
-                        ,value:  [newSelectedID]
+                        text:   updateCoreResidueList[coreList],
+                        value:  [newSelectedID]
                     ],
                     expUnbound: [value:tmpexpUnbound],
                     expBound: [value:tmpexpBound] 
@@ -1063,6 +1063,7 @@ endfunction
 
 function qbListModels;
 function qbRetrieveChemicalShifts;
+function qbRetrieveNMRScore;
 
 global function qbNMRAnalizePanel[]
 
@@ -1105,11 +1106,11 @@ global function qbNMRAnalizePanel[]
             [
                 Listbox :
                     [
-                    name: 'coreResiduesBox',
+                    name: 'scoresBox',
                     text: '',
-                    width:30,
+                    width:50,
                     extendH:1,
-                    header: 'Ligand\tNMRScore',
+                    header: 'Ligand\tNMRScore\tH-NMRScore\tC-NMRScore',
                     onTrigger: 'return',
                     type: 'modint',
                     multiSelect: 0,
@@ -1180,6 +1181,7 @@ global function qbNMRAnalizePanel[]
         aSetRGB[Atoms[], rep [bytepack3 [255,255,255],length Atoms[]]];     // change all atoms to white
 
         local interestAtoms = get [Atoms[],chemicalShifts.Index];
+        aSetHidden [rAtoms uniq aResidue interestAtoms, 0];
         local elements;
         if values.eleOptions == 'All' then
             elements = uniq aElement interestAtoms;
@@ -1189,7 +1191,7 @@ global function qbNMRAnalizePanel[]
         local element;
         for element in elements loop
             local interestAtomsMask = aElement interestAtoms == element;
-            aSetHidden [rAtoms uniq aResidue (interestAtoms | interestAtomsMask), 0];
+            
             local maxShift, minShift , normalizedShifts;
             if values.calctype == 1 then
                 maxShift = max (chemicalShifts.'Bound Shift' | interestAtomsMask);
@@ -1265,18 +1267,25 @@ global function qbNMRAnalizePanel[]
         endloop
     endfunction
     
-    function GetChemicalShifts [wkey, hdfFile, target, ligand]
+    function GetChemicalShifts [wkey, hdfFile, target, nmrscores]
         local values = WindowValues wkey;
+        local ligand;
+        write ['first: {} | second: {} | all: {}\n', first values.scoresBox, second values.scoresBox, values.scoresBox];
+        local selectedLigandID = bitshr [second values.scoresBox,WMOD_NBITS];
+        if selectedLigandID > 0 then
+            ligand = first nmrscores;       // TODO: this needs updated for multiple scores from multiple ligands
+        endif
         local chemicalShifts = qbRetrieveChemicalShifts [hdfFile, target, ligand];
         local elements = cat ['All',sort uniq aElement get[Atoms [], chemicalShifts.Index]];
         WindowSetAttr[wkey,[ eleOptions: [ text:elements ] ] ];
         return chemicalShifts;
     endfunction
     
-    local hdfModels,chemicalShifts;
+    local hdfModels,chemicalShifts, nmrscores;
     local atomColors;
     loop
         local [values, trigger] = WindowWait wkey;
+//        write ['DEBUG: {} | {}\n', values, trigger];
         if trigger === 'browse_HDF' then
             local hdfFile = FilePrompt [title:'Select HDF5 File', mode:'open', filter:'*.h5', multi:0];
             if not isnull hdfFile then
@@ -1289,7 +1298,12 @@ global function qbNMRAnalizePanel[]
                     else
                         hdfModels = qbListModels hdfFile;
                         if not isnull hdfModels.target then
-                            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, 'Wildtype'];
+                            nmrscores = qbRetrieveNMRScore [hdfFile, hdfModels.target];
+                            WindowSetAttr[wkey,[scoresBox: [
+                                text:[twrite['{}\t{}\t{}\t{}',nmrscores(1),nmrscores(2),nmrscores(3),nmrscores(4)]],
+                                value:[1]
+                                ]]];
+                            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, nmrscores];
                             View[];
                             atomColors = aColorBy Atoms[];
                             WindowSetAttr[wkey,[ processShifts: [ sensitive:1 ] ] ];
@@ -1305,22 +1319,22 @@ global function qbNMRAnalizePanel[]
         elseif trigger === 'showColors' then
             if values.showColors == 1 then
                 atomColors = aColorBy Atoms[];
-                chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, 'Wildtype'];
+                chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, nmrscores];
                 ColorAtomsByValue[values,chemicalShifts];
             else
                 aSetColorBy [Atoms[],atomColors];
             endif
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'showLabels' then
-            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, 'Wildtype'];
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, nmrscores];
             ColorAtomsByValue[values,chemicalShifts];
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'calctype' then
-            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, 'Wildtype'];
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, nmrscores];
             ColorAtomsByValue[values,chemicalShifts];
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'eleOptions' then
-            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, 'Wildtype'];
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, nmrscores];
             ColorAtomsByValue[values,chemicalShifts];
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'panel' then
