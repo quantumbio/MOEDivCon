@@ -1142,7 +1142,7 @@ global function qbNMRAnalizePanel[]
 	        ],
 	        Mbox:
 	        [
-	            columns:    3,
+	            columns:    5,
 	            Checkbox: [
 	                name    :   'showColors',
 	                title   :   '',
@@ -1150,21 +1150,20 @@ global function qbNMRAnalizePanel[]
 	                bubbleHelp: ['Color atoms based on available shift values. White means no calculated values available.']
 	            ],
 	            Label : [flushLeft:1, title: 'Color Atoms'],
-                Option:
-                [
-                    name: 'eleOptions',
-//                    title: 'SF Column:',
-                    onTrigger : 'return',
-                    type: 'char',
-                    bubbleHelp: 'Structure factor column within MTZ file.'
-                ],
 	            Checkbox: [
 	                name    :   'showLabels',
 	                title   :   '',
 	                onTrigger:  'return',
 	                bubbleHelp: ['Label atoms based on available shift values.']
 	            ],
-	            Label : [flushLeft:1, title: 'Label Shifts']
+	            Label : [flushLeft:1, title: 'Label Shifts'],
+                Option:
+                [
+                    name: 'eleOptions',
+                    onTrigger : 'return',
+                    type: 'char',
+                    bubbleHelp: 'Structure factor column within MTZ file.'
+                ]
 	        ]
 	        ]
 	    ]
