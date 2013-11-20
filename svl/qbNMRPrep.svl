@@ -191,7 +191,7 @@ local function GenerateBatchScript [opt,batchfilename]
     fwrite [shscr, '        \n'];
     fwrite [shscr, '    echo "NOTE: using DivCon installed at $DIVCON"\n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbdivconopt="$pdbFileName $posesSDFname $csvFileName $h5FileName -h mndo_nmr --np $setNP --print --dc"\n'];
+    fwrite [shscr, '    qbdivconopt="$pdbFileName $posesSDFname $csvFileName $h5FileName -h mndo_nmr --np $setNP --print 2 --dc"\n'];
     
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbdivconopt="$qbdivconopt --ligand-selection \'$selection\'"  ;   fi    \n',"{selection}"];
     fwrite [shscr, '    echo "$DIVCON $qbdivconopt"  \n'];
@@ -925,8 +925,8 @@ global function qbNMRPrepPanel[]
             for newSelected in newSelectedList loop
                 local prevLenCoreList = length coreList;
                 coreList = cat [coreList, newSelected];
-                boundData.(totok newSelected) = 0.00;
-                unboundData.(totok newSelected) = 0.00;
+                boundData.(totok newSelected) = 0;
+                unboundData.(totok newSelected) = 0;
                 setData.(totok newSelected) = 0;
                 WindowSetAttr[wkey,
                 [
@@ -979,16 +979,22 @@ global function qbNMRPrepPanel[]
                 endif
 
                 if not isnull batchname then
-                    WritePDB[twrite['{}-NMR.pdb',values.baseName]];
-                    qbSendAtomsToNMRCSV[twrite['{}-NMR.csv',values.baseName],coreList,boundData,unboundData];
-                    if values.calctype == 1 then
+                    if values.calctype == 1 then    // Shifts alone
                         siteatoms = [];
                         ligatoms = [];
+                    endif
+                    if values.calctype <> 3 then    // NOT NMRScore
+                        for selectedAtomID in coreList loop
+                            boundData.(totok selectedAtomID) = [];
+                            unboundData.(totok selectedAtomID) = [];
+                        endloop
                     endif
                     if length uniq aResidue siteatoms == 1 then
                         values.siteatoms = siteatoms;
                         values.ligatoms = ligatoms;
                     endif
+                    WritePDB[twrite['{}-NMR.pdb',values.baseName]];
+                    qbSendAtomsToNMRCSV[twrite['{}-NMR.csv',values.baseName],coreList,boundData,unboundData];
                     GenerateBatchScript[values,batchname];
                     break;
                 endif
