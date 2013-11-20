@@ -331,7 +331,12 @@ function db_Open;
 function db_Close;
 
 global function qb_cLetter chainid
-    return fext cName chainid;
+    // when the cName and the cTag are the same this means that there is no (or empty) chain ID.
+    if cName chainid === cTag chainid then
+        return ' ';
+    else
+        return fext cName chainid;
+    endif
 endfunction
 
 // Functions necessary to find the corresponding Atoms from a QB-standard NMR CSV file
