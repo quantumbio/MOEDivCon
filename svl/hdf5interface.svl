@@ -67,6 +67,10 @@ global function qbTesth5Main [h5file]
    // qbSetNMRAtomSelection [h5file, modelTags.target, [0,1,2,10]];
    // print  qbRetrieveHamiltonian [modelTags.target, 'pm6'];
     print  qbRetrieveDefaultProgramOptions [];
+print  modelTags.target;
+    local [newmol, errorcode2] = qbRetrieveModel [h5file, modelTags.target];
+    print "TEST\n";
+    print newmol;
 
 endfunction
 
