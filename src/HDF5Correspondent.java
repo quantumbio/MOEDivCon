@@ -338,7 +338,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                 sessionOutBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
         java.lang.System.setErr(sessionErrBuffer);
         java.lang.System.setOut(sessionOutBuffer);
-        java.lang.System.out.println("in: retrieveModel");
+//        java.lang.System.out.println("in: retrieveModel");
         H5File h5File = new H5File(filename, H5File.READ);
         if(!h5File.exists())
         {
@@ -354,8 +354,8 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             return new SVLVar(new SVLVar(), new SVLVar(target + " specimen doesn't exists in "+filename+".", true));
             //throw new SVLJavaException(target + " specimen doesn't exists in "+filename+".");
         }
-        HObject obj=h5File.get("DivCon/"+target+"/Document");
-        java.lang.System.out.println("looking for: "+"DivCon/"+target+"/Document");
+        HObject obj=h5File.get("DivCon/"+target+"/Documents/"+target+".xml");
+//        java.lang.System.out.println("looking for: "+"DivCon/"+target+"/Documents/"+target+".xml");
         SVLVar[] model=new SVLVar[4];
         if(obj!=null)
         {
@@ -406,7 +406,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         {
             JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbMoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)cml.getAnyCmlOrAnyOrAny().get(moleculeCount);
             Molecule molecule=jaxbMoleculeElement.getValue();
-            title=molecule.getTitle();
+            if(molecule.getTitle()!=null)title=molecule.getTitle();
             String chain="";
             for(int submoleculeCount=0;submoleculeCount<molecule.getAnyCmlOrAnyOrAny().size();submoleculeCount++)
             {
@@ -424,7 +424,14 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                     xsList.add(new Double(atom.getX3().doubleValue()));
                     ysList.add(new Double(atom.getY3().doubleValue()));
                     zsList.add(new Double(atom.getZ3().doubleValue()));
-                    formalChargesList.add(new Double(atom.getFormalCharge().doubleValue()));
+                    if(atom.getFormalCharge()!=null)
+                    {
+                        formalChargesList.add(new Double(atom.getFormalCharge().doubleValue()));
+                    }
+                    else
+                    {
+                        formalChargesList.add(new Double(0.0));
+                    }
                     if(atom.getAnyCmlOrAnyOrAny().size()>1)
                     {
                         JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)atom.getAnyCmlOrAnyOrAny().get(1);
@@ -538,12 +545,9 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         model[1]=new SVLVar(linkageVectors);
         model[2]=new SVLVar(residueVectors);
         model[3]=new SVLVar(atomVectors);
-//        cml.getAnyCmlOrAnyOrAny()
-            java.lang.System.out.println("doc class name: "+obj.getClass().getName());
-//            model[0]=new SVLVar("divcon *: "+cml.getAnyCmlOrAnyOrAny().get(0).getClass().getName());
         }
         h5File.close();
-        return  new SVLVar(new SVLVar(model), new SVLVar("",true));
+        return  new SVLVar(new SVLVar(new SVLVar(model)), new SVLVar("",true));
     }
 
     private SVLVar retrieveQMScore(SVLVar var) throws SVLJavaException, IOException, Exception
