@@ -411,18 +411,33 @@ global function qbSendAtomsToNMRCSV [ascii_file,runAtoms,boundData,unboundData]
     endif
 
     local db_file = twrite['{}-DELETE.mdb',fbase ascii_file];
-    local names = ['Chain','Residue ID','Sequence','Atom Name','Unbound ppm','Bound ppm'];
-    local types = ['char','char','int','char','float','float'];
+    local names, types;
+    // we can only support NMRScore if all values are non-null
+    if anytrue app isnull second untag cat [boundData, unboundData] then
+        names = ['Chain','Residue ID','Sequence','Atom Name'];
+        types = ['char','char','int','char'];
+    else
+        names = ['Chain','Residue ID','Sequence','Atom Name','Unbound ppm','Bound ppm'];
+        types = ['char','char','int','char','float','float'];
+    endif
 
     local mdbKey = db_Open [db_file,'create'];
     apt db_CreateField [mdbKey, names, types];
     local tmpAtom;
-    for tmpAtom in runAtoms loop
-       db_Write [mdbKey,0, tag [names,[
-           string qb_cLetter aChain tmpAtom,string rName aResidue tmpAtom,
-           rUID aResidue tmpAtom,string aName tmpAtom,
-           unboundData.(totok tmpAtom),boundData.(totok tmpAtom)]]];
-    endloop
+    if anytrue app isnull second untag cat [boundData, unboundData] then
+        for tmpAtom in runAtoms loop
+           db_Write [mdbKey,0, tag [names,[
+               string qb_cLetter aChain tmpAtom,string rName aResidue tmpAtom,
+               rUID aResidue tmpAtom,string aName tmpAtom   ]]];
+        endloop
+    else
+        for tmpAtom in runAtoms loop
+           db_Write [mdbKey,0, tag [names,[
+               string qb_cLetter aChain tmpAtom,string rName aResidue tmpAtom,
+               rUID aResidue tmpAtom,string aName tmpAtom,
+               unboundData.(totok tmpAtom),boundData.(totok tmpAtom)    ]]];
+        endloop
+    endif
     db_Close mdbKey;
 
     db_ExportASCII [db_file, ascii_file, first db_Fields [db_file], db_Entries [db_file], [delimiter:',', quotes:0, titles:1]];
