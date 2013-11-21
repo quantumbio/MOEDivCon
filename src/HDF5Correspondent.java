@@ -139,14 +139,17 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                 res = retrieveTopologyClassNumbers(res);
                     break;
                 default:
-		throw new SVLJavaException("here Unknown command: '" + cmd + "'.");
+                  res=new SVLVar(new SVLVar(), new SVLVar("Exception:\n"+"here Unknown command: '" + cmd + "'."));
+		//throw new SVLJavaException("here Unknown command: '" + cmd + "'.");
+                    break;
             }
 	    return res;
 	}
 	catch (Exception ex) {
 	    StringWriter sw = new StringWriter();
 	    ex.printStackTrace(new PrintWriter(sw));
-	    throw new SVLJavaException("Exception:\n"+sw.toString());
+            return new SVLVar(new SVLVar(), new SVLVar("Exception:\n"+sw.toString()));
+//	    throw new SVLJavaException("Exception:\n"+sw.toString());
 	}
     }
 
@@ -184,7 +187,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             data[index]=new SVLVar(new String[]{"target", "ligand"}, individuals);
         }
         h5File.close();
-        return new SVLVar(data);
+        return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
 
     private SVLVar storeModel(SVLVar var) throws SVLJavaException, IOException, Exception
@@ -207,7 +210,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         System.out.println("h5File.canWrite="+h5File.canWrite());
         h5File.open();
         long[] dims = {1};
-        Group targetGroup=(Group)h5File.get("DivCon/"+target);
+        Group targetGroup=(Group)h5File.get("DivCon/"+target+"/Documents");
         if(targetGroup==null)
         {
             Group divconGroup=(Group)h5File.get("DivCon");
@@ -315,14 +318,14 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         while(li.hasNext())
         {
             Object obj=li.next();
-            if(obj instanceof ncsa.hdf.object.h5.H5ScalarDS && ((ncsa.hdf.object.h5.H5ScalarDS)obj).getName().compareTo("Document")==0)
+            if(obj instanceof ncsa.hdf.object.h5.H5ScalarDS && ((ncsa.hdf.object.h5.H5ScalarDS)obj).getName().compareTo(target+".xml")==0)
             {
                 documentExists=true;
                 ((ncsa.hdf.object.h5.H5ScalarDS)obj).write(new String[]{baos.toString()});
                 break;
             }
         }
-        if(!documentExists)h5File.createScalarDS("Document", targetGroup, docType, dims, null, null, 0, new String[]{baos.toString()});
+        if(!documentExists)h5File.createScalarDS(target+".xml", targetGroup, docType, dims, null, null, 0, new String[]{baos.toString()});
         h5File.close();
         return new SVLVar();
     }
@@ -339,7 +342,8 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         H5File h5File = new H5File(filename, H5File.READ);
         if(!h5File.exists())
         {
-            throw new SVLJavaException(filename + " doesn't exists.");
+            return new SVLVar(new SVLVar(), new SVLVar(filename + " doesn't exists.", true));
+//            throw new SVLJavaException(filename + " doesn't exists.");
         }
         h5File=(H5File)h5File.createInstance(filename, H5File.READ);
         h5File.open();
@@ -347,7 +351,8 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         Group targetGroup=(Group)h5File.get("DivCon/"+target);
         if(targetGroup==null)
         {
-            throw new SVLJavaException(target + " specimen doesn't exists in "+filename+".");
+            return new SVLVar(new SVLVar(), new SVLVar(target + " specimen doesn't exists in "+filename+".", true));
+            //throw new SVLJavaException(target + " specimen doesn't exists in "+filename+".");
         }
         HObject obj=h5File.get("DivCon/"+target+"/Document");
         java.lang.System.out.println("looking for: "+"DivCon/"+target+"/Document");
@@ -538,7 +543,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
 //            model[0]=new SVLVar("divcon *: "+cml.getAnyCmlOrAnyOrAny().get(0).getClass().getName());
         }
         h5File.close();
-        return new SVLVar(model);
+        return  new SVLVar(new SVLVar(model), new SVLVar("",true));
     }
 
     private SVLVar retrieveQMScore(SVLVar var) throws SVLJavaException, IOException, Exception
@@ -550,7 +555,11 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         String xPath="/DivCon/"+target+"/QM Score";
         HObject ho=findHDF5Object(h5File, xPath);
         H5CompoundDS hObject=(H5CompoundDS)ho;
-        if(hObject==null) throw new SVLJavaException("QM Score does not exist for: '" + target + "'.");
+        if(hObject==null)
+        {
+            return new SVLVar(new SVLVar(), new SVLVar("QM Score does not exist for: '" + target + "'.", true));
+            //throw new SVLJavaException("QM Score does not exist for: '" + target + "'.");
+        }
         hObject.init();
         hObject.clear();
         hObject.setMemberSelection(true);
@@ -586,7 +595,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             }
         }
             h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
 }
 
 private SVLVar retrieveResiduePWD(SVLVar var) throws SVLJavaException, IOException, Exception
@@ -625,7 +634,11 @@ private SVLVar retrieveResiduePWD(SVLVar var) throws SVLJavaException, IOExcepti
             return new SVLVar();
             }
             SVLVar[] pwdDataset=new SVLVar[pwdTargetLigandObject.getNumberOfMembersInFile()+1];
-            if(pwdDataset.length!=5) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            if(pwdDataset.length!=5)
+            {
+                return new SVLVar(new SVLVar(), new SVLVar("pwd set wrong size: " + pwdDataset.length + ".", true));
+                //throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            }
             List pwdRow=pwdTargetLigandObject.getMemberList();
             pwdDataset[0]=new SVLVar(pwdTargetLigandObject.getName());
             if(pwdRow.size()==4)
@@ -667,7 +680,7 @@ private SVLVar retrieveResiduePWD(SVLVar var) throws SVLJavaException, IOExcepti
 //            pwdDataset[4]=new SVLVar(sequenceLabels.readBytes());
            SVLVar data=new SVLVar(new String[]{"name", "indexA", "indexB", "values", "labels"}, pwdDataset);
             h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
     else
     {
@@ -677,7 +690,11 @@ private SVLVar retrieveResiduePWD(SVLVar var) throws SVLJavaException, IOExcepti
         {
             H5Group pwdGroup=(H5Group)pwdMembers.get(index);
             SVLVar[] pwdDataset=new SVLVar[pwdGroup.getNumberOfMembersInFile()+1];
-            if(pwdDataset.length!=5) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            if(pwdDataset.length!=5)
+            {
+                return new SVLVar(new SVLVar(), new SVLVar("pwd set wrong size: " + pwdDataset.length + "."));
+                //throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            }
             List pwdRow=pwdGroup.getMemberList();
             pwdDataset[0]=new SVLVar(pwdGroup.getName());
             for(int memberIndex=0;memberIndex<4;memberIndex++)
@@ -710,7 +727,7 @@ private SVLVar retrieveResiduePWD(SVLVar var) throws SVLJavaException, IOExcepti
             data[index]=new SVLVar(new String[]{"name", "indexA", "indexB", "values", "labels"}, pwdDataset);
         }
             h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
 }
     
@@ -797,10 +814,14 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
             if(!hit)
             {
                 h5File.close();
-            return new SVLVar();
+            return new SVLVar(new SVLVar(), new SVLVar("", true));
             }
             SVLVar[] pwdDataset=new SVLVar[pwdTargetLigandObject.getNumberOfMembersInFile()+8];
-            if(pwdDataset.length!=11) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            if(pwdDataset.length!=11)
+            {
+                return new SVLVar(new SVLVar(), new SVLVar("pwd set wrong size: " + pwdDataset.length + ".", true));
+                //throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            }
             List pwdRow=pwdTargetLigandObject.getMemberList();
             pwdDataset[0]=new SVLVar(pwdTargetLigandObject.getName());
             int[] targetIndex=null;
@@ -904,7 +925,7 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
                     pwdDataset[10]=new SVLVar(distance);
             SVLVar data=new SVLVar(new String[]{"name", "indexA", "indexB", "Eab", "Eabp", "Eabc", "LennardJones", "dispersion", "repulsion", "electrostatic", "distance"}, pwdDataset);
         h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
     else
     {
@@ -915,7 +936,11 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
                     List<HObject> ligandList=pwdGroup.getMemberList();
                     H5Group pwdTargetLigandObject=(H5Group)ligandList.get(index);
             SVLVar[] pwdDataset=new SVLVar[pwdTargetLigandObject.getNumberOfMembersInFile()+8];
-            if(pwdDataset.length!=11) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            if(pwdDataset.length!=11)
+            {
+                return new SVLVar(new SVLVar(), new SVLVar("pwd set wrong size: " + pwdDataset.length + ".", true));
+                //throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            }
             List pwdRow=pwdTargetLigandObject.getMemberList();
             pwdDataset[0]=new SVLVar(pwdTargetLigandObject.getName());
             int[] targetIndex=null;
@@ -1021,7 +1046,7 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
         }
 //             bufferedPWDWriter.close();       
         h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
 }
     
@@ -1113,10 +1138,14 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
             if(!hit)
             {
                 h5File.close();
-            return new SVLVar();
+            return new SVLVar(new SVLVar(), new SVLVar("", true));
             }
             SVLVar[] pwdDataset=new SVLVar[pwdTargetLigandObject.getNumberOfMembersInFile()+2];
-            if(pwdDataset.length!=11) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            if(pwdDataset.length!=11)
+            {
+                return new SVLVar(new SVLVar(), new SVLVar("pwd set wrong size: " + pwdDataset.length + ".", true));
+                //throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            }
             List pwdRow=pwdTargetLigandObject.getMemberList();
             pwdDataset[0]=new SVLVar(pwdTargetLigandObject.getName());
             int[] targetIndex=null;
@@ -1220,7 +1249,7 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
                     pwdDataset[4]=new SVLVar(distance);
             SVLVar data=new SVLVar(new String[]{"name", "indexA", "indexB", "Eab", "distance"}, pwdDataset);
         h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
     else
     {
@@ -1251,7 +1280,11 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
 ////                    List<HObject> ligandList=pwdGroup.getMemberList();
 ////                    H5Group pwdTargetLigandObject=(H5Group)ligandList.get(index);
 //            SVLVar[] pwdDataset=new SVLVar[pwdGroup.getNumberOfMembersInFile()+2];
-//            if(pwdDataset.length!=4) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+//            if(pwdDataset.length!=4)
+//              {
+//                  return new SVLVar(new SVLVar(), new SVLVar("pwd set wrong size: " + pwdDataset.length + "."));
+//                  //throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+//              }
 //            List pwdRow=pwdGroup.getMemberList();
 //            pwdDataset[0]=new SVLVar(pwdGroup.getName());
 //            int[] targetIndex=null;
@@ -1361,7 +1394,7 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
 //        }
 //             bufferedPWDWriter.close();       
         h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
 }
     
@@ -1448,10 +1481,14 @@ private SVLVar retrieveAtomByAtomMRM(SVLVar var) throws SVLJavaException, IOExce
             if(!hit)
             {
                 h5File.close();
-            return new SVLVar();
+            return new SVLVar(new SVLVar(), new SVLVar("", true));
             }
             SVLVar[] pwdDataset=new SVLVar[pwdTargetLigandObject.getNumberOfMembersInFile()+4];
-            if(pwdDataset.length!=7) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            if(pwdDataset.length!=7)
+            {
+                return new SVLVar(new SVLVar(), new SVLVar("pwd set wrong size: " + pwdDataset.length + ".", true));
+                //throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            }
             List pwdRow=pwdTargetLigandObject.getMemberList();
             pwdDataset[0]=new SVLVar(pwdTargetLigandObject.getName());
             int[] targetIndex=null;
@@ -1538,7 +1575,7 @@ private SVLVar retrieveAtomByAtomMRM(SVLVar var) throws SVLJavaException, IOExce
                     pwdDataset[6]=new SVLVar(distance);
         SVLVar data=new SVLVar(new String[]{"name", "indexA", "indexB", "mrmSteric", "mrmElectrostatic", "mrmPhenomenologicalSolvation", "distance"}, pwdDataset);
         h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
     else
     {
@@ -1549,7 +1586,11 @@ private SVLVar retrieveAtomByAtomMRM(SVLVar var) throws SVLJavaException, IOExce
                     List<HObject> ligandList=pwdGroup.getMemberList();
                     H5Group pwdTargetLigandObject=(H5Group)ligandList.get(index);
             SVLVar[] pwdDataset=new SVLVar[pwdTargetLigandObject.getNumberOfMembersInFile()+4];
-            if(pwdDataset.length!=7) throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            if(pwdDataset.length!=7)
+            {
+                return new SVLVar(new SVLVar(), new SVLVar("pwd set wrong size: " + pwdDataset.length + ".", true));
+                //throw new SVLJavaException("pwd set wrong size: " + pwdDataset.length + ".");
+            }
             List pwdRow=pwdTargetLigandObject.getMemberList();
             pwdDataset[0]=new SVLVar(pwdTargetLigandObject.getName());
             int[] targetIndex=null;
@@ -1638,7 +1679,7 @@ private SVLVar retrieveAtomByAtomMRM(SVLVar var) throws SVLJavaException, IOExce
         }
 //             bufferedPWDWriter.close();       
         h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
 }
     
@@ -1651,7 +1692,11 @@ private SVLVar retrieveNMRScore(SVLVar var) throws SVLJavaException, IOException
         String xPath="/DivCon/"+target+"/NMR Score Class Number Average";
         HObject ho=findHDF5Object(h5File, xPath);
         H5CompoundDS hObject=(H5CompoundDS)ho;
-        if(hObject==null) throw new SVLJavaException("NMR Score does not exist for: '" + target + "'.");
+        if(hObject==null)
+        {
+            return new SVLVar(new SVLVar(), new SVLVar("'NMR Score Class Number Average' does not exist for: '" + target + "'.", true));
+            //throw new SVLJavaException("'NMR Score Class Number Average' does not exist for: '" + target + "'.");
+        }
         hObject.init();
         hObject.clear();
         hObject.setMemberSelection(true);
@@ -1687,7 +1732,7 @@ private SVLVar retrieveNMRScore(SVLVar var) throws SVLJavaException, IOException
             }
         }
             h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
 }
     
 private SVLVar retrieveChemicalShifts(SVLVar var) throws SVLJavaException, IOException, Exception
@@ -1708,13 +1753,17 @@ private SVLVar retrieveChemicalShifts(SVLVar var) throws SVLJavaException, IOExc
     h5File.open();
         String xPath="/DivCon/"+target+"/NMR Matrices";
         HObject ho=findHDF5Object(h5File, xPath);
-        if(ho==null) return new SVLVar();
+        if(ho==null) return new SVLVar(new SVLVar(), new SVLVar("", true));
     if(ligand.length()>0)
     {
         xPath="/DivCon/"+target+"/NMR Matrices/"+ligand;
         ho=findHDF5Object(h5File, xPath);
         H5CompoundDS hObject=(H5CompoundDS)ho;
-        if(hObject==null) throw new SVLJavaException("NMR Score does not exist for: '" + target + "'.");
+        if(hObject==null)
+        {
+            return new SVLVar(new SVLVar(), new SVLVar("NMR Score does not exist for: '" + target + "'.", true));
+            //throw new SVLJavaException("NMR Score does not exist for: '" + target + "'.");
+        }
         hObject.init();
         hObject.clear();
         hObject.setMemberSelection(true);
@@ -1756,7 +1805,7 @@ private SVLVar retrieveChemicalShifts(SVLVar var) throws SVLJavaException, IOExc
         
            SVLVar data=new SVLVar(new String[]{"Index", "Bound Shift", "Unbound Shift", "Exp Bound Shift", "Exp Unbound Shift"}, chemicalShiftData);
             h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
     else
     {
@@ -1799,7 +1848,7 @@ private SVLVar retrieveChemicalShifts(SVLVar var) throws SVLJavaException, IOExc
 //            data[index]=new SVLVar(new String[]{"name", "Bound Shift", "Unbound Shift", "Exp Bound Shift", "Exp Unbound Shift"}, chemicalShiftsDataset);
 //        }
             h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
 }
     
@@ -1832,7 +1881,7 @@ private SVLVar retrieveDensities(SVLVar var) throws SVLJavaException, IOExceptio
     }
     SVLVar data=new SVLVar(new String[]{"rows", "cols", "densities"}, averages);
             h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
 }
     
 private SVLVar retrieveEigenVectors(SVLVar var) throws SVLJavaException, IOException, Exception
@@ -1864,7 +1913,7 @@ private SVLVar retrieveEigenVectors(SVLVar var) throws SVLJavaException, IOExcep
     }
     SVLVar data=new SVLVar(new String[]{"rows", "cols", "eigenVectors"}, averages);
             h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
 }
     
 private SVLVar retrieveEnergyLevels(SVLVar var) throws SVLJavaException, IOException, Exception
@@ -1892,7 +1941,7 @@ private SVLVar retrieveEnergyLevels(SVLVar var) throws SVLJavaException, IOExcep
     }
     SVLVar data=new SVLVar(new String[]{"energyLevels"}, averages);
     h5File.close();
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
 }
     
     private SVLVar setNMRAtomSelection(SVLVar var) throws SVLJavaException, IOException, Exception
@@ -1917,7 +1966,7 @@ private SVLVar retrieveEnergyLevels(SVLVar var) throws SVLJavaException, IOExcep
                 h5File.writeAttribute(member, attr, true);
             }
         h5File.close();
-        return new SVLVar();
+        return new SVLVar(new SVLVar(), new SVLVar("",true));
     }
     
     protected int indexW(int i, int j)
@@ -1995,7 +2044,7 @@ private SVLVar retrieveHamiltonian(SVLVar var) throws SVLJavaException, IOExcept
     hamiltonianParameters[8]=new SVLVar(zetadn);
 
     SVLVar data=new SVLVar(new String[]{"Uss", "Upp", "Udd", "Zetas", "Zetap", "Zetad", "Zetasn", "Zetapn", "Zetadn"}, hamiltonianParameters);
-    return new SVLVar(data);
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
 }
 
 private SVLVar retrieveDefaultProgramOptions(SVLVar var) throws SVLJavaException, IOException, Exception
@@ -2015,8 +2064,8 @@ private SVLVar retrieveDefaultProgramOptions(SVLVar var) throws SVLJavaException
             defaultProgramOptions[11]=new SVLVar("off", true);
             defaultProgramOptions[12]=new SVLVar("off", true);
             defaultProgramOptions[13]=new SVLVar(1);
-    return new SVLVar(new String[]{"hamiltonian", "gradient", "opt", "freq", "decompose", "ecrit", "pwd",
-                                   "perception", "selection", "region", "test", "restart", "standard", "np"}, defaultProgramOptions);
+    return new SVLVar( new SVLVar(new String[]{"hamiltonian", "gradient", "opt", "freq", "decompose", "ecrit", "pwd",
+                                   "perception", "selection", "region", "test", "restart", "standard", "np"}, defaultProgramOptions), new SVLVar("",true));
 }
 //[ '3FVA.pdb',
 //[ ['3FVA.pdb.A','3FVA.pdb.W'], ['3FVA.pdb','3FVA.pdb'], ['',''], [6,2] ], 
@@ -2157,7 +2206,7 @@ private SVLVar retrieveDefaultProgramOptions(SVLVar var) throws SVLJavaException
         SVLVar[] cnVar=new SVLVar[1];
         cnVar[0]=new SVLVar(cn);
         data[1]=new SVLVar(new String[]{"qbData.classNumber"},cnVar);
-        return new SVLVar(data);
+        return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
 
 

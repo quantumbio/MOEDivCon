@@ -40,10 +40,10 @@ global function qbTesth5Main [h5file]
 
     print qbListModels [h5file];
     
-//    write ['length {}\n', length cat qbListModels [h5file]];
+    write ['length {}\n', length  qbListModels [h5file]];
     
-    local modelTags = cat qbListModels [h5file];
-    
+    local [modelTags, errorcode] =  qbListModels [h5file];
+
 //    write ['length modelTags.target : {}\n', length modelTags.target];
     
 //    write ['modelTags.target: {}\n', modelTags.target];
@@ -61,12 +61,12 @@ global function qbTesth5Main [h5file]
     //print qbRetrieveAtomByAtomMRM [h5file, modelTags.target];
     print qbRetrieveNMRScore [h5file, modelTags.target];
     print qbRetrieveChemicalShifts [h5file, modelTags.target, 'Wildtype'];
-    //print  qbRetrieveDensities [h5file, modelTags.target];
-    //print  qbRetrieveEigenVectors [h5file, modelTags.target];
-    //print  qbRetrieveEnergyLevels [h5file, modelTags.target];
+    print  qbRetrieveDensities [h5file, modelTags.target];
+    print  qbRetrieveEigenVectors [h5file, modelTags.target];
+    print  qbRetrieveEnergyLevels [h5file, modelTags.target];
    // qbSetNMRAtomSelection [h5file, modelTags.target, [0,1,2,10]];
    // print  qbRetrieveHamiltonian [modelTags.target, 'pm6'];
-   // print  qbRetrieveDefaultProgramOptions [];
+    print  qbRetrieveDefaultProgramOptions [];
 
 endfunction
 
