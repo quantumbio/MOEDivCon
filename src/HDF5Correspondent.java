@@ -586,7 +586,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         model[3]=new SVLVar(atomVectors);
         }
         h5File.close();
-        return  new SVLVar(new SVLVar(new SVLVar(model)), new SVLVar("",true));
+        return new SVLVar(new SVLVar(new SVLVar(model)), new SVLVar("",true));
     }
 
     private SVLVar retrievePosingModel(SVLVar var) throws SVLJavaException, IOException, Exception
@@ -624,7 +624,6 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         JAXBContext jc = JAXBContext.newInstance("com.quantumbioinc.xml.divcon");
         Unmarshaller um=jc.createUnmarshaller();
         JAXBElement<com.quantumbioinc.xml.divcon.DivconType> jaxbOutElement=um.unmarshal(new StreamSource(new ByteArrayInputStream (((String[])doc.read())[0].getBytes())), com.quantumbioinc.xml.divcon.DivconType.class);
-                if(true) return new SVLVar(new SVLVar(ligand, true), new SVLVar(target,true));
         DivconType divcon=jaxbOutElement.getValue();
         Cml cml=(Cml)divcon.getCmlOrTargetOrLigand().get(0);
         ArrayList<String> chainTitlesList=new ArrayList<>();
@@ -666,7 +665,6 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         String title="";
         if(moleculeCount<cml.getAnyCmlOrAnyOrAny().size())
         {
-        if(true) return new SVLVar(new SVLVar("here", true), new SVLVar("",true));
             JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbMoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)cml.getAnyCmlOrAnyOrAny().get(moleculeCount);
             Molecule molecule=jaxbMoleculeElement.getValue();
             if(molecule.getTitle()!=null)title=molecule.getTitle();
@@ -759,16 +757,28 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                         insertionCode+=" ";
                     }
                 }
-                if(submolecule.getAnyCmlOrAnyOrAny().size()>1)
+                if(submolecule.getAnyCmlOrAnyOrAny().size()>0)
                 {
-                    JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)submolecule.getAnyCmlOrAnyOrAny().get(1);
+                        boolean hit=false;
+                        int count=0;
+                        while(!hit && count<submolecule.getAnyCmlOrAnyOrAny().size())
+                        {
+                            if(((JAXBElement)submolecule.getAnyCmlOrAnyOrAny().get(count)).getValue() instanceof com.quantumbioinc.xml.divcon.Scalar)
+                            {
+                    JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)submolecule.getAnyCmlOrAnyOrAny().get(count);
                     switch (jaxScalarElement.getValue().getTitle())
                     {
                         case "sequence":
                             sequencesList.add(new Integer(jaxScalarElement.getValue().getValue()));
+                            hit=true;
                             break;
                     }
+                            }
+                        count++;
+                        }
+                        if(!hit)sequencesList.add(new Integer(0));
                 }
+//        if(true) return new SVLVar(new SVLVar("here", true), new SVLVar("",true));
                 if(submolecule.getTitle()!=null)
                 {
                     residueNamesList.add(submolecule.getTitle());
@@ -861,7 +871,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         model[3]=new SVLVar(atomVectors);
         }
         h5File.close();
-        return  new SVLVar(new SVLVar(new SVLVar(model)), new SVLVar("",true));
+        return new SVLVar(new SVLVar(new SVLVar(model)), new SVLVar("",true));
     }
 
     private SVLVar retrieveQMScore(SVLVar var) throws SVLJavaException, IOException, Exception
