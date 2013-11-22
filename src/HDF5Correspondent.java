@@ -404,7 +404,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         ArrayList<Double> zsList=new ArrayList<>();
         ArrayList<Double> formalChargesList=new ArrayList<>();
         ArrayList<String> hybridizationsList=new ArrayList<>();
-        String title="";
+        String title=target;
         for(int moleculeCount=0;moleculeCount<cml.getAnyCmlOrAnyOrAny().size();moleculeCount++)
         {
             JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbMoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)cml.getAnyCmlOrAnyOrAny().get(moleculeCount);
