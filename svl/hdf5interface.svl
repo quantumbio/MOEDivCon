@@ -28,11 +28,1255 @@ global function qbRetrieveHamiltonian  arg = jvmqb ['retrieveHamiltonian' , [arg
 global function qbRetrieveDefaultProgramOptions  arg = jvmqb ['retrieveDefaultProgramOptions' , [arg] ];
 global function qbRetrieveTopologyClassNumbers  arg = jvmqb ['retrieveTopologyClassNumbers' , [arg] ];
 
+// ============ BETWEEN HERE AND SAME BELOW IS STUFF FROM io_pdb.svl ============
+
+function AutoConnectFromPosition, AutoTypeFromPosition;
+
+// TODO: this constant needs to be updated for H5 stuff
+const FREAD_PDB_DEFAULTS = [
+    multi_model:	    0,  // if true, read all models in NMR (eg) files
+    collate_res:	    1,  // if true, align SEQRES to ATOM res
+    ignore_conect:	    1,  // if true, do not apply CONECT records
+    auto_connect:	    1,  // if true, apply AutoConnect
+    use_link:		    0,	// if true, apply & require links for inter-res
+    ignore_hoh:		    0,
+    ignore_hetero:	    0,
+    save_variants:	    1,
+    alt_loc:		    0,
+    split_hets:		    0,
+    use_element:	    0,  // if true, apply element column of PDB file
+    chain_tag:		    'auto',
+    gen_symm:		    0,  // if true, apply symmetries from MTRIXn records
+    gen_biomt:		    0,  // if non-zero, create specified biomol
+    biomol:		    0,
+    crystal_contacts:	    0,
+    crystal_contact_rad:    4.5,
+    translate_primes:	    2,  // 0:none, 1:'->*,'OP1'->O1P', 2: vice versa
+    consecutive_atoms:	    0,  // If on, residue atoms must be contiguous
+    preserve_order:	    0,
+    atom_data:		    0
+];
+
+//===================== Extensions, Utilities & Brevity =======================
+
+local function oAppendSet [setname, atoms]
+    oSetCollection [setname, uniq cat [atoms, oGetCollection setname]];
+endfunction
+
+local function mean v = invz length v * add v;
+
+local function trim_ws s
+    local m = not isspace s, p = pscan m;
+    return (s | m or (rotl m and ltE [0, p, last p]));
+endfunction
+
+local function trim_trailing_ws s
+    local m = not isspace s, p = pscan m;
+    return (s | m or p < last p);
+endfunction
+
+local function apt_sread v = tr app first apt sread v;
+
+const MOL_RES_STD  = MOL_RES_EXTEND;
+const MOL_RES_IDX  = MOL_RES_EXTEND+1;
+const MOL_RES_ALOC = MOL_RES_EXTEND+2;
+const MOL_RES_VAR  = MOL_RES_EXTEND+3;	// variant
+
+const MOL_ATOM_ORDER	= MOL_ATOM_EXTEND;
+const MOL_ATOM_ALOC	= MOL_ATOM_EXTEND+1;
+const MOL_ATOM_OCC	= MOL_ATOM_EXTEND+2;
+const MOL_ATOM_ACTIVE	= MOL_ATOM_EXTEND+3;
+const MOL_ATOM_CTABH    = MOL_ATOM_EXTEND+4;
+const MOL_ATOM_SERIAL	= MOL_ATOM_EXTEND+5;
+const MOL_ATOM_TEMP	= MOL_ATOM_EXTEND+6;
+const MOL_ATOM_ELCOL	= MOL_ATOM_EXTEND+7;
+const MOL_ATOM_QCOL	= MOL_ATOM_EXTEND+8;
+const MOL_ATOM_REC	= MOL_ATOM_EXTEND+9;
+const MOL_ATOM_LITERAL	= MOL_ATOM_EXTEND+10;
+
+local function mol_DropExtend mol = apt keep [mol, app length mol_Extract[]];
+
+local function mol_cName mol = mol(2)(MOL_CHAIN_NAME);
+local function mol_cTag  mol = mol(2)(MOL_CHAIN_TAG);
+local function mol_cHdr  mol = mol(2)(MOL_CHAIN_HEADER);
+local function mol_nRes  mol = mol(2)(MOL_CHAIN_NRES);
+
+local function mol_rName  mol = mol(3)(MOL_RES_NAME);
+local function mol_rUID   mol = mol(3)(MOL_RES_UID);
+local function mol_rINS   mol = mol(3)(MOL_RES_INS);
+local function mol_rType  mol = mol(3)(MOL_RES_TYPE);
+local function mol_nAtoms mol = mol(3)(MOL_RES_NATOMS);
+local function mol_rStd   mol = mol(3)(MOL_RES_STD);
+
+local function mol_rSetStd [mol, v] = poke [mol, [3, MOL_RES_STD], v];
+
+local function mol_aBck mol = mol(4)(MOL_ATOM_BACKBONE);
+local function mol_aIon mol = mol(4)(MOL_ATOM_ION);
+local function mol_aHLP mol = mol(4)(MOL_ATOM_HINTLP);
+local function mol_aHyb mol = mol(4)(MOL_ATOM_GEOM);
+local function mol_aBnd mol = mol(4)(MOL_ATOM_BONDS);
+local function mol_aEle mol = mol(4)(MOL_ATOM_EL);
+
+local function mol_aRad mol = el_COV_Radius mol_aEle mol;
+local function mol_aLht mol = 1 >= el_Protons mol_aEle mol;
+
+local function mol_aNumH mol = app add apt get [[mol_aLht mol], mol_aBnd mol];
+
+local function mol_aSetBnd [mol, B] = poke [mol, [4, MOL_ATOM_BONDS], B];
+
+local function mol_SymmetrizeBondlist mol
+    local B = graph_edges mol_aBnd mol;
+    return mol_aSetBnd [ mol, graph_uneighbors cat [B, mol_aCount mol]];
+endfunction
+
+local function str_R2A [mol, v] = stretch [v, mol_nAtoms mol];
+local function str_C2A [mol, v] = str_R2A [mol, stretch [v, mol_nRes mol]];
+local function mol_aRnum mol = str_R2A [mol, igen mol_rCount mol];
+local function mol_aCnum mol = str_C2A [mol, igen mol_cCount mol];
+
+// ResName : rName_rUID_rINS; AtomName  : Resname_aName
+
+local function res_name [r, u, i] = apt twrite ['{}_{}_{}', r, u, i];
+const RES_NAME = [MOL_RES_NAME, MOL_RES_UID, MOL_RES_INS];
+local function mol_rFullName mol = res_name mol(3)[RES_NAME];
+local function rFullName r = res_name [rName r, rUID r, rINS r];
+
+local function mol_aFullName mol = cat tok_cat [
+    mol_rFullName mol, '_', split [mol_aName mol, mol_nAtoms mol]
+];
+
+local function aUnitedElement atoms = toupper el_UnitedElement aElement atoms;
+
+local function aAltLoc A
+    local alt_char = findmatch ['PDB_ALTLOC_[A-Z,a-z,0-9]', oCollections[]];
+    local alt_atoms = app oGetCollection alt_char;
+    alt_char = stretch [app last app string alt_char, app length alt_atoms];
+    local x = indexof [A, cat alt_atoms];
+
+    return unpack [alt_char[pack x], [" "], x];
+endfunction
+
+local function ele2hyb ele
+    local m = indexof toupper [ele, ELEMENT_SYM];
+    return unpack [el_DefaultGeometry (ele | m), 'sp3', m];
+endfunction
+
+local function is_el ele = indexof toupper [ele, cat ['D', ELEMENT_SYM]];
+
+local function safe_element ele
+    ele | ele == 'D' = 'H';
+    ele | not is_el ele = 'LP';
+
+    const T = ELEMENT_SYM;
+    local x = indexof [ele, toupper T];
+    ele | x = T[pack x];
+
+    return ele;
+endfunction
+
+//=============== fread_PDB_model: Bonding, Chemistry, Residue types etc ======
+
+const RIBOSE = [
+  ['O5*','C5*','C4*','O4*','C3*','O3*','C2*','C1*','P','OP1','OP2','OP3','O2*'],
+  [[2,9], 3, [4,5], 8, [6,7], [], [8,13], [], [10,11,12], [], [], [], [] ]
+];
+
+// pdbx_formal_charge from components.cif, except halogens
+// using the rule that charge is otherwise # from (el name)#
+// halogens: pass through to autotype?
+
+const PDB_IONS = untag [
+    AG:1, AL:3, AU:1, BA:2, BR:-1, CA:2, CD:2, CE:3, CL:-1, CO:2, CR:3, CS:1,
+    CU:2, EU:2, FE:3, GA:3, GD:3, HG:2, HO:3, I:-1, IN:3, IR:4,  K:1, LA:3,
+    LI:1, LU:3, MG:2, MN:2, MO:4, NA:1, NI:3, OS:3, PB:2, PD:2, PR:3, PT:2,
+    RB:1, RU:3, SM:3, SR:2, TB:3, TL:1, V:3, W:6, Y:2, YB:3, ZN:2
+];
+
+// HIP is ambiguous; in an RCSB file it should be ND1-phosphonohistidine;
+// however, there is common usage of the AMBER conventions (and HIP in the
+// RCSB sense appears in only five files as of 2010-02-09 - 1JEM,1NSP,1NSQ,
+// 1PFH & 2VME).
+// !!! UNK really doesn't belong here. We can call UNK's with appropriate
+// atom names amino later on ...
+
+const STD_AMINO_RES_ATOMS = [
+    UNK:['CA', []],
+    ACE:[['CA','C','O'], [2,3,[]]],
+    NH2:[ 'N', []],
+    NME:[['N','CA'], 2],
+    FOR:[['C','O'], 2],
+    ALA:[['N','CA','C','O','CB', 'OXT'], [ 2, [3,5], [4,6], [], [], []] ],
+    ARG:[['N','CA','C','O','CB','CG','CD','NE','CZ','NH1','NH2','OXT'],
+	 [ 2, [3,5], [4,12], [], 6, 7, 8, 9, [10,11], [], [], [], []]],
+    ASN:[['N','CA','C','O','CB','CG','OD1','ND2','OXT'],
+	 [ 2, [3,5], [4,9], [], 6, [7,8], [], [], [], []] ],
+    ASP:[['N','CA','C','O','CB','CG','OD1','OD2','OXT'],
+	 [ 2, [3,5], [4,9], [], 6, [7,8], [], [], []]],
+    ASH:[['N','CA','C','O','CB','CG','OD1','OD2','OXT'],
+	 [ 2, [3,5], [4,9], [], 6, [7,8], [], [], []]],
+    CYS:[['N','CA','C','O','CB','SG','OXT'],
+	 [ 2, [3,5], [4,7], [], 6, [], []] ],
+    CYX:[['N','CA','C','O','CB','SG','OXT'],
+	 [ 2, [3,5], [4,7], [], 6, [], []] ],
+    CYM:[['N','CA','C','O','CB','SG','OXT'],
+	 [ 2, [3,5], [4,7], [], 6, [], []] ],
+    CSO:[['N','CA','C','O','CB','SG','OD','OXT'],
+	 [ 2, [3,5], [4,8], [], 6, 7, []] ],
+    GLN:[['N','CA','C','O','CB','CG','CD','OE1','NE2', 'OXT'],
+	 [ 2,[3,5],[4,10],[],6,7,[8,9],[],[],[]]],
+    PCA:[['N','CA','C','O','CB','CG','CD','OE', 'OXT'],
+	 [ [2,7], [3,5], [4,9], [], 6, 7, 8, [], [] ]],
+    GLU:[['N','CA','C','O','CB','CG','CD','OE1','OE2', 'OXT'],
+	 [ 2,[3,5],[4,10],[],6,7,[8,9],[],[],[]] ],
+    GLH:[['N','CA','C','O','CB','CG','CD','OE1','OE2', 'OXT'],
+	 [ 2,[3,5],[4,10],[],6,7,[8,9],[],[],[]]],
+    GLY:[['N','CA','C','O','OXT'], [ 2, 3, [4,5], [], []] ],
+    HID:[['N','CA','C','CB','CG','ND1','CD2','CE1','NE2','O','OXT'],
+	 [ 2, [3,4], [10,11], 5, [6,7], 8, 9, 9, [], [], []] ],
+    HIE:[['N','CA','C','CB','CG','ND1','CD2','CE1','NE2','O','OXT'],
+	 [ 2, [3,4], [10,11], 5, [6,7], 8, 9, 9, [], [], []] ],
+    HIP:[['N','CA','C','CB','CG','ND1','CD2','CE1','NE2','O','OXT'],
+	 [ 2,[3,4],[10,11],5,[6,7],8,9,9,[],[],[]] ],
+    HIS:[['N','CA','C','O','CB','CG','ND1','CD2','CE1','NE2','OXT'],
+	 [ 2,[3,5],[4,11],[],6,[7,8],9,10,10,[],[]] ],
+    HYP:[['N','CA','C','CB','CG','OD1','CD','O','OXT'],
+	 [ [2,7],[3,4],[8,9],5,[6,7],[],[],[],[]]],
+    ILE:[['N','CA','C','O','CB','CG1','CG2','CD1','OXT'],
+	 [ 2, [3,5], [4,9] , [], [6,7], 8, [], [], []] ],
+    LEU:[['N','CA','C','O','CB','CG','CD1','CD2','OXT'],
+	 [ 2,[3,5],[4,9],[],6,[7,8],[],[],[]] ],
+    LYS:[['N','CA','C','O','CB','CG','CD','CE','NZ','OXT'],
+	 [ 2,[3,5],[4,10],[],6,7,8,9,[],[]] ],
+    LYN:[['N','CA','C','O','CB','CG','CD','CE','NZ','OXT'],
+	 [ 2,[3,5],[4,10],[],6,7,8,9,[],[]] ],
+    MET:[['N','CA','C','O','CB','CG','SD','CE','OXT'],
+	 [ 2,[3,5],[4,9],[],6,7,8,[],[]] ],
+    MSE:[['N','CA','C','O','CB','CG','SE','CE','OXT'],
+	 [ 2,[3,5],[4,9],[],6,7,8,[],[]] ],
+    PHE:[['N','CA','C','O','CB','CG','CD1','CD2','CE1','CE2','CZ','OXT'],
+	 [ 2,[3,5],[4,12],[],6,[7,8],9,10,11,11,[]] ],
+    PRO:[['N','CA','C','O','CB','CG','CD','OXT'],
+	 [ [2,7],[3,5],[4,8],[],6,7,[],[]] ],
+    SER:[['N','CA','C','O','CB','OG','OXT'],
+	 [ 2, [3,5], [4,7], [], 6, [], []] ],
+    SEP:[['N','CA','C','O','CB','OG','P','O1P', 'O2P','O3P','OXT'],
+	 [ 2, [3,5], [4,11], [], 6, 7, [8,9,10], []] ],
+    THR:[['N','CA','C','O','CB','OG1','CG2','OXT'],
+	 [ 2,[3,5],[4,8],[],[6,7],[],[],[]] ],
+    TPO:[['N','CA','C','O','CB','OG1','CG2','P','O1P','O2P','O3P','OXT'],
+	 [ 2,[3,5],[4,12],[],[6,7],8,[],[9,10,11],[]] ],
+    TRP:[['N','CA','C','O','CB','CG','CD1','CD2','NE1','CE2','CE3','CZ2','CZ3',
+	    'CH2','OXT'],
+	 [ 2,[3,5],[4,15],[],6,[7,8],9,[10,11],10,12,13,14,14,[],[]]],
+    TYR:[['N','CA','C','O','CB','CG','CD1','CD2','CE1','CE2','CZ','OH','OXT'],
+	[ 2, [3,5], [4,13], [], 6, [7,8], 9, 10, 11, 11, 12, [], []] ],
+    PTR:[['N','CA','C','O','CB','CG','CD1','CD2','CE1','CE2','CZ','OH',
+	    'P','O1P','O2P','O3P','OXT'],
+	[ 2,[3,5],[4,17],[],6,[7,8],9,10,11,11,12,13,[14,15,16],[]] ],
+    VAL:[['N','CA','C','CB','CG1','CG2','O','OXT'],
+	 [ 2, [3,4], [7,8], [5,6], [], [], [], []] ]
+];
+
+const NUCLEOTIDES = [
+    T:[ ['N1','C2','O2','N3','C4','O4','C5','C5M','C6'],
+	[[2,9], [3,4], [], 5, [6,7], [], [8,9], [], [] ] ],
+    U:[ ['N1','C2','O2','N3','C4','O4','C5','C6'],
+	[[2,8], [3,4], [], 5, [6,7], [], 8, [] ] ],
+    A:[ ['N9','C8','N7','C5','C6','N6','N1','C2','N3','C4'],
+	[[2,10], 3, 4, [5,10], [6,7], [], 8, 9, 10, [] ] ],
+    I:[ ['N9','C8','N7','C5','C6','O6','N1','C2','N3','C4'],
+	[[2,10], 3, 4, [5,10], [6,7], [], 8, 9, 10, [] ] ],
+    G:[ ['N9','C8','N7','C5','C6','O6','N1','C2','N2','N3','C4'],
+	[[2,11], 3, 4, [5,11], [6,7], [], 8, [9,10], [], 11, []] ],
+    C:[ ['N1','C2','O2','N3','C4','N4','C5','C6'],
+	[[2,8], [3,4], [], 5, [6,7], [], 8, [] ] ],
+    DT:[ ['N1','C2','O2','N3','C4','O4','C5','C5M','C6'],
+	[[2,9], [3,4], [], 5, [6,7], [], [8,9], [], [] ] ],
+    DU:[ ['N1','C2','O2','N3','C4','O4','C5','C6'],
+	[[2,8], [3,4], [], 5, [6,7], [], 8, [] ] ],
+    DA:[ ['N9','C8','N7','C5','C6','N6','N1','C2','N3','C4'],
+	[[2,10], 3, 4, [5,10], [6,7], [], 8, 9, 10, [] ] ],
+    DI:[ ['N9','C8','N7','C5','C6','O6','N1','C2','N3','C4'],
+	[[2,10], 3, 4, [5,10], [6,7], [], 8, 9, 10, [] ] ],
+    DG:[ ['N9','C8','N7','C5','C6','O6','N1','C2','N2','N3','C4'],
+	[[2,11], 3, 4, [5,11], [6,7], [], 8, [9,10], [], 11, []] ],
+    DC:[ ['N1','C2','O2','N3','C4','N4','C5','C6'],
+	[[2,8], [3,4], [], 5, [6,7], [], 8, [] ] ]
+];
+
+const STD_NUCLEIC_RESIDUES = [
+    'DT','DA','DG','DC','DI','DU',
+    'T','A','G','C','I','U','N',
+    '+T','+A','+G','+C','+I','+U'
+];
+
+local function get_atom_table []
+    local i, x, m;
+
+    local atom_table = [amino:STD_AMINO_RES_ATOMS];
+
+    local [R,A] = untag NUCLEOTIDES;
+    local [an,bonds] = tr A;
+    local n = app length an;
+    an = apt cat [an, [first RIBOSE]];
+    bonds = apt cat [bonds, n + [last RIBOSE]];
+    local nb = apt cat [app first bonds, apt indexof ['C1*', an]] ;
+    bonds = apt poke [bonds, 1, nb];
+
+    atom_table.rna = tag [R, tr [an, bonds]];
+
+	// Create the DNA table by dropping the last oxygen from the RNA table
+
+    for i = 1, length bonds loop
+	local B = cat bonds(i);
+	m = B < dec length bonds(i);
+	B = split [B | m, s_add [m, app length bonds(i)]];
+	an(i) = droplast an(i);
+	bonds(i) = droplast B;
+    endloop
+    atom_table.dna = tag [R, tr [an, bonds]];
+
+    return atom_table;
+endfunction
+
+// We use library to assign standard attr; if we discover later that there
+// are unusual bonds to take into account, we will run another pass
+// using atoms. Anyone who now does not match will be autotyped.
+
+// We find residues with the same name & atoms & apply standard attr.
+// When peptide bonds are formed, we set N to sp2 & neutral.
+
+local function mol_StandardAttributes [mol, opt]
+    static std_atoms;
+    if isnull std_atoms then
+	std_atoms = get_atom_table [];
+    endif
+
+    local i,x,m;
+
+    local rN = mol_rName mol;
+    local nA = mol_nAtoms mol;
+    local aN = mol_aName mol;
+    local el = mol_aEle mol;
+    local xR = stretch [x_id rN, nA];
+
+    aN | aN == 'CD'  and rN[xR] == 'ILE' = 'CD1';	    // CHARMM naming
+    aN | aN == 'CH3' and rN[xR] == 'ACE' = 'CA';	    // Amber
+    aN | aN == 'CH3' and rN[xR] == 'NME' = 'CA';	    // Amber
+
+	// Set amino & nucleic residue types.
+
+    local rT = rep ['none', mol_rCount mol];
+    rT | indexof [rN, tags std_atoms.amino] = 'amino';
+    rT | indexof [rN, STD_NUCLEIC_RESIDUES] = 'dna';
+
+    if anytrue opt.translate_primes then
+	m = str_R2A [mol, rT] == 'dna';
+	local s = app string (aN | m);
+	if 1 == opt.translate_primes then
+	    aN | m = app token apt mput [s, s == "'", "*"];
+	    aN | m and aN == 'OP1' = 'O1P';
+	    aN | m and aN == 'OP2' = 'O2P';
+	else
+	    aN | m = app token apt mput [s, s == "*", "'"];
+	    aN | m and aN == 'O1P' = 'OP1';
+	    aN | m and aN == 'O2P' = 'OP2';
+	endif
+	mol(4)(MOL_ATOM_NAME) = aN;
+    endif
+
+	// Determine RNA type from atoms.
+
+    m = app orE split [indexof [aN, ['O2*','O2\'']], nA];
+    rT | (rT == 'dna' and (m or rN == 'U')) = 'rna';
+    mol(3)(MOL_RES_TYPE) = rT;
+
+	// Set the backbone bit on amino & nucleic.
+
+    const AMINO_MAIN = ['N','CA','C','O','OXT'];
+    const NUCLEIC_MAIN = [
+	'C3\'','C4\'','C5\'', 'O3\'','O3\'','O5\'',
+	'C3*','C4*','C5*','O1P','O2P','O3P','O3*','O5*','P'
+    ];
+
+    x = indexof [str_R2A [mol, rT], ['amino','dna','rna']];
+    mol(4)(MOL_ATOM_BACKBONE) = orE [
+	x == 1 and indexof [aN, AMINO_MAIN],
+	x > 1  and indexof [aN, NUCLEIC_MAIN]
+    ];
+
+	// Set intra-residue bonds from the std_atoms table.
+	// TBD: bond hydrogens here: alternates are gone, after all.
+
+    xR = stretch [igen mol_cCount mol, mol_nRes mol];
+    local xTerm = xR <> rotlpoke [xR, 0];
+
+    [aN,el] = apt split [[aN,el], [nA]];
+    x = split [igen mol_aCount mol, nA];
+    local B = rep [[], mol_aCount mol], stdF = zero rT;
+    for i in x_pack (rT <> 'none' and nA > 0) loop
+	local [Aname, bonds] = std_atoms.(rT(i)).(rN(i));
+	local an = aN(i);
+	if xTerm(i) then
+	    m = an == 'O';
+	    an | m and (2 == pscan m) = 'OXT';  // allows duplicate O !!!
+	endif
+	local x1 = indexof [an, Aname];
+
+	if andE (x1 or 1 >= el_Protons el(i)) then
+//	    stdF(i) = andE indexof [Aname | Aname <> 'OXT', an];
+	    stdF(i) = andE indexof [an, Aname]; // Aname | Aname <> 'OXT', an];
+	    if isnull bonds then continue; endif;
+	    bonds = bonds[pack x1];
+	    Aname = Aname[cat bonds];
+	    local x2 = indexof [Aname, an];
+	    if isnull x2 then continue; endif;
+	    x2 = app pack split [x2, app length bonds];
+	    B[x(i) | x1] = split [x(i)[cat x2], app length x2];
+	endif
+    endloop
+
+    mol = mol_aSetBnd [mol, B];
+    mol = mol_rSetStd [mol, stdF];
+
+    return mol;
+endfunction
+
+// Override default states: 'sp3', neutral etc
+// !!! SimpleWash makes phosphate groups unnecessary here.
+
+const STANDARD_CHEM = [
+    ACE:[ sp2:['C','O']],
+    FOR:[ sp2:['C','O']],
+    ASN:[ sp2:['CG','OD1','ND2']],
+    GLN:[ sp2:['CD','OE1','NE2']],
+    PCA:[ sp2:['CD','OE']],
+    ASP:[ sp2:['CG','OD1','OD2'], anion:'OD2'],
+    GLU:[ sp2:['CD','OE1','OE2'], anion:'OE2'],
+    PHE:[ sp2:['CG','CD1','CD2','CE1','CE2','CZ']],
+    TYR:[ sp2:['CG','CD1','CD2','CE1','CE2','CZ']],
+    PTR:[ sp2:['CG','CD1','CD2','CE1','CE2','CZ']],
+    TRP:[ sp2:['CG','CD1','CD2','NE1','CE2','CE3','CZ2','CZ3','CH2']],
+    HIS:[ sp2:['CG','ND1','CD2','CE1','NE2'], hintlp:'ND1'],
+    HID:[ sp2:['CG','ND1','CD2','CE1','NE2'], hintlp:'NE2'],
+    HIE:[ sp2:['CG','ND1','CD2','CE1','NE2'], hintlp:'ND1'],
+    HIP:[ sp2:['CG','ND1','CD2','CE1','NE2'], cation:'ND1'],
+    ARG:[ sp2:['NE','CZ','NH1','NH2'], cation:'NH2'],	// components.cif
+    LYS:[ cation:'NZ' ],
+
+    A:[ anion:['OP1','OP2','OP3'], cation:'P', hintlp:['N1','N3','N7']],
+    G:[ anion:['OP1','OP2','OP3'], cation:'P', hintlp:['N3','N7']],
+    T:[ anion:['OP1','OP2','OP3'], cation:'P'  ],
+    C:[ anion:['OP1','OP2','OP3'], cation:'P', hintlp:'N3'],
+    I:[ anion:['OP1','OP2','OP3'], cation:'P', hintlp:['N1','N3','N7']],
+    U:[ anion:['OP1','OP2','OP3'], cation:'P' ],
+
+    DA:[ anion:['OP1','OP2','OP3'], cation:'P', hintlp:['N1','N3','N7']],
+    DG:[ anion:['OP1','OP2','OP3'], cation:'P', hintlp:['N3','N7']],
+    DT:[ anion:['OP1','OP2','OP3'], cation:'P'  ],
+    DC:[ anion:['OP1','OP2','OP3'], cation:'P', hintlp:'N3'],
+    DI:[ anion:['OP1','OP2','OP3'], cation:'P', hintlp:['N1','N3','N7']],
+    DU:[ anion:['OP1','OP2','OP3'], cation:'P' ]
+];
+
+// Set ATOM_ION, ATOM_GEOM, & ATOM_HINTLP states for standard amino
+// acids and nucleotides.
+
+local function mol_StandardChemistry mol
+    local x,m;
+    local rN = str_R2A [mol, mol_rName mol];
+    local rT = str_R2A [mol, mol_rType mol];
+    local aN = mol_aName mol;
+
+    local hyb = mol_aHyb mol;
+    local ion = mol_aIon mol;
+    local hlp = mol_aHLP mol;
+
+    local residue;
+    for residue in tags STANDARD_CHEM loop
+	x = x_pack (residue == rN);
+	local Aname = aN[x];
+	local chem = STANDARD_CHEM.(residue);
+	hlp [x | indexof [Aname, chem.hintlp ]] =  1;
+	hyb [x | indexof [Aname, chem.sp2    ]] = 'sp2';
+	hyb [x | indexof [Aname, chem.d2sp3  ]] = 'd2sp3';
+	ion [x | indexof [Aname, chem.cation ]] =  1;
+	ion [x | indexof [Aname, chem.anion  ]] = -1;
+	if length chem.ion then
+	    local x_ion = indexof [Aname, tags chem.ion];
+	    ion [x | x_ion] = tagget [chem.ion, Aname | x_ion];
+	endif
+    endloop
+
+	// Ribose & main chain peptide atoms are not in the chemical tables.
+
+    local na_sp3 = cat [first RIBOSE, 'C5M'];
+    hyb | indexof [rT, ['dna','rna']] and not indexof [aN, na_sp3] = 'sp2';
+    hyb | mol_aBck mol and indexof [aN, ['C','O','N']] = 'sp2';
+    ion | rT == 'amino' and aN == 'OXT' = -1;
+
+    m = aN == 'N'and rT == 'amino';
+    ion | m = 1;
+    hyb | m = 'sp3';
+
+    x = indexof [toupper mol_aEle mol, PDB_IONS(1)];
+    x | 1 < str_R2A [mol, mol_nAtoms mol] = 0;
+    ion | x = PDB_IONS(2)[pack x];
+
+    mol(4)(MOL_ATOM_GEOM)   = hyb;
+    mol(4)(MOL_ATOM_ION)    = ion;
+    mol(4)(MOL_ATOM_HINTLP) = hlp;
+
+    return mol;
+endfunction
+
+//============= Standardize residues ==========================================
+
+function amber_ResidueLibrary, amber_ResidueLookup;
+
+static amberRlib, amberMols;
+
+#if 0
+
+// Empty res: if they match an amino acid ...
+// connectivity & (preliminary chemistry)
+
+local function mol_AmberAttributes [mol, opt]
+    static mols;
+
+    if isnull amberRlib then
+	amberRlib = amber_ResidueLibrary '$MOE/lib/amber10.mdb';
+	mols = apt tagpeek [amberRlib, 'mol'];
+    endif
+
+
+    local rN = mol_rName mol;
+    local nA = mol_nAtoms mol;
+    local aN = mol_aName mol;
+    local el = mol_aEle mol;
+    local xR = stretch [x_id rN, nA];
+
+    aN | aN == 'CD'  and rN[xR] == 'ILE' = 'CD1';	    // CHARMM naming
+    aN | aN == 'CH3' and rN[xR] == 'ACE' = 'CA';	    // Amber
+    aN | aN == 'CH3' and rN[xR] == 'NME' = 'CA';	    // Amber
+
+	// Set amino & nucleic residue types.
+
+    local rT = rep ['none', mol_rCount mol];
+    rT | indexof [rN, tags std_atoms.amino] = 'amino';
+    rT | indexof [rN, STD_NUCLEIC_RESIDUES] = 'dna';
+
+	// Here we translate primes only if the name matches DT etc or T etc
+
+    if anytrue opt.translate_primes then
+	m = str_R2A [mol, rT] == 'dna';
+	local s = app string (aN | m);
+	if 1 == opt.translate_primes then
+	    aN | m = app token apt mput [s, s == "'", "*"];
+	    aN | m and aN == 'OP1' = 'O1P';
+	    aN | m and aN == 'OP2' = 'O2P';
+
+	else
+	    aN | m = app token apt mput [s, s == "*", "'"];
+	    aN | m and aN == 'O1P' = 'OP1';
+	    aN | m and aN == 'O2P' = 'OP2';
+	endif
+	mol(4)(MOL_ATOM_NAME) = aN;
+    endif
+
+	// rna  vs dna comes from match
+
+	// backbone bit: from match
+	// Set the backbone bit on amino & nucleic.
+
+    local idx = indexof [rname, lib.names];
+
+    for i = 1, length res loop
+    endloop
+
+    return mol;
+endfunction
+
+#endif
+
+local function mol_AmberStandardize mol
+
+    if isnull amberRlib then
+	amberRlib = amber_ResidueLibrary GetRC 'RotamerLibrary';
+	if isnull amberRlib then return mol; endif;
+	amberMols = apt tagpeek [amberRlib, 'mol'];
+    endif
+
+    local psys = SystemPush [];
+    local chains = mol_Create mol;
+    local res = Residues[];
+
+    local [idx, atoms] = amber_ResidueLookup [
+	amberRlib, res, [level:0, stereo:1]
+    ];
+
+    local ridx = x_pack app length idx;
+    idx = app first idx[ridx];
+    atoms = app first atoms[ridx];
+
+    local i, mols = amberMols[idx];;
+    for i = 1, length idx loop
+	local resmol = mols(i);
+	local mask = atoms(i);
+	atoms(i) = pack atoms(i);
+	aSetIon	     [atoms(i), (mol_aIon  resmol) | mask];
+	aSetGeometry [atoms(i), (mol_aHyb  resmol) | mask];
+	aSetHintLP   [atoms(i), (mol_aHLP  resmol) | mask];
+
+	local aname = (mol_aName resmol) | mask;
+	mask = aIsLight atoms(i);
+	aSetName [atoms(i) | mask, aname | mask];
+    endloop
+
+    local mol2 = mol_Extract Residues[];
+    oDestroy chains;
+    SystemPop psys;
+
+    mol(3)(MOL_RES_STD)     = put [mol_rStd mol, ridx, 1];
+    mol(4)(MOL_ATOM_ION)    = mol_aIon mol2;
+    mol(4)(MOL_ATOM_GEOM)   = mol_aHyb mol2;
+    mol(4)(MOL_ATOM_HINTLP) = mol_aHLP mol2;
+
+    return mol;
+endfunction
+
+//========== Bonding & Typing ================================================
+
+const WATER_RESIDUES = ['HOH','WAT','TIP','SOL','OH2','DOD','D20'];
+
+local function is_water_res v = indexof [v, WATER_RESIDUES];
+
+// !!! and unbonded (according to explicit inter-residue conects)
+
+local function mol_rSolventIonsMetals mol
+    local na = s_add [not mol_aLht mol, mol_nAtoms mol];
+    local rn = mol_rName mol;
+    return (na == 1 and indexof [rn, first PDB_IONS]) or is_water_res rn;
+endfunction
+
+local function mol_aProx mol
+    const BOND_TOL = 0.50;  // AutoConnect threshold
+    local P = mol_aPos mol;
+    local R = mol_aRad mol;
+
+    local key = prox_open [2 * max [0, max R] + BOND_TOL, P, R + BOND_TOL];
+    local [N,x2,d2] = prox_find [key, P, R];
+    prox_close key;
+
+    return [stretch [x_id N, N], x2, d2];
+endfunction
+
+local function MatchCTAB [Aname, isH, ctab]
+    local i, x = [];
+    for i = 1, length ctab.aname loop
+	x(i) = indexof [Aname, ctab.aname(i)];
+	if andE (x(i) or isH) then break; endif;
+    endloop
+    i = x_max app length app pack x;
+    return [x(i), ctab.aname(i)];
+endfunction
+
+local function mol_ApplyCTAB [mol, ctab_dict]
+    local rn = mol_rName mol;
+
+    local ion = mol_aIon mol;
+    local hyb = mol_aHyb mol;
+    local hlp = mol_aHLP mol;
+    local bnd = mol_aBnd mol;
+
+    local Hdeg = mol(4)(MOL_ATOM_CTABH);
+
+    if isnull Hdeg or Hdeg(1) === " " then
+	Hdeg = -1 * one ion;
+    endif
+
+    local std = mol_rStd mol;
+
+    local natoms = mol_nAtoms mol;
+    local Aname = split [mol_aName mol,	        natoms ];
+    local anum  = split [igen mol_aCount mol,	natoms ];
+    local light = split [mol_aLht mol,	        natoms ];
+
+    const LONG_BOND = 3;
+
+    local i;
+    for i in x_pack indexof [rn, tags ctab_dict] loop
+	local ctab = ctab_dict.(rn(i));
+	if isnull ctab then continue; endif;
+	local [x1, an] = MatchCTAB [Aname(i), light(i), ctab];
+	local n = anum(i) | x1, x = pack x1;
+
+	local B = (ctab.bonds)[x];
+	local x2 = indexof [an[cat B], Aname(i)];
+	if length x2 then
+	    x2 = app pack split [x2, app length B];
+	    B = split [anum(i)[cat x2], app length x2];
+	    local j, d = 0;
+	    for j = 1, length n loop
+		local p1 = apt peek [mol_aPos mol, n(j)];
+		local p2 = apt get [mol_aPos mol, [B(j)]];
+		d = max [d, max norm sub [p1, p2]];
+	    until d > LONG_BOND
+	    endloop
+	    if d > LONG_BOND then
+		continue;   // Unreliable CTAB
+	    endif;
+	    bnd[n] = B;
+	endif
+
+	ion[n] = (ctab.ion)[x];
+	hyb[n] = (ctab.hyb)[x];
+	hlp[n] = (ctab.hlp)[x];
+
+	    // Protect from CTAB's with no hydrogens.
+
+	if add ('H' == ctab.ele) then
+	    Hdeg[n] = (ctab.Hdeg)[x];
+	endif
+
+	std(i) = andE (x1 or light(i));
+    endloop
+
+    mol(4)(MOL_ATOM_ION)    = ion;
+    mol(4)(MOL_ATOM_GEOM)   = hyb;
+    mol(4)(MOL_ATOM_HINTLP) = hlp;
+    mol(4)(MOL_ATOM_BONDS)  = bnd;
+    mol(4)(MOL_ATOM_CTABH)  = Hdeg;
+
+    mol = mol_rSetStd [mol, std];
+
+    return mol;
+endfunction
+
+local function mol_MicroHet mol
+    const CLASH_VAL = 0.5;
+    local P = mol_aPos mol;
+    local key = prox_open [2 * CLASH_VAL, P, CLASH_VAL];
+    local [N,x2] = prox_find [key, P, 0];
+    prox_close key;
+
+    local x1 = stretch [x_id N, N];
+
+    local R_idx   = mol_aRnum mol;
+    local R_uid   = str_R2A [mol, mol_rUID mol];
+    local R_ins   = str_R2A [mol, mol_rINS mol];
+    local R_type  = str_R2A [mol, mol_rType mol];
+    local A_name  = mol_aName mol;
+    local A_chain = mol_aCnum mol;
+    local light   = mol_aLht mol;
+
+    local m = andE [
+	not (A_name[x1] == 'SG' and A_name[x2] == 'SG'),
+	not (A_name[x1] == 'C'  and A_name[x2] == 'N'),
+	not (light[x1] or light[x2]),
+	R_idx[x1] == dec R_idx[x2] and A_chain[x1] == A_chain[x2],
+	R_uid[x1] == R_uid[x2] and R_ins[x1] == R_ins[x2],
+	R_type[x1] == 'amino' or R_type[x2] == 'amino'	// ??
+    ];
+    m = put [zero igen mol_rCount mol, R_idx[x2|m], 1];
+
+    if anytrue m then
+	local variants = mol_rMask [mol, m];
+	variants = mol_cMask [variants, mol_nRes variants];
+	variants(2)(MOL_CHAIN_HEADER) = rep [
+	    'Sequence Variants', mol_cCount variants
+	];
+	variants(4)(MOL_ATOM_ACTIVE) = zero variants(4)(MOL_ATOM_ION);
+	mol = mol_Cat [mol_rMask [mol, not m], variants];
+    endif
+
+    return mol;
+endfunction
+
+local function mol_StandardBonds mol
+
+    local [x1,x2,d2] = mol_aProx mol;
+    [x1,x2,d2] = apt get [[x1,x2,d2], [x_sort d2]];
+
+    local R_idx   = mol_aRnum mol;
+    local R_uid   = str_R2A [mol, mol_rUID mol];
+    local R_type  = str_R2A [mol, mol_rType mol];
+    local A_name  = mol_aName mol;
+    local A_chain = mol_aCnum mol;
+    local L       = mol_aLht mol;
+
+	// Make the polymer bonds between consecutive residues.
+	// Also bonds hydrogens to nearest heavy atom... should do this
+	// separately?
+
+    local m = andE [
+	R_idx[x1] == dec R_idx[x2] and A_chain[x1] == A_chain[x2],
+	orE [
+	    A_name[x1] == 'C'    and A_name[x2] == 'N',
+	    A_name[x1] == 'O3*'  and A_name[x2] == 'P',
+	    A_name[x1] == 'O3\'' and A_name[x2] == 'P'
+	]
+    ];
+    local m_lht = L[x1] and not L[x2] and (R_idx[x1] == R_idx[x2]);
+    m_lht | m_lht = m_uniq (x1 | m_lht);
+    m = m or m_lht;
+
+    local B = mol_aBnd mol;
+    B[x1|m] = apt cat [B[ x1|m ], x2|m];
+    mol(4)(MOL_ATOM_BONDS) = B;
+
+    return mol;
+endfunction
+
+// ....
+
+local function mol_AutoConnectMask [mol, rmask, use_link]
+    local M = mol_rMask [mol, rmask];
+    local E = mol_aEle M;
+    local P = mol_aPos M;
+    local B = mol_aBnd M;
+
+    local [x1,x2] = graph_edges AutoConnectFromPosition [E,P,B];
+
+    local res = mol_aRnum M;
+    local pep = str_R2A [M, 'amino' == mol_rType M];
+    local std = str_R2A [M, mol_rStd M];
+    local ion = str_R2A [M, mol_rSolventIonsMetals M];
+    local lht = mol_aLht M;
+    local an  = mol_aName M;
+
+    local cyx = std[x1] and std[x2] and an[x1] == 'SG' and an[x2] == 'SG';
+
+    [x1,x2] = [x1,x2] || nest not orE [
+	ion[x1] or ion[x2],		    // Exclude single-heavy ions etc.
+	lht[x1] or lht[x2],		    // mol_StandardBonds does these.
+	std[x1] and std[x2] and res[x1] == res[x2],
+	std[x1] and std[x2] and pep[x1] and pep[x2] and not cyx,
+	use_link and not cyx and (res[x1] <> res[x2])	// Not if links active
+    ];
+    B = graph_uneighbors [x1, x2, add M(3)(MOL_RES_NATOMS)];
+
+    local m = str_R2A [mol, rmask];
+    B = split [indexof [(x_pack m)[cat B], x_id m], app length B];
+    B = app uniq apt cat [(mol_aBnd mol) | m,  B];
+
+    mol = mol_aSetBnd [mol, mput [mol_aBnd mol, m, B]];
+
+    return mol;
+endfunction
+
+local function mol_AutoConnect [mol, use_link]
+    const CLASH_COUNT = 3;
+    local [x1,x2] = mol_aProx mol;
+
+    local aR = mol_aRnum mol;
+    local xr1 = aR[x1];
+    local xr2 = aR[x2];
+    [xr1,xr2] = [xr1,xr2] || [xr2 > xr1];
+
+    local doneF = zero igen mol_rCount mol;
+    loop
+	local i, clashF = zero doneF;
+	for i in x_pack not doneF loop
+	    if not clashF(i) then
+		local r = xr2 | xr1 == i;
+		r = r | r > i;
+		if length r then
+		    local [x,m] = sam r;
+		    r = (r[x|m]) | (mtoc m) >= CLASH_COUNT;
+		    if length r then
+			clashF[r] = 1;
+		    endif;
+		endif
+	    endif
+	endloop
+	local autoF = not (doneF or clashF);
+	if anytrue autoF then
+	    mol = mol_AutoConnectMask [mol, autoF, use_link];
+	endif
+    until alltrue (doneF = doneF or not clashF)
+    endloop
+
+    return mol;
+endfunction
+
+local function mol_AutoType mol
+    local m = str_R2A [mol, not (mol_rStd mol or mol_rSolventIonsMetals mol)];
+
+    local mol_auto = mol_SymmetrizeBondlist mol_aMask [mol, m];
+
+    local E = mol_aEle mol_auto;
+    local P = mol_aPos mol_auto;
+    local B = mol_aBnd mol_auto;
+
+    local [ion, hyb, hlp] = AutoTypeFromPosition [E, P, B];
+
+    mol(4)(MOL_ATOM_ION)    = mput [mol_aIon mol, m, ion ];
+    mol(4)(MOL_ATOM_GEOM)   = mput [mol_aHyb mol, m, hyb ];
+    mol(4)(MOL_ATOM_HINTLP) = mput [mol_aHLP mol, m, hlp ];
+
+    return mol;
+endfunction
+
+// ....
+
+//=============== Clean-up : hyb/ion in peptide main chain; ==================
+
+// This entire section of code should be done using a private system
+// mol_Finalize is particularly poor.
+
+local function mol_AdjustStandardTitratableRes mol
+    local B = mol_aBnd mol;
+    local nH = s_add [(mol_aLht mol)[cat B], app length B];
+
+    if allfalse nH then return mol; endif;
+
+    local rn = str_R2A [mol, indexof [mol_rName mol, ['HIS','ASP','GLU']]];
+    local na = mol_nAtoms mol;
+    local an = indexof [mol_aName mol, ['ND1','NE2','OD1','OD2']];
+    nH | not (an and rn) = 0;
+
+    local H_tot = str_R2A [mol, s_add [nH, na]];
+
+    local ion = mol_aIon mol;
+    ion | an == 1 and rn == 1 and H_tot == 2 = 1;
+    ion | an == 2 and rn == 1 and H_tot == 2 = 0;
+    ion | an  > 2 and rn  > 1 and H_tot  > 0 = 0;
+    mol(4)(MOL_ATOM_ION) = ion;
+
+    local hlp = mol_aHLP mol;
+    hlp | (an == 1 or an == 2) and rn == 1 and nH == 1 = 0;
+    hlp | (an == 1 or an == 2) and rn == 1 and H_tot == 1 and nH == 0 = 1;
+    mol(4)(MOL_ATOM_HINTLP) = hlp;
+
+    local hyb = mol_aHyb mol;
+    hyb | an > 2 and rn > 1 and nH == 1 = 'sp3';
+    mol(4)(MOL_ATOM_GEOM) = hyb;
+
+    return mol;
+endfunction
+
+// SimpleWash looks for very specific acids and bases for protonation
+// & deprotonation.
+
+local function mol_SimpleWash mol
+    local el    = mol_aEle mol;
+    local atno  = el_Protons el;	// atomic number
+    local hyb   = mol_aHyb mol;		// hybridization
+    local ion   = mol_aIon mol;		// ionization
+    local xbond = mol_aBnd mol;		// bond list
+    local deg   = app length xbond;	// explicit degree
+    local xB    = cat xbond;
+    local Qdeg  = s_add [(atno > 1)[xB], deg];	// heavy degree
+
+    local i, n, m, x;
+
+    local isOX	= ((el=='O' or el=='S') and deg == 1);	// is terminal O/S ?
+    local OXdeg = s_add [ isOX[xB], deg ];		// number of OX's
+
+    local S = el == 'S', P = el == 'P', C = el == 'C', N = el == 'N';
+
+	// Look for (thio)carboxylates [O,S;+0X1][C+0]=[O,S;X1].
+
+    m = andE [C,  hyb == 'sp2', ion == 0, OXdeg > 1];
+    for i in x_pack m loop
+	x = xbond(i) | isOX[xbond(i)];
+	x = x[x_sort atno[x]];
+
+	m = (hyb[x] == 'sp2' and ion[x] == 0);	// find == O's
+
+	if (n = iadd m) > 0 then
+	    x = x | put [one m, first x_pack m, 0];
+	else
+	    ion[first x] = 0;
+	    hyb[first x] = 'sp2';
+	    x = dropfirst x;
+	endif
+
+	ion[x] = -1;
+	hyb[x] = 'sp2';
+    endloop
+
+    ion | andE [hyb == 'sp3', OXdeg == 0, S, deg == 3] = 1;
+
+	// look for O-[PX4] or O-[SX3] and make P+ and O- or S+ and O-
+	// look for O-[SX4] make S++ and O-
+
+    m = andE [hyb == 'sp3', OXdeg > 0, orE [P and deg == 4, S and deg == 3]];
+    for i in x_pack m loop
+	ion(i) = 1;
+	ion[xbond(i) | isOX[xbond(i)]] = -1;
+    endloop
+
+    m = andE [hyb == 'sp3', OXdeg > 0, S, deg == 4];
+    for i in x_pack m loop
+	ion(i) = 2;
+	ion[xbond(i) | isOX[xbond(i)]] = -1;
+    endloop
+
+	// look for primary amines: N's with only H or [Csp3+0] as neighbors
+	// !!! 1T46.A STI
+
+    m = (el == 'H') or andE [C, ion == 0, hyb == 'sp3'];
+    m = andE [N, ion == 0, s_add [m[xB], deg] == deg];
+    ion[x_pack m] = 1;
+
+	// look for terminal NCN+ resonances in amidinium/guanidinium
+	// we insist on at least two terminal N's (no rings or mid-groups)
+
+    m = andE [C, ion == 0, hyb == 'sp2', s_add [(N and deg < 4)[xB], deg] > 1];
+    for i in x_pack m loop
+	x = xbond(i);
+	x = x | (el[x] == 'N' and deg[x] < 4);
+	if length x < 2 then continue; endif	    // at least NCN
+
+	m = 0 <> mol_aHLP mol[x];		    // find double bonds
+	if iadd m <> 1 then continue; endif	    // need 1 double bond
+	x = x[x_sort neg m];			    // N=CN
+	if ion(first x) <> 0 then continue; endif   // already +?
+	if deg(first x) >  2 then continue; endif   // need empty slot
+
+	if iadd (Qdeg[x] == 1) < 2 then		    // want two terminal
+	    continue;
+	endif
+
+	ion(first x)     = 1;
+	ion[dropfirst x] = 0;
+    endloop
+
+	// look for N+ next to [S+][O-] or [P+][O-] and neutralize N
+	// !!! LOOK FOR AMIDES TOO ???
+
+    m = andE [OXdeg, hyb == 'sp3', ion > 0, S or P];
+    m = andE [N, deg < 4, hyb == 'sp3', ion > 0, s_add[m[xB],deg]];
+    ion[x_pack m] = 0;
+
+    mol(4)(MOL_ATOM_ION)  = ion;
+    mol(4)(MOL_ATOM_GEOM) = hyb;
+
+    return mol;
+endfunction
+
+local function mol_Finalize mol
+    local x, m, n;
+
+    mol = mol_SymmetrizeBondlist mol;
+
+    local an = mol_aName mol;
+
+    local aR = mol_aRnum mol;
+    local aC = mol_aCnum mol;
+    local el = mol_aEle mol;
+
+    local natoms = mol_nAtoms mol;
+
+    x = inc indexof [an, ['N','CA','C']];    // value of x will be used
+    x = dec mput [x, x == 1 or mol_aEle mol <> ['', 'N','C','C'][x], 1];
+    n = app pack split [x, natoms];
+    n = select [s_add [x > 0, natoms], 0, app alltrue app m_uniq n];
+
+	// UNK's must have either n > 0 or no atoms at all
+
+    m = mol_rName mol == 'UNK' and n == 0 and natoms <> 0;
+    local rT = select ['none', mol_rType mol, m];
+    mol(3)(MOL_RES_TYPE) = rT;
+
+    m = str_R2A [mol, app orE (2 == split [x, mol_nAtoms mol])];
+    n = str_R2A [mol, n];
+
+    local B = mol_aBnd mol;
+    local [x1,x2] = graph_edges B;
+    [x1,x2] = [x1,x2] || [x1 < x2];
+    m = andE [
+	m[x1] and m[x2],		    // both have alpha carbons
+	aC[x1] == aC[x2],		    // same chain
+	aR[x1] == dec aR[x2],		    // consecutive residues
+	x[x1] == 3 and x[x2] == 1	    // names & elements correct
+    ];
+
+    local ion = mol_aIon mol;
+    local hyb = mol_aHyb mol;
+
+    ion[x2 | m] = 0;			    // peptide Nitrogens
+    hyb[x2 | m] = 'sp2';
+
+	// Propagate the amino res type to neighbors; catch UNK's (removed
+	// from table 2009-07-08) by ATOM record, or uniq atom names
+	// including a carbon atom named CA.
+
+    local xAmino = aR[cat [x1|m, x2|m]];
+    mol(3)(MOL_RES_TYPE) = put [mol_rType mol, uniq xAmino, 'amino'];
+    local aminoF = indexof [aR, xAmino];
+
+    m = aminoF and n == 3 and (x or an == 'O');
+    mol(4)(MOL_ATOM_BACKBONE) = mput [mol_aBck mol, m, 1];
+
+#if 0
+    m = aminoF and x == 1;
+    m | m = app anytrue ('C' == apt get [[mol_aName mol], B | m]);
+    hyb | m = 'sp2';
+    ion | m = 0;
+#endif
+
+    local Hdeg = mol(4)(MOL_ATOM_CTABH);
+    if length Hdeg then
+	m = Hdeg < mol_aNumH mol and Hdeg >= 0;
+	if anytrue m then
+	    ion | m = (ion | m) + ((mol_aNumH mol - Hdeg) | m);
+	endif
+    endif
+
+    mol(4)(MOL_ATOM_ION)  = ion;
+    mol(4)(MOL_ATOM_GEOM) = hyb;
+
+    mol = mol_AdjustStandardTitratableRes mol;
+    mol = mol_SimpleWash mol;
+
+    return mol;
+endfunction
+
+// take a model from Java routines and return a completed model
+//  this needs a lot of cleaning out once we are sure everything is working as planned
+global function fread_H5_model mol
+    local opt ;
+    opt = tagcat [opt, FREAD_PDB_DEFAULTS];
+//    local mol = [];
+
+    // Init the variables not set by Java.
+     mol(3)(MOL_RES_INS) = rep [" ",length mol(3)(1)];   // MOL_RES_INS
+     mol(3)(MOL_RES_TYPE) = rep ['',length mol(3)(1)];   // MOL_RES_TYPE
+     mol(4)(MOL_ATOM_GEOM) = rep ['',length mol(4)(1)];    // MOL_ATOM_GEOM
+     mol(4)(MOL_ATOM_CHIRALITY) = rep [0,length mol(4)(1)];     // MOL_ATOM_CHIRALITY
+     mol(4)(MOL_ATOM_HINTLP) = rep [0,length mol(4)(1)];     // MOL_ATOM_HINTLP
+     mol(4)(MOL_ATOM_BONDS) = rep [0,length mol(4)(1)];     // MOL_ATOM_BONDS
+     mol(4)(MOL_ATOM_CHARGE) = rep [0,length mol(4)(1)];     // MOL_ATOM_CHARGE
+     mol(4)(MOL_ATOM_BACKBONE) = rep [0,length mol(4)(1)];     // MOL_ATOM_BACKBONE
+
+//    atoms = split [tr atoms, mtoc m_uniq chain];
+//    for i = 1, length atoms loop
+//	mol(i) = pack_chain [atoms(i), opt, atoms(i) = []];
+//    endloop
+//    chain = atoms = [];
+//    mol = mol_Cat mol;
+
+    mol(1)(MOL_NAME) = 'filename';
+
+	// pack_chain guessed the elements; if the user insists, we use the
+	// element column. PDB 3.2 docs say that the formal charge is not
+	// guaranteed to be correct - but we will apply it anyway. Caveat
+	// emptor.
+	// use_element == -1 forces element from name (testing)
+
+//    if opt.use_element == 0 then
+//	if alltrue indexof toupper [mol(4)(MOL_ATOM_ELCOL), ELEMENT_SYM] then
+//	    opt.use_element = anytrue ('LP' == mol_aEle mol);
+//	endif
+//    endif
+//    if opt.use_element == 1 then
+	local el = safe_element mol(4)(MOL_ATOM_EL);	
+	mol(4)(MOL_ATOM_EL) = el;
+	mol(4)(MOL_ATOM_GEOM) = ele2hyb el;
+//    endif
+
+// TODO: re-add the Alternate Atom Stuff
+
+	// Create a default mol by picking one set of positions from each
+	// residue.
+
+//    mol = mol_AltLoc mol;
+
+//    local mask = (
+//	mol(4)(MOL_ATOM_ALOC) == " " or
+//	str_R2A [mol, mol(3)(MOL_RES_ALOC)] == "*" or
+//	mol(4)(MOL_ATOM_ALOC) == str_R2A [mol, mol(3)(MOL_RES_ALOC)]
+//    );
+
+//    if anyfalse mask then
+//	model.alt_mol = mol_aMask [mol, not mask];
+//	model.alt_mol = mol_rMask [model.alt_mol, mol_nAtoms model.alt_mol];
+//    endif
+
+//    mol = mol_aMask [mol, mask];
+
+	// Assign lots of "dictionary" based properties for standard amino
+	// acids & nucleic acids.
+
+    mol = mol_StandardAttributes [mol, opt];	// standard intra-res bonds
+    mol = mol_StandardChemistry mol;		// standard hyb/ion/LP hint
+
+//    if length opt.ctab then
+//	mol = mol_ApplyCTAB [mol, opt.ctab];	// from REMARK 600
+//    endif
+
+//    local chain_data = mol(2);
+
+    mol = mol_MicroHet mol;			// sequence microheterogeneity
+    mol = mol_StandardBonds mol;		// std polymer bonds & H's
+
+	// Apply link & conect records, then auto-connect & auto-type.
+
+    local use_links = anytrue opt.use_link;
+//    if use_links and length opt.link then
+//	[mol, use_links] = mol_ApplyLink [mol, opt.link, 0];
+//    endif
+//    if allfalse opt.ignore_conect then
+//	mol = mol_ApplyConect [mol, conect];
+//    endif
+//    if anytrue opt.auto_connect then
+	mol = mol_AutoConnect [mol, use_links];
+//    endif
+
+    mol = mol_AmberStandardize mol;	// standard hyb/ion/LP hint
+    mol = mol_AutoType mol;
+
+	// Metals after AutoType
+
+//    if anytrue opt.use_link and length opt.link then
+//	mol = first mol_ApplyLink [mol, opt.link, 1];
+//    endif
+    mol = mol_Finalize mol;
+
+// 	// Place alt loc atoms into mol structure. Chemistry etc will be
+// 	// copied from corresponding atoms (now typed).
+// 
+//     if anytrue opt.alt_loc and l_length model.alt_mol(4) then
+// 	mol = mol_InsertAltMol [mol, model.alt_mol];
+//     endif
+// 
+//     if anytrue opt.preserve_order then
+// 	mol = mol_RestoreOrder [chain_data, mol];
+//     endif
+// 
+//     model.atom_serial = mol(4)(MOL_ATOM_SERIAL);
+//     model.alt_loc     = mol(4)(MOL_ATOM_ALOC);
+//     model.occupancy   = mol(4)(MOL_ATOM_OCC);
+//     model.B_factor    = mol(4)(MOL_ATOM_TEMP);
+//     model.active      = mol(4)(MOL_ATOM_ACTIVE);
+//     model.ele_col     = mol(4)(MOL_ATOM_ELCOL);
+// 
+//     model.mol = mol_DropExtend mol;
+// 
+// 	// append 1 to the end of these for model number
+// 
+//     anisou = anisou | app length anisou;
+//     if length anisou then model.anisou = tr apt cat [anisou, 1]; endif;
+//     siguij = siguij | app length siguij;
+//     if length siguij then model.siguij = tr apt cat [siguij, 1]; endif;
+//     sigatm = sigatm | app length sigatm;
+//     if length sigatm then model.sigatm = tr apt cat [sigatm, 1]; endif;
+// 
+//     model.crystal_contacts = zero model.atom_serial;
+
+    return mol;
+endfunction
+
+// ============ BETWEEN HERE AND SAME ABOVE IS STUFF FROM io_pdb.svl ============
+
 // The following function can be used test the new h5 
 // example:
 // qbmoebatch -exec "qbTesth5Main['c387.h5']" -exit
 
-global function qbTesth5Main [h5file]
+global function qbTesth5Main [h5file,inpdb]
     write ['{}\n',h5file];
     if isnull h5file then
         return;
@@ -69,8 +1313,53 @@ global function qbTesth5Main [h5file]
     print  qbRetrieveDefaultProgramOptions [];
 print  modelTags.target;
     local [newmol, errorcode2] = qbRetrieveModel [h5file, modelTags.target];
-    print "TEST\n";
     print newmol;
+// //     print "TEST\n";
+//      newmol(3)(3) = rep [" ",length newmol(3)(1)];   // MOL_RES_INS
+//      newmol(3)(4) = rep ['',length newmol(3)(1)];   // MOL_RES_TYPE
+//      newmol(4)(3) = rep ['',length newmol(4)(1)];    // MOL_ATOM_GEOM
+//      newmol(4)(4) = rep [0,length newmol(4)(1)];     // MOL_ATOM_CHIRALITY
+//      newmol(4)(5) = rep [0,length newmol(4)(1)];     // MOL_ATOM_HINTLP
+//      newmol(4)(6) = rep [0,length newmol(4)(1)];     // MOL_ATOM_BONDS
+//      newmol(4)(7) = rep [0,length newmol(4)(1)];     // MOL_ATOM_CHARGE
+//      newmol(4)(9) = rep [0,length newmol(4)(1)];     // MOL_ATOM_BACKBONE
+// //     print mol_aCount newmol;
+
+    print app length newmol;
+    print app length newmol(1);
+    print app length newmol(2);
+    print app length newmol(3);
+    print app length newmol(4);
+    
+    print newmol(3)(3); 
+    
+    if not isnull inpdb then
+        local tmpChains = ReadAuto inpdb;
+        local oldmol = mol_Extract tmpChains;
+
+        print app length oldmol;
+        print app length oldmol(1);
+        print app length oldmol(2);
+        print app length oldmol(3);
+        print app length oldmol(4);
+        print oldmol(3)(4);
+        print oldmol(4)(3);
+    endif
+    oDestroy Chains[];
+    
+    local realynew = mol_Extract mol_Create fread_H5_model newmol;
+    
+    print app length realynew;
+    print app length realynew(1);
+    print app length realynew(2);
+    print app length realynew(3);
+    print app length realynew(4);
+        print realynew(3)(4);
+        print realynew(4)(3);      
+    
+    local outfile = twrite['{}-new.pdb', fbase h5file];
+    write ['Outfile: {}\n', outfile];
+    WriteAuto [outfile];
 
 endfunction
 
