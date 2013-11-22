@@ -96,6 +96,9 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                 case "retrieveModel":
                 res = retrieveModel(res);
                     break;
+                case "retrievePosingModel":
+                res = retrievePosingModel(res);
+                    break;
                 case "retrieveQMScore":
                 res = retrieveQMScore(res);
                     break;
@@ -393,7 +396,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         ArrayList<Integer> residueAtomCountsList=new ArrayList<>();
         ArrayList<Integer> residueOffsetsList=new ArrayList<>();
         ArrayList<Integer> sequencesList=new ArrayList<>();
-        
+        String insertionCode="";
         ArrayList<String> namesList=new ArrayList<>();
         ArrayList<String> symbolsList=new ArrayList<>();
         ArrayList<Double> xsList=new ArrayList<>();
@@ -444,13 +447,49 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                     }
                     if(atom.getAnyCmlOrAnyOrAny().size()>2)
                     {
-                        JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)atom.getAnyCmlOrAnyOrAny().get(2);
+                        boolean hit=false;
+                        int count=0;
+                        while(!hit && count<atom.getAnyCmlOrAnyOrAny().size())
+                        {
+                            if(((JAXBElement)atom.getAnyCmlOrAnyOrAny().get(count)).getValue() instanceof com.quantumbioinc.xml.divcon.Scalar)
+                            {
+                        JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)atom.getAnyCmlOrAnyOrAny().get(count);
                         switch (jaxScalarElement.getValue().getTitle())
                         {
                             case "hybridization":
                         hybridizationsList.add(jaxScalarElement.getValue().getValue());
+                        hit=true;
                                 break;
                         }
+                            }
+                            count++;
+                        }
+                        if(!hit)hybridizationsList.add("huh");
+                    }
+                    if(atomCount==0 && atom.getAnyCmlOrAnyOrAny().size()>0)
+                    {
+                        boolean hit=false;
+                        int count=0;
+                        while(!hit && count<atom.getAnyCmlOrAnyOrAny().size())
+                        {
+                            if(((JAXBElement)atom.getAnyCmlOrAnyOrAny().get(count)).getValue() instanceof com.quantumbioinc.xml.divcon.Scalar)
+                            {
+                        JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)atom.getAnyCmlOrAnyOrAny().get(count);
+                        switch (jaxScalarElement.getValue().getTitle())
+                        {
+                            case "insertionCode":
+                                insertionCode+=jaxScalarElement.getValue().getValue();
+                                hit=true;
+                                break;
+                        }
+                            }
+                        count++;
+                        }
+                        if(!hit)insertionCode+=" ";
+                    }
+                    else if(atomCount==0)
+                    {
+                        insertionCode+=" ";
                     }
                 }
                 if(submolecule.getAnyCmlOrAnyOrAny().size()>1)
@@ -514,7 +553,282 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         SVLVar[] residueVectors=new SVLVar[5];
         residueVectors[0]=new SVLVar(jresidueNames);
         residueVectors[1]=new SVLVar(jsequences);
-        residueVectors[2]=new SVLVar("           ");
+        residueVectors[2]=new SVLVar(insertionCode);
+        residueVectors[3]=new SVLVar(jresidueAminos);
+        residueVectors[4]=new SVLVar(jresidueAtomCounts);
+        SVLVar[] atomVectors=new SVLVar[12];
+        double[] jxs=new double[xsList.size()];
+        double[] jys=new double[ysList.size()];
+        double[] jzs=new double[zsList.size()];
+        double[] jformalCharges=new double[formalChargesList.size()];
+        for(int vIndex=0;vIndex<jformalCharges.length;vIndex++)
+        {
+            jxs[vIndex]=xsList.get(vIndex);
+            jys[vIndex]=ysList.get(vIndex);
+            jzs[vIndex]=zsList.get(vIndex);
+            jformalCharges[vIndex]=formalChargesList.get(vIndex);
+        }
+        atomVectors[0]=new SVLVar(jsymbols);
+        atomVectors[1]=new SVLVar(jformalCharges);
+        atomVectors[2]=new SVLVar(jhybridizations);
+        atomVectors[3]=new SVLVar("");
+        atomVectors[4]=new SVLVar("");
+        atomVectors[5]=new SVLVar("");
+        atomVectors[6]=new SVLVar("");
+        atomVectors[7]=new SVLVar(jnames);
+        atomVectors[8]=new SVLVar("");
+        atomVectors[9]=new SVLVar(jxs);
+        atomVectors[10]=new SVLVar(jys);
+        atomVectors[11]=new SVLVar(jzs);
+        model[0]=new SVLVar(title, true);
+        model[1]=new SVLVar(linkageVectors);
+        model[2]=new SVLVar(residueVectors);
+        model[3]=new SVLVar(atomVectors);
+        }
+        h5File.close();
+        return  new SVLVar(new SVLVar(new SVLVar(model)), new SVLVar("",true));
+    }
+
+    private SVLVar retrievePosingModel(SVLVar var) throws SVLJavaException, IOException, Exception
+    {
+        String filename = var.peek(1).getTokn(1);
+        String target = var.peek(1).getTokn(2);
+        String ligand = var.peek(1).getTokn(3);
+        int moleculeCount = var.peek(1).getInt(4);
+                sessionErrBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
+                sessionOutBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
+        java.lang.System.setErr(sessionErrBuffer);
+        java.lang.System.setOut(sessionOutBuffer);
+//        java.lang.System.out.println("in: retrieveModel");
+        H5File h5File = new H5File(filename, H5File.READ);
+        if(!h5File.exists())
+        {
+            return new SVLVar(new SVLVar(), new SVLVar(filename + " doesn't exists.", true));
+//            throw new SVLJavaException(filename + " doesn't exists.");
+        }
+        h5File=(H5File)h5File.createInstance(filename, H5File.READ);
+        h5File.open();
+        long[] dims = {1};
+        Group targetGroup=(Group)h5File.get("DivCon/"+target);
+        if(targetGroup==null)
+        {
+            return new SVLVar(new SVLVar(), new SVLVar(target + " specimen doesn't exists in "+filename+".", true));
+            //throw new SVLJavaException(target + " specimen doesn't exists in "+filename+".");
+        }
+        HObject obj=h5File.get("DivCon/"+target+"/Documents/"+ligand+".xml");
+//        java.lang.System.out.println("looking for: "+"DivCon/"+target+"/Documents/"+ligand+".xml");
+        SVLVar[] model=new SVLVar[4];
+        if(obj!=null)
+        {
+            H5ScalarDS doc=(H5ScalarDS)obj;
+        JAXBContext jc = JAXBContext.newInstance("com.quantumbioinc.xml.divcon");
+        Unmarshaller um=jc.createUnmarshaller();
+        JAXBElement<com.quantumbioinc.xml.divcon.DivconType> jaxbOutElement=um.unmarshal(new StreamSource(new ByteArrayInputStream (((String[])doc.read())[0].getBytes())), com.quantumbioinc.xml.divcon.DivconType.class);
+                if(true) return new SVLVar(new SVLVar(ligand, true), new SVLVar(target,true));
+        DivconType divcon=jaxbOutElement.getValue();
+        Cml cml=(Cml)divcon.getCmlOrTargetOrLigand().get(0);
+        ArrayList<String> chainTitlesList=new ArrayList<>();
+        ArrayList<String> chainsList=new ArrayList<>();
+        ArrayList<Integer> chainResidueCountsList=new ArrayList<>();
+        ArrayList<String> residueNamesList=new ArrayList<>();
+        ArrayList<String> residueAminosList=new ArrayList<>();
+        ArrayList<String> aminosList=new ArrayList<>();
+        aminosList.add("ALA");
+        aminosList.add("ARG");
+        aminosList.add("ASN");
+        aminosList.add("ALP");
+        aminosList.add("CYS");
+        aminosList.add("GLN");
+        aminosList.add("GLU");
+        aminosList.add("GLY");
+        aminosList.add("HIS");
+        aminosList.add("ILE");
+        aminosList.add("LEU");
+        aminosList.add("LYS");
+        aminosList.add("MET");
+        aminosList.add("PHE");
+        aminosList.add("PRO");
+        aminosList.add("SER");
+        aminosList.add("THR");
+        aminosList.add("TRP");
+        aminosList.add("VAL");
+        ArrayList<Integer> residueAtomCountsList=new ArrayList<>();
+        ArrayList<Integer> residueOffsetsList=new ArrayList<>();
+        ArrayList<Integer> sequencesList=new ArrayList<>();
+        String insertionCode="";        
+        ArrayList<String> namesList=new ArrayList<>();
+        ArrayList<String> symbolsList=new ArrayList<>();
+        ArrayList<Double> xsList=new ArrayList<>();
+        ArrayList<Double> ysList=new ArrayList<>();
+        ArrayList<Double> zsList=new ArrayList<>();
+        ArrayList<Double> formalChargesList=new ArrayList<>();
+        ArrayList<String> hybridizationsList=new ArrayList<>();
+        String title="";
+        if(moleculeCount<cml.getAnyCmlOrAnyOrAny().size())
+        {
+        if(true) return new SVLVar(new SVLVar("here", true), new SVLVar("",true));
+            JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbMoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)cml.getAnyCmlOrAnyOrAny().get(moleculeCount);
+            Molecule molecule=jaxbMoleculeElement.getValue();
+            if(molecule.getTitle()!=null)title=molecule.getTitle();
+            String chain="";
+            for(int submoleculeCount=0;submoleculeCount<molecule.getAnyCmlOrAnyOrAny().size();submoleculeCount++)
+            {
+                JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbSubmoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)molecule.getAnyCmlOrAnyOrAny().get(submoleculeCount);
+                Molecule submolecule=jaxbSubmoleculeElement.getValue();
+                JAXBElement<com.quantumbioinc.xml.divcon.AtomArray> jaxbAtomArrayElement=(JAXBElement<com.quantumbioinc.xml.divcon.AtomArray>)submolecule.getAnyCmlOrAnyOrAny().get(0);
+                AtomArray atomArray=jaxbAtomArrayElement.getValue();
+                for(int atomCount=0;atomCount<atomArray.getAnyCmlOrAnyOrAny().size();atomCount++)
+                {
+                    JAXBElement<com.quantumbioinc.xml.divcon.Atom> jaxbAtomElement=(JAXBElement<com.quantumbioinc.xml.divcon.Atom>)atomArray.getAnyCmlOrAnyOrAny().get(atomCount);
+                    Atom atom=jaxbAtomElement.getValue();
+                    if(atom.getAnyCmlOrAnyOrAny().size()>0)
+                    {
+                    JAXBElement<com.quantumbioinc.xml.divcon.AtomType> jaxbAtomTypeElement=(JAXBElement<com.quantumbioinc.xml.divcon.AtomType>)atom.getAnyCmlOrAnyOrAny().get(0);
+                    namesList.add(jaxbAtomTypeElement.getValue().getName());
+                    }
+                    else
+                    {
+                        namesList.add("");
+                    }
+                    symbolsList.add(atom.getElementType());
+                    xsList.add(new Double(atom.getX3().doubleValue()));
+                    ysList.add(new Double(atom.getY3().doubleValue()));
+                    zsList.add(new Double(atom.getZ3().doubleValue()));
+                    if(atom.getFormalCharge()!=null)
+                    {
+                        formalChargesList.add(new Double(atom.getFormalCharge().doubleValue()));
+                    }
+                    else
+                    {
+                        formalChargesList.add(new Double(0.0));
+                    }
+                    if(atom.getAnyCmlOrAnyOrAny().size()>1)
+                    {
+                        JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)atom.getAnyCmlOrAnyOrAny().get(1);
+                        switch (jaxScalarElement.getValue().getTitle())
+                        {
+                            case "chainID":
+                                chain=(jaxScalarElement.getValue().getValue());
+                                break;
+                        }
+                    }
+                    if(atom.getAnyCmlOrAnyOrAny().size()>2)
+                    {
+                        boolean hit=false;
+                        int count=0;
+                        while(!hit && count<atom.getAnyCmlOrAnyOrAny().size())
+                        {
+                            if(((JAXBElement)atom.getAnyCmlOrAnyOrAny().get(count)).getValue() instanceof com.quantumbioinc.xml.divcon.Scalar)
+                            {
+                        JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)atom.getAnyCmlOrAnyOrAny().get(count);
+                        switch (jaxScalarElement.getValue().getTitle())
+                        {
+                            case "hybridization":
+                        hybridizationsList.add(jaxScalarElement.getValue().getValue());
+                        hit=true;
+                                break;
+                        }
+                            }
+                            count++;
+                        }
+                        if(!hit)hybridizationsList.add("huh");
+                    }
+                    if(atomCount==0 && atom.getAnyCmlOrAnyOrAny().size()>0)
+                    {
+                        boolean hit=false;
+                        int count=0;
+                        while(!hit && count<atom.getAnyCmlOrAnyOrAny().size())
+                        {
+                            if(((JAXBElement)atom.getAnyCmlOrAnyOrAny().get(count)).getValue() instanceof com.quantumbioinc.xml.divcon.Scalar)
+                            {
+                        JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)atom.getAnyCmlOrAnyOrAny().get(count);
+                        switch (jaxScalarElement.getValue().getTitle())
+                        {
+                            case "insertionCode":
+                                insertionCode+=jaxScalarElement.getValue().getValue();
+                                hit=true;
+                                break;
+                        }
+                            }
+                        count++;
+                        }
+                        if(!hit)insertionCode+=" ";
+                    }
+                    else if(atomCount==0)
+                    {
+                        insertionCode+=" ";
+                    }
+                }
+                if(submolecule.getAnyCmlOrAnyOrAny().size()>1)
+                {
+                    JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)submolecule.getAnyCmlOrAnyOrAny().get(1);
+                    switch (jaxScalarElement.getValue().getTitle())
+                    {
+                        case "sequence":
+                            sequencesList.add(new Integer(jaxScalarElement.getValue().getValue()));
+                            break;
+                    }
+                }
+                if(submolecule.getTitle()!=null)
+                {
+                    residueNamesList.add(submolecule.getTitle());
+                }
+                else
+                {
+                    residueNamesList.add("");
+                }
+                residueAtomCountsList.add(new Integer(atomArray.getAnyCmlOrAnyOrAny().size()));
+                if(aminosList.contains(residueNamesList.get(residueNamesList.size()-1)))
+                {
+                    residueAminosList.add("amino");
+                }
+                else
+                {
+                    residueAminosList.add("none");
+                }
+            }
+            chainTitlesList.add(title);
+            chainsList.add(title+"."+chain);
+            chainResidueCountsList.add(new Integer(molecule.getAnyCmlOrAnyOrAny().size()));
+        }
+        if(true) new SVLVar(new SVLVar("here"), new SVLVar("",true));
+        String[] jchainTitles=new String[chainTitlesList.size()];
+        chainTitlesList.toArray(jchainTitles);
+        String[] jchains=new String[chainsList.size()];
+        chainsList.toArray(jchains);
+        String[] jchainEmpties=new String[chainsList.size()];
+        int[] jchainResidueCounts=new int[chainsList.size()];
+        for(int vIndex=0;vIndex<jchainResidueCounts.length;vIndex++)
+        {
+            jchainEmpties[vIndex]="";
+            jchainResidueCounts[vIndex]=chainResidueCountsList.get(vIndex);
+        }
+        String[] jresidueNames=new String[residueNamesList.size()];
+        residueNamesList.toArray(jresidueNames);
+        String[] jresidueAminos=new String[residueAminosList.size()];
+        residueAminosList.toArray(jresidueAminos);
+        int[] jresidueAtomCounts=new int[residueAtomCountsList.size()];
+        int[] jsequences=new int[residueAtomCountsList.size()];
+        for(int vIndex=0;vIndex<jresidueAtomCounts.length;vIndex++)
+        {
+            jsequences[vIndex]=sequencesList.get(vIndex);
+            jresidueAtomCounts[vIndex]=residueAtomCountsList.get(vIndex);
+        }
+        String[] jnames=new String[namesList.size()];
+        namesList.toArray(jnames);
+        String[] jsymbols=new String[symbolsList.size()];
+        symbolsList.toArray(jsymbols);
+        String[] jhybridizations=new String[hybridizationsList.size()];
+        hybridizationsList.toArray(jhybridizations);
+        SVLVar[] linkageVectors=new SVLVar[4];
+        linkageVectors[0]=new SVLVar(jchains);
+        linkageVectors[1]=new SVLVar(jchainTitles);
+        linkageVectors[2]=new SVLVar(jchainEmpties);
+        linkageVectors[3]=new SVLVar(jchainResidueCounts);
+        SVLVar[] residueVectors=new SVLVar[5];
+        residueVectors[0]=new SVLVar(jresidueNames);
+        residueVectors[1]=new SVLVar(jsequences);
+        residueVectors[2]=new SVLVar(insertionCode);
         residueVectors[3]=new SVLVar(jresidueAminos);
         residueVectors[4]=new SVLVar(jresidueAtomCounts);
         SVLVar[] atomVectors=new SVLVar[12];
