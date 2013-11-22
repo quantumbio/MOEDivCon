@@ -24,6 +24,7 @@ global function qbRetrieveEnergyLevels  arg = jvmqb ['retrieveEnergyLevels' , [a
 global function qbSetNMRAtomSelection  arg = jvmqb ['setNMRAtomSelection' , [arg] ];
 global function qbStoreModel  arg = jvmqb ['storeModel' , [arg] ];
 global function qbRetrieveModel  arg = jvmqb ['retrieveModel' , [arg] ];
+global function qbRetrievePosingModel  arg = jvmqb ['retrievePosingModel' , [arg] ];
 global function qbRetrieveHamiltonian  arg = jvmqb ['retrieveHamiltonian' , [arg] ];
 global function qbRetrieveDefaultProgramOptions  arg = jvmqb ['retrieveDefaultProgramOptions' , [arg] ];
 global function qbRetrieveTopologyClassNumbers  arg = jvmqb ['retrieveTopologyClassNumbers' , [arg] ];
@@ -1314,6 +1315,9 @@ global function qbTesth5Main [h5file,inpdb]
 print  modelTags.target;
     local [newmol, errorcode2] = qbRetrieveModel [h5file, modelTags.target];
     print newmol;
+    local [newmol2, errorcode3] = qbRetrievePosingModel [h5file, modelTags.target, 'decoy_poses', 0];
+    print "\n";
+    print newmol2;
 // //     print "TEST\n";
 //      newmol(3)(3) = rep [" ",length newmol(3)(1)];   // MOL_RES_INS
 //      newmol(3)(4) = rep ['',length newmol(3)(1)];   // MOL_RES_TYPE
