@@ -172,7 +172,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             String xPath="/DivCon/"+targetList.get(index)+"/QM Score";
             HObject ho=findHDF5Object(h5File, xPath);
             H5CompoundDS hObject=(H5CompoundDS)ho;
-            String nmrXPath="/DivCon/"+targetList.get(index)+"/NMR Score";
+            String nmrXPath="/DivCon/"+targetList.get(index)+"/NMR Score Atom Specific";
             HObject nmrHO=findHDF5Object(h5File, nmrXPath);
             H5CompoundDS nmrHObject=(H5CompoundDS)nmrHO;
             if(hObject!=null){
