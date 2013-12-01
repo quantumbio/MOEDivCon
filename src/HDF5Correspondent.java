@@ -594,7 +594,6 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         String filename = var.peek(1).getTokn(1);
         String target = var.peek(1).getTokn(2);
         String ligand = var.peek(1).getTokn(3);
-        int moleculeCount = var.peek(1).getInt(4);
                 sessionErrBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
                 sessionOutBuffer=new PrintStream(new java.io.ByteArrayOutputStream(), true);
         java.lang.System.setErr(sessionErrBuffer);
@@ -615,7 +614,27 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             return new SVLVar(new SVLVar(), new SVLVar(target + " specimen doesn't exists in "+filename+".", true));
             //throw new SVLJavaException(target + " specimen doesn't exists in "+filename+".");
         }
-        HObject obj=h5File.get("DivCon/"+target+"/Documents/"+ligand+".xml");
+        String sdfName="";
+        H5Group documentGroup=(H5Group)h5File.get("DivCon/"+target+"/Documents");
+        if(documentGroup!=null)
+        {
+            ListIterator<HObject> li=documentGroup.getMemberList().listIterator();
+            boolean hit=false;
+            while(!hit && li.hasNext())
+            {
+                HObject ho=li.next();
+                if(ho.getName().endsWith(".sdf"))
+                {
+                    sdfName=ho.getName().substring(0, ho.getName().length()-4);
+                    hit=true;
+                }
+            }
+            if(!hit)
+            {
+                sdfName=ligand;
+            }
+        }
+        HObject obj=h5File.get("DivCon/"+target+"/Documents/"+sdfName+".xml");
 //        java.lang.System.out.println("looking for: "+"DivCon/"+target+"/Documents/"+ligand+".xml");
         SVLVar[] model=new SVLVar[4];
         if(obj!=null)
@@ -663,11 +682,15 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         ArrayList<Double> formalChargesList=new ArrayList<>();
         ArrayList<String> hybridizationsList=new ArrayList<>();
         String title="";
-        if(moleculeCount<cml.getAnyCmlOrAnyOrAny().size())
+        int moleculeCount=0;
+        boolean hitPose=false;
+        while(!hitPose && moleculeCount<cml.getAnyCmlOrAnyOrAny().size())
         {
             JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbMoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)cml.getAnyCmlOrAnyOrAny().get(moleculeCount);
             Molecule molecule=jaxbMoleculeElement.getValue();
-            if(molecule.getTitle()!=null)title=molecule.getTitle();
+            if(molecule.getTitle()==null || molecule.getTitle().compareTo(ligand)!=0){moleculeCount++;continue;};
+            hitPose=true;
+            title=molecule.getTitle();
             String chain="";
             for(int submoleculeCount=0;submoleculeCount<molecule.getAnyCmlOrAnyOrAny().size();submoleculeCount++)
             {

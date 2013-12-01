@@ -72,6 +72,20 @@ global function qbTesth5Main [h5file,inpdb]
 print  modelTags.target;
     local [newmol, errorcode2] = qbRetrieveModel [h5file, modelTags.target];
     print newmol;
+    local [newmol2, errorcode3] = qbRetrievePosingModel [h5file, modelTags.target, modelTags.ligand[1]];
+    print "\n";
+    print newmol2;
+<<<<<<< .mine
+// //     print "TEST\n";
+//      newmol(3)(3) = rep [" ",length newmol(3)(1)];   // MOL_RES_INS
+//      newmol(3)(4) = rep ['',length newmol(3)(1)];   // MOL_RES_TYPE
+//      newmol(4)(3) = rep ['',length newmol(4)(1)];    // MOL_ATOM_GEOM
+//      newmol(4)(4) = rep [0,length newmol(4)(1)];     // MOL_ATOM_CHIRALITY
+//      newmol(4)(5) = rep [0,length newmol(4)(1)];     // MOL_ATOM_HINTLP
+//      newmol(4)(6) = rep [0,length newmol(4)(1)];     // MOL_ATOM_BONDS
+//      newmol(4)(7) = rep [0,length newmol(4)(1)];     // MOL_ATOM_CHARGE
+//      newmol(4)(9) = rep [0,length newmol(4)(1)];     // MOL_ATOM_BACKBONE
+// //     print mol_aCount newmol;
 
 endfunction
 
