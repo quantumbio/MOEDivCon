@@ -24,6 +24,7 @@ global function qbRetrieveEnergyLevels  arg = jvmqb ['retrieveEnergyLevels' , [a
 global function qbSetNMRAtomSelection  arg = jvmqb ['setNMRAtomSelection' , [arg] ];
 global function qbStoreModel  arg = jvmqb ['storeModel' , [arg] ];
 global function qbRetrieveModel  arg = jvmqb ['retrieveModel' , [arg] ];
+global function qbRetrievePosingModel  arg = jvmqb ['retrievePosingModel' , [arg] ];
 global function qbRetrieveHamiltonian  arg = jvmqb ['retrieveHamiltonian' , [arg] ];
 global function qbRetrieveDefaultProgramOptions  arg = jvmqb ['retrieveDefaultProgramOptions' , [arg] ];
 global function qbRetrieveTopologyClassNumbers  arg = jvmqb ['retrieveTopologyClassNumbers' , [arg] ];
@@ -34,7 +35,7 @@ global function qbRetrieveTopologyClassNumbers  arg = jvmqb ['retrieveTopologyCl
 // example:
 // qbmoebatch -exec "qbTesth5Main['c387.h5']" -exit
 
-global function qbTesth5Main [h5file,inpdb]
+global function qbTesth5Main [h5file]
     write ['{}\n',h5file];
     if isnull h5file then
         return;
@@ -72,21 +73,9 @@ global function qbTesth5Main [h5file,inpdb]
 print  modelTags.target;
     local [newmol, errorcode2] = qbRetrieveModel [h5file, modelTags.target];
     print newmol;
-    local [newmol2, errorcode3] = qbRetrievePosingModel [h5file, modelTags.target, modelTags.ligand[1]];
+    local [newmol2, errorcode3] = qbRetrievePosingModel [h5file, modelTags.target, modelTags.ligand[2]];
     print "\n";
     print newmol2;
-<<<<<<< .mine
-// //     print "TEST\n";
-//      newmol(3)(3) = rep [" ",length newmol(3)(1)];   // MOL_RES_INS
-//      newmol(3)(4) = rep ['',length newmol(3)(1)];   // MOL_RES_TYPE
-//      newmol(4)(3) = rep ['',length newmol(4)(1)];    // MOL_ATOM_GEOM
-//      newmol(4)(4) = rep [0,length newmol(4)(1)];     // MOL_ATOM_CHIRALITY
-//      newmol(4)(5) = rep [0,length newmol(4)(1)];     // MOL_ATOM_HINTLP
-//      newmol(4)(6) = rep [0,length newmol(4)(1)];     // MOL_ATOM_BONDS
-//      newmol(4)(7) = rep [0,length newmol(4)(1)];     // MOL_ATOM_CHARGE
-//      newmol(4)(9) = rep [0,length newmol(4)(1)];     // MOL_ATOM_BACKBONE
-// //     print mol_aCount newmol;
-
 endfunction
 
 
