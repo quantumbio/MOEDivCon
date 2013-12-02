@@ -57,6 +57,7 @@ import javax.xml.bind.JAXBElement;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.transform.stream.StreamSource;
+import ncsa.hdf.hdf5lib.exceptions.HDF5Exception;
 import ncsa.hdf.object.Group;
 
         
@@ -137,6 +138,9 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                     break;
                 case "retrieveDefaultProgramOptions":
                 res = retrieveDefaultProgramOptions(res);
+                    break;
+                case "retrieveLigandSelection":
+                res = retrieveLigandSelection(res);
                     break;
                 case "retrieveTopologyClassNumbers":
                 res = retrieveTopologyClassNumbers(res);
@@ -2124,23 +2128,15 @@ private SVLVar retrieveChemicalShifts(SVLVar var) throws SVLJavaException, IOExc
         for(int index=0;index<hObject.getMemberCount();index++)
         {
             hObject.selectMember(index);
-            if(index==0)
+            if(index<=1)
             {
-                for(int columnIndex=0;columnIndex<hObject.getSelectedMemberCount();columnIndex++)
-                {
-                    Datatype dt=hObject.getSelectedMemberTypes()[columnIndex];
-                    //insertIntoCell((columnIndex+1), (index+1), hObject.getMemberNames()[columnIndex], xSpreadsheet, "F");
-                }
                 int[] indexData=(int[])o.elementAt(index);
+                if(index==0)
                 for(int indexIndex=0;indexIndex<indexData.length;indexIndex++)
                 {
                     indexData[indexIndex]+=1;
                 }
                 chemicalShiftData[index]=new SVLVar(indexData);
-//                for(int columnIndex=0;columnIndex<rowData.length;columnIndex++)
-//                {
-//                    //scores[columnIndex]=(double)rowData[columnIndex];
-//                }
             }
             else
             {
@@ -2154,7 +2150,7 @@ private SVLVar retrieveChemicalShifts(SVLVar var) throws SVLJavaException, IOExc
             }
         }
         
-           SVLVar data=new SVLVar(new String[]{"Index", "Bound Shift", "Unbound Shift", "Exp Bound Shift", "Exp Unbound Shift"}, chemicalShiftData);
+           SVLVar data=new SVLVar(new String[]{"Index", "Role", "Bound Shift", "Unbound Shift", "Exp Bound Shift", "Exp Unbound Shift"}, chemicalShiftData);
             h5File.close();
     return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
@@ -2434,6 +2430,59 @@ private SVLVar retrieveDefaultProgramOptions(SVLVar var) throws SVLJavaException
 //  [-6.702,-7.086,-6.105,-6.086,-8.507,-9.595,-9.322,-10.845,-7.491,-6.256,-6.113,-7.06,-8.6,-8.648,-11.502,-10.997,-5.305,-4.238,-4.339,-4.46,-2.891,-2.771,-2.94,-2.553,-5.363,-4.317,-2.797,-2.179,-2.478,-2.488,-4.312,-4.492,-3.406,-3.213,-5.873,-7.049,-8.384,-8.538,-9.375,-4.19,-4.427,-5.962,-5.937,-7.077,-6.928,-10.15,-9.238,-2.688,-1.748,-2.009,-2.262,-0.299,0.697,0.899,1.318,-2.727,-1.852,-0.126,-0.172,1.895,1.144,-1.942,-1.937,-0.871,-0.674,-3.322,-3.203,-3.844,-1.899,-1.718,-3.961,-3.928,-4.699,-3.94,-3.232,-0.187,0.767,0.043,-1.185,1.92,2.818,2.559,3.889,3.379,4.703,4.446,0.644,-0.256,1.156,1.55,2.454,1.84,4.063,3.205,5.421,4.999,-4.963,-4.55,-4.857,3.229,4.206,2.873],
 //  [-0.246,-0.456,0.245,1.471,0.053,-0.823,-1.82,-0.455,-0.083,-1.029,0.509,-1.415,0.946,0.075,-0.909,0.237,-0.56,-0.059,-0.686,-1.902,-0.381,0.218,1.432,-0.63,-1.418,0.914,-1.343,-0.018,-0.334,-1.473,0.157,-0.3,0.301,1.513,0.128,-0.532,0.084,1.308,-0.766,1.005,-1.277,1.089,-0.111,-1.474,-0.424,-0.465,-1.614,-0.55,-0.074,-0.747,-1.949,-0.363,0.175,1.379,-0.718,-1.406,0.894,0.057,-1.322,-0.461,-1.555,0.035,-0.543,0.104,1.318,-0.437,-0.912,0.981,0.894,-1.495,-0.989,-0.862,1.011,1.305,1.55,-0.71,-0.2,0.142,-0.034,-1.196,-1.298,-2.231,-0.428,-2.309,-0.496,-1.433,0.627,-1.567,0.63,-2.076,-0.906,-2.814,0.209,-2.941,0.088,-1.488,1.946,2.566,2.342,1.122,1.113,1.272],
 //  [-0.738,-2.167,-3.087,-3.179,-2.45,-1.836,-1.146,-2.097,-0.215,-0.408,-0.673,-2.368,-2.082,-3.409,-1.779,-2.584,-3.78,-4.637,-6.017,-6.14,-3.992,-2.611,-2.438,-1.607,-3.769,-4.728,-3.914,-4.542,-0.803,-1.763,-7.046,-8.432,-9.31,-9.314,-8.959,-8.226,-8.604,-8.617,-8.883,-6.972,-8.472,-8.857,-9.897,-8.454,-7.27,-9.102,-8.843,-10.038,-11.048,-12.39,-12.45,-10.629,-11.625,-11.723,-12.38,-9.967,-11.16,-9.772,-10.563,-12.963,-12.287,-13.461,-14.799,-15.676,-15.627,-15.495,-16.838,-15.511,-13.442,-14.724,-15.018,-17.218,-15.947,-14.612,-15.984,-16.472,-17.457,-18.765,-18.875,-17.666,-16.478,-15.482,-16.318,-14.355,-15.202,-14.213,-19.73,-16.463,-17.111,-17.839,-18.422,-15.571,-16.973,-13.695,-15.114,-13.467,-0.298,-0.935,0.592,-20.636,-20.715,-21.537] ] ]
+
+
+private SVLVar retrieveLigandSelection(SVLVar var) throws SVLJavaException, IOException, Exception
+{
+    String filename = var.peek(1).getTokn(1);
+    String target = var.peek(1).getTokn(2);
+    H5File h5File=new H5File(filename, H5File.READ);
+    h5File.open();
+//   java.lang.System.out.println("h5 opened ");
+    String xPath="/DivCon/"+target+"/Selections";
+    H5Group selectionsGroup=(H5Group)findHDF5Object(h5File, xPath);
+    SVLVar[] selections=new SVLVar[2];
+    if(selectionsGroup!=null)
+    {
+        List nmrRow=selectionsGroup.getMemberList();
+        for(int memberIndex=0;memberIndex<nmrRow.size();memberIndex++)
+        {
+            HObject hObject=(HObject)nmrRow.get(memberIndex);
+            switch(hObject.getName())
+            {
+                case "Compliment":
+//            if(true) return new SVLVar(new SVLVar("here2", true), new SVLVar(""+((H5ScalarDS)hObject).getFullName(),true));
+                    try
+                    {
+                        selections[0]=new SVLVar((int[])((H5ScalarDS)hObject).read());
+                    }
+                    catch(HDF5Exception ex)
+                    {
+                        selections[0]=new SVLVar();
+                    }
+                     break;
+                case "Selection":
+//            if(true) return new SVLVar(new SVLVar("here", true), new SVLVar(""+((H5ScalarDS)hObject).getFullName(),true));
+                    try
+                    {
+                        selections[1]=new SVLVar((int[])((H5ScalarDS)hObject).read());
+                    }
+                    catch(HDF5Exception ex)
+                    {
+                        selections[1]=new SVLVar();
+                    }
+                    break;
+            }
+        }
+    }
+    else
+    {
+        return new SVLVar(new SVLVar("",true), new SVLVar("",true));
+    }
+    SVLVar data=new SVLVar(new String[]{"Compliment", "Selection"}, selections);
+    h5File.close();
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
+}
     private SVLVar retrieveTopologyClassNumbers(SVLVar var) throws SVLJavaException, IOException, Exception
     {
         String target = var.peek(1).getTokn(1);
