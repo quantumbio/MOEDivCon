@@ -178,6 +178,22 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             H5CompoundDS hObject=(H5CompoundDS)ho;
             String nmrXPath="/DivCon/"+targetList.get(index)+"/NMR Score Atom Specific";
             HObject nmrHO=findHDF5Object(h5File, nmrXPath);
+            String sdfName="";
+            H5Group documentGroup=(H5Group)h5File.get("DivCon/"+targetList.get(index)+"/Documents");
+            if(documentGroup!=null)
+            {
+                ListIterator<HObject> li=documentGroup.getMemberList().listIterator();
+                boolean hit=false;
+                while(!hit && li.hasNext())
+                {
+                    HObject hobj=li.next();
+                    if(hobj.getName().endsWith(".sdf"))
+                    {
+                        sdfName=hobj.getName().substring(0, hobj.getName().length()-4);
+                        hit=true;
+                    }
+                }
+            }
             H5CompoundDS nmrHObject=(H5CompoundDS)nmrHO;
             if(hObject!=null){
                 Vector o=(Vector)hObject.getData();
@@ -186,6 +202,51 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             else if(nmrHObject!=null){
                 Vector o=(Vector)nmrHObject.getData();
                 individuals[1]=new SVLVar((String[])o.elementAt(0));
+            }
+            else if(!sdfName.isEmpty())
+            {
+                HObject obj=h5File.get("DivCon/"+targetList.get(index)+"/Documents/"+sdfName+".xml");
+        //        java.lang.System.out.println("looking for: "+"DivCon/"+target+"/Documents/"+ligand+".xml");
+                if(obj!=null)
+                {
+                    H5ScalarDS doc=(H5ScalarDS)obj;
+                    JAXBContext jc = JAXBContext.newInstance("com.quantumbioinc.xml.divcon");
+                    Unmarshaller um=jc.createUnmarshaller();
+                    JAXBElement<com.quantumbioinc.xml.divcon.DivconType> jaxbOutElement=um.unmarshal(new StreamSource(new ByteArrayInputStream (((String[])doc.read())[0].getBytes())), com.quantumbioinc.xml.divcon.DivconType.class);
+                    DivconType divcon=jaxbOutElement.getValue();
+                    Cml cml=(Cml)divcon.getCmlOrTargetOrLigand().get(0);
+                    ArrayList<String> titleList=new ArrayList<String>();
+                    String[] titles=new String[cml.getAnyCmlOrAnyOrAny().size()];
+                    for(int moleculeCount=0;moleculeCount<cml.getAnyCmlOrAnyOrAny().size();moleculeCount++)
+                    {
+                        JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbMoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)cml.getAnyCmlOrAnyOrAny().get(moleculeCount);
+                        Molecule molecule=jaxbMoleculeElement.getValue();
+                        if(molecule.getTitle()!=null)
+                        {
+                            if(!titleList.contains(molecule.getTitle()))
+                            {
+                            titleList.add(molecule.getTitle());
+                            }
+                            else
+                            {
+                                titleList.add("Ligand"+(moleculeCount+1));
+                            }
+                        }
+                        else
+                        {
+                            titleList.add("Ligand"+(moleculeCount+1));
+                        }
+                    }
+                    for(int moleculeCount=0;moleculeCount<cml.getAnyCmlOrAnyOrAny().size();moleculeCount++)
+                    {
+                        titles[moleculeCount]=titleList.get(moleculeCount);
+                    }
+                    individuals[1]=new SVLVar(titles);
+                }
+                else
+                {
+                    individuals[1]=new SVLVar();
+                }
             }
             else
             {
