@@ -34,6 +34,7 @@ cp /home/roger/NetBeansProjects/JNIDivcon/dist/JNIDivcon.jar $PROJECT_PATH/linux
 #qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Cl4Y2/roothaan.h5']" -exit
 #qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Josh/CSPtest/shadowfax/2YXJ_out.xml.h5']" -exit
 qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Josh/CSPtest/frodo/roothaan.h5']" -exit
+#qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Lance/2YXJ/Tut#1/targ_CSP/2YXJ_target_shifts_dc.h5']" -exit
 
 #qbmoe
 
