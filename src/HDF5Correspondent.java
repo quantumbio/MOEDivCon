@@ -476,8 +476,10 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             Molecule molecule=jaxbMoleculeElement.getValue();
             if(molecule.getTitle()!=null)title=molecule.getTitle();
             String chain="";
+            int residueCounts=molecule.getAnyCmlOrAnyOrAny().size();
             for(int submoleculeCount=0;submoleculeCount<molecule.getAnyCmlOrAnyOrAny().size();submoleculeCount++)
             {
+                if(((JAXBElement)molecule.getAnyCmlOrAnyOrAny().get(submoleculeCount)).getValue() instanceof com.quantumbioinc.xml.divcon.BondArray){residueCounts--;continue;};
                 JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbSubmoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)molecule.getAnyCmlOrAnyOrAny().get(submoleculeCount);
                 Molecule submolecule=jaxbSubmoleculeElement.getValue();
                 JAXBElement<com.quantumbioinc.xml.divcon.AtomArray> jaxbAtomArrayElement=(JAXBElement<com.quantumbioinc.xml.divcon.AtomArray>)submolecule.getAnyCmlOrAnyOrAny().get(0);
@@ -486,8 +488,15 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                 {
                     JAXBElement<com.quantumbioinc.xml.divcon.Atom> jaxbAtomElement=(JAXBElement<com.quantumbioinc.xml.divcon.Atom>)atomArray.getAnyCmlOrAnyOrAny().get(atomCount);
                     Atom atom=jaxbAtomElement.getValue();
-                    JAXBElement<com.quantumbioinc.xml.divcon.AtomType> jaxbAtomTypeElement=(JAXBElement<com.quantumbioinc.xml.divcon.AtomType>)atom.getAnyCmlOrAnyOrAny().get(0);
-                    namesList.add(jaxbAtomTypeElement.getValue().getName());
+                    if(atom.getAnyCmlOrAnyOrAny().size()>0 && ((JAXBElement)atom.getAnyCmlOrAnyOrAny().get(0)).getValue() instanceof com.quantumbioinc.xml.divcon.AtomType)
+                    {
+                        JAXBElement<com.quantumbioinc.xml.divcon.AtomType> jaxbAtomTypeElement=(JAXBElement<com.quantumbioinc.xml.divcon.AtomType>)atom.getAnyCmlOrAnyOrAny().get(0);
+                        namesList.add(jaxbAtomTypeElement.getValue().getName());
+                    }
+                    else
+                    {
+                        namesList.add(atom.getElementType());
+                    }
                     symbolsList.add(atom.getElementType());
                     xsList.add(new Double(atom.getX3().doubleValue()));
                     ysList.add(new Double(atom.getY3().doubleValue()));
@@ -500,17 +509,28 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                     {
                         formalChargesList.add(new Double(0.0));
                     }
-                    if(atom.getAnyCmlOrAnyOrAny().size()>1)
+                    if(atom.getAnyCmlOrAnyOrAny().size()>0)
                     {
-                        JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)atom.getAnyCmlOrAnyOrAny().get(1);
+                        boolean hit=false;
+                        int count=0;
+                        while(!hit && count<atom.getAnyCmlOrAnyOrAny().size())
+                        {
+                            if(((JAXBElement)atom.getAnyCmlOrAnyOrAny().get(count)).getValue() instanceof com.quantumbioinc.xml.divcon.Scalar)
+                            {
+                        JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)atom.getAnyCmlOrAnyOrAny().get(count);
                         switch (jaxScalarElement.getValue().getTitle())
                         {
                             case "chainID":
                                 chain=(jaxScalarElement.getValue().getValue());
+                                hit=true;
                                 break;
                         }
+                            }
+                            count++;
+                        }
+                        if(!hit)chain+="";
                     }
-                    if(atom.getAnyCmlOrAnyOrAny().size()>2)
+                    if(atom.getAnyCmlOrAnyOrAny().size()>0)
                     {
                         boolean hit=false;
                         int count=0;
@@ -557,17 +577,35 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                         insertionCode+=" ";
                     }
                 }
-                if(submolecule.getAnyCmlOrAnyOrAny().size()>1)
+                if(submolecule.getAnyCmlOrAnyOrAny().size()>0)
                 {
-                    JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)submolecule.getAnyCmlOrAnyOrAny().get(1);
-                    switch (jaxScalarElement.getValue().getTitle())
-                    {
-                        case "sequence":
-                            sequencesList.add(new Integer(jaxScalarElement.getValue().getValue()));
-                            break;
-                    }
+                        boolean hit=false;
+                        int count=1;
+                        while(!hit && count<submolecule.getAnyCmlOrAnyOrAny().size())
+                        {
+                            if(((JAXBElement)submolecule.getAnyCmlOrAnyOrAny().get(count)).getValue() instanceof com.quantumbioinc.xml.divcon.Scalar)
+                            {
+                                JAXBElement<com.quantumbioinc.xml.divcon.Scalar> jaxScalarElement=(JAXBElement<com.quantumbioinc.xml.divcon.Scalar>)submolecule.getAnyCmlOrAnyOrAny().get(count);
+                                switch (jaxScalarElement.getValue().getTitle())
+                                {
+                                    case "sequence":
+                                        sequencesList.add(new Integer(jaxScalarElement.getValue().getValue()));
+                                        hit=true;
+                                        break;
+                                }
+                            }
+                            count++;
+                        }
+                        if(!hit)sequencesList.add(new Integer(0));
                 }
-                residueNamesList.add(submolecule.getTitle());
+                if(submolecule.getTitle()!=null)
+                {
+                    residueNamesList.add(submolecule.getTitle());
+                }
+                else
+                {
+                    residueNamesList.add("");
+                }
                 residueAtomCountsList.add(new Integer(atomArray.getAnyCmlOrAnyOrAny().size()));
                 if(aminosList.contains(submolecule.getTitle()))
                 {
@@ -580,7 +618,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             }
             chainTitlesList.add(title);
             chainsList.add(title+"."+chain);
-            chainResidueCountsList.add(new Integer(molecule.getAnyCmlOrAnyOrAny().size()));
+            chainResidueCountsList.add(new Integer(residueCounts));
         }
         String[] jchainTitles=new String[chainTitlesList.size()];
         chainTitlesList.toArray(jchainTitles);
@@ -621,6 +659,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         residueVectors[2]=new SVLVar(insertionCode);
         residueVectors[3]=new SVLVar(jresidueAminos);
         residueVectors[4]=new SVLVar(jresidueAtomCounts);
+        //if(true) return new SVLVar(new SVLVar(residueVectors[0]), new SVLVar("",true));
         SVLVar[] atomVectors=new SVLVar[12];
         double[] jxs=new double[xsList.size()];
         double[] jys=new double[ysList.size()];
@@ -767,7 +806,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                 {
                     JAXBElement<com.quantumbioinc.xml.divcon.Atom> jaxbAtomElement=(JAXBElement<com.quantumbioinc.xml.divcon.Atom>)atomArray.getAnyCmlOrAnyOrAny().get(atomCount);
                     Atom atom=jaxbAtomElement.getValue();
-                    if(atom.getAnyCmlOrAnyOrAny().size()>0)
+                    if(atom.getAnyCmlOrAnyOrAny().size()>0 && ((JAXBElement)atom.getAnyCmlOrAnyOrAny().get(0)).getValue() instanceof com.quantumbioinc.xml.divcon.AtomType)
                     {
                     JAXBElement<com.quantumbioinc.xml.divcon.AtomType> jaxbAtomTypeElement=(JAXBElement<com.quantumbioinc.xml.divcon.AtomType>)atom.getAnyCmlOrAnyOrAny().get(0);
                     namesList.add(jaxbAtomTypeElement.getValue().getName());
@@ -1489,28 +1528,33 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
     h5File.open();
                     String xPath="/DivCon/"+target+"/Pairwise Decomposition";
                     H5Group pwdGroup=(H5Group)findHDF5Object(h5File, xPath);
-                    xPath="/DivCon/"+target+"/"+target;
-                    H5CompoundDS hTargetCollectionObject=(H5CompoundDS)findHDF5Object(h5File, xPath);
-                    hTargetCollectionObject.selectMember(0);
-                    String[] targetAtomSymbols=(String[])((Vector)hTargetCollectionObject.read()).elementAt(0);
-                    hTargetCollectionObject.selectMember(1);
-                    String[] targetAtomNames=(String[])((Vector)hTargetCollectionObject.read()).elementAt(1);
-                    hTargetCollectionObject.selectMember(2);
-                    String[] targetResidueNames=(String[])((Vector)hTargetCollectionObject.read()).elementAt(2);
-                    hTargetCollectionObject.selectMember(5);
-                    int[] targetSequence=(int[])((Vector)hTargetCollectionObject.read()).elementAt(5);
-                    hTargetCollectionObject.selectMember(7);
-                    double[] x=(double[])((Vector)hTargetCollectionObject.read()).elementAt(7);
-                    hTargetCollectionObject.selectMember(8);
-                    double[] y=(double[])((Vector)hTargetCollectionObject.read()).elementAt(8);
-                    hTargetCollectionObject.selectMember(9);
-                    double[] z=(double[])((Vector)hTargetCollectionObject.read()).elementAt(9);
-                    hTargetCollectionObject.selectMember(12);
-                    double[] epsilon=(double[])((Vector)hTargetCollectionObject.read()).elementAt(12);
-                    hTargetCollectionObject.selectMember(13);
-                    double[] welllDepth=(double[])((Vector)hTargetCollectionObject.read()).elementAt(13);
-                    hTargetCollectionObject.selectMember(14);
-                    int[] formalCharge=(int[])((Vector)hTargetCollectionObject.read()).elementAt(14);
+                    DivconType divcon=loadTarget(h5File, target);
+                    double[] x=null;
+                    double[] y=null;
+                    double[] z=null;
+                    getTargetCoordinates(divcon, x, y, z);
+//                    xPath="/DivCon/"+target+"/"+target;
+//                    H5CompoundDS hTargetCollectionObject=(H5CompoundDS)findHDF5Object(h5File, xPath);
+//                    hTargetCollectionObject.selectMember(0);
+//                    String[] targetAtomSymbols=(String[])((Vector)hTargetCollectionObject.read()).elementAt(0);
+//                    hTargetCollectionObject.selectMember(1);
+//                    String[] targetAtomNames=(String[])((Vector)hTargetCollectionObject.read()).elementAt(1);
+//                    hTargetCollectionObject.selectMember(2);
+//                    String[] targetResidueNames=(String[])((Vector)hTargetCollectionObject.read()).elementAt(2);
+//                    hTargetCollectionObject.selectMember(5);
+//                    int[] targetSequence=(int[])((Vector)hTargetCollectionObject.read()).elementAt(5);
+//                    hTargetCollectionObject.selectMember(7);
+//                    double[] x=(double[])((Vector)hTargetCollectionObject.read()).elementAt(7);
+//                    hTargetCollectionObject.selectMember(8);
+//                    double[] y=(double[])((Vector)hTargetCollectionObject.read()).elementAt(8);
+//                    hTargetCollectionObject.selectMember(9);
+//                    double[] z=(double[])((Vector)hTargetCollectionObject.read()).elementAt(9);
+//                    hTargetCollectionObject.selectMember(12);
+//                    double[] epsilon=(double[])((Vector)hTargetCollectionObject.read()).elementAt(12);
+//                    hTargetCollectionObject.selectMember(13);
+//                    double[] welllDepth=(double[])((Vector)hTargetCollectionObject.read()).elementAt(13);
+//                    hTargetCollectionObject.selectMember(14);
+//                    int[] formalCharge=(int[])((Vector)hTargetCollectionObject.read()).elementAt(14);
                     xPath="/DivCon/"+target+"/Trajectories/Geometries/Final";
                     H5ScalarDS trajectoryObject=(H5ScalarDS)findHDF5Object(h5File, xPath);
                     SVLJava.print(" trajectoryObject? "+trajectoryObject);
@@ -1525,18 +1569,18 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
                         z[i]=buf[i*3+2];
                     }
                     }
-                    ListIterator li=hTargetCollectionObject.getMetadata().listIterator();
-                    while(li.hasNext())
-                    {
-                        Object obj=li.next();
-                        if(obj instanceof ncsa.hdf.object.Attribute && ((ncsa.hdf.object.Attribute)obj).getName().compareTo("Total Charge")==0)
-                        {
-//                            ChargesType chargeType=new ChargesType();
-//                            TotalChargeType totalChargeType=new TotalChargeType();
-//                            chargeType.setTotalCharge(totalChargeType);
-//                            int[] tc=(int[])((ncsa.hdf.object.Attribute)obj).getValue();
-                        }
-                    }
+//                    ListIterator li=hTargetCollectionObject.getMetadata().listIterator();
+//                    while(li.hasNext())
+//                    {
+//                        Object obj=li.next();
+//                        if(obj instanceof ncsa.hdf.object.Attribute && ((ncsa.hdf.object.Attribute)obj).getName().compareTo("Total Charge")==0)
+//                        {
+////                            ChargesType chargeType=new ChargesType();
+////                            TotalChargeType totalChargeType=new TotalChargeType();
+////                            chargeType.setTotalCharge(totalChargeType);
+////                            int[] tc=(int[])((ncsa.hdf.object.Attribute)obj).getValue();
+//                        }
+//                    }
     if(ligand.length()>0)
     {
             List<HObject> ligandList=pwdGroup.getMemberList();
@@ -1609,7 +1653,7 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
 //                    double[] welllDepth=(double[])((Vector)hLigandCollectionObject.read()).elementAt(8);
 //                    hLigandCollectionObject.selectMember(9);
 //                    int[] formalCharge=(int[])((Vector)hLigandCollectionObject.read()).elementAt(9);
-                    SVLJava.print(targetAtomSymbols.length+" lengths "+ligandAtomSymbols.length);
+//                    SVLJava.print(targetAtomSymbols.length+" lengths "+ligandAtomSymbols.length);
                     ArrayList<Double> EabList=new  ArrayList<Double>();
 //                    ArrayList<Double> EabpList=new  ArrayList<Double>();
 //                    ArrayList<Double> EabcList=new  ArrayList<Double>();
@@ -2110,7 +2154,7 @@ private SVLVar retrieveNMRScore(SVLVar var) throws SVLJavaException, IOException
         H5CompoundDS hObject=(H5CompoundDS)ho;
         if(hObject==null)
         {
-            return new SVLVar(new SVLVar(), new SVLVar("'NMR Score Class Number Average' does not exist for: '" + target + "'.", true));
+            return new SVLVar(new SVLVar(""), new SVLVar("'NMR Score Class Number Average' does not exist for: '" + target + "'.", true));
             //throw new SVLJavaException("'NMR Score Class Number Average' does not exist for: '" + target + "'.");
         }
         hObject.init();
@@ -2670,5 +2714,60 @@ private SVLVar retrieveLigandSelection(SVLVar var) throws SVLJavaException, IOEx
         return new SVLVar(new SVLVar(data), new SVLVar("",true));
     }
 
+    DivconType loadTarget(H5File h5File, String target) throws Exception
+    {
+                HObject obj=h5File.get("DivCon/"+target+"/Documents/"+target+".xml");
+//        java.lang.System.out.println("looking for: "+"DivCon/"+target+"/Documents/"+target+".xml");
+        SVLVar[] model=new SVLVar[4];
+        if(obj!=null)
+        {
+            H5ScalarDS doc=(H5ScalarDS)obj;
+        JAXBContext jc = JAXBContext.newInstance("com.quantumbioinc.xml.divcon");
+        Unmarshaller um=jc.createUnmarshaller();
+        JAXBElement<com.quantumbioinc.xml.divcon.DivconType> jaxbOutElement=um.unmarshal(new StreamSource(new ByteArrayInputStream (((String[])doc.read())[0].getBytes())), com.quantumbioinc.xml.divcon.DivconType.class);
+        return jaxbOutElement.getValue();
+        }
+        return null;
+    }
+    
+    void getTargetCoordinates(DivconType divcon, double[] x,  double[] y,  double[] z)
+    {
+        ArrayList<Double> xsList=new ArrayList<>();
+        ArrayList<Double> ysList=new ArrayList<>();
+        ArrayList<Double> zsList=new ArrayList<>();
+        Cml cml=(Cml)divcon.getCmlOrTargetOrLigand().get(0);
+        for(int moleculeCount=0;moleculeCount<cml.getAnyCmlOrAnyOrAny().size();moleculeCount++)
+        {
+            JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbMoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)cml.getAnyCmlOrAnyOrAny().get(moleculeCount);
+            Molecule molecule=jaxbMoleculeElement.getValue();
+            for(int submoleculeCount=0;submoleculeCount<molecule.getAnyCmlOrAnyOrAny().size();submoleculeCount++)
+            {
+                if(((JAXBElement)molecule.getAnyCmlOrAnyOrAny().get(submoleculeCount)).getValue() instanceof com.quantumbioinc.xml.divcon.BondArray)continue;
+                JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbSubmoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)molecule.getAnyCmlOrAnyOrAny().get(submoleculeCount);
+                Molecule submolecule=jaxbSubmoleculeElement.getValue();
+                JAXBElement<com.quantumbioinc.xml.divcon.AtomArray> jaxbAtomArrayElement=(JAXBElement<com.quantumbioinc.xml.divcon.AtomArray>)submolecule.getAnyCmlOrAnyOrAny().get(0);
+                AtomArray atomArray=jaxbAtomArrayElement.getValue();
+                for(int atomCount=0;atomCount<atomArray.getAnyCmlOrAnyOrAny().size();atomCount++)
+                {
+                    JAXBElement<com.quantumbioinc.xml.divcon.Atom> jaxbAtomElement=(JAXBElement<com.quantumbioinc.xml.divcon.Atom>)atomArray.getAnyCmlOrAnyOrAny().get(atomCount);
+                    Atom atom=jaxbAtomElement.getValue();
+                    JAXBElement<com.quantumbioinc.xml.divcon.AtomType> jaxbAtomTypeElement=(JAXBElement<com.quantumbioinc.xml.divcon.AtomType>)atom.getAnyCmlOrAnyOrAny().get(0);
+                    xsList.add(new Double(atom.getX3().doubleValue()));
+                    ysList.add(new Double(atom.getY3().doubleValue()));
+                    zsList.add(new Double(atom.getZ3().doubleValue()));
+                }
+            }
+        }
+        x=new double[xsList.size()];
+        y=new double[ysList.size()];
+        z=new double[zsList.size()];
+        for(int vIndex=0;vIndex<x.length;vIndex++)
+        {
+            x[vIndex]=xsList.get(vIndex);
+            y[vIndex]=ysList.get(vIndex);
+            z[vIndex]=zsList.get(vIndex);
+        }
+        
+    }
 
 }
