@@ -1,7 +1,8 @@
 local function jvmqb arg
     local [result,code] = jvm ['HDF5Correspondent', arg];
     if code == 'error' then exit result; endif
-    return cat result;      // Java returns a vector-packaged result. cat de-nests packaging.
+    return result;
+//    return cat result;      // Java returns a vector-packaged result. cat de-nests packaging.
 //    return [result,code];
  //   return jvm ['HDF5Correspondent', arg];
 endfunction
