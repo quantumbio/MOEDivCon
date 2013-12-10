@@ -7,6 +7,14 @@
 #set class	'MOE:file-io'
 #set version	'2012.11'
 
+const OPENDEFAULTS = [
+    model:[],         // the model to open.
+    ligand:[],       // the pose/ligand to open
+    center:1,            // center the structure when read in
+    return_data:0       // return the mol data instead of the chains
+];
+
+
 
 // ============ BETWEEN HERE AND SAME BELOW IS STUFF FROM io_pdb.svl ============
 
@@ -91,18 +99,20 @@ endfunction
 
 function qbListModels;
 function qbRetrieveModel;
-
+function qbRetrievePosingModel;
 
 global function ReadHDF5 [file,opt]
-    
-    local model;
-    if isnull opt then
+    opt = tagcat[opt, OPENDEFAULTS];
+    if isnull opt.model then
         local [modelTags, errorcode] =  qbListModels [file];
-        model = modelTags.target;
-    else
-        model = opt.model;
+        opt.model = modelTags.target;
     endif
-    local [mol, errorcode2] = qbRetrieveModel [file, model];
+    local mol, errorcode2;
+    if isnull opt.ligand then
+        [mol, errorcode2] = qbRetrieveModel [file, opt.model];
+    else
+        [mol, errorcode2] = qbRetrievePosingModel [file, opt.model, opt.ligand];
+    endif
 
     // Init the variables not set by Java.
      mol(3)(MOL_RES_INS) = rep [" ",length mol(3)(1)];   // MOL_RES_INS
@@ -137,7 +147,7 @@ global function ReadHDF5 [file,opt]
     cN = select [cT, tok_cat [cT, '.', cN], cN == ' ' or cN  == ''];
 
     local cH = app token app trim_ws app string mol_cHdr mol;
-    cH | cH == '' = token model;
+    cH | cH == '' = token opt.model;
 
     mol(1)(MOL_NAME) = mol_name;
     mol(2)(MOL_CHAIN_TAG)    = cT;
@@ -145,8 +155,15 @@ global function ReadHDF5 [file,opt]
     mol(2)(MOL_CHAIN_HEADER) = cH;
 
     local tmpChains = mol_CreateHidden mol;
-    RenderProtein [tmpChains,[center:1]];
+    RenderProtein [tmpChains,[center:opt.center]];
     DrawHBonds hbState; DrawVDWContacts vdwState;
-    return tmpChains;
+    
+    if not call[] then
+	    if anytrue opt.return_data then
+	        return mol;
+	    else
+	        return tmpChains;
+	    endif
+    endif
 endfunction
 

@@ -1273,23 +1273,29 @@ global function qbNMRAnalizePanel[]
         endloop
     endfunction
     
-    function GetChemicalShifts [wkey, hdfFile, target, nmrscores]
+    function GetChemicalShifts [wkey, hdfFile, target, ligandlist,poseMols]
         local values = WindowValues wkey;
         local errorcode;
         local ligand;
+        static poseChains;
+
         write ['first: {} | second: {} | all: {}\n', first values.scoresBox, second values.scoresBox, values.scoresBox];
         local selectedLigandID = bitshr [second values.scoresBox,WMOD_NBITS];
         if selectedLigandID > 0 then
-            ligand = first nmrscores;       // TODO: this needs updated for multiple scores from multiple ligands
+            ligand = ligandlist(selectedLigandID);       // TODO: this needs updated for multiple scores from multiple ligands
         endif
         local chemicalShifts;
+        oDestroy poseChains;
+        write ['{} | {}\n', ligand, poseMols.(totok ligand)];
+        poseChains = mol_Create poseMols.(totok ligand);
+write ['{} , {} , {} \n', hdfFile, target, ligand];
         [chemicalShifts,errorcode] = qbRetrieveChemicalShifts [hdfFile, target, ligand];
         local elements = cat ['All',sort uniq aElement get[Atoms [], chemicalShifts.Index]];
         WindowSetAttr[wkey,[ eleOptions: [ text:elements ] ] ];
         return chemicalShifts;
     endfunction
     
-    local hdfModels,chemicalShifts, nmrscores;
+    local hdfModels,chemicalShifts, nmrscores, tmpLigand, ligandlist, poseMols;
     local atomColors;
     local errorcode;
     loop
@@ -1306,14 +1312,34 @@ global function qbNMRAnalizePanel[]
 //                        Warning [twrite ['Read error: {}.pdb',fbase hdfFile]];
 //                    else
                         [hdfModels,errorcode] = qbListModels hdfFile;
+//                        hdfModels = cat hdfModels;    // TODO: WARNING: this will not support multiple target H5 files!
                         if not isnull hdfModels.target then
                             ReadHDF5[hdfFile,[model:hdfModels.target]];
+                            ligandlist = cat ['Wildtype',hdfModels.ligand]; // TODO: check for selection first
                             [nmrscores,errorcode] = qbRetrieveNMRScore [hdfFile, hdfModels.target];
-                            WindowSetAttr[wkey,[scoresBox: [
-                                text:[twrite['{}\t{}\t{}\t{}',nmrscores(1),nmrscores(2),nmrscores(3),nmrscores(4)]],
-                                value:[1]
-                                ]]];
-                            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, nmrscores];
+write ['Scores: {} | {} \n', nmrscores,errorcode];
+                            if errorcode == '' then
+                            write ['in here {} \n', length nmrscores];
+                                WindowSetAttr[wkey,[scoresBox: [
+                                    text:[twrite['{}\t{}\t{}\t{}',nmrscores(1),nmrscores(2),nmrscores(3),nmrscores(4)]],
+                                    value:[1]
+                                    ]]];
+                            else
+                            write ['no, in here {}\n', length ligandlist];
+                                WindowSetAttr[wkey,[scoresBox: [
+                                    text:apt twrite['{}\t{}\t{}\t{}',ligandlist,'','',''],
+                                    value:[igen length ligandlist]
+                                    ]]];
+                            endif
+                            poseMols = [];
+                            // read in and store all of the mols
+                            local pdata = SystemPush [];
+                            for tmpLigand in ligandlist loop
+                                poseMols.(totok tmpLigand) = ReadHDF5[hdfFile,[model:hdfModels.target,ligand:tmpLigand,center:0,return_data:1]];
+                            endloop
+                            SystemPop pdata;
+
+                            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
                             View[];
                             atomColors = aColorBy Atoms[];
                             WindowSetAttr[wkey,[ processShifts: [ sensitive:1 ] ] ];
@@ -1329,22 +1355,26 @@ global function qbNMRAnalizePanel[]
         elseif trigger === 'showColors' then
             if values.showColors == 1 then
                 atomColors = aColorBy Atoms[];
-                chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, nmrscores];
+                chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
                 ColorAtomsByValue[values,chemicalShifts];
             else
                 aSetColorBy [Atoms[],atomColors];
             endif
             LabelAtomsByValue[values,chemicalShifts];
+        elseif trigger === 'scoresBox' then
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
+            ColorAtomsByValue[values,chemicalShifts];
+            LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'showLabels' then
-            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, nmrscores];
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
             ColorAtomsByValue[values,chemicalShifts];
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'calctype' then
-            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, nmrscores];
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
             ColorAtomsByValue[values,chemicalShifts];
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'eleOptions' then
-            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, nmrscores];
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
             ColorAtomsByValue[values,chemicalShifts];
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'panel' then
