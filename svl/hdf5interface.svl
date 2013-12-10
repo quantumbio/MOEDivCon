@@ -1,7 +1,32 @@
 local function jvmqb arg
+
+    // some Java/SVL access functions take time (especially when reading in a new mol).
+    //      this task will pop up just to make sure that the user knows that something is going on.
+    if second task_fork [master:'parent'] === 'child' then          // this will give the user some feedback
+        task_settitle [ task_key -1, 'mem_progress'];
+        sleep 2.0;
+        local wkey = WindowCreate [Hbox: [ Label:[name:'progressLabel',title:'H5 Processing: ',text:'--']]];
+        WindowShow wkey;
+        local loopCount = '|';
+        loop
+            sleep 0.5;
+            if loopCount == '|' then
+                loopCount = '/';
+            elseif loopCount == '/' then
+                loopCount = '-';
+            elseif loopCount == '-' then
+                loopCount = '\\';
+            elseif loopCount == '\\' then
+                loopCount = '|';
+            endif
+            WindowSetAttr[wkey, [ progressLabel: [text: [twrite['{}',loopCount] ]] ]];
+        endloop
+    endif
+
     local [result,code] = jvm ['HDF5Correspondent', arg];
+    task_kill (task_keylist [] | task_title task_keylist [] == 'mem_progress');
     if code == 'error' then exit result; endif
-    return result;
+    return [cat first result, second result];
 //    return cat result;      // Java returns a vector-packaged result. cat de-nests packaging.
 //    return [result,code];
  //   return jvm ['HDF5Correspondent', arg];
