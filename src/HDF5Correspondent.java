@@ -229,7 +229,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                             }
                             else
                             {
-                                titleList.add("Ligand"+(moleculeCount+1));
+                                titleList.add(molecule.getTitle()+"."+(moleculeCount+1));
                             }
                         }
                         else
@@ -792,9 +792,38 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         {
             JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbMoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)cml.getAnyCmlOrAnyOrAny().get(moleculeCount);
             Molecule molecule=jaxbMoleculeElement.getValue();
-            if(molecule.getTitle()==null || molecule.getTitle().compareTo(ligand)!=0){moleculeCount++;continue;};
-            hitPose=true;
-            title=molecule.getTitle();
+//            if(molecule.getTitle()==null || molecule.getTitle().compareTo(ligand)!=0){moleculeCount++;continue;};
+            if(molecule.getTitle()!=null && molecule.getTitle().compareTo(ligand)==0)
+            {
+                hitPose=true;
+                title=molecule.getTitle();
+            }
+            else
+            {
+                moleculeCount++;
+            }
+        }
+        if(!hitPose)
+        {
+            if(ligand.lastIndexOf('.')>=0)
+            {
+                try  
+                {  
+                    int d = Integer.parseInt(ligand.substring(ligand.lastIndexOf('.')+1));
+                    hitPose=true;
+                    moleculeCount=d-1;
+                    title=ligand.substring(0, ligand.lastIndexOf('.'));
+                }  
+                catch(NumberFormatException nfe)  
+                {  
+                }
+            }
+            
+        }
+        if(hitPose)
+        {
+            JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbMoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)cml.getAnyCmlOrAnyOrAny().get(moleculeCount);
+            Molecule molecule=jaxbMoleculeElement.getValue();
             String chain="";
             for(int submoleculeCount=0;submoleculeCount<molecule.getAnyCmlOrAnyOrAny().size();submoleculeCount++)
             {
@@ -2147,6 +2176,12 @@ private SVLVar retrieveNMRScore(SVLVar var) throws SVLJavaException, IOException
 {
     String filename = var.peek(1).getTokn(1);
     String target = var.peek(1).getTokn(2);
+    String ligand = "";
+    if(var.peek(1).length()>2)
+    {
+        ligand = var.peek(1).getTokn(3);
+        //if(true) return new SVLVar("retrieveAtomByAtomPWD "+ligand);
+    }
     H5File h5File=new H5File(filename, H5File.READ);
     h5File.open();
         String xPath="/DivCon/"+target+"/NMR Score Class Number Average";
@@ -2161,34 +2196,83 @@ private SVLVar retrieveNMRScore(SVLVar var) throws SVLJavaException, IOException
         hObject.clear();
         hObject.setMemberSelection(true);
         Vector o=(Vector)hObject.getData();
-        String[] dimNames=hObject.getDimNames();
-    SVLVar[] data=new SVLVar[hObject.getMemberCount()];
-        for(int index=0;index<hObject.getMemberCount();index++)
+//        String[] dimNames=hObject.getDimNames();
+        SVLVar[] data=new SVLVar[hObject.getMemberCount()];
+        if(ligand.isEmpty())
         {
-            hObject.selectMember(index);
-            if(index==0)
+            for(int index=0;index<hObject.getMemberCount();index++)
             {
-                for(int columnIndex=0;columnIndex<hObject.getSelectedMemberCount();columnIndex++)
+                hObject.selectMember(index);
+                if(index==0)
                 {
-                    Datatype dt=hObject.getSelectedMemberTypes()[columnIndex];
-                    //insertIntoCell((columnIndex+1), (index+1), hObject.getMemberNames()[columnIndex], xSpreadsheet, "F");
+                    for(int columnIndex=0;columnIndex<hObject.getSelectedMemberCount();columnIndex++)
+                    {
+                        Datatype dt=hObject.getSelectedMemberTypes()[columnIndex];
+                        //insertIntoCell((columnIndex+1), (index+1), hObject.getMemberNames()[columnIndex], xSpreadsheet, "F");
+                    }
+                    String[] rowData=(String[])o.elementAt(index);
+                    data[index]=new SVLVar(rowData);
+    //                for(int columnIndex=0;columnIndex<rowData.length;columnIndex++)
+    //                {
+    //                    //scores[columnIndex]=(double)rowData[columnIndex];
+    //                }
                 }
-                String[] rowData=(String[])o.elementAt(index);
-                data[index]=new SVLVar(rowData);
-//                for(int columnIndex=0;columnIndex<rowData.length;columnIndex++)
-//                {
-//                    //scores[columnIndex]=(double)rowData[columnIndex];
-//                }
+                else
+                {
+                    //double[] scores = new double[11];
+                    double[] rowData=(double[])o.elementAt(index);
+                    data[index]=new SVLVar(rowData);
+    //                for(int columnIndex=0;columnIndex<rowData.length;columnIndex++)
+    //                {
+    //                    scores[columnIndex]=(double)rowData[columnIndex];
+    //                }
+                }
             }
-            else
+        }
+        else
+        {
+            int rowIndex=0;
+            for(int index=0;index<hObject.getMemberCount();index++)
             {
-                //double[] scores = new double[11];
-                double[] rowData=(double[])o.elementAt(index);
-                data[index]=new SVLVar(rowData);
-//                for(int columnIndex=0;columnIndex<rowData.length;columnIndex++)
-//                {
-//                    scores[columnIndex]=(double)rowData[columnIndex];
-//                }
+                hObject.selectMember(index);
+                if(index==0)
+                {
+                    for(int columnIndex=0;columnIndex<hObject.getSelectedMemberCount();columnIndex++)
+                    {
+                        Datatype dt=hObject.getSelectedMemberTypes()[columnIndex];
+                        //insertIntoCell((columnIndex+1), (index+1), hObject.getMemberNames()[columnIndex], xSpreadsheet, "F");
+                    }
+                    String[] rowData=(String[])o.elementAt(index);
+                    boolean hit=false;
+                    while(!hit && rowIndex<rowData.length)
+                    {
+                        if(rowData[rowIndex].compareTo(ligand)==0)
+                        {
+                            hit=true;
+                        }
+                        else
+                        {
+                            rowIndex++;
+                        }
+                    }
+                    if(!hit)new SVLVar(new SVLVar(""), new SVLVar(ligand+" not in 'NMR Score Class Number Average' table for '" + target + "'.", true));
+                    
+                    data[index]=new SVLVar(new String[]{rowData[rowIndex]});
+    //                for(int columnIndex=0;columnIndex<rowData.length;columnIndex++)
+    //                {
+    //                    //scores[columnIndex]=(double)rowData[columnIndex];
+    //                }
+                }
+                else
+                {
+                    //double[] scores = new double[11];
+                    double[] rowData=(double[])o.elementAt(index);
+                    data[index]=new SVLVar(new double[]{rowData[rowIndex]});
+    //                for(int columnIndex=0;columnIndex<rowData.length;columnIndex++)
+    //                {
+    //                    scores[columnIndex]=(double)rowData[columnIndex];
+    //                }
+                }
             }
         }
             h5File.close();
