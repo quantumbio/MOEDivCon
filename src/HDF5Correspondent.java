@@ -2630,7 +2630,7 @@ private SVLVar retrieveLigandSelection(SVLVar var) throws SVLJavaException, IOEx
 //   java.lang.System.out.println("h5 opened ");
     String xPath="/DivCon/"+target+"/Selections";
     H5Group selectionsGroup=(H5Group)findHDF5Object(h5File, xPath);
-    SVLVar[] selections=new SVLVar[2];
+    SVLVar[] selections=new SVLVar[1];
     if(selectionsGroup!=null)
     {
         List nmrRow=selectionsGroup.getMemberList();
@@ -2654,11 +2654,11 @@ private SVLVar retrieveLigandSelection(SVLVar var) throws SVLJavaException, IOEx
 //            if(true) return new SVLVar(new SVLVar("here", true), new SVLVar(""+((H5ScalarDS)hObject).getFullName(),true));
                     try
                     {
-                        selections[1]=new SVLVar((int[])((H5ScalarDS)hObject).read());
+                        selections[0]=new SVLVar((int[])((H5ScalarDS)hObject).read());
                     }
                     catch(HDF5Exception ex)
                     {
-                        selections[1]=new SVLVar();
+                        selections[0]=new SVLVar();
                     }
                     break;
             }
@@ -2668,7 +2668,7 @@ private SVLVar retrieveLigandSelection(SVLVar var) throws SVLJavaException, IOEx
     {
         return new SVLVar(new SVLVar("",true), new SVLVar("",true));
     }
-    SVLVar data=new SVLVar(new String[]{"Compliment", "Selection"}, selections);
+    SVLVar data=new SVLVar(new String[]{"ligandSelection"}, selections);
     h5File.close();
     return new SVLVar(new SVLVar(data), new SVLVar("",true));
 }
