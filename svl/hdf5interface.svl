@@ -72,7 +72,7 @@ global function qbTesth5Main [h5file]
     
     write ['length {}\n', length  qbListModels [h5file]];
     
-    local [[modelTags, errorcode]] =  qbListModels [h5file];
+    local [modelTags, errorcode] =  qbListModels [h5file];
 
 //    write ['length modelTags.target : {}\n', length modelTags.target];
     
@@ -90,7 +90,7 @@ global function qbTesth5Main [h5file]
 //    print qbRetrieveAtomByAtomDecomposition [h5file, modelTags.target, 'Final'];
     //print qbRetrieveAtomByAtomMRM [h5file, modelTags.target];
     print qbRetrieveNMRScore [h5file, modelTags.target];
-    print modelTags.ligand[2];
+    print modelTags.ligand[3];
     print qbRetrieveNMRScore [h5file, modelTags.target, modelTags.ligand[3]];
 //    print qbRetrieveChemicalShifts [h5file, modelTags.target, 'Wildtype'];
 //    print  qbRetrieveDensities [h5file, modelTags.target];

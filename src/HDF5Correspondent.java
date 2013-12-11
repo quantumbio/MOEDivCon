@@ -2639,18 +2639,18 @@ private SVLVar retrieveLigandSelection(SVLVar var) throws SVLJavaException, IOEx
             HObject hObject=(HObject)nmrRow.get(memberIndex);
             switch(hObject.getName())
             {
-                case "Compliment":
-//            if(true) return new SVLVar(new SVLVar("here2", true), new SVLVar(""+((H5ScalarDS)hObject).getFullName(),true));
-                    try
-                    {
-                        selections[0]=new SVLVar((int[])((H5ScalarDS)hObject).read());
-                    }
-                    catch(HDF5Exception ex)
-                    {
-                        selections[0]=new SVLVar();
-                    }
-                     break;
-                case "Selection":
+//                case "Compliment":
+////            if(true) return new SVLVar(new SVLVar("here2", true), new SVLVar(""+((H5ScalarDS)hObject).getFullName(),true));
+//                    try
+//                    {
+//                        selections[0]=new SVLVar((int[])((H5ScalarDS)hObject).read());
+//                    }
+//                    catch(HDF5Exception ex)
+//                    {
+//                        selections[0]=new SVLVar();
+//                    }
+//                     break;
+                case "Wildtype":
 //            if(true) return new SVLVar(new SVLVar("here", true), new SVLVar(""+((H5ScalarDS)hObject).getFullName(),true));
                     try
                     {
