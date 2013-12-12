@@ -22,18 +22,11 @@
  // END COPYRIGHT
 #endif
 
-// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['3V7Y.pdb',[enableAutoPrep:0,enableProtonate:1,enableLigFix:0],['test.cif','test2.cif']],'qbPhenixPrepFile']" -exit
-
-// example: qbmoebatch -exec "run ['qbPhenixPrep.svl',['1A2C-phenix.pdb','1A2C-phenix.translation'],'qbPostPhenixFile']" -exit
-
 function _Atoms;
 function fwrite_PDB;
 function pro_StandardRes;
 function pro_PeptideFlags;
 function StructurePreparationGUI; 
-
-function CIF_fread_cif_all;
-function cif_ExtractInfo;
 
 // QB tool box
 function qbPrepareSystem;
@@ -45,68 +38,6 @@ function qb_cLetter;
 // statics
 static transFileName;
 static residueNamesTaken;
-
-const CORE_DEFAULTS = [
-    enableAutoPrep:0,       // Run the MOE structure preparation tool.
-    enableProtonate:1,      // Turns on Protonate3D
-    protPH:7.4,              // Set pH for Protonation
-    enableLigFix:0,          // Fixes the ligand protonation
-    enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
-];
-
-const PREPDEFAULTS = cat [CORE_DEFAULTS,[
-    forceUseElement:1,         // force reading of the element in the PDB file. Not a good idea if file format broken.
-    qmApplication:[],       // Skip the DivCon tests - we will be running no matter what since this is refinement.
-    enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
-]];
-
-local function WriteLog [line,basename,state]
-    static logFileName;
-    local fileHandle;
-
-    if isnull state then
-        state = 'none';
-    endif
-
-    if state == 'init' then
-        logFileName = [];
-        line = 'qbMOE INIT LOG\n\n';
-    endif
-    
-    if isnull basename and isnull logFileName then
-        logFileName = twrite ['{}.log','qbMOE'];
-        fileHandle = fopenw logFileName;
-    elseif isnull logFileName then
-        logFileName = twrite ['{}-{}.log',basename,'qbMOE'];
-        fileHandle = fopenw logFileName;
-    elseif not isnull basename and not isnull logFileName then
-        local newFilename = twrite ['{}-{}.log',basename,'qbMOE'];
-        if newFilename <> logFileName then
-            fdelete newFilename;
-            frename [logFileName,newFilename];
-            line = append [line, twrite ['Log file renamed from {} to {}', logFileName, newFilename]];
-            logFileName = newFilename;
-        endif
-        fileHandle = fopenx logFileName;
-        fileHandle = fseek [fileHandle, fsize fileHandle];
-    else
-        fileHandle = fopenx logFileName;
-        fileHandle = fseek [fileHandle, fsize fileHandle];
-    endif
-    
-    if state == 'getname' then
-        fclose fileHandle;
-        return logFileName;
-    endif
-    local tmpLine;
-    for tmpLine in line loop
-        fwrite [fileHandle,'{} --- {}\n', asctime[], tmpLine];
-        write ['{}\n', tmpLine];
-    endloop
-    
-    fclose fileHandle;
-    return logFileName;
-endfunction
 
 local function GenerateBatchScript [opt,batchfilename]
 
@@ -251,7 +182,7 @@ endfunction
 local function BatchPanel finame
     local wkey = WindowCreate [
         name: 'batchwin', windowName: 'batch',
-        title: 'Phenix/DivCon: Create Batch File',
+        title: 'NMR: Create Batch File',
         text: ['Create', 'Cancel'],
         onTrigger: ['validate', 'return'],
         Hbox: [
@@ -423,8 +354,8 @@ global function qbNMRPrepPanel[]
 	    onTrigger: ['return','validate','return'],
 	    bubbleHelp: [
 	    'Help, Guidelines, and Support',
-		'Generate Batch script for Phenix/DivCon...',
-		'Cancel without creating Phenix/DivCon run script.'
+		'Generate Batch script for DivCon-NMR...',
+		'Cancel without creating DivCon-NMR run script.'
 	    ],
         Group :
         [
@@ -593,13 +524,12 @@ global function qbNMRPrepPanel[]
                                 name: 'button_ShowNMRAtoms', text: '?', font: 'mediumBold',
                                 bubbleHelp: 'Displays the approximate number of atoms that will be treated quantum mechanically.'
                             ],
-                    Button:
-                        [
-                            name: 'deleteSelection', 
-                            text: 'X', font: 'mediumBold',flushLeft: 0,
-                            bubbleHelp: 'Delete selected atom from the list.'
-                        ]
-
+                        Button:
+                            [
+                                name: 'deleteSelection', 
+                                text: 'X', font: 'mediumBold',flushLeft: 0,
+                                bubbleHelp: 'Delete selected atom from the list.'
+                            ]
                     ],
                     Data: [name:'CSVFileName'],
                     Listbox :
@@ -768,7 +698,7 @@ global function qbNMRPrepPanel[]
     local ynMemIsSet = 0;
     values = WindowValues wkey;
 	local status;
-	status.cif_success = []; status.phenix_success = [];status.ran_protonate = 0;status.ran_structprep = 0;status.structprep_changed = 0;
+	status.ran_protonate = 0; status.ran_structprep = 0; status.structprep_changed = 0;
 
 	local function setCalcValues [wkey,values]
 	    if isnull values then
@@ -1273,25 +1203,27 @@ global function qbNMRAnalizePanel[]
         endloop
     endfunction
     
-    function GetChemicalShifts [wkey, hdfFile, target, ligandlist,poseMols]
+    function GetChemicalShifts [wkey, hdfFile, target, poseMols]
         local values = WindowValues wkey;
         local errorcode;
         local ligand;
-        static poseChains;
+        static poseChains,prevPoseMols,chemicalShifts;
+        if neL [prevPoseMols,poseMols] then
+write ['clearing....\n'];
+            poseChains = [];
+            chemicalShifts = [];
+            prevPoseMols = poseMols;
+        endif
 
-        write ['first: {} | second: {} | all: {}\n', first values.scoresBox, second values.scoresBox, values.scoresBox];
         local selectedLigandID = bitshr [second values.scoresBox,WMOD_NBITS];
         if selectedLigandID > 0 then
-            ligand = ligandlist(selectedLigandID);       // TODO: this needs updated for multiple scores from multiple ligands
+            ligand = (first untag poseMols)(selectedLigandID);
+            oDestroy poseChains;
+            poseChains = mol_Create poseMols.(totok ligand);
+            [chemicalShifts,errorcode] = qbRetrieveChemicalShifts [hdfFile, target, ligand];
+            local elements = cat ['All',sort uniq aElement get[Atoms [], chemicalShifts.Index]];
+            WindowSetAttr[wkey,[ eleOptions: [ text:elements ] ] ];
         endif
-        local chemicalShifts;
-        oDestroy poseChains;
-        write ['{} | {}\n', ligand, poseMols.(totok ligand)];
-        poseChains = mol_Create poseMols.(totok ligand);
-write ['{} , {} , {} \n', hdfFile, target, ligand];
-        [chemicalShifts,errorcode] = qbRetrieveChemicalShifts [hdfFile, target, ligand];
-        local elements = cat ['All',sort uniq aElement get[Atoms [], chemicalShifts.Index]];
-        WindowSetAttr[wkey,[ eleOptions: [ text:elements ] ] ];
         return chemicalShifts;
     endfunction
     
@@ -1304,83 +1236,68 @@ write ['{} , {} , {} \n', hdfFile, target, ligand];
         if trigger === 'browse_HDF' then
             local hdfFile = FilePrompt [title:'Select HDF5 File', mode:'open', filter:'*.h5', multi:0];
             if not isnull hdfFile then
-//                if not (ftype twrite ['{}.pdb',fbase hdfFile] == '') then
-                    values.showLabels=0;
-                    LabelAtomsByValue[values];
-                    oDestroy Chains[];
-//                    if isnull ReadAuto twrite ['{}.pdb',fbase hdfFile] then
-//                        Warning [twrite ['Read error: {}.pdb',fbase hdfFile]];
-//                    else
-                        [hdfModels,errorcode] = qbListModels hdfFile;
-//                        hdfModels = cat hdfModels;    // TODO: WARNING: this will not support multiple target H5 files!
-                        if not isnull hdfModels.target then
-                            ReadHDF5[hdfFile,[model:hdfModels.target]];
-                            ligandlist = uniq cat ['Wildtype',hdfModels.ligand]; // TODO: check for selection first
-                            for tmpLigand in ligandlist loop
-                                [nmrscores,errorcode] = qbRetrieveNMRScore [hdfFile, hdfModels.target,tmpLigand];
-                                if errorcode <> '' then
-                                    nmrscores = rep ['',4];
-                                    nmrscores(1) = tmpLigand;
-                                endif
-                                allScores = append[allScores,nmrscores];
-                            endloop
-//                                    WindowSetAttr[wkey,[scoresBox: [
-//                                        text:[twrite['{}\t{}\t{}\t{}',nmrscores(1),nmrscores(2),nmrscores(3),nmrscores(4)]],
-//                                        value:[1]
-//                                        ]]];
-//                            else
-                            write ['no, in here {} | {} | {}\n', length ligandlist, length allScores, allScores];
-                                allScores = tr allScores;
-                                write ['aftertr: {} | {} \n', length allScores, allScores];
-                                WindowSetAttr[wkey,[scoresBox: [
-                                    text:apt twrite['{}\t{}\t{}\t{}',allScores(1),allScores(2),allScores(3),allScores(4)],
-                                    value:[igen length ligandlist]
-                                    ]]];
-//                            endif
-                            poseMols = [];
-                            // read in and store all of the mols
-                            local pdata = SystemPush [];
-                            for tmpLigand in ligandlist loop
-                                    poseMols.(totok tmpLigand) = ReadHDF5[hdfFile,[model:hdfModels.target,ligand:tmpLigand,center:0,return_data:1]];
-                            endloop
-                            SystemPop pdata;
-
-                            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
-                            View[];
-                            atomColors = aColorBy Atoms[];
-                            WindowSetAttr[wkey,[ processShifts: [ sensitive:1 ] ] ];
-                            WindowSetAttr[wkey,[completedHDF: [value:hdfFile]]];
-                        else
-                            Warning [twrite ['Read error: {}',hdfFile]];
+                values.showLabels=0;
+                LabelAtomsByValue[values];
+                oDestroy Chains[];
+                allScores = [];
+                poseMols = [];
+                [hdfModels,errorcode] = qbListModels hdfFile;
+                if not isnull hdfModels.target then
+                    ReadHDF5[hdfFile,[model:hdfModels.target]];
+                    ligandlist = uniq cat ['Wildtype',hdfModels.ligand]; // TODO: check for selection first
+                    for tmpLigand in ligandlist loop
+                        [nmrscores,errorcode] = qbRetrieveNMRScore [hdfFile, hdfModels.target,tmpLigand];
+                        if errorcode <> '' then
+                            nmrscores = rep ['',4];
+                            nmrscores(1) = tmpLigand;
                         endif
-//                    endif
-//                else
-//                    Warning [twrite ['File not found: {}.pdb',fbase hdfFile]];
-//                endif
+                        allScores = append[allScores,nmrscores];
+                    endloop
+                    allScores = tr allScores;
+                    WindowSetAttr[wkey,[scoresBox: [
+                        text:apt twrite['{}\t{}\t{}\t{}',allScores(1),allScores(2),allScores(3),allScores(4)],
+                        value:[igen length ligandlist]
+                        ]]];
+                    
+                    // read in and store all of the mols
+                    local pdata = SystemPush [];
+                    for tmpLigand in ligandlist loop
+                            poseMols.(totok tmpLigand) = ReadHDF5[hdfFile,[model:hdfModels.target,ligand:tmpLigand,center:0,return_data:1]];
+                    endloop
+                    SystemPop pdata;
+
+                    chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target,poseMols];
+                    View[];
+                    atomColors = aColorBy Atoms[];
+                    WindowSetAttr[wkey,[ processShifts: [ sensitive:1 ] ] ];
+                    WindowSetAttr[wkey,[completedHDF: [value:hdfFile]]];
+                else
+                    Warning [twrite ['Read error: {}',hdfFile]];
+                endif
             endif
         elseif trigger === 'showColors' then
             if values.showColors == 1 then
                 atomColors = aColorBy Atoms[];
-                chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
+                chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, poseMols];
                 ColorAtomsByValue[values,chemicalShifts];
             else
                 aSetColorBy [Atoms[],atomColors];
             endif
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'scoresBox' then
-            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, poseMols];
             ColorAtomsByValue[values,chemicalShifts];
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'showLabels' then
-            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, poseMols];
             ColorAtomsByValue[values,chemicalShifts];
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'calctype' then
-            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, poseMols];
             ColorAtomsByValue[values,chemicalShifts];
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'eleOptions' then
-            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, ligandlist, poseMols];
+            chemicalShifts = GetChemicalShifts [wkey, hdfFile, hdfModels.target, poseMols];
             ColorAtomsByValue[values,chemicalShifts];
             LabelAtomsByValue[values,chemicalShifts];
         elseif trigger === 'panel' then
