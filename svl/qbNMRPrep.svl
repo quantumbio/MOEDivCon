@@ -1296,7 +1296,7 @@ write ['{} , {} , {} \n', hdfFile, target, ligand];
     endfunction
     
     local hdfModels,chemicalShifts, nmrscores, tmpLigand, ligandlist, poseMols;
-    local atomColors;
+    local atomColors, allScores;
     local errorcode;
     loop
         local [values, trigger] = WindowWait wkey;
@@ -1315,27 +1315,33 @@ write ['{} , {} , {} \n', hdfFile, target, ligand];
 //                        hdfModels = cat hdfModels;    // TODO: WARNING: this will not support multiple target H5 files!
                         if not isnull hdfModels.target then
                             ReadHDF5[hdfFile,[model:hdfModels.target]];
-                            ligandlist = cat ['Wildtype',hdfModels.ligand]; // TODO: check for selection first
-                            [nmrscores,errorcode] = qbRetrieveNMRScore [hdfFile, hdfModels.target];
-write ['Scores: {} | {} \n', nmrscores,errorcode];
-                            if errorcode == '' then
-                            write ['in here {} \n', length nmrscores];
+                            ligandlist = uniq cat ['Wildtype',hdfModels.ligand]; // TODO: check for selection first
+                            for tmpLigand in ligandlist loop
+                                [nmrscores,errorcode] = qbRetrieveNMRScore [hdfFile, hdfModels.target,tmpLigand];
+                                if errorcode <> '' then
+                                    nmrscores = rep ['',4];
+                                    nmrscores(1) = tmpLigand;
+                                endif
+                                allScores = append[allScores,nmrscores];
+                            endloop
+//                                    WindowSetAttr[wkey,[scoresBox: [
+//                                        text:[twrite['{}\t{}\t{}\t{}',nmrscores(1),nmrscores(2),nmrscores(3),nmrscores(4)]],
+//                                        value:[1]
+//                                        ]]];
+//                            else
+                            write ['no, in here {} | {} | {}\n', length ligandlist, length allScores, allScores];
+                                allScores = tr allScores;
+                                write ['aftertr: {} | {} \n', length allScores, allScores];
                                 WindowSetAttr[wkey,[scoresBox: [
-                                    text:[twrite['{}\t{}\t{}\t{}',nmrscores(1),nmrscores(2),nmrscores(3),nmrscores(4)]],
-                                    value:[1]
-                                    ]]];
-                            else
-                            write ['no, in here {}\n', length ligandlist];
-                                WindowSetAttr[wkey,[scoresBox: [
-                                    text:apt twrite['{}\t{}\t{}\t{}',ligandlist,'','',''],
+                                    text:apt twrite['{}\t{}\t{}\t{}',allScores(1),allScores(2),allScores(3),allScores(4)],
                                     value:[igen length ligandlist]
                                     ]]];
-                            endif
+//                            endif
                             poseMols = [];
                             // read in and store all of the mols
                             local pdata = SystemPush [];
                             for tmpLigand in ligandlist loop
-                                poseMols.(totok tmpLigand) = ReadHDF5[hdfFile,[model:hdfModels.target,ligand:tmpLigand,center:0,return_data:1]];
+                                    poseMols.(totok tmpLigand) = ReadHDF5[hdfFile,[model:hdfModels.target,ligand:tmpLigand,center:0,return_data:1]];
                             endloop
                             SystemPop pdata;
 
