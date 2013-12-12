@@ -1547,7 +1547,7 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
     if(var.peek(1).length()>3)
     {
         ligand = var.peek(1).getTokn(4);
-        //if(true) return new SVLVar("retrieveAtomByAtomPWD "+ligand);
+        //if(true) return new SVLVar("retrieveAtomByAtomDecomposition "+ligand);
     }
 //                    FileWriter pwdOutputFile=new FileWriter("./check.pwd");
 //                    BufferedWriter bufferedPWDWriter=new BufferedWriter(pwdOutputFile);
@@ -1558,10 +1558,19 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
                     String xPath="/DivCon/"+target+"/Pairwise Decomposition";
                     H5Group pwdGroup=(H5Group)findHDF5Object(h5File, xPath);
                     DivconType divcon=loadTarget(h5File, target);
-                    double[] x=null;
-                    double[] y=null;
-                    double[] z=null;
-                    getTargetCoordinates(divcon, x, y, z);
+                    ArrayList<Double> xsList=new ArrayList<>();
+                    ArrayList<Double> ysList=new ArrayList<>();
+                    ArrayList<Double> zsList=new ArrayList<>();
+                    getTargetCoordinates(divcon, xsList, ysList, zsList);
+                    double[] x=new double[xsList.size()];
+                    double[] y=new double[ysList.size()];
+                    double[] z=new double[zsList.size()];
+                    for(int vIndex=0;vIndex<x.length;vIndex++)
+                    {
+                        x[vIndex]=xsList.get(vIndex);
+                        y[vIndex]=ysList.get(vIndex);
+                        z[vIndex]=zsList.get(vIndex);
+                    }
 //                    xPath="/DivCon/"+target+"/"+target;
 //                    H5CompoundDS hTargetCollectionObject=(H5CompoundDS)findHDF5Object(h5File, xPath);
 //                    hTargetCollectionObject.selectMember(0);
@@ -1660,22 +1669,22 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
                     pwdValues=(double[])member.read();
                 }
             }
-                    xPath="/DivCon/"+pwdObject.getName();
-                    H5CompoundDS hLigandCollectionObject=(H5CompoundDS)findHDF5Object(h5File, xPath);
-                    hLigandCollectionObject.selectMember(0);
-                    String[] ligandAtomSymbols=(String[])((Vector)hLigandCollectionObject.read()).elementAt(0);
-                    hLigandCollectionObject.selectMember(1);
-                    String[] ligandAtomNames=(String[])((Vector)hLigandCollectionObject.read()).elementAt(1);
-                    hLigandCollectionObject.selectMember(2);
-                    String[] ligandResidueNames=(String[])((Vector)hLigandCollectionObject.read()).elementAt(2);
-                    hLigandCollectionObject.selectMember(5);
-                    int[] ligandSequence=(int[])((Vector)hLigandCollectionObject.read()).elementAt(5);
-                    hLigandCollectionObject.selectMember(7);
-                    double[] xLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(7);
-                    hLigandCollectionObject.selectMember(8);
-                    double[] yLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(8);
-                    hLigandCollectionObject.selectMember(9);
-                    double[] zLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(9);
+//                    xPath="/DivCon/"+pwdObject.getName();
+//                    H5CompoundDS hLigandCollectionObject=(H5CompoundDS)findHDF5Object(h5File, xPath);
+//                    hLigandCollectionObject.selectMember(0);
+//                    String[] ligandAtomSymbols=(String[])((Vector)hLigandCollectionObject.read()).elementAt(0);
+//                    hLigandCollectionObject.selectMember(1);
+//                    String[] ligandAtomNames=(String[])((Vector)hLigandCollectionObject.read()).elementAt(1);
+//                    hLigandCollectionObject.selectMember(2);
+//                    String[] ligandResidueNames=(String[])((Vector)hLigandCollectionObject.read()).elementAt(2);
+//                    hLigandCollectionObject.selectMember(5);
+//                    int[] ligandSequence=(int[])((Vector)hLigandCollectionObject.read()).elementAt(5);
+//                    hLigandCollectionObject.selectMember(7);
+//                    double[] xLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(7);
+//                    hLigandCollectionObject.selectMember(8);
+//                    double[] yLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(8);
+//                    hLigandCollectionObject.selectMember(9);
+//                    double[] zLigand=(double[])((Vector)hLigandCollectionObject.read()).elementAt(9);
 //                    hLigandCollectionObject.selectMember(7);
 //                    double[] epsilon=(double[])((Vector)hLigandCollectionObject.read()).elementAt(7);
 //                    hLigandCollectionObject.selectMember(8);
@@ -1698,7 +1707,7 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
                         int ligandOffsetIndex=ligandIndex[atomIndex];
 //                        bufferedPWDWriter.append(targetIndex[atomIndex]+" "+ligandOffsetIndex+"\n");
                         ligandOffsetIndex-=x.length;
-                        double distance=Math.sqrt(Math.pow(x[targetIndex[atomIndex]]-xLigand[ligandOffsetIndex],2)+Math.pow(y[targetIndex[atomIndex]]-yLigand[ligandOffsetIndex],2)+Math.pow(z[targetIndex[atomIndex]]-zLigand[ligandOffsetIndex],2));
+                        double distance=0.0;//Math.sqrt(Math.pow(x[targetIndex[atomIndex]]-xLigand[ligandOffsetIndex],2)+Math.pow(y[targetIndex[atomIndex]]-yLigand[ligandOffsetIndex],2)+Math.pow(z[targetIndex[atomIndex]]-zLigand[ligandOffsetIndex],2));
                         //if(distance<=4.0 || pwdValues[7*iw]!=0.0)
                         EabList.add(pwdValues[7*atomIndex]);
 //                        EabpList.add(pwdValues[7*atomIndex+1]);
@@ -1759,7 +1768,7 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
                     double[] distance=new double[pwdDataset[1].length()];
                     for(int vIndex=0;vIndex<pwdDataset[1].length();vIndex++)
                     {
-                        distance[vIndex]=0.0;
+                        distance[vIndex]=Math.sqrt(Math.pow(x[indexA[vIndex]]-x[indexB[vIndex]],2)+Math.pow(y[indexA[vIndex]]-y[indexB[vIndex]],2)+Math.pow(z[indexA[vIndex]]-z[indexB[vIndex]],2));
                     }
                     pwdDataset[4]=new SVLVar(distance);
             data[0]=new SVLVar(new String[]{"name", "indexA", "indexB", "Eab", "distance"}, pwdDataset);
@@ -2814,11 +2823,8 @@ private SVLVar retrieveLigandSelection(SVLVar var) throws SVLJavaException, IOEx
         return null;
     }
     
-    void getTargetCoordinates(DivconType divcon, double[] x,  double[] y,  double[] z)
+    void getTargetCoordinates(DivconType divcon, ArrayList<Double> xsList,  ArrayList<Double> ysList,  ArrayList<Double> zsList)
     {
-        ArrayList<Double> xsList=new ArrayList<>();
-        ArrayList<Double> ysList=new ArrayList<>();
-        ArrayList<Double> zsList=new ArrayList<>();
         Cml cml=(Cml)divcon.getCmlOrTargetOrLigand().get(0);
         for(int moleculeCount=0;moleculeCount<cml.getAnyCmlOrAnyOrAny().size();moleculeCount++)
         {
@@ -2841,15 +2847,6 @@ private SVLVar retrieveLigandSelection(SVLVar var) throws SVLJavaException, IOEx
                     zsList.add(new Double(atom.getZ3().doubleValue()));
                 }
             }
-        }
-        x=new double[xsList.size()];
-        y=new double[ysList.size()];
-        z=new double[zsList.size()];
-        for(int vIndex=0;vIndex<x.length;vIndex++)
-        {
-            x[vIndex]=xsList.get(vIndex);
-            y[vIndex]=ysList.get(vIndex);
-            z[vIndex]=zsList.get(vIndex);
         }
         
     }
