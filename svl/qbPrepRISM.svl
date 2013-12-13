@@ -1,0 +1,291 @@
+#svl
+
+// qbmoebatch  -exec "run ['qbPrepRISM.svl',['1AZM_PDB.pdb']]" -exit
+
+#set main 'qbPrepRISM' 
+
+function PartialCharge;
+function _Atoms;
+function Protonate3D;
+function qbNearby;
+function fwrite_RISM;
+function Add_H;
+
+// between  ========= closely copy/paste from $MOE/lib/run/rism_run_ui.svl
+//   =========
+const SOLVENT_FILES_DIR = "$MOE/lib/rism/";
+
+const RISM_CONVERGE = ['Loose','Medium','Tight'];
+const RISM_CONVERGE_MAP = [1e-5,1e-7,1e-9];
+const GRID_SPACING = [0.20,0.25,0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7];
+const GRID_BUFFER = [4.0,5.0,6.0,7.0,8.0,9.0,10.0,15.0,20.0];
+const MAX_NATOM_MOPAC = 60;
+
+const MODE_BINDING = 1;
+const MODE_SINGLE = 2;
+const RISM_OPTIONS_DEFAULT = [
+	convergence	: x_pack ( RISM_CONVERGE == 'Medium'),
+	ndiis		: 5,
+	dx		: x_pack ( GRID_SPACING == 0.4 ),
+	buffer		: x_pack ( GRID_BUFFER == 7.0 )
+];
+
+const SOLVENT_DEFAULTS = [
+    saltid: 2,
+    hydrophobeid: 1
+];
+
+local function map_solvent_choice_to_file[choice]
+    local salt = choice.saltid;
+    local hydrophobe = choice.hydrophobeid;
+    local salt_name = "";
+    local hydrophobe_name = "";
+    local fname = "tip3p";
+
+    if salt == 1 then
+	// do nothing
+    elseif salt == 2 then
+	fname = cat [fname, "_nacl100"];
+    elseif salt == 3 then
+	fname = cat [fname, "_nacl500"];
+    elseif salt == 4 then
+	fname = cat [fname, "_nacl1000"];
+    endif
+
+    if hydrophobe == 1 then
+	// do nothing
+    elseif hydrophobe == 2 then
+	fname = cat [fname,"_cl"];
+    endif
+
+    return token cat[ SOLVENT_FILES_DIR, fname,".xvv"];
+endfunction
+
+// lig_method is the method to obtain ligand partial charges
+local function CalculatePartialCharges[ atoms, lig_method ]
+    local charges = [];
+    if not length atoms then
+	return charges;
+    endif
+    if isnull lig_method then
+	lig_method = 'AM1-BCC*';
+    endif
+
+	// Calculate a default set of charges from Amber
+
+    charges = first PartialCharge[ atoms, 'AMBER10' ];
+    local charging_method = rep['AMBER10', length atoms];
+
+	// Use AM1-BCC to calculate all ligand charges part
+	// of atoms. The calculation should be done on whole molecules
+	// of which any atom of atoms is part.
+
+    local ligands = _Atoms '$$ligand';
+    local allatoms = Atoms[];
+    local anum_u = uniq aMoleculeNumber atoms;
+    local anum_lig_u = uniq aMoleculeNumber ligands;
+    local lig_mol_in_atoms = indexof[ anum_lig_u, anum_u ];
+
+    if anytrue lig_mol_in_atoms then
+	local molid = anum_lig_u | lig_mol_in_atoms;
+	local allid = aMoleculeNumber allatoms;
+	local indices = indicesof[molid,allid];
+	local idxes;
+	local charged_ligat = [];
+	local charges_ligat = [];
+	local qmethod = [];
+	for idxes in indices loop
+	    local totalH = add aHCount allatoms[idxes];
+	    local explicitH = add aExplicitHCount allatoms[idxes];
+	    local heavycount = (length allatoms[idxes])-explicitH;
+	    if totalH <> explicitH and indexof[lig_method,
+		['AM1-BCC','AM1-BCC*']] then
+		continue;
+	    endif
+	    if heavycount > MAX_NATOM_MOPAC or explicitH > MAX_NATOM_MOPAC then
+		continue;
+	    endif
+	    local ncharges = first PartialCharge[ allatoms[idxes], lig_method];
+	    charges_ligat = cat[ charges_ligat, ncharges ];
+	    charged_ligat = cat[ charged_ligat, allatoms[idxes] ];
+	    qmethod = cat[ qmethod, rep[lig_method, length ncharges]];
+	endloop
+
+	idxes = indexof[ atoms, charged_ligat ];
+	charges[x_pack idxes] = charges_ligat[ pack idxes ];
+	charging_method[x_pack idxes] = qmethod[ pack idxes ];
+    endif
+    return [charges,charging_method];
+endfunction
+
+
+local function PrepareRISMOptions[ wkey, vals, atoms, receptor, ligand,
+    unused_atoms, rism_data, solvent_data ]
+
+    local function GetMinBoxSide [atkeys, buffer]
+	local pmin = app min aPos atkeys;
+	local pmax = app max aPos atkeys;
+	local pbox = (pmax-pmin) + 2*buffer;
+	return min pbox;
+    endfunction
+
+    static fwrite_options = [
+	solvent: fabsname map_solvent_choice_to_file[solvent_data],
+	buffer : GRID_BUFFER(rism_data.buffer),
+	spacing: GRID_SPACING(rism_data.dx),
+	tol    : RISM_CONVERGE_MAP(rism_data.convergence),
+	cutoff : 10.0,
+	ndiis  : rism_data.ndiis
+    ];
+
+	// Verify that the cutoff matches the box size
+
+    local minboxside;
+
+    if vals.calctype == MODE_BINDING then
+	minboxside = min apt GetMinBoxSide [ [receptor, ligand],
+	    [fwrite_options.buffer] ];
+
+    elseif vals.calctype == MODE_SINGLE then
+	minboxside = GetMinBoxSide [atoms, fwrite_options.buffer];
+    else
+	exit 'Wrong calctype in PrepareRISMOptions';
+    endif
+
+    fwrite_options.cutoff = min [10, minboxside/2];
+
+	// Verify that at least 32 grid points in each dimension are used
+	// Not sure why but the fortran code required sufficient nbr grid
+	// points.
+
+    local ngpts = app floor( minboxside / fwrite_options.spacing );
+    if anytrue (ngpts < 32 ) then
+	fwrite_options.spacing = (minboxside/(32+2));
+    endif
+
+    static charging_method;
+
+    if vals.calctype == MODE_BINDING then
+	fwrite_options.title = "3D-RISM Binding";
+
+	// This line creates a dependency on the run
+	// The atom classes are:
+	// 1: ligand
+	// 2: receptor
+	// 1 2: ligand & receptor
+
+	fwrite_options.atoms = [ligand, receptor, unused_atoms];
+
+    elseif vals.calctype == MODE_SINGLE then
+	fwrite_options.title = "3D-RISM Solute";
+	fwrite_options.atoms = [atoms, unused_atoms];
+
+    endif
+
+	// Default user charge calculation
+
+    fwrite_options.charges = aCharge (cat fwrite_options.atoms);
+
+    charging_method = rep[ 'Unmodified', length cat fwrite_options.atoms ];
+    local lig_charge_method;
+
+    if vals.charge_check then
+	lig_charge_method = 'AM1-BCC*';
+	fwrite_options.charges = [];
+
+	    // Start the partial charge assignment in a different task.
+
+	local fork_opt_charge = [
+	    master: 'parent',
+	    prio  : 0,
+	    idle  : 1,
+	    errmsg: 'ignore'
+	];
+
+	local [result_charge, code_charge] = task_wfork fork_opt_charge;
+	local result_charging;
+
+	if code_charge === 'child' then
+	    result_charging = CalculatePartialCharges[
+		(cat fwrite_options.atoms), lig_charge_method];
+	    fwrite_options.charges = first result_charging;
+	    charging_method = second result_charging;
+	    exit[];
+
+	elseif code_charge === 'error' then
+	    lig_charge_method = 'AMBER10';
+	    [result_charge, code_charge] = task_wfork fork_opt_charge;
+
+	    if code_charge === 'child' then
+		result_charging = CalculatePartialCharges[
+		    (cat fwrite_options.atoms),lig_charge_method];
+		fwrite_options.charges = first result_charging;
+		charging_method = second result_charging;
+		exit[];
+
+	    elseif code_charge === 'error' then
+		fwrite_options.charges = [];
+
+	    endif
+	endif
+    endif
+
+    return [fwrite_options, charging_method];
+
+endfunction
+
+//   =========
+
+global function qbPrepRISM[infname]
+    local globalSystem = SystemPush [];
+    oDestroy Chains[];
+    local molData=ReadPDB [infname,[return_data:1,gen_symm:1,crystal_contact_rad:15,crystal_contacts:1]];
+    oDestroy Chains[];
+
+    local asymmetricChains = mol_Create molData.mol;
+    local crystalChains = mol_Create molData.crystal_shell;
+    // clean out all water residues
+    local waterChains = uniq rChain (Residues [] | rName Residues [] == 'HOH');
+    asymmetricChains = diff [asymmetricChains,waterChains];
+    crystalChains = diff [crystalChains,waterChains];
+    oDestroy waterChains;
+    Add_H Atoms[];
+//    Protonate3D [Atoms[],Atoms[],Atoms[],[],[],[]];
+    
+    // start to build up fwrite
+    local vals;
+    vals.charge_check = 1;
+    vals.calctype = MODE_SINGLE;
+    vals.neardist = 10.0;
+
+    local receptor = [];
+    local ligand = [];
+    local atoms = cat rAtoms uniq aResidue qbNearby[cat cAtoms cat [asymmetricChains,crystalChains], cat cAtoms asymmetricChains, vals.neardist];
+    atoms = atoms | (not aInert atoms);
+
+    local wkey = [];
+    local unused_atoms_nowat = diff [Atoms[],atoms];
+    unused_atoms_nowat = unused_atoms_nowat | (not aInert unused_atoms_nowat);
+    local [ fwrite_options, charging_method ] = PrepareRISMOptions 
+    [
+		wkey,
+		vals,
+		atoms,
+		receptor,
+		ligand,
+		unused_atoms_nowat,
+		RISM_OPTIONS_DEFAULT,
+		SOLVENT_DEFAULTS
+    ];
+    
+    local basename = fbase ftail infname;
+    write ['Writing ... {}\n', twrite ['{}-rism.pdb',basename]];
+    fwrite_PDB[twrite ['{}-rism.pdb',basename], Chains[]];
+    write ['Writing ... {}\n', twrite ['{}-rism.rism',basename]];
+    fwrite_RISM[twrite ['{}-rism.rism',basename], fwrite_options ];
+    write ['DONE!\n'];
+    SystemPop globalSystem;
+endfunction
+	    
+#eof
+
