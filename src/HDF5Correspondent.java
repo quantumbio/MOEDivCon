@@ -2663,7 +2663,12 @@ private SVLVar retrieveLigandSelection(SVLVar var) throws SVLJavaException, IOEx
 //            if(true) return new SVLVar(new SVLVar("here", true), new SVLVar(""+((H5ScalarDS)hObject).getFullName(),true));
                     try
                     {
-                        selections[0]=new SVLVar((int[])((H5ScalarDS)hObject).read());
+                        int[] indexData=(int[])((H5ScalarDS)hObject).read();
+                        for(int indexIndex=0;indexIndex<indexData.length;indexIndex++)
+                        {
+                            indexData[indexIndex]+=1;
+                        }
+                        selections[0]=new SVLVar(indexData);
                     }
                     catch(HDF5Exception ex)
                     {
