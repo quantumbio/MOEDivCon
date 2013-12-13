@@ -214,98 +214,12 @@ local function BatchPanel finame
     endif
 endfunction
 
-// code between ======== copy/paste/edit from dock_ui.svl MOE 2012
-// ============
-const SETS = tr [
-//                              S  L  R
-    [ 'Dummy Atoms',            0, 0, 0, '$$dummy'      ],
-    [ 'Ligand Atoms',           1, 1, 0, '$$ligand'     ],
-    [ 'SDF File',               0, 1, 0, '$$ligfile'    ],
-    [ 'Pocket Atoms',           0, 0, 0, '$$pocket'     ],
-    [ 'Receptor Atoms',         0, 0, 1, '$$receptor'   ],
-    [ 'Receptor+Solvent',       0, 0, 1, '$$recsolvent' ],
-    [ 'All Atoms',              0, 0, 1, '$$all'        ],
-    [ 'Selected Atoms',         1, 1, 1, '$$aselected'  ],
-    [ 'Unselected Atoms',       0, 0, 1, '$$unselected' ],
-    [ 'Selected Residue',       1, 1, 1, '$$rselected'  ],
-    [ 'Selected Chains',        0, 0, 1, '$$cselected'  ],
-    [ 'None (Wall Only)',	    0, 0, 0, '$$none'	]
-];
-
-local function StandardSetTitles what
-    if     what == 'siteset' then what = 2;             // map category
-    elseif what == 'ligset'  then what = 3;
-    elseif what == 'recset'  then what = 4;
-    else                          what = 4;
-    endif
-
-    local dynprio = SETS(what);
-    local dynset = (SETS(5)|dynprio)[x_sort pack dynprio];
-    local dyntitle = SETS(1)[indexof [dynset, SETS(5)]];
-
-    local chains = Chains [];
-    chains = chains | not m_findmatch ['[[]PRIVATE]*', cName chains];
-    local ctag = diff [uniq sort cTag chains, ''];      // chain tags
-    ctag = ctag | not m_findmatch ['DUMMY*PH4*', ctag];
-    ctag = ctag | not m_findmatch ['$*', ctag];
-
-    local sets = sortuniq oCollections [];             // named sets
-    sets = sets | not m_findmatch [['[$.]*','*~'], sets];
-
-    return [
-	cat [dyntitle, sets],
-	cat [dynset, sets]
-    ];
-endfunction
-local function StandardSet [name, visible]
-    local atoms;
-
-	// Get Active atoms. An atom will be considered as active if there
-	// is at least 1 atom which is active in the molecule.
-
-    local a_atoms = Atoms [];
-    a_atoms = split [a_atoms, mtoc m_uniq aMoleculeNumber a_atoms];
-    a_atoms = a_atoms | app orE not aInert a_atoms;
-    a_atoms = cat a_atoms;
-
-    if name == '$$ligfile' then
-	return [];
-    elseif name == '$$none' then
-	return [];
-    elseif name == '$$recsolvent' then
-	atoms = join [
-	    uniq cat [ _Atoms '$$receptor', _Atoms '$$solvent'],
-	    a_atoms
-	];
-    elseif name == '$$all' then
-	atoms = Atoms[];
-    elseif name == '$$unselected' then
-	atoms = Atoms [] | not aSelected Atoms[];
-    elseif m_findmatch ['$$*', name] then
-	atoms = join [_Atoms name, a_atoms];
-    elseif m_findmatch ['ctag$$*', name] then
-	atoms = Chains[];
-	atoms = atoms | cTag atoms == tok_drop [name, 6];
-	atoms = cat cAtoms atoms;
-    else
-	atoms = cat oAtoms oGetCollection name;
-    endif
-    if istrue visible then
-	atoms = atoms | not aHidden atoms;
-    endif
-    return join [atoms, _Atoms []]; 
-endfunction
-
-// ============
-
-function qbGetAtomsInNMRCSV;
 function qbFixChargedAtomsPanel; 
 function qbCalcMemoryRequirementsInGB;
-function qbSendAtomsToNMRCSV;
 
-global function qbNMRPrepPanel[]
-
-	if WindowShow ['NMRPrepPanel', 1] then
+global function qbDCPrepPanel[]
+    local windowname = 'DivCon PrepPanel';
+	if WindowShow [windowname, 1] then
 	    return;
 	endif
 	
@@ -322,9 +236,6 @@ global function qbNMRPrepPanel[]
 
     static s_sets, s_names, l_sets, l_names;
     local siteatoms, ligatoms;
-
-    [s_sets, s_names] = StandardSetTitles 'siteset';
-    [l_sets, l_names] = StandardSetTitles 'ligset';
 
     local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
     
@@ -347,15 +258,15 @@ global function qbNMRPrepPanel[]
 	local wkey = WindowCreate
 	[
 	    name: 'panel',
-	    title: 'NMR Preparation',
-	    windowName: 'NMRPrepPanel',
+	    title: 'General DivCon Preparation',
+	    windowName: windowname,
 	    text: ['Help','Batch...','Cancel'],
-//	    onTrigger: ['return','validate','exit'],
-	    onTrigger: ['return','validate','return'],
+	    onTrigger: ['return','validate','exit'],
+//	    onTrigger: ['return','validate','return'],
 	    bubbleHelp: [
 	    'Help, Guidelines, and Support',
-		'Generate Batch script for DivCon-NMR...',
-		'Cancel without creating DivCon-NMR run script.'
+		'Generate Batch script for DivCon...',
+		'Cancel without creating DivCon run script.'
 	    ],
         Group :
         [
@@ -373,7 +284,7 @@ global function qbNMRPrepPanel[]
                     extendH: 1,
                     allowBlank: 0,
                     bubbleHelp:
-                        'Choose base filename for use in NMRScore. Note: any spaces will be replaced with underscores.'
+                        'Choose base filename for use in DivCon. Note: any spaces will be replaced with underscores.'
                 ]
             ],
         Separator : [flushLeft:1],
@@ -402,184 +313,124 @@ global function qbNMRPrepPanel[]
                 [
                     title: 'Stabilize Charge', name: 'button_FixCharge', graphics: config,
                     bubbleHelp: '(Optional) Stabilize charged atoms/residues through various means in order to encourage convergence.\n'
-                                '   NOTE: This can be done after the NMR atoms of interest are chosen below.'
                 ],
                 Label :
                 [ 
                     name: 'chgstabilize_info', text: '', 
                     bubbleHelp: '(Optional) Stabilize charged atoms/residues through various means in order to encourage convergence.\n'
-                                '   NOTE: This can be done after the NMR atoms of interest are chosen below.'
                 ]
             ]
         ],
 
         Separator : [flushLeft:1],
+        
         Hbox:
         [
-            Radio : [
-                name	: 'calctype',
-                title   : 'Calculation:',
-                margin	: 1,
-                columns	: 3,
-                type	: 'int',
-                flushLeft	: 1,
-                extendH	: 1,
-                onTrigger	: 'return',
-                font	: 'mediumBold',
-                text	: ['Shift','ShiftP','NMRScore'],
-                bubbleHelp	: 
-                    ['Calculate NMR Chemical Shift (CS) on all chosen atoms.',
-                        'Calculate NMR Chemical Shift Perturbation (CSP) on all chosen atoms.',
-                        'Calculate NMRScore on all chosen atoms.']
-            ]
-	    ],
-
-        Vbox:
-        [
-            name:   'NMRScoreOptions',
-            sensitive:0,
-            Hbox:
+            columns:2,
+            Option:
             [
-                Option:
-                [
-                    name: 'siteOptions',
-                    title: 'NMR Selection:',
-                    type: 'int',
-                    text: s_sets,
-                    onTrigger: 'return',
-                    bubbleHelp: 'The NMR Selection that will be scored/removed prior to the pose placement.'
-                ],
-                Button:
-                    [
-                        name: 'button_ShowSelectionAtoms', text: '?', font: 'mediumBold',
-                        bubbleHelp: 'Displays the approximate number of atoms that will be treated quantum mechanically.'
-                    ],
-                Label :
-                [ 
-                    name: 'siteOptions_info', text: '', 
-                    bubbleHelp: 'NMR Selection can only include one (1) residue.'
-                ]
+                name: 'hamiltonianOpt',
+                title: 'Hamiltonian: ',
+                type: 'int',
+                text: ['PM6','AM1','PM3'],
+                bubbleHelp: 'Semiempirical Quantum Mechanics Hamiltonian.\n'
+                            '   PM6: Advanced Hamiltonian that supports spd orbitals.\n'
+                            '   AM1/PM3: Legacy Hamiltonians that support sp orbitals.'
             ],
-
-            Hbox:
+            Option:
             [
-                Option:
-                [
-                    name: 'ligandOptions',
-                    title: 'Ligand Poses:',
-                    type: 'int',
-                    text: l_sets,
-                    onTrigger: 'return',
-                    bubbleHelp: 'The set of atoms (or file) that defines the ligand pose to score.'
-                ],
-                Button:
-                    [
-                        name: 'button_ShowLigandAtoms', text: '?', font: 'mediumBold',
-                        bubbleHelp: 'Displays the atoms that will be treated .'
-                    ],
-                Label :
-                [ 
-                    name: 'ligandOptions_info', text: '', 
-                    bubbleHelp: 'Unless SDF is chosen, the ligand atoms must be the same as the NMR Selection\n'
-                                '   and can only be a single residue.'
-                ]
+                name: 'guessOpt',
+                title: 'Guess DMX: ',
+                type: 'int',
+                text: ['Auto','Huckel','ADMA','None'],
+                bubbleHelp: 'A guess is generated to speed up the calculation.\n'
+                            '   Auto: The method will be chosen automatically based on conditions.\n'
+                            '   Huckel: Extended Huckel\n'
+                            '   ADMA: Adjustable Density Matrix Assembler\n'
+                            '   None: Simple identity matrix'
             ],
-            Hbox:
+            Option:
             [
-                extendH: 1,
-                FSBText: 
-                [
-                    name: 'posesSDF', len: 25, extendH: 1, sensitive: 0,
-                    allowBlank: 1,
-                    bubbleHelp:
-                    'Choose SDF which has the poses to be scored.'
-                ],
-                Button: [   name: 'browse_posesSDF', text: 'Browse...', sensitive: 0    ]
+                name: 'screenOpt',
+                title: 'Verbosity: ',
+                type: 'int',
+                text: ['0','1','2'],
+                bubbleHelp: 'Screen output verbosity.\n'
+                            '   0: Nothing is printed to the screen except errors.\n'
+                            '   1: Print basic SCF and Optimization cycle information only.\n'
+                            '   2: Print detailed information along with final output.'
+            ],
+            Option:
+            [
+                name: 'optimizationOpt',
+                title: 'Optimization: ',
+                type: 'int',
+                onTrigger: 'return',
+                text: ['None','All','Protons','Selection','SelectionH'],
+                bubbleHelp: 'Optimize structure.\n'
+                            '   None: Turn off structure optimization\n'
+                            '   All: All atoms in system\n'
+                            '   Protons: Just protons in system\n'
+                            '   Selection: Selected residue(s)\n'
+                            '   SelectionH: Just protons in selection'
             ]
         ],
-            Separator : [flushLeft:1],
-            Group : 
+        Vbox:
+        [
+            Checkbox: 
+            [ 
+                name: 'checkPWD',
+                text: 'Pairwise Energy Interaction',
+                bubbleHelp: 'Calculate atom:atom interaction energy.\n'
+                            '   Initial and final if optimization.'
+            ],
+            Checkbox: 
+            [ 
+                name: 'checkDecomposition',
+                text: 'Interaction Energy Decomposition',
+                onTrigger: 'return',
+                bubbleHelp: 'Calculate interaction energy components (Ees, Epol, Ect)\n'
+                            '   between selection and everything else.'
+            ]
+        ],
+        Separator : [flushLeft:1],
+        Group : 
+        [
+            Vbox:   
             [
-                Vbox:   
-                [
-                title: 'NMR Atoms:',
-                name: 'coreResidues',
-                    Hbox:
-                    [
-                        columns:4,
-                        Button:
-                            [
-                                name: 'retrieveSelection', 
-                                text: 'Retrieve Selection',
-                                bubbleHelp: 'Retrieve selected residues and add them to region refinement.'
-                            ],
-                        Button:
-                            [
-                                name: 'retrieveCSV', 
-                                text: 'Retrieve CSV',
-                                bubbleHelp: 'Retrieve experimental chemical shift data from QuantumBio-standard CSV NMR file.'
-                            ],
-                        Button:
-                            [
-                                name: 'button_ShowNMRAtoms', text: '?', font: 'mediumBold',
-                                bubbleHelp: 'Displays the approximate number of atoms that will be treated quantum mechanically.'
-                            ],
-                        Button:
-                            [
-                                name: 'deleteSelection', 
-                                text: 'X', font: 'mediumBold',flushLeft: 0,
-                                bubbleHelp: 'Delete selected atom from the list.'
-                            ]
-                    ],
-                    Data: [name:'CSVFileName'],
-                    Listbox :
-                        [
-                        name: 'coreResiduesBox',
-                        text: '',
-                        width:30,
-                        extendH:1,
-                        header: 'Chain\tRes\tUID\tAtom',
-                        onTrigger: 'return',
-                        type: 'modint',
-                        multiSelect: 0,
-                        sortEnable: 1,
-                        bubbleHelp:
-                            'NMR Chemical shift (CS) calculations will be performed on each of these atoms.\n'
-                            '   If SHIFT is chosen, only the CSs will be calculated.\n'
-                            '   If ShiftP is chosen, the CS Perturbation (CSP) for each bound/unbound atom will be calculated.\n'
-                            '   If NMRScore is chosen, the CSP RMSD (or NMRScore) will be calculated for each atom.\n'
-                            '   The list may be expanded by selecting additional atoms in the MOE window and \n'
-                            '   pressing the Retrieve Selection button above.'
-                        ]                ],
+            title: 'Core Residues:',
+            name: 'coreResidues',
                 Hbox:
                 [
-                    name: 'expData',
-                    columns:3,
-                    Text:
-                        [
-                            name: 'expUnbound',
-                            title:  'Unbound Shift: ',
-                            type:   'real',
-                            onTrigger: 'return',
-                            allowBlank: 1,
-                            bubbleHelp: 'Experimental unbound data (ppm).'
-                        ],
-                    Text:
-                        [
-                            name: 'expBound',
-                            title:  'Bound Shift: ',
-                            type:   'real',
-                            onTrigger: 'return',
-                            allowBlank: 1,
-                            bubbleHelp: 'Experimental bound data (ppm).'
-                        ],
-                     Button:
-                        [
-                            name: 'button_SetExp', text: 'Set', font: 'mediumBold',
-                            bubbleHelp: 'Sets the experimental bound/unbound shift data.'
-                        ]
-               ]
-            ],
+                    columns:4,
+                    Button:
+                    [
+                        name: 'retrieveSelection', 
+                        text: 'Retrieve Selection',
+                        bubbleHelp: 'Retrieve selected residues.'
+                    ],
+                    Button:
+                    [
+                        name: 'deleteSelection', 
+                        text: 'X', font: 'mediumBold',flushLeft: 0,
+                        bubbleHelp: 'Delete selected residue from the list.'
+                    ]
+                ],
+                Listbox :
+                    [
+                    name: 'coreResiduesBox',
+                    text: '',
+                    width:30,
+                    header: 'Chain\tRes\tUID',
+                    onTrigger: 'return',
+                    type: 'modint',
+                    multiSelect: 0,
+                    sortEnable: 1,
+                    bubbleHelp:
+                        'This list is required when regional treatment has been chosen.\n'
+                    ]
+            ]
+        ],
         Separator : [flushLeft:1],
         Mbox:
         [
@@ -615,46 +466,12 @@ global function qbNMRPrepPanel[]
 	];
 	
 	local function updateCoreResidueList [coreList]
-	    return apt twrite ['{}\t{}\t{}\t{}',qb_cLetter aChain coreList, rName aResidue coreList, rUID aResidue coreList, aName coreList];
+	    return apt twrite ['{}\t{}\t{}',qb_cLetter rChain coreList, rName coreList, rUID coreList];
 	endfunction
     
     local function ShowWarnings [wkey,trigger,values,status,siteatoms,ligatoms,is_file]
             local message = [];
-            
-            // check the NMR Selection and Ligand poses to make sure that they are correct
-            local siteCorrect = 0;
-            local ligandCorrect = 0;
-            if (length uniq aResidue siteatoms) > 1 then
-                WindowSetAttr[wkey, [ siteOptions_info: [text:'ERROR: >1 residue', foreground:'red']   ]];
-            else
-                siteCorrect = 1;
-                WindowSetAttr[wkey, [ siteOptions_info: [text:'', foreground:'red']   ]];
-            endif
-            if (length uniq aResidue ligatoms) > 1 then
-                WindowSetAttr[wkey, [ ligandOptions_info: [text:'ERROR: >1 residue', foreground:'red']   ]];
-            else
-                ligandCorrect = 1;
-                WindowSetAttr[wkey, [ ligandOptions_info: [text:'', foreground:'red']   ]];
-            endif
-            if not is_file and not (ligatoms === siteatoms) then
-                siteCorrect = 0;
-                ligandCorrect = 0;
-	            WindowSetAttr[wkey, [ ligandOptions_info: [text:'ERROR: no match site', foreground:'red']   ]];
-	            WindowSetAttr[wkey, [ siteOptions_info: [text:'ERROR: no match ligand', foreground:'red']   ]];
-	        endif
-	        if (not is_file and not length ligatoms) then 
-                ligandCorrect = 0;
-	            WindowSetAttr[wkey, [ ligandOptions_info: [text:'ERROR: ligand empty', foreground:'red']   ]];
-            endif	        
-	        if (not length siteatoms) then
-                siteCorrect = 0;
-	            WindowSetAttr[wkey, [ siteOptions_info: [text:'ERROR: site empty', foreground:'red']   ]];
-            endif
-	        if values.calctype == 1 then
-	            siteCorrect = 1;
-                ligandCorrect = 1;
-            endif
-            WindowSetAttr [wkey, [panel: [sensitive: [1,(siteCorrect and ligandCorrect),1]]]];
+
             // we dont support alternate atom positions yet
             local alt_atoms = cat app oGetCollection findmatch ['PDB_ALTLOC_[A-Z,a-z,0-9]', oCollections[]];
             local commonAtoms = join [alt_atoms,Atoms[]];
@@ -700,89 +517,25 @@ global function qbNMRPrepPanel[]
 	local status;
 	status.ran_protonate = 0; status.ran_structprep = 0; status.structprep_changed = 0;
 
-	local function setCalcValues [wkey,values]
-	    if isnull values then
-	        values = WindowValues wkey;
-	    endif
-        if values.calctype == 2 then
-            WindowSetAttr[wkey,
-            [
-                NMRScoreOptions:    [sensitive:1],
-                expData:            [sensitive:0]
-            ]];
-        elseif values.calctype == 1 then
-            WindowSetAttr[wkey,
-            [
-                NMRScoreOptions:    [sensitive:0],
-                expData:            [sensitive:0]
-            ]];
-        elseif values.calctype == 3 then
-            WindowSetAttr[wkey,
-            [
-                NMRScoreOptions:    [sensitive:1],
-                expData:            [sensitive:1]
-            ]];
-        endif
-	endfunction
-	
-    setCalcValues [wkey];
-
     WindowSetAttr[wkey, [ setMem: [value:status.memory] ]];
         
     values = WindowValues wkey;
-    siteatoms = StandardSet s_names(values.siteOptions);
-    ligatoms = StandardSet l_names(values.ligandOptions);
 
     local prevAtoms = Atoms[];
     if second task_fork [] == 'child' then
         task_settitle [ task_key -1, 'update_QBmemory'];
-        status.memory = 2 * qbCalcMemoryRequirementsInGB[Atoms[],values.setNP];
+        status.memory = qbCalcMemoryRequirementsInGB[Atoms[],values.setNP];
         WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
         exit[];
     endif
     ShowWarnings [wkey,trigger,values,status,siteatoms,ligatoms, l_names(values.ligandOptions) == '$$ligfile'];
 	WindowShow wkey;
 	local tmpFile;
-	local selectedAtomID;
+	local selectedResidueID;
 	local is_file;
     loop
         [values, trigger] = WindowWait wkey;
-  // write ['DEBUG: {} | {}\n', values, trigger];
-        if trigger === 'expUnbound' or trigger === 'expBound' or trigger === 'button_SetExp' then
-            selectedAtomID = bitshr [second values.coreResiduesBox,WMOD_NBITS];
-            if selectedAtomID > 0 then
-                unboundData.(totok coreList(selectedAtomID)) = values.expUnbound;
-                boundData.(totok coreList(selectedAtomID)) = values.expBound;
-                setData.(totok coreList(selectedAtomID)) = 1;
-            endif
-        elseif trigger === 'button_ShowNMRAtoms' then
-            aSetSelected [coreList, 1];
-        elseif trigger === 'button_ShowLigandAtoms' then
-            aSetSelected [ligatoms, 1];
-        elseif trigger === 'button_ShowSelectionAtoms' then
-            aSetSelected [siteatoms, 1];
-        elseif trigger === 'siteOptions' then
-            siteatoms = StandardSet s_names(values.siteOptions);
-            if l_names(values.ligandOptions) <> '$$ligfile' then
-                values.ligandOptions = indexof [s_names(values.siteOptions),l_names];
-                WindowSetAttr [wkey, [ligandOptions: [value:values.ligandOptions]]];
-                ligatoms = StandardSet l_names(values.ligandOptions);
-            endif
-        elseif trigger === 'ligandOptions' then
-            ligatoms = StandardSet l_names(values.ligandOptions);
-	        is_file = l_names(values.ligandOptions) == '$$ligfile';
-	        WindowSetAttr [wkey, [ 
-	            posesSDF:           [sensitive: is_file],
-	            browse_posesSDF:    [sensitive: is_file]
-	        ]];
-        elseif trigger === 'calctype' then
-            setCalcValues [wkey, values];
-            is_file = l_names(values.ligandOptions) == '$$ligfile';
-            WindowSetAttr [wkey, [ 
-                posesSDF:           [sensitive: is_file],
-                browse_posesSDF:    [sensitive: is_file]
-            ]];
-        elseif trigger === 'button_MOEPreparation' then
+        if trigger === 'button_MOEPreparation' then
             local before_run = length cat Atoms[];
             StructurePreparationGUI[cmd:'interactive'];
             status.ran_structprep = 1;
@@ -806,36 +559,23 @@ global function qbNMRPrepPanel[]
                 status.structprep_changed = 1;
             endif
             WindowShow[wkey,1];
+
         elseif trigger === 'coreResiduesBox' then
-            selectedAtomID = bitshr [second values.coreResiduesBox,WMOD_NBITS];
-            if selectedAtomID > 0 then
-                Isolate [coreList(selectedAtomID),Atoms[]];
-                WindowSetAttr[wkey,
-                [
-                    expUnbound: [value:unboundData.(totok coreList(selectedAtomID))],
-                    expBound: [value:boundData.(totok coreList(selectedAtomID))]                
-                ]];
+            selectedResidueID = bitshr [second values.coreResiduesBox,WMOD_NBITS];
+            if selectedResidueID > 0 then
+                Isolate [coreList(selectedResidueID),Residues[]];
             endif
         elseif trigger === 'deleteSelection' then
-            selectedAtomID = first values.coreResiduesBox;
-            if not isnull selectedAtomID then
-                local newSelectedID = selectedAtomID - 1;
-                if selectedAtomID == 1 then
+            selectedResidueID = first values.coreResiduesBox;
+            if not isnull selectedResidueID then
+                local newSelectedID = selectedResidueID - 1;
+                if selectedResidueID == 1 then
                     newSelectedID = 1;
                 endif
                 local tmpMask;
                 tmpMask = m_id coreList;
-                tmpMask(selectedAtomID) = 0;
+                tmpMask(selectedResidueID) = 0;
                 coreList = coreList | tmpMask;
-                local tmpexpUnbound;
-                local tmpexpBound;
-                if length coreList > 0 then
-                    tmpexpUnbound = unboundData.(totok coreList(newSelectedID));
-                    tmpexpBound = boundData.(totok coreList(newSelectedID));
-                else
-                    tmpexpUnbound = [];
-                    tmpexpBound = [];
-                endif
 
                 WindowSetAttr[wkey, 
                 [
@@ -843,128 +583,28 @@ global function qbNMRPrepPanel[]
                     [ 
                         text:   updateCoreResidueList[coreList],
                         value:  [newSelectedID]
-                    ],
-                    expUnbound: [value:tmpexpUnbound],
-                    expBound: [value:tmpexpBound] 
+                    ]
                 ]];
 
             endif
         elseif trigger === 'retrieveSelection' then
-            local newSelectedList = diff[Atoms [] | aSelected Atoms [],coreList];
+            local newSelectedList = uniq aResidue diff[Atoms [] | aSelected Atoms [],cat rAtoms coreList];
             local newSelected;
             for newSelected in newSelectedList loop
                 local prevLenCoreList = length coreList;
                 coreList = cat [coreList, newSelected];
-                boundData.(totok newSelected) = 0;
-                unboundData.(totok newSelected) = 0;
-                setData.(totok newSelected) = 0;
                 WindowSetAttr[wkey,
                 [
                     coreResiduesBox: 
                         [
                         text:   updateCoreResidueList[coreList],
                         value:  [1]
-                        ],
-                    expUnbound: [value:unboundData.(totok coreList(1))],
-                    expBound: [value:boundData.(totok coreList(1))]
+                        ]
                 ]];
             endloop
-        elseif trigger === 'retrieveCSV' then
-            tmpFile = FilePrompt [title:'Select QuantumBio Standard NMR CSV file', mode:'open', filter:'*.csv', multi:0];
-            local [tmpCoreList,tmpBoundData,tmpUnboundData] = qbGetAtomsInNMRCSV [tmpFile];
-            boundData = uniq cat [boundData,tmpBoundData];
-            unboundData = uniq cat [unboundData,tmpUnboundData];
-            coreList = uniq cat [coreList,tmpCoreList];
-            WindowSetAttr[wkey,
-            [
-                coreResiduesBox: 
-                    [
-                    text:   updateCoreResidueList[coreList],
-                    value:  [1]
-                    ],
-                expUnbound: [value:unboundData.(totok coreList(1))],
-                expBound: [value:boundData.(totok coreList(1))],
-                CSVFileName: [value:tmpFile]
-            ]];
-        elseif trigger === 'button_FixCharge' then
-            tmpCoreList = [];
-            tmpCoreList.coreList = coreList;
-            qbFixChargedAtomsPanel[tmpCoreList];
-            WindowShow[wkey,1];
-        elseif trigger === 'browse_posesSDF' then
-            local poseFile = FilePrompt [title:'Select Pose SDF', mode:'open', filter:'*.sdf', multi:0];
-            if not isnull poseFile then
-                WindowSetAttr[wkey,[posesSDF: [value:poseFile]]];
-            endif
-        elseif trigger === 'panel' then
-            if values.(trigger) == 'Batch...' then
-                local baseNameString = swrite ['{}', values.baseName];
-                baseNameString[cat indicesof[" ",baseNameString]] = "_";
-                values.baseName = token baseNameString;
-                WindowSetAttr[wkey, [ baseName:   [value:values.baseName]  ]];
-                                
-                local batchname = [];
-                if ShowWarnings [wkey,'inbatch',values,status,siteatoms,ligatoms, l_names(values.ligandOptions) == '$$ligfile'] then
-                    batchname = BatchPanel values.baseName;
-                endif
+        
+        endif
 
-                if not isnull batchname then
-                    if values.calctype == 1 then    // Shifts alone
-                        siteatoms = [];
-                        ligatoms = [];
-                    endif
-                    if values.calctype <> 3 then    // NOT NMRScore
-                        for selectedAtomID in coreList loop
-                            boundData.(totok selectedAtomID) = [];
-                            unboundData.(totok selectedAtomID) = [];
-                        endloop
-                    endif
-                    if length uniq aResidue siteatoms == 1 then
-                        values.siteatoms = siteatoms;
-                        values.ligatoms = ligatoms;
-                    endif
-                    WritePDB[twrite['{}-NMR.pdb',values.baseName]];
-                    qbSendAtomsToNMRCSV[twrite['{}-NMR.csv',values.baseName],coreList,boundData,unboundData];
-                    GenerateBatchScript[values,batchname];
-                    break;
-                endif
-            elseif values.(trigger) == 'Help' then
-                LaunchDocument '$QBHOME/doc/help-refine.html';
-            elseif values.(trigger) == 'Cancel' then
-                break;
-            endif
-        endif
-        ShowWarnings [wkey,trigger,values,status,siteatoms,ligatoms,l_names(values.ligandOptions) == '$$ligfile'];
-        if not (Atoms[] === prevAtoms) then
-            prevAtoms = Atoms[];
-            task_kill (task_keylist [] | task_title task_keylist [] == 'update_QBmemory');    // kill other memory update tasks
-            if second task_fork[master:'parent'] == 'child' then
-                task_settitle [ task_key -1, 'update_QBmemory'];
-                
-                if second task_fork [master:'parent'] === 'child' then          // this will give the user some feedback
-                    task_settitle [ task_key -1, 'mem_progress'];
-                    local loopCount = '|';
-                    loop
-                        sleep 0.5;
-                        if loopCount == '|' then
-                            loopCount = '/';
-                        elseif loopCount == '/' then
-                            loopCount = '-';
-                        elseif loopCount == '-' then
-                            loopCount = '\\';
-                        elseif loopCount == '\\' then
-                            loopCount = '|';
-                        endif
-                        WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',loopCount] ]], setMem: [value: [twrite['-10']]] ]];
-                    endloop
-                    exit[];
-                endif
-                status.memory = 2 * qbCalcMemoryRequirementsInGB [Atoms[],values.setNP];
-                task_kill (task_keylist [] | task_title task_keylist [] == 'mem_progress');
-                WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
-                exit[];
-            endif
-        endif
     endloop
     // clean up some items and then close out
     task_kill (task_keylist [] | task_title task_keylist [] == 'update_QBmemory');    // kill other memory update tasks
@@ -1001,9 +641,8 @@ function qbListModels;
 function qbRetrieveChemicalShifts;
 function qbRetrieveNMRScore;
 function ReadHDF5;
-function qbRetrieveLigandSelection;
 
-global function qbNMRAnalizePanel[]
+global function qbDCAnalizePanel[]
 
 	if WindowShow ['NMRAnalizePanel', 1] then
 	    return;
@@ -1210,6 +849,7 @@ global function qbNMRAnalizePanel[]
         local ligand;
         static poseChains,prevPoseMols,chemicalShifts;
         if neL [prevPoseMols,poseMols] then
+write ['clearing....\n'];
             poseChains = [];
             chemicalShifts = [];
             prevPoseMols = poseMols;
@@ -1221,12 +861,6 @@ global function qbNMRAnalizePanel[]
             oDestroy poseChains;
             poseChains = mol_Create poseMols.(totok ligand);
             [chemicalShifts,errorcode] = qbRetrieveChemicalShifts [hdfFile, target, ligand];
-            local runSelectionResidue;
-            if ligand <> 'Wildtype' then
-                [runSelectionResidue,errorcode] = qbRetrieveLigandSelection [hdfFile,target];
-                local inAtomList = diff [Atoms [], uniq cat rAtoms ((Residues[])(runSelectionResidue.ligandSelection+1))];
-                chemicalShifts.Index = indexof [get [inAtomList,chemicalShifts.Index],Atoms[]];
-            endif
             local elements = cat ['All',sort uniq aElement get[Atoms [], chemicalShifts.Index]];
             WindowSetAttr[wkey,[ eleOptions: [ text:elements ] ] ];
         endif
