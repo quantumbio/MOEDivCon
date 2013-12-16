@@ -1,7 +1,8 @@
 #svl
 //	io_pdb.svl		Protein Data Bank format
 //
-//  16-dec-2013 (md) lmw(QB) added alternate aware aHeavyValence
+//  16-dec-2013      lmw(QB) added option to apply symmetry op to HOH
+//  21-aug-2013 (md) lmw(QB) added alternate aware aHeavyValence
 //	18-sep-2013 (kk) get res_high & res_low (remark 3)
 //	12-sep-2013 (kk) TLS aniso calc; aSetAniso
 //	12-sep-2013 (kk) Copy tempfactor & occ to symmetry mates
@@ -301,6 +302,7 @@ const FREAD_PDB_DEFAULTS = [
     biomol:		    0,
     crystal_contacts:	    0,
     crystal_contact_rad:    4.5,
+    gen_symm_hoh:       1,      // symmetry is not applied to water in CCG-dist version.
     translate_primes:	    2,  // 0:none, 1:'->*,'OP1'->O1P', 2: vice versa
     consecutive_atoms:	    0,  // If on, residue atoms must be contiguous
     preserve_order:	    0,
@@ -4822,7 +4824,13 @@ global function pdb_CrystalContacts [data, opt];
     local rad = first cat [opt.crystal_contact_rad, 4.5];
     local mol = data.mol;
     local r = rep [0.5 * rad, mol_aCount mol];
-    local m = stretch [not mol_rSolventIonsMetals mol, mol_nAtoms mol];
+    // lmw(QBio): should apply symmetry opperation to both water and non-water.
+    local m;
+    if not opt.gen_symm_hoh then
+    m = stretch [not mol_rSolventIonsMetals mol, mol_nAtoms mol];
+    else
+    m = rep[1,mol_aCount mol];
+    endif
     local p = (mol_aPos mol) || [m = m and not mol_aLht mol];
     local [toF, toXYZ, X, Sym, Vec] = CrystalContacts [p, r|m, [spg, dim, ang]];
     p = [];
