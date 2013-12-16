@@ -1,7 +1,14 @@
 #svl
 //	io_pdb.svl		Protein Data Bank format
 //
-//	21-aug-2013 (md) lmw(QB) added alternate aware aHeavyValence
+//  16-dec-2013 (md) lmw(QB) added alternate aware aHeavyValence
+//	18-sep-2013 (kk) get res_high & res_low (remark 3)
+//	12-sep-2013 (kk) TLS aniso calc; aSetAniso
+//	12-sep-2013 (kk) Copy tempfactor & occ to symmetry mates
+//	04-sep-2013 (kk) Symmetry related atoms put in PDB_CrystalShell set
+//	04-sep-2013 (kk) standard residues must not have duplicate heavy atoms
+//	02-aug-2013 (kk) relaxed parse_mol_list (unwrap inc pack x => pack x)
+//	02-aug-2013 (kk) No RenderProtein in MOE_BATCH
 //	21-feb-2013 (kk) Try use_element if element perception fails
 //	13-feb-2013 (kk) Handle multiple END records ; option to ignore
 //	13-feb-2013 (kk) Fixed multi_model line skip
@@ -13,7 +20,7 @@
 //	17-sep-2012 (kk) Return errors for seqres non-matches
 //	30-aug-2012 (kk) Remarks with all spaces in #cols put in  remark.remark
 //	30-aug-2012 (kk) Read full line for TITLE etc
-//	30-aug-2012 (kk) Assume DBREF1/2 acc code is in same place as DBREF 
+//	30-aug-2012 (kk) Assume DBREF1/2 acc code is in same place as DBREF
 //	28-aug-2012 (kk) Write chain letter in TER card
 //	12-jul-2012 (kk) Write 70 chars in HEADER (dssp fails otherwise)
 //	12-jul-2012 (kk) Use first char as ele for left-just names + blank el
@@ -242,8 +249,9 @@
 
 #set title	'PDB File I/O'
 #set class	'MOE:file-io'
-#set version	'2013.02'
+#set version	'2013.09'
 
+// TBD : gzip -dt : integrity check
 // TBD : option to re-name atoms on read - all or H only
 // TBD : Use new oReparent when ready
 // TBD : Replace pro_AtomCheck; fix simple wash; 5' to 3'
@@ -256,6 +264,7 @@
 function pro_AtomCheck, pro_PeptideFlags;
 function AutoConnectFromPosition, AutoTypeFromPosition;
 function crys_StandardShortGroup, crys_GetGroupIndex;
+function crys_UfromTLS;
 function AtomSurfaceArea, aSlogP, aIdealVSA;
 function Write_Prompt;
 function RenderProtein;
@@ -311,16 +320,26 @@ local function oAppendSet [setname, atoms]
     oSetCollection [setname, uniq cat [atoms, oGetCollection setname]];
 endfunction
 
+local function el_IsLight el = el_Protons el <= 1;
+
 local function mean v = invz length v * add v;
 
 local function trim_ws s
+    if not isflat s then return app trim_ws s; endif;
+    if isnull s then return []; endif;
     local m = not isspace s, p = pscan m;
     return (s | m or (rotl m and ltE [0, p, last p]));
 endfunction
 
 local function trim_trailing_ws s
+    if not isflat s then return app trim_trailing_ws s; endif;
     local m = not isspace s, p = pscan m;
     return (s | m or p < last p);
+endfunction
+
+local function cut_to [s, c]
+    if not isflat s then return apt cut_to [s,c]; endif;
+    return drop [s, indexof [c, s]];
 endfunction
 
 local function apt_sread v = tr app first apt sread v;
@@ -366,7 +385,7 @@ local function mol_aBnd mol = mol(4)(MOL_ATOM_BONDS);
 local function mol_aEle mol = mol(4)(MOL_ATOM_EL);
 
 local function mol_aRad mol = el_COV_Radius mol_aEle mol;
-local function mol_aLht mol = 1 >= el_Protons mol_aEle mol;
+local function mol_aLht mol = el_IsLight mol_aEle mol;
 
 local function mol_aNumH mol = app add apt get [[mol_aLht mol], mol_aBnd mol];
 
@@ -378,6 +397,7 @@ local function mol_SymmetrizeBondlist mol
 endfunction
 
 local function str_R2A [mol, v] = stretch [v, mol_nAtoms mol];
+local function str_C2R [mol, v] = stretch [v, mol_nRes mol];
 local function str_C2A [mol, v] = str_R2A [mol, stretch [v, mol_nRes mol]];
 local function mol_aRnum mol = str_R2A [mol, igen mol_rCount mol];
 local function mol_aCnum mol = str_C2A [mol, igen mol_cCount mol];
@@ -425,7 +445,7 @@ endfunction
 //====== REMARK 600 - get ion/hyb/hintlp & bonds from CTAB structure ==========
 
 local function make_ctab v
-    v = v | app length app trim_ws v;
+    v = v | app length trim_ws v;
     local [rname, s] = apt_sread [v, '{t:}{c:*}'];
     local [natoms, nbonds] = first sread [s(1), '{t:X}{n:}{n:}'];
 
@@ -459,7 +479,7 @@ local function make_ctab v
 	B = B || [B(3)];
 
 	bond_info(CTAB_B_FROM)   = indexof [app token B(1), Aname];
-	bond_info(CTAB_B_TO)     = indexof [app token B(2), Aname];
+	bond_info(CTAB_B_TO)	 = indexof [app token B(2), Aname];
 	bond_info(CTAB_B_TYPE)   = B(3);
 	bond_info(CTAB_B_STEREO) = 0;
     endif
@@ -469,8 +489,8 @@ local function make_ctab v
     return tag [rname(1), [[
 	aname: [
 	    Aname,
-	    app token app trim_ws A(2),
-	    app token app trim_ws A(1)
+	    app token trim_ws A(2),
+	    app token trim_ws A(1)
 	],
 	ion:	mol_aIon mol,
 	hyb:	mol_aHyb mol,
@@ -518,7 +538,7 @@ local function split_list [s, split_char]
     local d = isdigit s;
     x | x == 1 and rotlpoke [d,0] and rotrpoke [d,0] = 0;
     x = append [x, 1];
-    s = app trim_ws app droplast split [cat [s, " "], mtoc rotr x];
+    s = trim_ws app droplast split [cat [s, " "], mtoc rotr x];
     s = s || s <> "\\";
     return app token (s | app length s);
 endfunction
@@ -548,7 +568,7 @@ local function wrap [s, len]
 	    s(j = inc j) = w(i);
 	endif
     endloop
-    return app trim_trailing_ws s;
+    return trim_trailing_ws s;
 endfunction
 
 local function unwrap v
@@ -625,7 +645,7 @@ local function parse_mol_list v
 	x | x = pack x * not isspace s;
     endif
 
-    local attr = app token app trim_ws apt keep [v | x, dec pack x];
+    local attr = app token trim_ws apt keep [v | x, dec pack x];
 
 	// "When necessary to fully describe hybrid molecules, tokens may"
 	// "appear more than once for a given MOL_ID."
@@ -635,7 +655,7 @@ local function parse_mol_list v
     x | x = (m = m_uniq attr) * pack x;	// ** See 3e6p
     attr = attr | m;
 
-    v | x = apt drop [v | x, inc pack x];
+    v | x = apt drop [v | x, pack x];	// was "inc pack"
     v = app unwrap split [v, mtoc x];
     m = apt eqL [";", app last v];
     v | m = app droplast (v | m);
@@ -656,7 +676,7 @@ local function parse_mol_list v
     return tag ([attr, v] || [app anytrue v]);
 endfunction
 
-local function parse_specification_list [data, record_type];
+local function parse_specification_list [data, record_type]
     local v = app token app first data.(record_type);
     local m = m_findmatch ['*MOL_ID: [1-9]*', v];
     if not anytrue first m then
@@ -925,7 +945,7 @@ global function fread_PDB_header [file, first_line]
 
     if length pdb.author then
 	v = unwrap app first pdb.author;
-	pdb.author = app token app trim_ws fieldsplit [v, ","];
+	pdb.author = app token trim_ws fieldsplit [v, ","];
     endif
 
 	// REVDAT
@@ -1000,12 +1020,12 @@ global function fread_PDB_header [file, first_line]
     function extract_remark_value [rem_text, ref_pattern]
 	local rf = string first findmatch [ref_pattern, rem_text];
 	if isnull rf then return []; endif;
-	rf = token trim_ws drop [rf, indexof [":", rf]];
-	if rf == 'NULL' then rf = []; endif;
-	return rf;
+	rf = trim_ws cut_to [rf, ":"];
+	if rf === "NULL" then rf = []; endif;
+	return token rf;
     endfunction
 
-    v = app token app trim_ws pdb.remark.'3';
+    v = app token trim_ws pdb.remark.'3';
     pdb.free_R = pdb.R_free = tonum extract_remark_value [v, [
 	'FREE R VALUE :*',		    // Refinment
 	'FREE R VALUE (NO CUTOFF) :*'	    // All data
@@ -1017,6 +1037,13 @@ global function fread_PDB_header [file, first_line]
     pdb.mean_B = tonum extract_remark_value [
 	v, 'MEAN B * (OVERALL, A\*\*:*'
     ];
+    pdb.res_high = tonum extract_remark_value [
+	v, 'RESOLUTION RANGE HIGH*\*:*'
+    ];
+    pdb.res_low  = tonum extract_remark_value [
+	v, 'RESOLUTION RANGE LOW*\*:*'
+    ];
+
     pdb.program = extract_remark_value [v, 'PROGRAM *:*'];
 
     const EXP_DETAILS_REMARKS = ['200','210','230','240','245','265'];
@@ -1038,9 +1065,6 @@ global function fread_PDB_header [file, first_line]
     if length pdb.dbref1 and length pdb.dbref1 == length pdb.dbref2 then
 	local dbref = apt cat [pdb.dbref1, pdb.dbref2];
 	if eqL app length dbref then
-//	    dbref = tr dbref;
-//	    dbref[[8,9]] = dbref[[9,8]]; // docs appear to be wrong 2012/08/30
-//	    pdb.dbref = cat [pdb.dbref, tr dbref];
 	    pdb.dbref = cat [pdb.dbref, dbref];
 	endif
     endif
@@ -1066,7 +1090,7 @@ global function fread_PDB_header [file, first_line]
     function parse_res_rec res_tag
 	local res_rec = tr pdb.(res_tag);
 	if l_length res_rec then
-	    res_rec(length res_rec) = app token app trim_ws last res_rec;
+	    res_rec(length res_rec) = app token trim_ws last res_rec;
 	    pdb.(res_tag) = res_rec;
 	else
 	    pdb = pdb | m_diff [tags pdb, res_tag];
@@ -1080,7 +1104,7 @@ global function fread_PDB_header [file, first_line]
 
     function parse_hetlist het_tag
 	local [rname, het_name] = tr pdb.(het_tag);
-	het_name = app trim_ws het_name;
+	het_name = trim_ws het_name;
 	m = m_uniq rname;
 	het_name = app cat split [het_name, mtoc m];
 	if het_tag == 'hetsyn' and length het_name then
@@ -1137,7 +1161,7 @@ const PDB_IONS = untag [
 
 // HIP is ambiguous; in an RCSB file it should be ND1-phosphonohistidine;
 // however, there is common usage of the AMBER conventions (and HIP in the
-// RCSB sense appears in only five files as of 2010-02-09 - 1JEM,1NSP,1NSQ,
+// RCSB sense appears in only five files as of 2013-09-16 - 1JEM,1NSP,1NSQ,
 // 1PFH & 2VME).
 // !!! UNK really doesn't belong here. We can call UNK's with appropriate
 // atom names amino later on ...
@@ -1215,6 +1239,9 @@ const STD_AMINO_RES_ATOMS = [
 	[ 2, [3,5], [4,13], [], 6, [7,8], 9, 10, 11, 11, 12, [], []] ],
     PTR:[['N','CA','C','O','CB','CG','CD1','CD2','CE1','CE2','CZ','OH',
 	    'P','O1P','O2P','O3P','OXT'],
+	[ 2,[3,5],[4,17],[],6,[7,8],9,10,11,11,12,13,[14,15,16],[]] ],
+    TYS:[['N','CA','C','O','CB','CG','CD1','CD2','CE1','CE2','CZ','OH',
+	    'S','O1','O2','O3','OXT'],
 	[ 2,[3,5],[4,17],[],6,[7,8],9,10,11,11,12,13,[14,15,16],[]] ],
     VAL:[['N','CA','C','CB','CG1','CG2','O','OXT'],
 	 [ 2, [3,4], [7,8], [5,6], [], [], [], []] ]
@@ -1366,9 +1393,7 @@ local function mol_StandardAttributes [mol, opt]
 	endif
 	local x1 = indexof [an, Aname];
 
-	if andE (x1 or 1 >= el_Protons el(i)) then
-//	    stdF(i) = andE indexof [Aname | Aname <> 'OXT', an];
-	    stdF(i) = andE indexof [an, Aname]; // Aname | Aname <> 'OXT', an];
+	if (stdF(i) = alltrue ((x1 and m_uniq x1) or el_IsLight el(i))) then
 	    if isnull bonds then continue; endif;
 	    bonds = bonds[pack x1];
 	    Aname = Aname[cat bonds];
@@ -1399,12 +1424,13 @@ const STANDARD_CHEM = [
     PHE:[ sp2:['CG','CD1','CD2','CE1','CE2','CZ']],
     TYR:[ sp2:['CG','CD1','CD2','CE1','CE2','CZ']],
     PTR:[ sp2:['CG','CD1','CD2','CE1','CE2','CZ']],
+    TYS:[ sp2:['CG','CD1','CD2','CE1','CE2','CZ']],
     TRP:[ sp2:['CG','CD1','CD2','NE1','CE2','CE3','CZ2','CZ3','CH2']],
     HIS:[ sp2:['CG','ND1','CD2','CE1','NE2'], hintlp:'ND1'],
     HID:[ sp2:['CG','ND1','CD2','CE1','NE2'], hintlp:'NE2'],
     HIE:[ sp2:['CG','ND1','CD2','CE1','NE2'], hintlp:'ND1'],
     HIP:[ sp2:['CG','ND1','CD2','CE1','NE2'], cation:'ND1'],
-    ARG:[ sp2:['NE','CZ','NH1','NH2'], cation:'NH2'],	// components.cif
+    ARG:[ sp2:['NE','CZ','NH1','NH2'], cation:'NH2'],	// as in components.cif
     LYS:[ cation:'NZ' ],
 
     A:[ anion:['OP1','OP2','OP3'], cation:'P', hintlp:['N1','N3','N7']],
@@ -1492,7 +1518,6 @@ local function mol_AmberAttributes [mol, opt]
 	mols = apt tagpeek [amberRlib, 'mol'];
     endif
 
-
     local rN = mol_rName mol;
     local nA = mol_nAtoms mol;
     local aN = mol_aName mol;
@@ -1552,38 +1577,38 @@ local function mol_AmberStandardize mol
 
     local psys = SystemPush [];
     local chains = mol_Create mol;
-    local res = Residues[];
+
+    local mcheck = not mol_rStd mol;
+    local res = Residues[] | mcheck;
 
     local [idx, atoms] = amber_ResidueLookup [
 	amberRlib, res, [level:0, stereo:1]
     ];
 
-    local ridx = x_pack app length idx;
-    idx = app first idx[ridx];
-    atoms = app first atoms[ridx];
+    local matchF = app length idx;
+    idx = app first (idx | matchF);
+    atoms = app first (atoms | matchF);
 
-    local i, mols = amberMols[idx];;
-    for i = 1, length idx loop
-	local resmol = mols(i);
+    local i, mols = amberMols[idx];
+    for i = 1, length mols loop
 	local mask = atoms(i);
 	atoms(i) = pack atoms(i);
-	aSetIon	     [atoms(i), (mol_aIon  resmol) | mask];
-	aSetGeometry [atoms(i), (mol_aHyb  resmol) | mask];
-	aSetHintLP   [atoms(i), (mol_aHLP  resmol) | mask];
 
-	local aname = (mol_aName resmol) | mask;
-	mask = aIsLight atoms(i);
-	aSetName [atoms(i) | mask, aname | mask];
+	aSetIon	     [atoms(i), (mol_aIon  mols(i)) | mask];
+	aSetGeometry [atoms(i), (mol_aHyb  mols(i)) | mask];
+	aSetHintLP   [atoms(i), (mol_aHLP  mols(i)) | mask];
     endloop
 
-    local mol2 = mol_Extract Residues[];
-    oDestroy chains;
-    SystemPop psys;
+    atoms = cat (atoms || not aIsLight atoms);
+    local xatom = aNumber atoms;
 
-    mol(3)(MOL_RES_STD)     = put [mol_rStd mol, ridx, 1];
-    mol(4)(MOL_ATOM_ION)    = mol_aIon mol2;
-    mol(4)(MOL_ATOM_GEOM)   = mol_aHyb mol2;
-    mol(4)(MOL_ATOM_HINTLP) = mol_aHLP mol2;
+    mol(3)(MOL_RES_STD)	    = mput [mol_rStd mol, mcheck, matchF];  // BONDS?
+
+    mol(4)(MOL_ATOM_ION)    = put [mol_aIon mol, xatom, aIon atoms];
+    mol(4)(MOL_ATOM_GEOM)   = put [mol_aHyb mol, xatom, aGeometry atoms];
+    mol(4)(MOL_ATOM_HINTLP) = put [mol_aHLP mol, xatom, aHintLP atoms];
+
+    SystemPop psys;
 
     return mol;
 endfunction
@@ -1607,7 +1632,7 @@ local function mol_aProx mol
     local P = mol_aPos mol;
     local R = mol_aRad mol;
 
-    local key = prox_open [2 * max [0, max R] + BOND_TOL, P, R + BOND_TOL];
+    local key = prox_open [2 * maxR [0, R] + BOND_TOL, P, R + BOND_TOL];
     local [N,x2,d2] = prox_find [key, P, R];
     prox_close key;
 
@@ -1620,7 +1645,7 @@ local function MatchCTAB [Aname, isH, ctab]
 	x(i) = indexof [Aname, ctab.aname(i)];
 	if andE (x(i) or isH) then break; endif;
     endloop
-    i = x_max app length app pack x;
+    i = x_max app add notnot x;
     return [x(i), ctab.aname(i)];
 endfunction
 
@@ -1641,9 +1666,9 @@ local function mol_ApplyCTAB [mol, ctab_dict]
     local std = mol_rStd mol;
 
     local natoms = mol_nAtoms mol;
-    local Aname = split [mol_aName mol,	        natoms ];
+    local Aname = split [mol_aName mol,		natoms ];
     local anum  = split [igen mol_aCount mol,	natoms ];
-    local light = split [mol_aLht mol,	        natoms ];
+    local light = split [mol_aLht mol,		natoms ];
 
     const LONG_BOND = 3;
 
@@ -1721,7 +1746,7 @@ local function mol_MicroHet mol
 	R_uid[x1] == R_uid[x2] and R_ins[x1] == R_ins[x2],
 	R_type[x1] == 'amino' or R_type[x2] == 'amino'	// ??
     ];
-    m = put [zero igen mol_rCount mol, R_idx[x2|m], 1];
+    m = put [rep [0, mol_rCount mol], R_idx[x2|m], 1];
 
     if anytrue m then
 	local variants = mol_rMask [mol, m];
@@ -1746,7 +1771,7 @@ local function mol_StandardBonds mol
     local R_type  = str_R2A [mol, mol_rType mol];
     local A_name  = mol_aName mol;
     local A_chain = mol_aCnum mol;
-    local L       = mol_aLht mol;
+    local light	  = mol_aLht mol;
 
 	// Make the polymer bonds between consecutive residues.
 	// Also bonds hydrogens to nearest heavy atom... should do this
@@ -1760,7 +1785,7 @@ local function mol_StandardBonds mol
 	    A_name[x1] == 'O3\'' and A_name[x2] == 'P'
 	]
     ];
-    local m_lht = L[x1] and not L[x2] and (R_idx[x1] == R_idx[x2]);
+    local m_lht = light[x1] and not light[x2] and (R_idx[x1] == R_idx[x2]);
     m_lht | m_lht = m_uniq (x1 | m_lht);
     m = m or m_lht;
 
@@ -1927,7 +1952,7 @@ local function mol_AutoConnect [mol, use_link]
     local xr2 = aR[x2];
     [xr1,xr2] = [xr1,xr2] || [xr2 > xr1];
 
-    local doneF = zero igen mol_rCount mol;
+    local doneF = rep [0, mol_rCount mol];
     loop
 	local i, clashF = zero doneF;
 	for i in x_pack not doneF loop
@@ -2067,40 +2092,33 @@ local function mol_InsertAltMol [mol, alt_mol]
     res = res | m;
     local atoms = oChildren res;
     local i, new_r = rep [[], length res];
-    
-    // lmw - the following lines are removed because for X-ray crystallography
-    //      this is not the right solution during the write. CCG is
-    //      exploring a fix where the alt. atoms are re-merged into the same
-    //      residue when the structure is written.
-    if 0 then
-        for i = 1, length res loop
-	    if anytrue (oParent aBonds atoms(i) <> res(i)) then continue; endif;
-	    local alt_r = alt[indexof [atoms(i), A]];
+    for i = 1, length res loop
+	if anytrue (oParent aBonds atoms(i) <> res(i)) then continue; endif;
+	local alt_r = alt[indexof [atoms(i), A]];
 
-	    [x,m] = sam (int alt_r and not indexof [atoms(i), A1]);
-	    atoms(i) = split [atoms(i)[x], mtoc m];
-	    alt_r = alt_r[x|m];
+	[x,m] = sam (int alt_r and not indexof [atoms(i), A1]);
+	atoms(i) = split [atoms(i)[x], mtoc m];
+	alt_r = alt_r[x|m];
 
-	    if first alt_r == " " then continue; endif;
-	    if not eqL app sort aName atoms(i) then continue; endif;
+	if first alt_r == " " then continue; endif;
+	if not eqL app sort aName atoms(i) then continue; endif;
 
-	    atoms(i) = dropfirst atoms(i);
+	atoms(i) = dropfirst atoms(i);
 
-	    local C = oParent res(i);
-	    local C_res = cat oChildren C;
+	local C = oParent res(i);
+	local C_res = cat oChildren C;
 
-	    oReparent [C_res = C_res | rNumber C_res > rNumber res(i), C_temp];
-	    new_r(i) = oCreate rep [C, length atoms(i)];
-	    oReparent [C_res, C];
+	oReparent [C_res = C_res | rNumber C_res > rNumber res(i), C_temp];
+	new_r(i) = oCreate rep [C, length atoms(i)];
+	oReparent [C_res, C];
 
-	    oReparent [atoms(i), new_r(i)];
+	oReparent [atoms(i), new_r(i)];
 
-	    rSetName [new_r(i), rName res(i)];
-	    rSetUID  [new_r(i),  rUID res(i)];
-	    rSetINS  [new_r(i),  dropfirst alt_r];
-	    rSetType [new_r(i), rType res(i)];
-        endloop
-    endif
+	rSetName [new_r(i), rName res(i)    ];
+	rSetUID  [new_r(i), rUID res(i)	    ];
+	rSetINS  [new_r(i), dropfirst alt_r ];
+	rSetType [new_r(i), rType res(i)    ];
+    endloop
 
     local mol_new = mol_Extract C1;
 
@@ -2253,7 +2271,7 @@ local function mol_SimpleWash mol
 	    continue;
 	endif
 
-	ion(first x)     = 1;
+	ion(first x)	 = 1;
 	ion[dropfirst x] = 0;
     endloop
 
@@ -2426,31 +2444,31 @@ local function pack_chain [A, opt]
     A(3) = mput [A(3), m, app token app rotl app string (A(3) | m)];
 #endif
 
-    mol(4)(MOL_ATOM_NAME)      = A(3);
-    mol(4)(MOL_ATOM_EL)	       = aname2ele app string A(18);
-    mol(4)(MOL_ATOM_GEOM)      = ele2hyb mol_aEle mol;
-    mol(4)(MOL_ATOM_BONDS)     = rep [[], add natoms];
-    mol(4)(MOL_ATOM_ION)       =
-    mol(4)(MOL_ATOM_HINTLP)    =
-    mol(4)(MOL_ATOM_CHARGE)    =
-    mol(4)(MOL_ATOM_CHIRALITY) =
-    mol(4)(MOL_ATOM_BACKBONE)  = zero A(3);
+    mol(4)(MOL_ATOM_NAME)	= A(3);
+    mol(4)(MOL_ATOM_EL)		= aname2ele app string A(18);
+    mol(4)(MOL_ATOM_GEOM)	= ele2hyb mol_aEle mol;
+    mol(4)(MOL_ATOM_BONDS)	= rep [[], add natoms];
+    mol(4)(MOL_ATOM_ION)	= zero A(3);
+    mol(4)(MOL_ATOM_HINTLP)	= zero A(3);
+    mol(4)(MOL_ATOM_CHARGE)	= zero A(3);
+    mol(4)(MOL_ATOM_CHIRALITY)	= zero A(3);
+    mol(4)(MOL_ATOM_BACKBONE)	= zero A(3);
 
 	// These extension columns must be removed before any mol_Create.
 
-    A(18) = app token app trim_ws A(18);
+    A(18) = app token trim_ws A(18);
 
-    mol(4)(MOL_ATOM_LITERAL) = A(18);		// literal atom name
-    mol(4)(MOL_ATOM_ORDER)   = A(19);		// original order
-    mol(4)(MOL_ATOM_SERIAL)  = A(2);		// atom serial number
-    mol(4)(MOL_ATOM_ALOC)    = A(4);		// alternate location char
-    mol(4)(MOL_ATOM_OCC)     = A(12);		// occupancy
-    mol(4)(MOL_ATOM_TEMP)    = A(13);		// temp factor
-    mol(4)(MOL_ATOM_ELCOL)   = A(15);		// pdb element col
-    mol(4)(MOL_ATOM_QCOL)    = A(16);		// pdb charge col
-    mol(4)(MOL_ATOM_REC)     = A(1);		// record type
-    mol(4)(MOL_ATOM_ACTIVE)  = one A(3);	// will be 0 for unchosen alts
-    mol(4)(MOL_ATOM_CTABH)   = - one A(3);
+    mol(4)(MOL_ATOM_LITERAL)	= A(18);	// literal atom name
+    mol(4)(MOL_ATOM_ORDER)	= A(19);	// original order
+    mol(4)(MOL_ATOM_SERIAL)	= A(2);		// atom serial number
+    mol(4)(MOL_ATOM_ALOC)	= A(4);		// alternate location char
+    mol(4)(MOL_ATOM_OCC)	= A(12);	// occupancy
+    mol(4)(MOL_ATOM_TEMP)	= A(13);	// temp factor
+    mol(4)(MOL_ATOM_ELCOL)	= A(15);	// pdb element col
+    mol(4)(MOL_ATOM_QCOL)	= A(16);	// pdb charge col
+    mol(4)(MOL_ATOM_REC)	= A(1);		// record type
+    mol(4)(MOL_ATOM_ACTIVE)	= one A(3);	// will be 0 for unchosen alts
+    mol(4)(MOL_ATOM_CTABH)	= - one A(3);
 
 	// Split "large" numbers of trailing waters into a new chain.
 
@@ -2551,23 +2569,26 @@ global function fread_PDB_model [file, first_line, opt]
 	    anames(i) = token L[[13,14,15,16]];
 	    chain(i)  = ichain;
 
-	elseif R == 'SIGATM' then
+	elseif R == 'SIGATM' then   // Obsolete a while ago, but ...
 	    if (j = inc j) > length sigatm then
 		sigatm = cat [sigatm, rep [[], PDB_MAX]];
 	    endif
-	    sigatm(j) = first sread [L, ATOM_FMT];
+	    sigatm(j) = (first sread [L, ANISOU_FMT])[[2,9,10,11,12,13,14]];
 
 	elseif R == 'ANISOU' then
 	    if (k = inc k) > length anisou then
 		anisou = cat [anisou, rep [[], PDB_MAX]];
 	    endif
-	    anisou(k) = first sread [L, ANISOU_FMT];
+
+		// atom serial + six values
+
+	    anisou(k) = (first sread [L, ANISOU_FMT])[[2,9,10,11,12,13,14]];
 
 	elseif R == 'SIGUIJ' then
 	    if (l = inc l) > length siguij then
 		siguij = cat [siguij, rep [[], PDB_MAX]];
 	    endif
-	    siguij(l) = first sread [L, ANISOU_FMT];
+	    siguij(l) = (first sread [L, ANISOU_FMT])[[2,9,10,11,12,13,14]];
 
 	elseif R == 'TER' then
 	    prev_chain = 0;			// new chain
@@ -2582,12 +2603,12 @@ global function fread_PDB_model [file, first_line, opt]
 	    break;				// BREAK: catenated PDB files
 
 	elseif R == 'ENDMDL' then
-	    if anytrue opt.multi_model then 
+	    if anytrue opt.multi_model then
 		while length (L = freadb [fnum, 'line', 1]) loop
 		    if isnull (L = first L) then continue; endif;
 		    R = first sread [keep [L, 6], '{t:}'];
 		until indexof [R, ['ATOM','HETATM','CONECT']]
-		until R == 'END' and not anytrue opt.ignore_END 
+		until R == 'END' and not anytrue opt.ignore_END
 		endloop
 	    else
 		while length (L = freadb [fnum, 'line', 1]) loop
@@ -2615,6 +2636,8 @@ global function fread_PDB_model [file, first_line, opt]
 	fclose fnum;
     endif;
 
+    [anisou, siguij, sigatm] = apt keep [[anisou, siguij, sigatm], [k,l,j]];
+
     conect = keep [conect, iC];
     [atoms, anames, chain] = apt keep [[atoms, anames, chain], [i]];
     atoms = tr atoms;
@@ -2626,7 +2649,7 @@ global function fread_PDB_model [file, first_line, opt]
 	endif
 	opt.use_element = 1;
     endif
-   
+
     atoms = append [atoms, anames]; anames = [];
     atoms = append [atoms, x_id first atoms];
 
@@ -2739,23 +2762,28 @@ global function fread_PDB_model [file, first_line, opt]
 	mol = mol_RestoreOrder [chain_data, mol];
     endif
 
-    model.atom_serial = mol(4)(MOL_ATOM_SERIAL);
-    model.alt_loc     = mol(4)(MOL_ATOM_ALOC);
-    model.occupancy   = mol(4)(MOL_ATOM_OCC);
-    model.B_factor    = mol(4)(MOL_ATOM_TEMP);
-    model.active      = mol(4)(MOL_ATOM_ACTIVE);
-    model.ele_col     = mol(4)(MOL_ATOM_ELCOL);
+    model.atom_serial	= mol(4)(MOL_ATOM_SERIAL);
+    model.alt_loc	= mol(4)(MOL_ATOM_ALOC);
+    model.occupancy	= mol(4)(MOL_ATOM_OCC);
+    model.B_factor	= mol(4)(MOL_ATOM_TEMP);
+    model.active	= mol(4)(MOL_ATOM_ACTIVE);
+    model.ele_col	= mol(4)(MOL_ATOM_ELCOL);
 
     model.mol = mol_DropExtend mol;
 
-	// append 1 to the end of these for model number
+    function map_anisou anisou
+	anisou = anisou | app length anisou;
+	if not eqE app length anisou then return []; endif;
+	anisou = tr anisou;
+	i = indexof [first anisou, model.atom_serial];
+	anisou = ((dropfirst anisou) || [i]);
+	i = pack i;
+	return apt put [rep [zero model.atom_serial, 6], [i], anisou];
+    endfunction
 
-    anisou = anisou | app length anisou;
-    if length anisou then model.anisou = tr apt cat [anisou, 1]; endif;
-    siguij = siguij | app length siguij;
-    if length siguij then model.siguij = tr apt cat [siguij, 1]; endif;
-    sigatm = sigatm | app length sigatm;
-    if length sigatm then model.sigatm = tr apt cat [sigatm, 1]; endif;
+    if length anisou then model.anisou = (inv 1e4) * map_anisou anisou; endif;
+    if length siguij then model.siguij = map_anisou siguij; endif;
+    if length sigatm then model.sigatm = map_anisou sigatm; endif;
 
     model.crystal_contacts = zero model.atom_serial;
 
@@ -2794,7 +2822,10 @@ local function _pdb_close [file, fnum, exe_key]
 endfunction
 
 global function pdb_Seqres2Atoms;
+
 local function pdb_SplitHets;
+local function pdb_GetAnisoTLS;
+
 global function pdb_GenerateImages, pdb_GenerateBiomol, pdb_CrystalContacts;
 
 global function: fread_PDB [file, opt]
@@ -2831,6 +2862,8 @@ global function: fread_PDB [file, opt]
     data.first_line = [];
     data = tagcat [data, fread_PDB_model [fnum, line, opt]];
 
+    data = pdb_GetAnisoTLS data;
+
     local i, v, m, attr;
 
 	// Multiple model handling
@@ -2857,14 +2890,8 @@ global function: fread_PDB [file, opt]
 	    endfunction
 
 	    v.atom_data = poke_model_num v.atom_data;
-	    v.anisou    = poke_model_num v.anisou;
-	    v.sigatm    = poke_model_num v.sigatm;
-	    v.siguij    = poke_model_num v.siguij;
 
 	    data.atom_data  = apt cat [data.atom_data, v.atom_data];
-	    data.siguij     = apt cat [data.siguij,    v.siguij   ];
-	    data.sigatm     = apt cat [data.sigatm,    v.sigatm   ];
-	    data.anisou     = apt cat [data.anisou,    v.anisou   ];
 	endloop
 	data.model_num = imodel;
 	data.first_line = line;
@@ -2924,7 +2951,7 @@ global function: fread_PDB [file, opt]
     cN = select [cT, tok_cat [cT, '.', cN], cN == ' ' or cN  == ''];
     data.chain_id = mput [data.chain_id, app isnull data.chain_id, " "];
 
-    local cH = app token app trim_ws app string mol_cHdr data.mol;
+    local cH = app token trim_ws app string mol_cHdr data.mol;
     cH | cH == '' = token data.header;
 
     local mol = data.mol;
@@ -2995,9 +3022,9 @@ global function: ReadPDB [file, opt]
 	[dim, ang] = split [data.unit_cell, 3];
 
 	if alltrue [
-	     not gotcell, 
-	     anytrue [opt.install_cryst, opt.gen_symm],
-	     anytrue space_group
+	    not gotcell,
+	    anytrue [opt.install_cryst, opt.gen_symm],
+	    anytrue space_group
 	] then
 	    local spg = crys_StandardShortGroup [space_group, dim, ang];
 	
@@ -3025,6 +3052,21 @@ global function: ReadPDB [file, opt]
 	chains = cat [chains, C];
 
 	aSetOccupancy [A, data.occupancy];
+	if length data.anisou then
+	    aSetAniso [A, data.anisou[[1,4,5,2,6,3]]];
+	elseif length data.TLS.anisou and length data.B_factor then
+	    local u = data.TLS.anisou;
+	    local B = data.B_factor;
+	    local m = B > 0 and orE (0 < abs u); // B > 0 sufficient?
+	    u = u || [m];
+	    B = B | m;
+	    if anytrue data.TLS.B_resid then
+		u = putadd [u, [1,4,6], [B/(8*sqr PI)]];
+	    else
+		u = putadd [u, [1,4,6], [B/(8*sqr PI) - mean u[[1,4,6]]]];
+	    endif
+	    aSetAniso [A | m,  u];
+	endif
 
 	if length data.active then
 	    aSetInert [A, not data.active];
@@ -3032,7 +3074,7 @@ global function: ReadPDB [file, opt]
 
 	if anytrue opt.use_charges then
 	    aSetCharge [A, data.B_factor];
-	else
+	elseif anytrue data.B_factor then
 	    aSetTempFactor [A, data.B_factor];
 	endif
 
@@ -3046,12 +3088,19 @@ global function: ReadPDB [file, opt]
 	    oAppendSet ['PDB_CrystalContacts', A | data.crystal_contacts];
 	endif
 
-	RenderProtein [C, [center:opt.center]];
+	if not MOE_BATCH then
+	    RenderProtein [C, [center:opt.center]];
+	endif
 
 	if length data.crystal_shell then
+	    local Abase = A[data.crystal_shell_auidx];
 	    A = cat oAtoms (c = mol_CreateHidden data.crystal_shell);
+	    oAppendSet ['PDB_CrystalShell', A];
 	    aSetColorBy [A, select ['rgb', 'element', 'C' == aElement A]];
 	    aSetRGB [A | 'C' == aElement A, icolor 'Green'];
+	    aSetTempFactor [A, aTempFactor Abase];
+	    aSetOccupancy  [A, aOccupancy  Abase];
+	    aSetAniso [A, aAniso Abase];
 	    aSetHidden [A, 0];
 	    chains = cat [chains, c];
 	endif
@@ -3282,8 +3331,8 @@ local function StandardizeHydrogenNames [atoms, opt]
     local Hnum = cat app igen n;
 
     local hvA = aBonds H;	// attached heavy atom
-	
-	// getHeavyValence is an approximate drop in replacement
+
+	// lmw(QBio): getHeavyValence is an approximate drop in replacement
 	//      for aHeavyValence but it will account for alternate locations.
 	//      Using the atom name as the cross reference for alternates.
 	function getHeavyValence atom
@@ -3294,6 +3343,7 @@ local function StandardizeHydrogenNames [atoms, opt]
 	// "Old" PDB always starts numbering hydrogens at 1, everybody
 	// else starts at the heavy valence, unless there is only one
 	// in which case there is no number.
+
     if not (opt.hnames === 'PDB') then
 //	Hnum = Hnum + (aHeavyValence hvA == 2);
 	Hnum = Hnum + (app getHeavyValence hvA == 2);
@@ -4216,7 +4266,8 @@ local function mol_CheckAlignment mol
 
 	local seg = btoc not N;
 
-	      N = split [N,		seg];
+	N = split [N, seg];
+
 	local U = split [R_uid(i),	seg];
 	local I = split [R_ins(i),	seg];
 	local R = split [R_names(i),	seg];
@@ -4263,15 +4314,15 @@ endfunction
 global function pdb_Seqres2Atoms [data, mol]
     local i,x;
 
-    local seqres = untag taguniq data.seqres;	// warn if duplicates !!!
+    local seqres = untag taguniq data.seqres;	// warn if duplicates ?
     local modres = data.modres;
     local seqadv = data.seqadv;
 
     modres = modres || [not eqE modres[[1,5]]];
-    modres = modres || [andE ('' <> modres[[1,5]])];
+    modres = modres || ['' <> modres(1)];
 
     seqadv = seqadv || [not eqE seqadv[[1,7]]];
-    seqadv = seqadv || [andE ('' <> seqadv[[1,7]])];
+    seqadv = seqadv || ['' <> seqadv(1)];
 
     local C_id = app token cLetter mol_cName mol;
 
@@ -4334,7 +4385,7 @@ global function pdb_Seqres2Atoms [data, mol]
 
 	sub_res = seqadv || [c == seqadv(2)];
 	if l_length sub_res  then
-	     if check_seq [idx(i), i, sub_res[[1,3,4,7]]] then
+	    if check_seq [idx(i), i, sub_res[[1,3,4,7]]] then
 		continue;
 	    endif;
 	endif
@@ -4436,39 +4487,38 @@ endfunction
 
 local function extract_BIOMT data
     function parse_error []
-	data.error = cat [data.error, 'Error parsing BIOMT record'];
+	data.error.biomt = cat [data.error.biomt, 'Error parsing BIOMT record'];
 	return data;
     endfunction
 
     local rem = data.remark.'350';
     local m = m_findmatch [
-	'BIOMOLECULE: [A-Z,a-z,1-9]*', app token app trim_ws rem
+	'BIOMOLECULE: [A-Z,a-z,1-9]*', app token trim_ws rem
     ];
     if allfalse m then return parse_error[]; endif;
 
     local v = dropfirst split [rem, mtoc m];
     local imol = rep ['', length v], biomol = rep [[], length v];
 
-    local i,j;
+    local i,j,k;
     for i = 1, length v loop
 	imol(i) = first sread [v(i)(1), '{t:X}{t:}'];
 	const CHAIN_LETTER_LINE = '*APPLY *CHAINS:*?*';
 	m = m_findmatch [CHAIN_LETTER_LINE, app token v(i)];
 	biomol(i) = dropfirst split [v(i), mtoc m];
 	for j = 1, length biomol(i) loop
-	    local s = biomol (i)(j);
+	    local s = biomol(i)(j);
 
 		// Pick up the chain letters
 
-	    local lett = drop [s(1), indexof [":", s(1)]];
-	    lett = (lett | not (isspace lett or lett == ","));
+	    local lett = cut_to [s(1), ":"];
 
 	    s = dropfirst s;
 	    while m_findmatch [' *AND CHAINS:*', token s(1)] loop
-		local l = drop [s(1), indexof [":", s(1)]];
-		lett = cat [lett, (l | not (isspace l or l == ","))];
+		lett = cat [lett, cut_to [s(1), ":"]];
 		s = dropfirst s;
 	    endloop
+	    lett = lett | not (isspace lett or lett == ",");
 
 	    local w = apt sread [s, '{t:8}{n:1}{n:4}{n:10*3}{n:}'];
 	    w = (app first w) | (app second w) >= 59;   // XXX !!! 1m4x
@@ -4538,9 +4588,9 @@ global function pdb_GenerateBiomol [data, opt]
 	endloop
 
 	k = inc length biomol;
-	biomol(k)    = mol_Cat mols;
-	imol(k)	     = rep [I(i), mol_cCount biomol(i)];
-	atom_attr(k) =  A;
+	biomol(k)	= mol_Cat mols;
+	imol(k)		= rep [I(i), mol_cCount biomol(i)];
+	atom_attr(k)	= A;
     endloop
 
     for attr in ATOM_ATTR loop
@@ -4601,6 +4651,7 @@ local function mol_Images [aumol, toFrac, toXYZ, ridx, Sym, Vec, rad]
     local image = rep [[], length idx];
 
     aumol(2) = append [aumol(2), igen mol_cCount aumol];
+    aumol(4) = append [aumol(4), igen mol_aCount aumol];
     aumol(4) = append [aumol(4), rad];
 
     local prox = prox_open [2 * max rad, mol_aPos aumol, rad];
@@ -4638,7 +4689,7 @@ local function mol_Images [aumol, toFrac, toXYZ, ridx, Sym, Vec, rad]
 
     idx = last image(2);
     I = uniq idx;
-    image = mol_DropExtend image;
+    image(2) = keep [image(2), dec MOL_CHAIN_EXTEND];   // protects mol_cMask
     aumol = [];
     for i = 1, length I loop
 	aumol(i) = mol_cMask [image, idx == I(i)];
@@ -4648,9 +4699,13 @@ local function mol_Images [aumol, toFrac, toXYZ, ridx, Sym, Vec, rad]
 	aumol(i)(2)(MOL_CHAIN_NRES)   = l_length aumol(i)(3);
     endloop
     aumol = mol_Cat aumol;
-    aumol = mol_cMask [aumol, mol_nRes aumol];
 
-    return [aumol, mask];
+    aumol(2) =  keep [image(2), dec MOL_CHAIN_EXTEND];	// protect  mol_cMask
+    aumol    = mol_cMask [aumol, mol_nRes aumol];
+
+    local auidx = last droplast aumol(4);
+
+    return [mol_DropExtend aumol, mask, auidx];
 endfunction
 
 local function periodic_pos fpos
@@ -4754,7 +4809,7 @@ local function CrystalContacts [aupos, rad, [spg, dim, ang]]
 endfunction
 
 global function pdb_CrystalContacts [data, opt];
-    if isnull data.unit_cell or isnull data.space_group then 
+    if isnull data.unit_cell or isnull data.space_group then
 	return data;
     endif
     local [dim, ang] = split [data.unit_cell, 3];
@@ -4772,15 +4827,16 @@ global function pdb_CrystalContacts [data, opt];
     local [toF, toXYZ, X, Sym, Vec] = CrystalContacts [p, r|m, [spg, dim, ang]];
     p = [];
 
-    local ridx = stretch [x_id first mol(3), mol_nAtoms mol];
-    X = (ridx | m)[X]; ridx = m = [];
+    local idx = stretch [x_id first mol(3), mol_nAtoms mol];
+    X = (idx | m)[X]; idx = m = [];
 
-    [mol, m] = mol_Images [mol, toF, toXYZ, X, Sym, Vec, r];
+    [mol, m, idx] = mol_Images [mol, toF, toXYZ, X, Sym, Vec, r];
 
 	// Add to data.mol instead ?
 
     if length mol then
 	data.crystal_shell = mol;
+	data.crystal_shell_auidx = idx;
 	data.crystal_contacts = m;
     endif
 
@@ -4870,3 +4926,639 @@ global function pdb_ConnectAndType [mol, opt]
 
     return [mol_DropExtend mol, mol(4)(MOL_ATOM_ACTIVE)];
 endfunction
+
+//===========================================================================
+
+// Convert BUSTER selection strings to PHENIX format.
+
+local function BUSTER2PHENIX s
+
+	// Remove extra spaces around dashes.
+
+    local origs = s;
+    local exts = cat ["x", s, "x"];
+    local x = x_pack (exts == "-");
+    local m_neg = isdigit exts[inc x] and not isdigit exts[dec x];
+    exts[x | m_neg] = "&"; // temporary negation placeholder
+    x = x | not m_neg;
+    x = cat [x, x_pack (exts == ":")];
+    x = x | (exts[inc x] == " " or exts[dec x] == " ");
+    x = uniq cat [inc x, dec x];
+    local m = one exts;
+    m[x] = 0;
+    s = dropfirst droplast (exts | (m or exts <> " "));
+    s = s | s <> "{" and s <> "}" and s <> "(" and s <> ")";
+    s | s == "," = " ";
+
+    local lastchain = "";
+    s = wordsplit [s, " "];
+    local i, ps = ""; // PHENIX string
+    for i = 1, length s loop
+	if s(i) === "CHAIN" then
+	    continue;
+	endif
+	if not isnull ps then
+	    ps = cat [ps, " OR "];
+	endif
+	local r = wordsplit [s(i), "-"];
+	local r1 = r(1);
+	r1 | r1 == "&" = "-";
+	r(1) = r1;
+	if length r == 1 then
+	    r = wordsplit [r(1), ":"];
+	endif
+	r(1) = wordsplit [r(1), "|"];
+	if length r(1) == 1 and not isdigit r(1)(1)(1) then // e.g. A200
+	    r(1) = split [r(1)(1), [1, INT_MAX]];
+	endif
+	if length r == 1 then
+	    if length r(1) == 1 then
+		if isnull lastchain then
+		    return origs;
+		endif
+		r(1)(2) = r(1)(1);
+		r(1)(1) = lastchain;
+	    else
+		lastchain = r(1)(1);
+	    endif
+	    if r(1)(2) === "*" then
+		ps = cat [ps, "(CHAIN ", r(1)(1), ")"];
+	    else
+		ps = cat [ps, "(CHAIN ", r(1)(1), " and resid ", r(1)(2), ")"];
+	    endif
+	    continue;
+	else
+	    if length r(1) == 1 then
+		if isnull lastchain then
+		    return origs;
+		endif
+		r(1)(2) = r(1)(1);
+		r(1)(1) = lastchain;
+	    endif
+	    lastchain = r(1)(1);
+	endif
+	local r2 = r(2);
+	r2 | r2 == "&" = "-";
+	r(2) = r2;
+	r(2) = wordsplit [r(2), "|"];
+	if length r(2) == 1 and not isdigit r(2)(1)(1) then // e.g. A200
+	    r(2) = split [r(2)(1), [1, INT_MAX]];
+	endif
+	if length r(2) == 1 then
+	    if isnull lastchain then
+		return origs;
+	    endif
+	    r(2)(2) = r(2)(1);
+	    r(2)(1) = lastchain;
+	else
+	    lastchain = r(2)(1);
+	endif
+	if length r(2) == 1 then
+	    r(2)(2) = r(2)(1);
+	    r(2)(1) = r(1)(1);
+	endif
+	if not (r(1)(1) === r(2)(1)) then  // error, can't have e.g. A|2-B|5
+	    return origs;
+	endif
+	ps = cat [ps,
+	    "(CHAIN ", r(1)(1), " and resid ", r(1)(2), ":", r(2)(2), ")"
+	];
+    endloop
+    return ps;
+endfunction
+
+// Parse PHENIX selection statements - AND, OR, NOT, RESID, RESSEQ, CHAIN, etc
+// Arguments:
+//
+// s: string to parse
+// code: PDB code token
+// chain: PDB chain letter for each residue (string)
+// rname: rName of the residues (tokens)
+// uid, ins: numbers, chars
+// seg: segmentation vector for chain, rname, uid, ins - should be split by
+//   molecule, each segment is assumed to have approximately consecutive
+//   residue numbering, and same chain letter
+//	    HOW DO THESE ASUMPTIONS MANIFEST?
+// trybuster: flag, operate is BUSTER mode if 1, PHENIX if 0
+
+local function unquote s
+    local n = length s;
+    if n > 2 then
+	if s[[1,n]] === "''" then s = s[inc igen (n-2)]; endif;
+    endif
+    return s;
+endfunction
+
+local function phenix_split s
+    local x = x_pack indexof [s, "()"];	// ( and ) must be elements
+    s = splice [s, x, 1, tr [" ", s[x], " "]];
+    s = app token wordsplit [trim_ws s, " "];
+    local m1 = indexof [s, ['THROUGH','through','-',':']];
+    local m2 = app alltrue isdigit app string s;
+    x = x_pack (m1 and rotlpoke [m2, 0] and rotrpoke [m2,0]);
+    if length x then
+	s[x] = ':';
+	x = dec x;
+	s = splice [s, x, 3, app tok_cat apt get [[s], x+[dec igen 3]]];
+    endif
+    return app string s;
+endfunction
+
+global function pdb_ParsePHENIXselect [
+    selstr, code, chain, rnam, uid, ins, seg, trybuster
+]
+    if isnull selstr then return 0; endif;
+    if indexof [[trim_ws toupper selstr], ["NULL","NONE"]] then return 0; endif;
+
+    local sorig = token cat [" in expression ", selstr], err = [];
+    function AddWarning w
+	err = cat [err, tok_cat [w, sorig]];
+    endfunction
+
+	// Drop ins == " " for lookups in FindRange.
+
+    local seqstr = apt twrite [
+	'{}{}', uid, select ['', app token ins, isspace ins]
+    ];
+    [uid, seqstr] = apt split [[uid, seqstr], [seg]];
+    local xstr = app x_id uid;
+
+    function FindRange rstr
+	local x, m1 = one uid, m2 = one uid;
+
+	if rstr(1) <> '' then
+	    x = apt indexof [rstr(1), seqstr];
+	    m1 | x = (xstr | x) >= pack x;
+	    m1 | not x = (uid | not x) >= atoi (rstr(1) | not x);
+	endif
+	if rstr(2) <> '' then
+	    x = apt indexof [rstr(2), seqstr];
+	    m2 | x = (xstr | x) <= pack x;
+	    m2 | not x = (uid | not x) <=  atoi (rstr(2) | not x);
+	endif
+
+	return cat (m1 and m2);
+    endfunction
+
+    local S = phenix_split selstr;	// strings, original case
+    local T = app token toupper S;	// tokens, keywords & code & rnam
+    code    = toupper code;		// case-insensitive code comparison
+    rnam    = toupper rnam;		// case-insensitive res name comparison
+
+    local iTerm = 1;
+    local nTerm = length T;
+
+    const RESID  = ['RESID','RESSEQ','RESI','RESIDUE','RESIDUES'];
+    const UNSUP1 = ['NAME','ELEMENT','ALTID','PEPTIDE','DNA','RNA'];
+    const UNSUP0 = [
+	'BACKBONE','SIDECHAIN','WATER', 'NUCLEOTIDE', 'PHOSPHATE','RIBOSE'
+    ];
+
+    function p_expr;	    // forward - the term handlers form a daisy chain
+
+    function p_term []
+	local sel = one chain;	
+	local isatom = 0;
+	local c;
+	
+	if T(iTerm) == '(' then
+	    iTerm = inc iTerm;
+	    [sel, isatom] = p_expr [];
+	    if neL [T(iTerm), ')'] then
+		AddWarning 'Missing )';
+	    endif
+	    iTerm = inc iTerm;
+	    return [sel, isatom];
+	endif
+	
+	local term = T(iTerm);
+
+	if term == 'ALL' then			    // ALL
+	    sel = one chain;
+	    iTerm = inc iTerm;
+
+	elseif term == 'PDB' then		    // PDB
+	    if T(iTerm+1) == 'ENTRY' then
+		if T(iTerm+2) == code then
+		    sel = one chain;
+		else
+		    sel = zero chain;
+		endif
+		iTerm = inc iTerm;
+	    else
+		AddWarning 'Unrecognized term';
+		isatom = 1;
+		sel = zero chain;
+	    endif
+	    iTerm = inc iTerm;
+
+	elseif term == 'CHAIN' then		    // CHAIN
+	    c = unquote S(iTerm+1);
+	    if length c > 1 then
+		if length c == 2 then		    // comma separated list
+		    if c(2) == "," then
+			c = cat [c(1), S(iTerm+2)];
+			if length c <> 2 then
+			    c = [];
+			endif
+			iTerm = inc iTerm;
+		    else
+			c = [];
+		    endif
+		else
+		    c = [];
+		endif
+	    endif
+	    if isnull c then
+		AddWarning 'Invalid chain';
+	    else
+		sel = orE eqE [[chain],c];
+		if not anytrue sel then		    // try case-insenstive
+		    sel = orE eqE toupper [[chain], c];
+		endif
+	    endif
+	    iTerm = inc iTerm;
+
+	elseif term == 'SEGID' then		    // SEGID: matches nothing.
+	    isatom = 1;
+	    sel = zero chain;
+	    iTerm = inc iTerm;
+
+	elseif indexof [term, RESID] then
+
+	    local rng = fieldsplit [S(iTerm+1), ":"];
+
+	    if length rng == 1 then	// -5 is ambiguous: (-5) or 1-5?
+		local x = last x_pack ("-" == (rng = first rng));
+		if length x then
+		    rng = [keep [rng, dec x], drop [rng, x]];
+		else
+		    rng = rep [rng, 2];
+		endif
+	    endif
+	    if isnull rng(2) then	// allow for ##: ##
+		if isscalarnum atoi T(iTerm+2) then
+		    rng(2) = S(iTerm+2);
+		    iTerm = inc iTerm;
+		endif
+	    endif
+
+	    sel = FindRange app token rng;
+	    iTerm = inc iTerm;
+
+	elseif term == 'RESNAME' then
+	    sel = rnam == T(iTerm = inc iTerm);
+	
+	elseif indexof [term, UNSUP1] then
+	    isatom = 1;
+	    iTerm = inc iTerm;	// NONSUP1 tokens consume the following token...
+	elseif indexof [term, UNSUP0] then
+	    isatom = 1;		// NONSUP0 tokens do not.
+	else
+		// chain letter, no list, no niceness re case.
+
+	    c = unquote S(iTerm);
+	    if 1 === isalpha c then
+		sel = chain == c;
+	    else
+		AddWarning twrite ['Unrecognized term {}', S(iTerm)];
+		isatom = 1;
+		sel = zero chain;
+	    endif
+	endif
+
+	iTerm = inc iTerm;
+
+	return [sel, isatom];
+    endfunction
+
+    function p_not []
+	local negate = 0;
+
+	while T(iTerm) == 'NOT' loop
+	    negate = not negate;
+	until (iTerm = inc iTerm) > nTerm
+	endloop
+
+	if iTerm > nTerm then
+	    AddWarning 'Incomplete NOT clause';
+	    return [one chain, 0];
+	endif
+
+	local [sel, isatom] = p_term [];
+
+	    // We do not negate atom terms - they are unsupported, and
+	    // therefore match nothing
+
+	if negate and not isatom then
+	    sel = not sel;
+	endif
+
+	return [sel, isatom];
+    endfunction
+
+    function p_and []
+	local [sel, isatom] = p_not [];
+	if iTerm > nTerm then
+	    return [sel, isatom];
+	endif
+	
+	while T(iTerm) == 'AND' loop
+	    iTerm = inc iTerm;
+	    if (iTerm > nTerm)  then
+		AddWarning 'Incomplete AND clause';
+		break;
+	    endif
+	    local pnot = p_not [];
+	    sel = sel and pnot(1);
+	    isatom = isatom and pnot(2);
+	until iTerm > nTerm
+	endloop
+	return [sel, isatom];
+    endfunction
+
+    function p_or []
+	local [sel, isatom] = p_and [];
+	if iTerm > nTerm then
+	    return [sel, isatom];
+	endif
+
+	while T(iTerm) == 'OR' loop
+	    if (iTerm = inc iTerm) > nTerm then
+		AddWarning 'Incomplete OR clause';
+		break;
+	    endif
+	    local pand = p_and[];
+	    sel = sel or pand(1);
+	    isatom = isatom or pand(2);
+	until iTerm > nTerm
+	endloop
+
+	return [sel, isatom];
+    endfunction
+
+    function p_expr [] = p_or [];
+
+    local rsel_mask = first p_expr [];
+
+    if length err then
+	rsel_mask = 0;
+	if trybuster == 1 then
+	    local [mask2, err2] = pdb_ParsePHENIXselect [
+		BUSTER2PHENIX selstr, code, chain, rnam, cat uid, ins, seg, 2
+	    ];
+	    if isnull err2 then
+		rsel_mask = mask2;
+		err = [];
+	    endif
+	endif
+    endif
+
+    return [rsel_mask, err];
+endfunction
+
+local function pdb_GetTLSInfo data
+    local tlines = app token trim_ws data.remark.'3';
+	
+	// A couple useful items.
+
+    const LIKELY_RESIDUAL = '*B VALUE TYPE*:*LIKELY RESIDUAL*';
+    data.TLS.likely_residual = not isnull findmatch [LIKELY_RESIDUAL, tlines];
+
+    data.TLS.program = string first findmatch ['*PROGRAM*:*?*', tlines];
+    if length data.TLS.program then
+	data.TLS.program = token trim_ws cut_to [data.TLS.program, ":"];
+    endif
+
+    local m = m_findmatch ['TLS GROUP*:*', tlines]; // Check numbers? Count?
+    local i = dec indexof [1, m];
+
+    if i < 0 then return data; endif;
+
+    local code = token data.code;
+    local n = mtoc drop [m, i];
+    local g = 0, groups = rep [[], length n];
+
+    function AddERR t
+	data.error.TLS = cat [data.err.TLS, t];
+	return data;
+    endfunction
+
+    local t;
+    for t in split [drop [tlines, i], n] loop
+
+	local xtensor = app first apt x_findmatch [
+	    ['T TENSOR*','L TENSOR*','S TENSOR*'], [t]
+	];
+	if not isflatnum xtensor then
+	    return AddERR 'Missing tensor';
+	endif
+
+	t = keep [t, 3 + max xtensor];  // assume that tensors are last
+
+	local k = first x_findmatch ['ORIGIN FOR THE GROUP*', t];
+	if isnull k then
+	    return AddERR 'No ORIGIN';
+	endif
+	
+	local G = [];
+
+	local s = cut_to [string t(k), ":"];		// origin
+	s = splice [s, x_pack (s == "-"), 0, " "];	// common issue
+	G.origin = cat first sread [s, '{n:*}'];
+	if length G.origin <> 3 then
+	    return AddERR twrite ['Bad origin {}', t(k)];
+	endif
+
+	s = [];
+	local j = first x_findmatch ['SELECTION*:*', t];
+	if length j then
+	    if k < j then k = min xtensor; endif;
+	    s = app string t[dec j + igen (k - j)];
+	    s = cut_to [s, ":"];
+	else
+	    local rng = app string findmatch ['RESIDUE RANGE*:*', t];
+	    rng = cut_to [rng, ":"];
+	    s = rep [" ", length rng];
+	    for i = 1, length rng loop
+		local [c1,n1,c2,n2] = first sread [rng(i), '{t:}{n:}{t:}{n:}'];
+		if c1 === c2 and tok_length c1 == 1 then
+		    s(i) = swrite ['(chain {} and resid {}-{}) ', c1, n1, n2];
+		else
+		    return AddERR twrite ['Bad residue range {}', rng(i)];
+		endif
+	    endloop
+	endif
+
+	G.sel = cat apt cat [s, " "];    // selection
+
+	const CMP6 = ['11','12','13','22','23','33'];
+	const CMP12 = ['11','12','13','21','22','23','31','32','33'];
+	function read_tensor [xcomp, cmp_num]
+	    if isnull xcomp then return []; endif;
+
+	    const FMT = '{t:}{n:}{t:}{n:}{t:}{n:}'
+			'{t:}{n:}{t:}{n:}{t:}{n:}'
+			'{t:}{n:}{t:}{n:}{t:}{n:}'
+	    ;
+	    local s = cat apt cat [app string t[xcomp+igen 3], " "];
+	    s | s == ":" = " ";
+	    local [v,nc,nf] = sread [s, FMT];
+	    local ncomp = length cmp_num;
+	    if nf < 2*ncomp then return []; endif;
+	    local [comp, vals] = tr split [keep [v, 2*ncomp], 2];
+	    [comp, vals] = apt get [[comp, vals], [x_sort comp]];
+	    comp = tok_keep [tok_drop [comp, 1], 2];
+	    if neL [comp, cmp_num] then
+		return [];
+	    endif
+	    if ncomp == 6 then
+		return [vals[[1,2,3]], vals [[2,4,5]], vals[[3,5,6]]];
+	    else
+		return split [vals, 3];
+	    endif
+	endfunction
+
+	    // Tensors
+
+	G.T = read_tensor [xtensor(1), CMP6];
+	G.L = read_tensor [xtensor(2), CMP6];
+	G.S = read_tensor [xtensor(3), CMP12];
+	if anytrue app isnull [G.T,G.L,G.S] then
+	    return AddERR twrite ['Bad tensor {}', g+1];
+	endif
+
+	groups(g = inc g) = G;
+    endloop
+
+    data.TLS.groups = keep [groups, g];
+
+    return data;
+endfunction
+
+local function pdb_GetAnisoTLS data
+    if isnull data.TLS then
+	data = pdb_GetTLSInfo data;
+    endif
+
+    if isnull data.TLS.groups then return data; endif;
+
+    local sel_args = [
+	[],
+	token data.code,
+	str_C2R [data.mol, cLetter mol_cName data.mol],
+	mol_rName data.mol,
+	mol_rUID data.mol,
+	mol_rINS data.mol,
+	data.mol(2)(MOL_CHAIN_NRES),
+	not isnull findmatch ['BUSTER*', data.TLS.program]	
+    ];
+
+    function AddERR err
+	data.error.TLS = cat [data.error.TLS, err];
+	return data;
+    endfunction
+
+    local aniso = rep [rep [0, l_length data.mol(4)], 6];
+    local i = 0, p = mol_aPos data.mol;
+    for i = 1, length data.TLS.groups loop
+	local g = data.TLS.groups(i);
+	local [sel, selerr]= pdb_ParsePHENIXselect poke [sel_args, 1, g.sel];
+	if anytrue sel then
+	    local x = x_pack str_R2A [data.mol, sel];
+	    local u = crys_UfromTLS [
+		apt get [p,[x]],
+		g.T, g.L * sqr (PI/180), (g.S) * (PI/180), g.origin
+	    ];
+	    aniso = apt put [aniso, [x], u];
+	elseif length selerr then
+	    AddERR selerr;
+	else
+	    AddERR twrite ['NULL selection {}', i];
+	endif
+    endloop
+
+    if allfalse aniso then
+	return AddERR 'Null aniso vals';
+    endif
+
+	// In some files the atomic B factors are equal only to the
+	// non-TLS component of the isotropic temp factor. Within the
+	// RCSB such files are generally flagged. Even if the file is not
+	// flagged we check REFMAC files to see if they are do so too. 
+	// (try our best to guess).
+
+    if anytrue data.TLS.likely_residual then
+	data.TLS.B_resid = 1;
+    elseif length findmatch ['REFMAC *', data.TLS.program] then
+	local Beff = data.B_factor -  8 * sqr PI * mean (aniso)[[1,4,6]];
+	if (mean (Beff < 0) > 0.1) or (min Beff < -10) then
+	    data.TLS.B_resid = 1;
+	endif
+    endif
+
+    data.TLS.anisou  = aniso;
+
+    return data;
+endfunction
+
+#eof
+
+function __pdb_GetTLSInfo v = pdb_GetTLSInfo v;
+function __pdb_GetAnisoTLS v  = pdb_GetAnisoTLS v;
+
+// TLSIN format for ccp4 tlsanl program.
+
+function __ccp4_write_tlsin data
+    local C = str_C2R [data.mol, cLetter mol_cName data.mol];
+    local U = mol_rUID data.mol;
+    local I = mol_rINS data.mol;
+
+    local sel_args = [
+        [],
+        token data.code,
+        C,
+        mol_rName data.mol,
+        U,
+        I,
+        data.mol(2)(MOL_CHAIN_NRES),
+        not isnull findmatch ['BUSTER*', data.TLS.program]
+    ];
+
+    I = select ['', app token I, isspace I];
+
+    local i;
+    for i = 1, length data.TLS.groups loop
+        local g = data.TLS.groups(i);
+        local [sel, selerr]= pdb_ParsePHENIXselect poke [sel_args, 1, g.sel];
+        if anytrue sel then
+	    local n = btoc sel;
+	    local m = app first split [sel, n]; 
+	    local p = pscan n;
+	    local [x1,x2] = [rotrpoke [inc p, 1], p] || [m];
+	    write ['TLS {}\n', i];
+	    apt write ['RANGE \'{}{n:4}{}.\' \'{}{n:4}.\' ALL\n',
+		C[x1], U[x1], I[x1], C[x2], U[x2], I[x2]
+	    ];
+	    local o = g.origin;
+	    write ['ORIGIN {n:}\n', g.origin];
+	    local T = g.T, L = g.L, S = g.S;
+	    write [
+		tok_cat cat ['T    ', tok_cat [rep ['{n:7.4f} ', 6]], '\n'],
+		T(1)(1), T(2)(2), T(3)(3), T(2)(3), T(3)(1), T(1)(2)
+	    ];
+	    write [
+		tok_cat cat ['L    ', tok_cat [rep ['{n:7.4f} ', 6]], '\n'],
+		L(1)(1), L(2)(2), L(3)(3), L(2)(3), L(3)(1), L(1)(2)
+	    ];
+	    write [
+		tok_cat cat ['S    ', tok_cat [rep ['{n:7.4f} ', 8]], '\n'],
+		S(3)(3) - S(2)(2), S(1)(1) - S(3)(3), 
+		S(2)(3), S(3)(1), S(1)(2),
+		S(3)(2), S(1)(3), S(2)(1)
+	    ];
+        endif
+    endloop
+endfunction
+
+#eof
