@@ -1,8 +1,9 @@
 #svl
 //	io_pdb.svl		Protein Data Bank format
 //
-//  16-dec-2013      lmw(QB) added option to apply symmetry op to HOH
+//  16-dec-2013      lmw(QB) added option to apply symmetry op to HOH, et al
 //  21-aug-2013 (md) lmw(QB) added alternate aware aHeavyValence
+//  16-dec-2016      lmw(QB) installed MOE 2013 version of io_pdb.svl in Suite/svl
 //	18-sep-2013 (kk) get res_high & res_low (remark 3)
 //	12-sep-2013 (kk) TLS aniso calc; aSetAniso
 //	12-sep-2013 (kk) Copy tempfactor & occ to symmetry mates
