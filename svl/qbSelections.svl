@@ -149,21 +149,18 @@ endfunction
 
 global function qbSelectWatOnRadius [Batoms, radius,yInvert]
 
-    local allSelected = rSelected uniq cat aResidue qbSelectOnRadius [Batoms, radius];
-    local allWats = uniq cat aResidue _Atoms '$$solvent';
-    
-    local selectedWats = cat [allWats | cat rSelected allWats];
+    local allWatAtms = Atoms[] | rName aResidue Atoms[] == 'HOH';
+    local localWats = join [allWatAtms,qbGetResidueOnRadius[Batoms,radius] ];
+    local distantWats = diff [allWatAtms,localWats];
 
-    local UnselectedWats = cat [allWats | rSelected allWats == 0];
-
-    aSetSelected [Atoms[],0];
     if isnull yInvert then
-        aSetSelected [rAtoms selectedWats,1];
+        aSetSelected [localWats,1];
+        return localWats;
     else
-        aSetSelected [rAtoms UnselectedWats,1];
+        aSetSelected [distantWats,1];
+        return distantWats;
     endif
-    
-    return Atoms[] | aSelected Atoms[];
 
 endfunction
+
 
