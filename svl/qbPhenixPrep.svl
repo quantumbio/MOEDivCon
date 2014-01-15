@@ -538,14 +538,17 @@ local function ResiduePreparation []
     return residueList;
 endfunction
 
+function CellEnable;
 local function ReadInputFiles[inpdbfile,opt]
     oDestroy Chains[];
     local tmpIn;
     tmpIn.alt_loc = opt.enableAltAtoms;
     tmpIn.install_cryst = 1;
+    tmpIn.gen_symm = 1;
     tmpIn.use_element = opt.forceUseElement;
     
     local inchains = ReadPDB[inpdbfile,tmpIn];
+    CellEnable 1;
     
     if not isnull inchains then
         if not opt.enableAltAtoms then
