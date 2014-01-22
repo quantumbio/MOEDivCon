@@ -5,7 +5,7 @@ function pause(){
 
 date
 
-export PROJECT_PATH=/home/roger/DivConDiscoverySuite-b1828
+export PROJECT_PATH=/home/roger/DivConDiscoverySuite-b1855
 #export JAVA_HOME=/home/roger/jdk1.7.0_25
 #export ANT_HOME=/home/roger/apache/apache-ant-1.8.4
 #export OOBACKBONE_HOME=/home/roger/NetBeansProjects/OOBackbone
@@ -33,7 +33,7 @@ export SVL_JVM=$PROJECT_PATH/linux-x86_64/java/bin/java
 #qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Josh/abbott/x_mcl1_a1107644/x_mcl1_a1107644_protonated.pdb.h5']" -exit
 #qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/s59/Moe interface/s59.pm6.sp.xml.h5']" -exit
 qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Josh/s59/s59.pm6.sp.xml.h5']" -exit
-#qbmoebatch -exec "qbTestPDBtoH5['./roothaan.h5', '/home/roger/NetBeansProjects/OOBackbone/tests/examples/3FVA.pdb']" -exit
+qbmoebatch -exec "qbTestPDBtoH5['./roothaan.h5', '/home/roger/NetBeansProjects/OOBackbone/tests/examples/3FVA.pdb']" -exit
 #qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Cl4Y2/roothaan.h5']" -exit
 #qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Josh/CSPtest/shadowfax/2YXJ_out.xml.h5']" -exit
 #qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Josh/CSPtest/frodo/backup/roothaan.h5']" -exit
@@ -41,7 +41,7 @@ qbmoebatch -exec "qbTesth5Main['/home/roger/testing-grounds/Josh/s59/s59.pm6.sp.
 #qbmoebatch -exec "qbTesth5Main['/home/lance/tmp/targ_NMRScore.node/2YXJ_target_shifts_dc.h5']" -exit
 #qbmoebatch -exec "qbTesth5Main['./2YXJ_target_shifts_dc.h5']" -exit
 #qbmoebatch -exec "qbTesth5Main['./3QRK.h5']" -exit
-qbmoebatch -exec "run ['/home/roger/NetBeansProjects/MOEDivcon/zipinterface.svl', []]" -exit
+#qbmoebatch -exec "run ['/home/roger/NetBeansProjects/MOEDivcon/zipinterface.svl', []]" -exit
 #qbmoebatch -licwait -exec "run ['java-test.svl', []]" -exit
 
 #qbmoe
