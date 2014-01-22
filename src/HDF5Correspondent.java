@@ -957,7 +957,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
             chainsList.add(title+"."+chain);
             chainResidueCountsList.add(new Integer(molecule.getAnyCmlOrAnyOrAny().size()));
         }
-        if(true) new SVLVar(new SVLVar("here"), new SVLVar("",true));
+        //if(true) new SVLVar(new SVLVar("here"), new SVLVar("",true));
         String[] jchainTitles=new String[chainTitlesList.size()];
         chainTitlesList.toArray(jchainTitles);
         String[] jchains=new String[chainsList.size()];
@@ -1437,12 +1437,10 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
                 if(member.getName().compareTo("Index A")==0)
                 {
                     targetIndex=(int[])member.read();
-                    pwdDataset[1]=new SVLVar((int[])member.read());
                 }
                 else if(member.getName().compareTo("Index B")==0)
                 {
                     ligandIndex=(int[])member.read();
-                    pwdDataset[2]=new SVLVar((int[])member.read());
                 }
                 else
                 {
@@ -1498,7 +1496,11 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
                         repulsionList.add(pwdValues[7*atomIndex+5]);
                         electrostaticList.add(pwdValues[7*atomIndex+6]);
                         distanceList.add(distance);
+                        targetIndex[atomIndex]++;
+                        ligandIndex[atomIndex]++;
                     }
+                    pwdDataset[1]=new SVLVar(targetIndex);
+                    pwdDataset[2]=new SVLVar(ligandIndex);
                     double[] Eab=new double[pwdDataset[1].length()];
                     double[] Eabp=new double[pwdDataset[1].length()];
                     double[] Eabc=new double[pwdDataset[1].length()];
