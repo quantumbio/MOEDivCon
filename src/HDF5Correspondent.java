@@ -1764,14 +1764,16 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
                     double[] Eab=(double[])((Vector)pwdData.read()).elementAt(2);
             SVLVar[] pwdDataset=new SVLVar[5];
                     pwdDataset[0]=new SVLVar(pwdGroup.getName());
-                    pwdDataset[1]=new SVLVar(indexA);
-                    pwdDataset[2]=new SVLVar(indexB);
                     pwdDataset[3]=new SVLVar(Eab);
-                    double[] distance=new double[pwdDataset[1].length()];
-                    for(int vIndex=0;vIndex<pwdDataset[1].length();vIndex++)
+                    double[] distance=new double[indexA.length];
+                    for(int vIndex=0;vIndex<indexA.length;vIndex++)
                     {
                         distance[vIndex]=Math.sqrt(Math.pow(x[indexA[vIndex]]-x[indexB[vIndex]],2)+Math.pow(y[indexA[vIndex]]-y[indexB[vIndex]],2)+Math.pow(z[indexA[vIndex]]-z[indexB[vIndex]],2));
+                        indexA[vIndex]++;
+                        indexB[vIndex]++;
                     }
+                    pwdDataset[1]=new SVLVar(indexA);
+                    pwdDataset[2]=new SVLVar(indexB);
                     pwdDataset[4]=new SVLVar(distance);
             data[0]=new SVLVar(new String[]{"name", "indexA", "indexB", "Eab", "distance"}, pwdDataset);
     
