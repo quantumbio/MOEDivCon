@@ -1560,6 +1560,8 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
                     String xPath="/DivCon/"+target+"/Pairwise Decomposition";
                     H5Group pwdGroup=(H5Group)findHDF5Object(h5File, xPath);
                     DivconType divcon=loadTarget(h5File, target);
+    if(ligand.length()>0)
+    {
                     ArrayList<Double> xsList=new ArrayList<>();
                     ArrayList<Double> ysList=new ArrayList<>();
                     ArrayList<Double> zsList=new ArrayList<>();
@@ -1621,8 +1623,6 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
 ////                            int[] tc=(int[])((ncsa.hdf.object.Attribute)obj).getValue();
 //                        }
 //                    }
-    if(ligand.length()>0)
-    {
             List<HObject> ligandList=pwdGroup.getMemberList();
             H5Group pwdTargetLigandObject=null;
             boolean hit=false;
@@ -1761,19 +1761,21 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
                     pwdData.selectMember(1);
                     int[] indexB=(int[])((Vector)pwdData.read()).elementAt(1);
                     pwdData.selectMember(2);
-                    double[] Eab=(double[])((Vector)pwdData.read()).elementAt(2);
+                    double[] distance=(double[])((Vector)pwdData.read()).elementAt(2);
+                    pwdData.selectMember(3);
+                    double[] Eab=(double[])((Vector)pwdData.read()).elementAt(3);
             SVLVar[] pwdDataset=new SVLVar[5];
                     pwdDataset[0]=new SVLVar(pwdGroup.getName());
-                    pwdDataset[3]=new SVLVar(Eab);
-                    double[] distance=new double[indexA.length];
+//                    double[] distance=new double[indexA.length];
                     for(int vIndex=0;vIndex<indexA.length;vIndex++)
                     {
-                        distance[vIndex]=Math.sqrt(Math.pow(x[indexA[vIndex]]-x[indexB[vIndex]],2)+Math.pow(y[indexA[vIndex]]-y[indexB[vIndex]],2)+Math.pow(z[indexA[vIndex]]-z[indexB[vIndex]],2));
+//                        distance[vIndex]=Math.sqrt(Math.pow(x[indexA[vIndex]]-x[indexB[vIndex]],2)+Math.pow(y[indexA[vIndex]]-y[indexB[vIndex]],2)+Math.pow(z[indexA[vIndex]]-z[indexB[vIndex]],2));
                         indexA[vIndex]++;
                         indexB[vIndex]++;
                     }
                     pwdDataset[1]=new SVLVar(indexA);
                     pwdDataset[2]=new SVLVar(indexB);
+                    pwdDataset[3]=new SVLVar(Eab);
                     pwdDataset[4]=new SVLVar(distance);
             data[0]=new SVLVar(new String[]{"name", "indexA", "indexB", "Eab", "distance"}, pwdDataset);
     
