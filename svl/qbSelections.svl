@@ -148,6 +148,10 @@ global function qbSelectResidueOnRadius [Batoms,radius,tmpChains]
 endfunction
 
 global function qbSelectWatOnRadius [Batoms, radius,yInvert]
+write ['IN qbSelectWatOnRadius\n'];
+    local allWatAtms = Atoms[] | rName aResidue Atoms[] == 'HOH';
+    local localWats = join [allWatAtms,qbGetResidueOnRadius[Batoms,radius] ];
+    local distantWats = diff [allWatAtms,localWats];
 
     local allWatAtms = Atoms[] | rName aResidue Atoms[] == 'HOH';
     local localWats = join [allWatAtms,qbGetResidueOnRadius[Batoms,radius] ];
