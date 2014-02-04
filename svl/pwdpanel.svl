@@ -1,28 +1,28 @@
 #svl
 #if 0
- // BEGIN COPYRIGHT
- /***********************************************************************
+// BEGIN COPYRIGHT
+/***********************************************************************
     Copyright (c) 1998-2012 QuantumBio Inc. and/or its affiliates.
-    
- This source code is the property of QuantumBio Inc. and/or its affiliates
- and is considered secret.
 
- This source code contains proprietary and Confidential Information, 
- including trade secrets, belonging to QuantumBio Inc. and/or its 
- affiliates.
+This source code is the property of QuantumBio Inc. and/or its affiliates
+and is considered secret.
 
- Use, duplication, or disclosure of this source code is strictly 
- prohibited without prior written authorization by the management of 
- QuantumBio Inc. At no time are you authorized to repurpose the source
- code for use with software other then that which it was intended.
+This source code contains proprietary and Confidential Information,
+including trade secrets, belonging to QuantumBio Inc. and/or its
+affiliates.
 
- Please see http://www.quantumbioinc.com/ for more information.
+Use, duplication, or disclosure of this source code is strictly
+prohibited without prior written authorization by the management of
+QuantumBio Inc. At no time are you authorized to repurpose the source
+code for use with software other then that which it was intended.
 
- ***********************************************************************/
- // END COPYRIGHT
-#endif      
+Please see http://www.quantumbioinc.com/ for more information.
 
-	//    pwdpanel.svl    User-interface entrypoint to QB-PWD calculations
+***********************************************************************/
+// END COPYRIGHT
+#endif
+
+        //    pwdpanel.svl    User-interface entrypoint to QB-PWD calculations
 
 #set title   'QuantumBio PWD Panel'
 #set class   'QuantumBio'
@@ -101,15 +101,15 @@ const ANALKEYS =
     'optlv'
     ];
 
-const HEADER = 
+const HEADER =
     [
-    name: 'panel', 
+    name: 'panel',
     title: 'QB-PWD',
     windowName: 'QB-PWDPanel',
     text: ['Apply', 'Load', 'Close'],
     onTrigger: ['return', 'return', 'return'],
     bubbleHelp: ['Perform QB-PWD analysis.',
-            'Load QB-PWD data from a QMScore database.', 
+            'Load QB-PWD data from a QMScore database.',
             '']
     ];
 
@@ -132,7 +132,7 @@ const PANEL =
                 ]
             ],
 //         Separator : [flushLeft:1, extendH:1, margin:1],
-// 
+//
 //         Hbox :
 //             [
 //             title: 'Scoring     ',
@@ -143,7 +143,7 @@ const PANEL =
 //                 bubbleHelp:
 //                     'E_AB is the exchange between atoms.'
 //                 ],
-//             Separator : 
+//             Separator :
 //                 [
 //                 vertical:0, shadow:'noline', extendH: 0, margin:1
 //                 ],
@@ -153,7 +153,7 @@ const PANEL =
 //                 bubbleHelp:
 //                     'E_ABp is the electron-electron repulsion.'
 //                 ],
-//             Separator : 
+//             Separator :
 //                 [
 //                 vertical:0, shadow:'noline', extendH: 0, margin:1
 //                 ],
@@ -164,7 +164,7 @@ const PANEL =
 //                     'E_ABc is the core-electron interaction.'
 //                 ]
 //             ],
-// 
+//
 //         Hbox :
 //             [
 //             title: 'Function    ',
@@ -175,7 +175,7 @@ const PANEL =
 //                 bubbleHelp:
 //                     'E_R6 is the van der Waals repulsive component.'
 //                 ],
-//             Separator : 
+//             Separator :
 //                 [
 //                 vertical:0, shadow:'noline', extendH: 0, margin:1
 //                 ],
@@ -185,7 +185,7 @@ const PANEL =
 //                 bubbleHelp:
 //                     'E_R12 is the van der Waals attractive component.'
 //                 ],
-//             Separator : 
+//             Separator :
 //                 [
 //                 vertical:0, shadow:'noline', extendH: 0, margin:1
 //                 ],
@@ -196,9 +196,9 @@ const PANEL =
 //                     'E_ELE is the electrostatic component.'
 //                 ]
 //             ],
-// 
+//
 //         Separator : [flushLeft:1, extendH:1, margin:1],
-// 
+//
 //         Hbox :
 //             [
 //             title: 'Activities  ',
@@ -211,7 +211,7 @@ const PANEL =
 //                     'The MOE database field name for\n'
 //                     'the experimental activity values.'
 //                 ],
-//             Separator : 
+//             Separator :
 //                 [
 //                 vertical:0, shadow:'noline', extendH: 0, margin:1
 //                 ],
@@ -223,9 +223,9 @@ const PANEL =
 //                     'from a csv file using the given field name.'
 //                 ]
 //             ],
-// 
+//
 //         Separator : [flushLeft:1, extendH:1, margin:1],
-// 
+//
 //         Hbox :
 //             [
 //             title: 'Residues    ',
@@ -250,7 +250,7 @@ const PANEL =
 //                 [
 //                 font: 'mediumBold', text: '%'
 //                 ],
-//             Separator : 
+//             Separator :
 //                 [
 //                 vertical:0, shadow:'noline', extendH: 0, margin:1
 //                 ],
@@ -266,7 +266,7 @@ const PANEL =
 //                     'not distinguishing characteristic.'
 //                 ]
 //             ],
-// 
+//
 //         Hbox :
 //             [
 //             title: '            ',
@@ -281,9 +281,9 @@ const PANEL =
 //                     'residues to show in the Heat Map (max 30).'
 //                 ]
 //             ],
-// 
+//
 //         Separator : [flushLeft:1, extendH:1, margin:1],
-// 
+//
 //         Hbox :
 //             [
 //             title: 'PLS         ',
@@ -297,14 +297,14 @@ const PANEL =
 //                     'Number of components to include in\n'
 //                     'the model during PLS analysis.'
 //                 ],
-//             Separator : 
+//             Separator :
 //                 [
 //                 vertical:0, shadow:'noline', extendH: 0, margin:1
 //                 ],
 //             Text :
 //                 [
 //                 name: 'trainingset', title: 'Training set size:',
-//                 len: 5, extendH: 0, 
+//                 len: 5, extendH: 0,
 //                 type: 'int', allowBlank: 0,
 //                 bubbleHelp:
 //                     'Size of the training set (the first N ligands\n'
@@ -313,8 +313,8 @@ const PANEL =
 //                 ]
 //             ]
 //         ],
-// 
-        
+//
+
     Separator : [flushLeft:1, extendH:1, margin:1],
 
     Hbox :
@@ -329,7 +329,7 @@ const PANEL =
             bubbleHelp:
                 'Chose an analysis data set to view and/or save.'
             ],
-        Separator : 
+        Separator :
             [
             vertical:0, shadow:'noline', extendH: 0, margin:1
             ],
@@ -339,7 +339,7 @@ const PANEL =
             bubbleHelp:
                 'View the analytic results (table or heat map).'
             ],
-        Separator : 
+        Separator :
             [
             vertical:0, shadow:'noline', extendH: 0, margin:1
             ],
@@ -366,24 +366,24 @@ const PANEL =
     Separator : [flushLeft:1, extendH:1, margin:1]
     ] ];
 
-	//  Global Variables
+        //  Global Variables
 
     global G_surface;                     // Callback function needs access
 
-	//  Local Functions
+        //  Local Functions
 
 function FindResidue;
 
 /****************************************************************************
- *
- *                          CheckResidues
- *
- *  Check whether the residue names and numbers match those present
- *  in the receptor in the MOE Window.
- *
- *  Returns the list of residues tokens not found in the receptor.
- *
- ****************************************************************************/
+*
+*                          CheckResidues
+*
+*  Check whether the residue names and numbers match those present
+*  in the receptor in the MOE Window.
+*
+*  Returns the list of residues tokens not found in the receptor.
+*
+****************************************************************************/
 local function CheckResidues [restoks]
 
     local res, missing = [];
@@ -401,16 +401,16 @@ endfunction
 function MatchResidue;
 
 /****************************************************************************
- *
- *                          ColorAtoms
- *
- *  Determine the color of the residue atoms based on its interaction with
- *  the ligand.  If ligidx is zero, return all white.
- *
- ****************************************************************************/
-local function ColorAtoms [data, ligidx, residx, recatoms, 
+*
+*                          ColorAtoms
+*
+*  Determine the color of the residue atoms based on its interaction with
+*  the ligand.  If ligidx is zero, return all white.
+*
+****************************************************************************/
+local function ColorAtoms [data, ligidx, residx, recatoms,
         mincut, maxcut, colors]
-
+write ['in ColorAtoms: {} | {} | {} | {} | {} | {} | {} \n',data, ligidx, residx, recatoms,mincut, maxcut, colors];
     if ligidx === 0 then
         return rep [G_surface.colconst, length recatoms];
     endif
@@ -445,18 +445,18 @@ local function ColorAtoms [data, ligidx, residx, recatoms,
 endfunction
 
 /****************************************************************************
- *
- *                          CreatePockets
- *
- *  Create a pockets for each receptor/ligand pair using the given distance.
- *
- *  Returns the list of pocket mols with the heavy atoms only.
- *
- ****************************************************************************/
+*
+*                          CreatePockets
+*
+*  Create a pockets for each receptor/ligand pair using the given distance.
+*
+*  Returns the list of pocket mols with the heavy atoms only.
+*
+****************************************************************************/
 local function CreatePockets [dist]
 
     G_surface.pockets = rep [[], G_surface.numgrids];
- 
+
     local ith, rec, recpos, pocket;
     if isnull G_surface.recmols then
         rec = G_surface.rec | aElement G_surface.rec <> 'H';
@@ -507,15 +507,15 @@ function UpdateRendering;
 function UpdateSurfaceMap;
 
 /****************************************************************************
- *
- *                          InitG_surface
- *
- *  Initialize G_surface object.
- *
- ****************************************************************************/
+*
+*                          InitG_surface
+*
+*  Initialize G_surface object.
+*
+****************************************************************************/
 local function InitG_surface []
 
-    local gridopt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5, 
+    local gridopt = [type: 'Connolly', probe_vdwR: 1.4000, spacing: 0.5,
         clipmode: 0];
 
     G_surface =
@@ -545,58 +545,62 @@ local function InitG_surface []
         rec      : [],
         lig      : [],
         restok   : '',
-        resatms  : []
+        resatms  : [],
+        pwddata  : [],              // added Jan2014
+        allchains: [],
+        rawpwd   : []
         ];
 
 endfunction
 
 /****************************************************************************
- *
- *                          CreateSurfaceMap
- *
- *  Create a surface map of the pocket.
- *
- *  Acknowledgement:  borrowed heavily from surfmap.svl.
- *
- ****************************************************************************/
+*
+*                          CreateSurfaceMap
+*
+*  Create a surface map of the pocket.
+*
+*  Acknowledgement:  borrowed heavily from surfmap.svl.
+*
+****************************************************************************/
 local function CreateSurfaceMap [opts, ligtok, restoks, pwdfilename]
-	if isnull G_surface then
-		InitG_surface [];
-		LoadMols [pwdfilename];
-	endif
-	
-	if G_surface.init === 1 then
-		UpdateComplex [ligtok, opts];
-	    UpdateRendering [opts];
-		local missing = CheckResidues [restoks];
-		if length missing > 0 then
-			Warning twrite ['The following residues are not \n'
-				'present in the receptor in the MOE Window:\n{v}\n',
-				missing];
-		endif
-	
-		G_surface.grids = rep [[], G_surface.numgrids];
-		G_surface.gobj = GCreateUnique G_surface.title;
-		local trans = [G_surface.trans_f, G_surface.trans_b];
-		GSetTransparency [G_surface.gobj, trans];
-		local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
-		GSetMaterial [G_surface.gobj, mat];
-		UpdateSurfaceMap [opts, 1, []];
-		G_surface.init = 0;
+// 	if isnull G_surface then
+// 		InitG_surface [];
+// 		LoadMols [pwdfilename];
+// 	endif
+write ['ligtok: {} | {}\n', ligtok,opts];
+write ['restoks: {} \n', restoks];
+        if G_surface.init === 1 then
+            UpdateComplex [ligtok, opts];
+            UpdateRendering [opts];
+            local missing = CheckResidues [restoks];
+            if length missing > 0 then
+                    Warning twrite ['The following residues are not \n'
+                            'present in the receptor in the MOE Window:\n{v}\n',
+                            missing];
+            endif
+
+            G_surface.grids = rep [[], G_surface.numgrids];
+            G_surface.gobj = GCreateUnique G_surface.title;
+            local trans = [G_surface.trans_f, G_surface.trans_b];
+            GSetTransparency [G_surface.gobj, trans];
+            local mat = peek [GMaterial 0, inc alltrue (trans >= MAT_TRANS_MIN)];
+            GSetMaterial [G_surface.gobj, mat];
+            UpdateSurfaceMap [opts, 1, []];
+            G_surface.init = 0;
     endif
 
 endfunction
 
 /****************************************************************************
- *
- *                          FindResidue
- *
- *  Find the residue with the given name and number in the receptor 
- *  in the MOE Window.  Check to make sure MOE or bio3d didn't rename it.
- *
- *  Returns the index of the residue and its atom set.
- *
- ****************************************************************************/
+*
+*                          FindResidue
+*
+*  Find the residue with the given name and number in the receptor
+*  in the MOE Window.  Check to make sure MOE or bio3d didn't rename it.
+*
+*  Returns the index of the residue and its atom set.
+*
+****************************************************************************/
 local function FindResidue [restok]
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
@@ -604,7 +608,7 @@ local function FindResidue [restok]
     local rnidx = indexof ["1234567890", string restok];
     rnidx = rnidx | rnidx <> 0;
     rnidx = (min rnidx) - 1;
-    local residx = 0, resatms = []; 
+    local residx = 0, resatms = [];
     local residues = Residues [];
     local resnames = rName residues;
     local rname = tok_keep [restok, rnidx];
@@ -625,22 +629,22 @@ local function FindResidue [restok]
 endfunction
 
 /****************************************************************************
- *
- *                          FindSurface
- *
- *  Find the index of an existing surface that matches the pocket of the 
- *  current receptor in G_surface.
- *
- *  Returns true if a match was found; false, otherwise.
- *
- ****************************************************************************/
+*
+*                          FindSurface
+*
+*  Find the index of an existing surface that matches the pocket of the
+*  current receptor in G_surface.
+*
+*  Returns true if a match was found; false, otherwise.
+*
+****************************************************************************/
 local function FindSurface []
 
     if isnull G_surface then return 0; endif
 
     local pocketpos = cat mol_aPos G_surface.pockets (G_surface.molidx);
 
-    local m = not (app isscalarnum G_surface.grids 
+    local m = not (app isscalarnum G_surface.grids
         or app isnull G_surface.grids);
     local indices = igen length G_surface.grids | m;
     local molidx, found = 0;
@@ -651,8 +655,8 @@ local function FindSurface []
         local rmsd = qb_RMSD [pocketpos, nextpos];
         found = ltL [rmsd, RMSD_MAX];
         if found then
-             break;
-         endif
+            break;
+        endif
     endloop
 
     if found then
@@ -663,18 +667,18 @@ local function FindSurface []
 endfunction
 
 /****************************************************************************
- *                          TruncateAnalData
- *
- *  Data provided by MOE/DivCon includes all data (even less significant data).
- *    Need to cut this down to only the most significant data using the following criteria:
- *
- *      (1) If max and min are equal (probably zero) the residue is not interesting.
- *      (2) After this, only the top 30 residues with the greatest max/min will be shown.
- *          (the assumption here is that the user is less interested when the data
- *              is less varied.)
- *          @todo: add others perhaps but certainly provide some options to the user.
- *
- ****************************************************************************/
+*                          TruncateAnalData
+*
+*  Data provided by MOE/DivCon includes all data (even less significant data).
+*    Need to cut this down to only the most significant data using the following criteria:
+*
+*      (1) If max and min are equal (probably zero) the residue is not interesting.
+*      (2) After this, only the top 30 residues with the greatest max/min will be shown.
+*          (the assumption here is that the user is less interested when the data
+*              is less varied.)
+*          @todo: add others perhaps but certainly provide some options to the user.
+*
+****************************************************************************/
 local function TruncateAnalData [ligvals, resnames, sequence]
     local idx;
     local mask;
@@ -683,7 +687,7 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     if length ligvals < 1 then
         return;
     endif
-	//      (1) If max and min are equal (probably zero) the residue is not interesting.
+        //      (1) If max and min are equal (probably zero) the residue is not interesting.
     if length ligvals > 1 then
         for idx = 1, length ligvals(1), 1 loop
             differenceVector(idx) = maxE apt peek [ligvals, idx] - minE apt peek [ligvals, idx];
@@ -697,7 +701,7 @@ local function TruncateAnalData [ligvals, resnames, sequence]
         idx = idx + 1;
         mask = differenceVector >= tmpSorted(idx);
         until (length ( differenceVector | mask ) <= min [length differenceVector, 30] or
-            length tmpSorted == idx) 
+            length tmpSorted == idx)
     endloop
     local outVals, outNames;
     local tmpVals, tmpNames;
@@ -707,27 +711,27 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     for tmpNames in resnames loop
         outNames = append [outNames, tmpNames | mask];
     endloop
-    
+
     return [outVals, outNames, sequence | mask];
-    
+
 endfunction
 
 
 /****************************************************************************
- *                          GetAnalData
- *
- *  Get the analysis data and repackage the tables for heat map.
- *
- *  Note:  it is assumed that this function is called from a child process
- *  and will exit on an error.
- *
- ****************************************************************************/
-local function GetAnalData [dbpath, title]
+*                          GetAnalData
+*
+*  Get the analysis data and repackage the tables for heat map.
+*
+*  Note:  it is assumed that this function is called from a child process
+*  and will exit on an error.
+*
+****************************************************************************/
+local function OLDGetAnalData [dbpath, title]
 
     local function trim [t]
         local i = indexof ["=", string t];
         if i > 0 then return tok_keep [t, i - 1]; else return t; endif
-   endfunction
+endfunction
     local function where [r]
         local rnidx = indexof ["1234567890", string r];
         rnidx = rnidx | rnidx <> 0;
@@ -746,17 +750,6 @@ local function GetAnalData [dbpath, title]
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
-    if neL [fext dbpath, 'mdb'] then
-        Warning twrite ['{}\n is not a MOE database.', dbpath];
-        exit [];
-    endif
-
-    if neL [ftype dbpath, 'file'] then
-        Warning twrite ['Unable to find the QMScore/PWD database:\n'
-            '    {}', dbpath];
-        exit [];
-    endif
-
     local dbkey = db_Open [dbpath, 'read'];
     local interdata = qb_GetAnalysisData [dbkey, 'pwd', 'inter'];
     local sardata = qb_GetAnalysisData [dbkey, 'pwd', 'sar'];
@@ -774,8 +767,8 @@ local function GetAnalData [dbpath, title]
         resnames = app third ligdata;
         [ligvals,resnames,sequence]=TruncateAnalData [ligvals, resnames, sequence];
         [resabbrevs, ligabbrevs] = abbreviate [resnames, lignames];
-	// @todo: remove the double reference to sequence. This will require structural change to 'data' and therefore
-	//          should come when we change to tagged vectors (or XML).
+        // @todo: remove the double reference to sequence. This will require structural change to 'data' and therefore
+        //          should come when we change to tagged vectors (or XML).
         interdata = [[fulltitle, 'Ligands', 'Residues'], sequence, sequence,
             tr [lignames, ligabbrevs, ligvals, resnames]];
     endif
@@ -804,18 +797,90 @@ local function GetAnalData [dbpath, title]
 
 endfunction
 
+local function GetAnalData [dbpath, title]
+
+    local function trim [t]
+        local i = indexof ["=", string t];
+        if i > 0 then return tok_keep [t, i - 1]; else return t; endif
+endfunction
+    local function where [r]
+        local rnidx = indexof ["1234567890", string r];
+        rnidx = rnidx | rnidx <> 0;
+        return  (min rnidx) - 1;
+    endfunction
+
+    local function abbreviate [rn, ln]
+        local idx = app where rn;
+        local arn = apt tok_drop [rn, idx];
+        arn = apt tok_keep [arn, -3];
+        local aln = app trim ln;
+        aln = apt tok_drop [aln, 3];
+        aln = apt tok_keep [aln, -3];
+        return [arn, aln];
+    endfunction
+
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+
+    local dbkey = db_Open [dbpath, 'read'];
+    local interdata = qb_GetAnalysisData [dbkey, 'pwd', 'inter'];
+    local sardata = qb_GetAnalysisData [dbkey, 'pwd', 'sar'];
+    local actdata = qb_GetAnalysisData [dbkey, 'pwd', 'act'];
+    local plsdata = qb_GetAnalysisData [dbkey, 'pwd', 'pls'];
+    local lvdata = qb_GetAnalysisData [dbkey, 'pwd', 'optlv'];
+    db_Close dbkey;
+    local fulltitle, resnames, sequence, resabbrevs;
+    local ligdata, lignames, ligabbrevs, ligvals;
+    if not isnull interdata then
+        fulltitle = twrite ['{} Interaction Map', title];
+        [sequence, ligdata] = interdata;
+        lignames = app first ligdata;
+        ligvals = app second ligdata;
+        resnames = app third ligdata;
+        [ligvals,resnames,sequence]=TruncateAnalData [ligvals, resnames, sequence];
+        [resabbrevs, ligabbrevs] = abbreviate [resnames, lignames];
+        // @todo: remove the double reference to sequence. This will require structural change to 'data' and therefore
+        //          should come when we change to tagged vectors (or XML).
+        interdata = [[fulltitle, 'Ligands', 'Residues'], sequence, sequence,
+            tr [lignames, ligabbrevs, ligvals, resnames]];
+    endif
+
+    if not isnull sardata then
+        fulltitle = twrite ['{} SAR Map', title];
+        [resnames, ligdata] = sardata;
+        lignames = app first ligdata;
+        ligvals = app second ligdata;
+        [resabbrevs, ligabbrevs] = abbreviate [resnames, lignames];
+        sardata = [[fulltitle, 'Ligands', 'Residues'], resnames, resabbrevs,
+            tr [lignames, ligabbrevs, ligvals]];
+    endif
+
+    if not isnull actdata then
+        fulltitle = twrite ['{} Activities Table', title];
+        actdata = [fulltitle, actdata];
+    endif
+
+    if not isnull plsdata then
+        fulltitle = twrite ['{} PLS Results Table', title];
+        plsdata = [fulltitle, plsdata];
+    endif
+
+    return [interdata, sardata, actdata, plsdata, lvdata];
+
+endfunction
+
+
 /****************************************************************************
- *                          LoadDB
- *
- *  Get the core enviroment and application environment.
- *
- *  Note:  it is assumed that this function is called from a child process
- *  and will exit on an error.
- *
- ****************************************************************************/
+*                          LoadDB
+*
+*  Get the core enviroment and application environment.
+*
+*  Note:  it is assumed that this function is called from a child process
+*  and will exit on an error.
+*
+****************************************************************************/
 local function LoadDB [dbpath]
 
-    local [dbkey, receptor, ligand, s, coreopts, c, mess] = 
+    local [dbkey, receptor, ligand, s, coreopts, c, mess] =
         qb_LoadCoreScoreDB [dbpath, 'qmscore'];
     if dbkey === 0 then
         Warning mess;
@@ -829,15 +894,16 @@ local function LoadDB [dbpath]
 endfunction
 
 /****************************************************************************
- *                          LoadMols
- *
- *  Load the ligands (and receptors, if necessary) from the PWD database.
- *
- *  Note:  it is assumed that this function is called from a child process
- *  and will exit on an error.
- *
+*                          LoadMols
+*
+*  Load the ligands (and receptors, if necessary) from the PWD database.
+*
+*  Note:  it is assumed that this function is called from a child process
+*  and will exit on an error.
+*
 ****************************************************************************/
-local function LoadMols [pwdfilename]
+// DEL THIS ONE
+local function OLDLoadMols [pwdfilename]
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
@@ -867,7 +933,7 @@ local function LoadMols [pwdfilename]
         ligmols = append [ligmols, ligmol];
         lignames = append [lignames, ligmol(1)(MOL_NAME)];
     endloop
-    
+
     if qb_IsModeManyToMany [coreopts] then
         local recflds = qb_GetRecFields [];
         recmols = db_ReadColumn [dbkey, first recflds];
@@ -881,10 +947,10 @@ local function LoadMols [pwdfilename]
     G_surface.numgrids = length ligmols;
 
     db_Close dbkey;
-    
+
     oDestroy Chains[];
 
-	// The following two loops will go through and make sure that the new G_surface has the aligned proteins.   
+        // The following two loops will go through and make sure that the new G_surface has the aligned proteins.
     local idx;
     local targ_chainsList = [], lig_chainsList = [];
     local allLigAtms = [];
@@ -893,7 +959,7 @@ local function LoadMols [pwdfilename]
 //        pro_Join targ_chainsList(idx);
 //        targ_chainsList(idx) = targ_chainsList(idx)(1);
         aSetHidden [oAtoms targ_chainsList(idx),1];
-		cSetName [targ_chainsList(idx), G_surface.recmols(idx)(1)(MOL_NAME)];
+                cSetName [targ_chainsList(idx), G_surface.recmols(idx)(1)(MOL_NAME)];
     endloop
     aSetHidden [oAtoms targ_chainsList(1), 0];
     for idx = 1, length G_surface.ligmols, 1 loop
@@ -901,7 +967,7 @@ local function LoadMols [pwdfilename]
         allLigAtms = cat [allLigAtms, cat cAtoms lig_chainsList(idx)];
         oSetCollection ['QB_LIGAND', allLigAtms];
         aSetHidden [oAtoms lig_chainsList(idx),1];
-		cSetName [lig_chainsList(idx), G_surface.ligmols(idx)(1)(MOL_NAME)];
+                cSetName [lig_chainsList(idx), G_surface.ligmols(idx)(1)(MOL_NAME)];
     endloop
     aSetHidden [oAtoms lig_chainsList(1), 0];
     if length Chains [] > 0 then
@@ -917,19 +983,237 @@ local function LoadMols [pwdfilename]
         tmpLigMols(idx) = mol_Extract lig_chainsList(idx);
     endloop
     G_surface.recmols = tmpRecMols;
-    G_surface.ligmols = tmpLigMols; 
+    G_surface.ligmols = tmpLigMols;
 
     G_surface.recChains = targ_chainsList;
-    G_surface.ligChains = lig_chainsList; 
+    G_surface.ligChains = lig_chainsList;
+endfunction
+
+function ReadHDF5;  // TODO: Move to top
+function qbRetrieveAtomByAtomDecomposition;
+// DEL THIS ONE
+local function MOL_LoadMols [pwdfilename]
+
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+
+    if neL [fext pwdfilename, 'h5'] then
+        Warning twrite ['{}\n is not a MOE database.', pwdfilename];
+        exit [];
+    endif
+
+    if neL [ftype pwdfilename, 'file'] then
+        Warning twrite ['Unable to find the QMScore/PWD database:\n'
+            '    {}', pwdfilename];
+        exit [];
+    endif
+
+    local recmols = [], tmpRecMol;
+    local ligmols = [], tmpLigMol;
+    local lignames = [];
+
+    local pdata = SystemPush[];
+    ReadHDF5[pwdfilename];
+    tmpLigMol = mol_Extract _Atoms '$$ligand';
+    tmpRecMol = mol_Extract diff [Atoms[],_Atoms '$$ligand'];
+    SystemPop pdata;
+
+    G_surface.recmols = [tmpRecMol];
+    G_surface.ligmols = [tmpLigMol];
+    G_surface.lignames = lignames;
+    G_surface.numgrids = length ligmols;
+
+        // The following two loops will go through and make sure that the new G_surface has the aligned proteins.
+    local idx;
+    local targ_chainsList = [], lig_chainsList = [];
+    local allLigAtms = [];
+    for idx = 1, length G_surface.recmols, 1 loop
+        targ_chainsList(idx) = mol_Create G_surface.recmols(idx);
+//        pro_Join targ_chainsList(idx);
+//        targ_chainsList(idx) = targ_chainsList(idx)(1);
+        aSetHidden [oAtoms targ_chainsList(idx),1];
+
+                cSetName [targ_chainsList(idx), G_surface.recmols(idx)(1)(MOL_NAME)];
+    endloop
+    aSetHidden [oAtoms targ_chainsList(1), 0];
+    for idx = 1, length G_surface.ligmols, 1 loop
+        lig_chainsList(idx) = mol_Create G_surface.ligmols(idx);
+        allLigAtms = cat [allLigAtms, cat cAtoms lig_chainsList(idx)];
+        oSetCollection ['QB_LIGAND', allLigAtms];
+        aSetHidden [oAtoms lig_chainsList(idx),1];
+                cSetName [lig_chainsList(idx), G_surface.ligmols(idx)(1)(MOL_NAME)];
+    endloop
+    aSetHidden [oAtoms lig_chainsList(1), 0];
+
+    G_surface.recChains = targ_chainsList;
+    G_surface.ligChains = lig_chainsList;
+endfunction
+
+local function getKey [indexA,indexB]
+    local tmpReturn = twrite ['{f.0}-{f.0}',first sort [indexA,indexB],second sort[indexA,indexB]];
+//    write ['{} {} {}\n', indexA,indexB, tmpReturn];
+    return tmpReturn;
+endfunction
+
+function qbListModels;
+local function LoadMols [pwdfilename]
+
+    if MOE_BATCH then exit ['Should only be run from MOE.']; endif
+
+    if neL [fext pwdfilename, 'h5'] then
+        Warning twrite ['{}\n is not a MOE database.', pwdfilename];
+        exit [];
+    endif
+
+    if neL [ftype pwdfilename, 'file'] then
+        Warning twrite ['Unable to find the QMScore/PWD database:\n'
+            '    {}', pwdfilename];
+        exit [];
+    endif
+    local models = first qbListModels [pwdfilename];
+    G_surface.allchains = ReadHDF5[pwdfilename];
+    G_surface.rawpwd = first qbRetrieveAtomByAtomDecomposition[pwdfilename,models.target,'Initial'];
+write ['access G_surface1: {} {}\n',length (cat cAtoms G_surface.allchains), G_surface.rawpwd];
+endfunction
+
+local function SplitPWD []
+    // TODO: one-liner opportunity
+//     local i = 1;
+//     local values = [];
+    local tmpAtomsList = cat cAtoms G_surface.allchains;
+//     while i <= length G_surface.rawpwd.Eab loop
+//         values.(getKey[tmpAtomsList[G_surface.rawpwd.indexA[i]+1],
+//                         tmpAtomsList[G_surface.rawpwd.indexB[i]+1]]) = G_surface.rawpwd.Eab[i];
+//         i = i+1;
+//     endloop
+    G_surface.lig = join [_Atoms '$$ligand',cat cAtoms G_surface.allchains];
+    G_surface.rec = diff [cat cAtoms G_surface.allchains,G_surface.lig];
+write ['recSize: {}\n', length G_surface.rec];
+write ['ligSize: {}\n', length G_surface.lig];
+    G_surface.lignames = '1';   // TODO: this needs to be done for multiple ligands!
+    G_surface.molidx = 1;
+//     G_surface.pwddata = values;
+
+// this will currently assume the ligand atoms vs. the target, but with changes, it could also account for user interaction/fragments.
+    local Aatoms = (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexA+1];
+    local Batoms = (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexB+1];
+write ['access G_surface2: {} {}\n',length (cat cAtoms G_surface.allchains), G_surface.rawpwd];
+     write ['Aatoms: {} | {}\n', length Aatoms,Aatoms];
+     write ['Batoms: {} | {}\n', length Batoms,Batoms];
+
+// DEBUG CODE
+// #if 0
+    local testLigVals;
+    local tmpAatom, tmpBatom;
+    local tmpInteraction = 1;
+    local tmpInteractionReference;
+    local residueA, residueB;
+    local testInterVals = [];
+local fnum = fopenw 'test.txt';
+    loop
+        residueA = rName aResidue (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexA[tmpInteraction]+1];
+        residueB = rName aResidue (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexB[tmpInteraction]+1];
+fwrite [fnum,'{},{},{},{}\n', tmpInteraction, residueA,residueB,G_surface.rawpwd.Eab[tmpInteraction]];
+        if residueA <> residueB then
+            tmpInteractionReference = twrite ['{}+{}', residueA, residueB];
+            if not isnull testInterVals.(totok tmpInteractionReference) then
+                testInterVals.(totok tmpInteractionReference) = testInterVals.(totok tmpInteractionReference)  + G_surface.rawpwd.Eab[tmpInteraction];
+            else
+                testInterVals.(totok tmpInteractionReference) = G_surface.rawpwd.Eab[tmpInteraction];
+            endif
+        endif
+    tmpInteraction = tmpInteraction + 1;
+    until tmpInteraction > length G_surface.rawpwd.Eab
+    endloop
+fclose fnum;
+    for residueA in uniq rName aResidue (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexA+1] loop
+        for residueB in uniq rName aResidue (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexB+1] loop
+            tmpInteractionReference = twrite ['{}+{}', residueA, residueB];
+            if not isnull testInterVals.(totok tmpInteractionReference) then
+                write ['{} = {}\n', tmpInteractionReference, testInterVals.(totok tmpInteractionReference) ];
+            endif
+        endloop
+    endloop
+// #endif
+// END DEBUG CODE
+
+    local Alig = cat indicesof [G_surface.lig,Aatoms];
+    local Blig = cat indicesof [G_surface.lig,Batoms];
+     write ['Alig: {} | {}\n', length Alig,Alig];
+     write ['Blig: {} | {}\n', length Blig,Blig];
+
+    local Arec = cat indicesof [G_surface.rec,Aatoms];
+    local Brec = cat indicesof [G_surface.rec,Batoms];
+     write ['Arec: {} | {}\n', length Arec,Arec];
+     write ['Brec: {} | {}\n', length Brec,Brec];
+
+    local ligUnion = sortuniq cat [Alig,Blig];     // lig atoms on either "side" of the relation
+    local recUnion = sortuniq cat [Arec,Brec];     // rec atoms on either "side" of the relation
+     write ['ligUnion: {} | {}\n', length ligUnion,ligUnion];
+     write ['recUnion: {} | {}\n', length recUnion,recUnion];
+
+    local interIndices = sortuniq join [ligUnion,recUnion];  // filter out any intra-interactions
+    interIndices = interIndices | interIndices > 0;
+    write ['interIndices: {} | {}\n', length interIndices,interIndices];
+
+    local ligAtoms = cat [join [Aatoms[interIndices],G_surface.lig],
+                        join [Batoms[interIndices],G_surface.lig]];     // recover the ligand atoms
+    local recAtoms = cat [join [Aatoms[interIndices],G_surface.rec],
+                        join [Batoms[interIndices],G_surface.rec]];     // recover the receptor atom
+     write ['ligAtoms: {}\n', length ligAtoms];
+     write ['recAtoms: {}\n', length recAtoms];
+
+    local fulltitle, resnames, sequence, resabbrevs;
+    local ligdata, lignames, ligabbrevs, ligvals;
+    local tmpResidue, tmpAtom, tmpIndex;
+    local interVals = [];
+    
+    for tmpIndex in interIndices loop
+        local tmpRecAtom;
+        write ['indexof Atm: {} {} {} ',tmpIndex, indexof [Aatoms[tmpIndex],recAtoms],indexof [Batoms[tmpIndex],recAtoms]];
+        if indexof [Aatoms[tmpIndex],recAtoms] then
+            write ['IN A\n'];
+            tmpRecAtom = Aatoms[tmpIndex];
+        else
+            write ['IN B\n'];
+            tmpRecAtom = Batoms[tmpIndex];
+        endif
+        if isnull interVals.(totok aResidue tmpRecAtom) then
+            interVals.(totok aResidue tmpRecAtom) = G_surface.rawpwd.Eab[tmpIndex];
+        else
+            interVals.(totok aResidue tmpRecAtom) = interVals.(totok aResidue tmpRecAtom) + G_surface.rawpwd.Eab[tmpIndex];
+        endif
+//         write ['interVals: {}:{} | {} | {}\n', rName aResidue tmpRecAtom, rUID aResidue tmpRecAtom,
+//             interVals.(totok aResidue tmpRecAtom),G_surface.rawpwd.Eab[tmpIndex]];
+    endloop
+    for tmpResidue in cat cResidues G_surface.allchains loop
+        if not isnull interVals.(totok tmpResidue) then
+            ligvals = append [ligvals,interVals.(totok tmpResidue)];
+            sequence = append [sequence,twrite ['{}{}',rName tmpResidue, rUID tmpResidue]];
+//             write ['ligvals: {} | {}\n', length ligvals, ligvals];
+        endif
+    endloop
+
+    fulltitle = 'HeatMapTitle';
+    write ['sequence: {} | {}\n', length sequence, sequence];
+    G_surface.pwddata = [
+        [fulltitle,'Residues','Ligands'],sequence,sequence,
+        [
+            [G_surface.lignames,G_surface.lignames,ligvals]
+        ]
+    ];
+    write ['this is it\n'];
+//     qbHeatMapSetupPanel[pwddata, 5,
+//                     'qb_QBPWDSelectHandler', INITDIST, 1,
+//                     'qb_QBPWDCloseHandler'];
 endfunction
 
 /****************************************************************************
- *                          MatchResidue
- *
- *  Look up the residue by NameUID token.  If not found, check to make sure
- *  MOE or bio3d didn't rename it.
- *
- ****************************************************************************/
+*                          MatchResidue
+*
+*  Look up the residue by NameUID token.  If not found, check to make sure
+*  MOE or bio3d didn't rename it.
+*
+****************************************************************************/
 local function MatchResidue [restok, restokset]
 
     local residx = indexof [restok, restokset];
@@ -950,17 +1234,17 @@ local function MatchResidue [restok, restokset]
 endfunction
 
 /****************************************************************************
- *
- *                          NearestAtomColor
- *
- *  Computes the surface colors as the closest atom colors to the
- *  surface points (weighted by distance).
- *
- *  Local function copied from surfmap.svl (ask CCG to change it to global?).
- *  Note:  the atom colors are based on the interaction between its residue
- *  and the ligand.
- *
- ****************************************************************************/
+*
+*                          NearestAtomColor
+*
+*  Computes the surface colors as the closest atom colors to the
+*  surface points (weighted by distance).
+*
+*  Local function copied from surfmap.svl (ask CCG to change it to global?).
+*  Note:  the atom colors are based on the interaction between its residue
+*  and the ligand.
+*
+****************************************************************************/
 local function NearestAtomColor [pos, rad, acolor, spos]
     const NAC_BUCKET_SIZE = 4.0;
     const NAC_MAX_POINTS  = 100000;
@@ -1016,17 +1300,17 @@ local function NearestAtomColor [pos, rad, acolor, spos]
 endfunction
 
 /****************************************************************************
- *
- *                          ReadExpActData
- *
- *  Read experimental activity data, separated by white space, from the file 
- *  and store it in the given QMScore database in the ExpAct field.  It is
- *  assumed that the orderings are consistent.
- *
- *  Note:  it is assumed that this function is called from a child process
- *  and will exit on an error.
- *
- ****************************************************************************/
+*
+*                          ReadExpActData
+*
+*  Read experimental activity data, separated by white space, from the file
+*  and store it in the given QMScore database in the ExpAct field.  It is
+*  assumed that the orderings are consistent.
+*
+*  Note:  it is assumed that this function is called from a child process
+*  and will exit on an error.
+*
+****************************************************************************/
 local function ReadExpActData [expactfn, qmsdbfn, header]
     if neL [fext qmsdbfn, 'mdb'] then
         Warning twrite ['{}\n is not a MOE database.', qmsdbfn];
@@ -1060,12 +1344,12 @@ local function ReadExpActData [expactfn, qmsdbfn, header]
 endfunction
 
 /****************************************************************************
- *
- *                          ReadMatrixData
- *
- *  Return data formatted for the heat map.
- *
- ****************************************************************************/
+*
+*                          ReadMatrixData
+*
+*  Return data formatted for the heat map.
+*
+****************************************************************************/
 local function ReadMatrixData [filename]
 
     local f = fopenr filename;
@@ -1091,12 +1375,12 @@ local function ReadMatrixData [filename]
 endfunction
 
 /****************************************************************************
- *
- *                          SaveMatrixData
- *
- *  Save the matrix data in csv format.
- *
- ****************************************************************************/
+*
+*                          SaveMatrixData
+*
+*  Save the matrix data in csv format.
+*
+****************************************************************************/
 local function SaveMatrixData [filename, matrixdata, type]
 
     local title, rowlbl, collbl, colnames, colabbrevs, rowdata;
@@ -1110,55 +1394,55 @@ local function SaveMatrixData [filename, matrixdata, type]
     endif
 
     filename = FilePrompt [
-	title :	'title',
-	mode  :	'saveAs',
-	path  :	'directory',
-	filter:	'*.csv',
-	name  :	filename,
-	multi :	0,
-	allowEmptyList : 0,
-	allowDuplicates: 0
+        title :	'title',
+        mode  :	'saveAs',
+        path  :	'directory',
+        filter:	'*.csv',
+        name  :	filename,
+        multi :	0,
+        allowEmptyList : 0,
+        allowDuplicates: 0
     ];
 
-	if not isnull filename then
-		local f = fopenw filename;
-	
-		local cname;
-		for cname in colnames loop
-			fwrite [f, ',{t:}', cname];          // first column name empty
-		endloop
-	
-		fwrite [f, '\n'];
-	
-		local row;
-		for row in rowdata loop
-			local rowname, rowabbrev, rowvals;
-			if type === 'sar' or type === 'inter' then
-				[rowname, rowabbrev, rowvals] = row;
-			elseif type === 'act' or type === 'pls' then
-				[rowname, rowvals] = row;
-			endif
-	
-			fwrite [f, '{t:}', rowname];
-			local val;
-			for val in rowvals loop
-				fwrite [f, ',{n:f}', val];
-			endloop
-	
-			fwrite [f, '\n'];
-		endloop
-	
-		fclose f;
-	endif
+        if not isnull filename then
+                local f = fopenw filename;
+
+                local cname;
+                for cname in colnames loop
+                        fwrite [f, ',{t:}', cname];          // first column name empty
+                endloop
+
+                fwrite [f, '\n'];
+
+                local row;
+                for row in rowdata loop
+                        local rowname, rowabbrev, rowvals;
+                        if type === 'sar' or type === 'inter' then
+                                [rowname, rowabbrev, rowvals] = row;
+                        elseif type === 'act' or type === 'pls' then
+                                [rowname, rowvals] = row;
+                        endif
+
+                        fwrite [f, '{t:}', rowname];
+                        local val;
+                        for val in rowvals loop
+                                fwrite [f, ',{n:f}', val];
+                        endloop
+
+                        fwrite [f, '\n'];
+                endloop
+
+                fclose f;
+        endif
     return;
 endfunction
 
 /****************************************************************************
- *                          SaveOptions
- *
- *  Save the analysis options in the QMScore database.
- *
- ****************************************************************************/
+*                          SaveOptions
+*
+*  Save the analysis options in the QMScore database.
+*
+****************************************************************************/
 local function SaveOptions [dbpath, options]
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
@@ -1181,12 +1465,12 @@ local function SaveOptions [dbpath, options]
 endfunction
 
 /****************************************************************************
- *                          ShowTable
- *
- *  Format the table data and display it in the message window.
- *
- *
- ****************************************************************************/
+*                          ShowTable
+*
+*  Format the table data and display it in the message window.
+*
+*
+****************************************************************************/
 local function ShowTable [data, postscript]
 
     local function writeNfield [nf]
@@ -1218,12 +1502,12 @@ local function ShowTable [data, postscript]
 endfunction
 
 /****************************************************************************
- *
- *                          UpdateRendering
- *
- *  Update the various visual settings based on the pwdpanel settings.
- *
- ****************************************************************************/
+*
+*                          UpdateRendering
+*
+*  Update the various visual settings based on the pwdpanel settings.
+*
+****************************************************************************/
 local function UpdateRendering [opts]
     local ligAtoms = oGetCollection['QB_LIGAND'];
     if isnull ligAtoms then
@@ -1252,16 +1536,17 @@ local function UpdateRendering [opts]
 endfunction
 
 /****************************************************************************
- *
- *                          UpdateComplex
- *
- *  Replace the ligand/receptor in the MOE window with those corresponding
- *  to the given ligand name.  Returns true if the surface needs to be
- *  created.
- *
- ****************************************************************************/
-local function UpdateComplex [ligtok, opts]
-
+*
+*                          UpdateComplex
+*
+*  Replace the ligand/receptor in the MOE window with those corresponding
+*  to the given ligand name.  Returns true if the surface needs to be
+*  created.
+*
+****************************************************************************/
+// TODO: this function needs significant reworking for Chain-based use!
+local function OLDUpdateComplex [ligtok, opts]
+write ['in UpdateComplex\n'];
     if ligtok === '' then return 0; endif
     if isnull G_surface then return 0; endif
     if isnull G_surface.ligmols then return 0; endif
@@ -1270,10 +1555,10 @@ local function UpdateComplex [ligtok, opts]
 
     G_surface.molidx = molidx;
     if isnull G_surface.molidx then
-	//    @todo: this fixes an error when empty, however we should provide an improved error.
+        //    @todo: this fixes an error when empty, however we should provide an improved error.
         return;
     endif
-        
+
     local RibbonModeList, showH;
     local redosurf = 0, vdwR = [], vdwE = [];
     if not isnull G_surface.recmols then
@@ -1333,7 +1618,7 @@ local function UpdateComplex [ligtok, opts]
     G_surface.lig = cat cAtoms ligchn;
     oSetCollection ['QB_LIGAND', G_surface.lig];
 
-    if gtL [length G_surface.ligmols, 1]  
+    if gtL [length G_surface.ligmols, 1]
             and (G_surface.init or neL [G_surface.dist, opts.radius]) then
         CreatePockets [opts.radius];
     endif
@@ -1349,16 +1634,110 @@ local function UpdateComplex [ligtok, opts]
     return redosurf;
 endfunction
 
+local function UpdateComplex [ligtok, opts]
+write ['in UpdateComplex\n'];
+    if ligtok === '' then return 0; endif
+//    if isnull G_surface then return 0; endif
+//    if isnull G_surface.ligmols then return 0; endif
+    local molidx = indexof [ligtok, G_surface.lignames];      // UPDATE needed for multiple indecies
+//    if G_surface.molidx === molidx then return 0; endif
+
+    G_surface.molidx = molidx;
+    if isnull G_surface.molidx then
+        //    @todo: this fixes an error when empty, however we should provide an improved error.
+        return;
+    endif
+write ['here 1\n'];
+    local RibbonModeList, showH;
+    local redosurf = 0, vdwR = [], vdwE = [];
+ //   if not isnull G_surface.recmols then              Update to not use recmols
+    if not isnull G_surface.rec then
+write ['here 2\n'];
+        showH = 0;
+//         if G_surface.init then
+//             Close [force:1];
+//         else
+            write ['in this one right here\n'];
+            showH = [aHidden Atoms [] | aElement Atoms [] == 'H'](1)(1);
+//            oDestroy uniq oChains G_surface.rec;      // Update to not destroy
+//            aSetHidden [G_surface.rec,1];             // once have multiple ligands can set hidden instead of destroy
+//         endif
+        local recidx = G_surface.molidx;
+        if length G_surface.recmols === 1 then
+            recidx = 1;
+        endif
+//        local recchn = mol_Create G_surface.recmols (recidx); // Update to not Create
+//        G_surface.rec = cat cAtoms recchn;                    // Update to already use the correct one
+        write ['G_surface.rec: {} \n', length G_surface.rec];
+        [vdwR, vdwE] = pboltz_AtomParameters oAtoms G_surface.rec;
+        G_surface.rad = vdwR;
+        G_surface.eps = vdwE;
+        G_surface.resatms = [];
+        G_surface.restok = '';
+write ['set lengths: {} | {} | {}\n', length aPos G_surface.rec, length G_surface.rad, length G_surface.eps];
+    elseif G_surface.init then
+        local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
+        if recatoms === [] then
+            Warning errmess;
+            return [];
+        endif
+
+        [vdwR, vdwE] = pboltz_AtomParameters recatoms;
+        G_surface.rec = recatoms;
+        G_surface.rad = vdwR;
+        G_surface.eps = vdwE;
+        G_surface.resatms = [];
+        G_surface.restok = '';
+
+        G_surface.lig = ligatoms;
+    endif
+
+// update the Ligand Interactions Panel if it is up:
+    local idx = 0;
+    if idx = indexof ['LigandInteractions', WindowNameList[]] then
+        WindowTrigger [(WindowKeyList[])(idx), [panel:'Apply']];
+    endif
+
+    local lignuc, ligbnd;
+    if isnull G_surface.lig then
+        lignuc = 'small-sphere';
+        ligbnd = 'cylinder';
+    else
+        lignuc = aNucleusLook G_surface.lig (1);
+        ligbnd = aBondLook G_surface.lig (1);
+//        oDestroy uniq oChains G_surface.lig;          // UPDATE TO REMOVE DESTORY
+    endif
+
+//    local ligchn = mol_Create G_surface.ligmols (G_surface.molidx);           // UPDATE
+//    G_surface.lig = cat cAtoms ligchn;                                        // UPDATE
+    oSetCollection ['QB_LIGAND', G_surface.lig];
+
+//    if gtL [length G_surface.ligmols, 1]
+//            and (G_surface.init or neL [G_surface.dist, opts.radius]) then
+        CreatePockets [opts.radius];
+//    endif
+
+    if isnull G_surface.grids (G_surface.molidx) then
+        redosurf = not FindSurface [];
+    endif
+
+ //   if G_surface.init then
+        View G_surface.lig;
+ //   endif
+
+    return redosurf;
+endfunction
+
 /****************************************************************************
- *
- *                          UpdateResidue
- *
- *  Name highlight, and shift the view towards the selected residue.
- *
- *  Acknowledgement:  labeling the residue was borrowed from LabelResidue
- *                    in menu.svl.
- *
- ****************************************************************************/
+*
+*                          UpdateResidue
+*
+*  Name highlight, and shift the view towards the selected residue.
+*
+*  Acknowledgement:  labeling the residue was borrowed from LabelResidue
+*                    in menu.svl.
+*
+****************************************************************************/
 local function UpdateResidue [restok, row, col, zoom]
     if col === 0 then
         aSetLabelRes [G_surface.resatms | oValid G_surface.resatms, 0];
@@ -1380,15 +1759,15 @@ local function UpdateResidue [restok, row, col, zoom]
 
     G_surface.restok = restok;
     G_surface.resatms = resatms;
-    
+
     aSetHidden [resatms,0];
     aSetBondLook [resatms,'cylinder'];
-    
-	local [idx, m] = sam graph_ccomponent BondGraph resatms;
+
+        local [idx, m] = sam graph_ccomponent BondGraph resatms;
     local aa;
-	for aa in split [resatms [idx], mtoc m] loop
-	    aSetLabelRes [sample [aa | graph_center BondGraph aa, 1], 1];
-	endloop
+        for aa in split [resatms [idx], mtoc m] loop
+            aSetLabelRes [sample [aa | graph_center BondGraph aa, 1], 1];
+        endloop
 
     if zoom then
         View resatms;
@@ -1397,14 +1776,14 @@ local function UpdateResidue [restok, row, col, zoom]
 endfunction
 
 /****************************************************************************
- *
- *                          UpdateSurfaceMap
- *
- *  Update the surface map of the pocket.
- *
- *  Acknowledgement:  borrowed heavily from surfmap.svl.
- *
- ****************************************************************************/
+*
+*                          UpdateSurfaceMap
+*
+*  Update the surface map of the pocket.
+*
+*  Acknowledgement:  borrowed heavily from surfmap.svl.
+*
+****************************************************************************/
 local function UpdateSurfaceMap [opts, redogrid, atomcolors]
 
     if isnull G_surface then return; endif
@@ -1430,15 +1809,15 @@ local function UpdateSurfaceMap [opts, redogrid, atomcolors]
             G_surface.grids = grids;
             G_surface.dist = opts.radius;
         endif
-
-        gvtx = msurf_MolecularSurface [aPos G_surface.rec, 
-            G_surface.rad, G_surface.eps, aPos G_surface.lig, G_surface.dist, 
+write ['lengths: {} | {} | {}\n', length aPos G_surface.rec, length G_surface.rad, length G_surface.eps];
+        gvtx = msurf_MolecularSurface [aPos G_surface.rec,
+            G_surface.rad, G_surface.eps, aPos G_surface.lig, G_surface.dist,
             G_surface.gridopt];
         [s_idx, s_color, s_vpt, s_vnorm] = gvtx;
         s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
         gvtx = poke [gvtx, 1, s_idx];
 
-        G_surface.grids = poke [G_surface.grids, 
+        G_surface.grids = poke [G_surface.grids,
             select [1, G_surface.molidx, G_surface.numgrids === 1], gvtx];
         Message [msgkey, ''];
     endif
@@ -1451,23 +1830,23 @@ local function UpdateSurfaceMap [opts, redogrid, atomcolors]
     if isnull atomcolors then
         vcolor = G_surface.colconst;
     else
-	    vcolor = NearestAtomColor [aPos G_surface.rec, G_surface.rad,
+            vcolor = NearestAtomColor [aPos G_surface.rec, G_surface.rad,
             atomcolors, s_vpt];
     endif
-
+write ['atomcolors in UpdateSurfaceMap : {} | {}\n', length vcolor, length atomcolors];
     GVertex [G_surface.gobj, G_surface.surfdim, s_idx, vcolor,
-      s_vpt, s_vnorm];
+    s_vpt, s_vnorm];
 
 endfunction
 
 
-	//  Global Functions
+        //  Global Functions
 
 /****************************************************************************
- *
- *                          qb_QBPWDCloseHandler
- *
- ****************************************************************************/
+*
+*                          qb_QBPWDCloseHandler
+*
+****************************************************************************/
 global function qb_QBPWDCloseHandler []
 
     if not isnull G_surface then
@@ -1480,34 +1859,34 @@ global function qb_QBPWDCloseHandler []
 endfunction
 
 /****************************************************************************
- *
- *                          qb_QBPWDGetDefaults
- *
- ****************************************************************************/
+*
+*                          qb_QBPWDGetDefaults
+*
+****************************************************************************/
 global function qb_QBPWDGetDefaults []
 
-   return tag tr QBPWD_OPT_DEFAULTS;
+return tag tr QBPWD_OPT_DEFAULTS;
 endfunction
 
 /****************************************************************************
- *
- *                          qb_QBPWDSelectHandler
- *
- ****************************************************************************/
+*
+*                          qb_QBPWDSelectHandler
+*
+****************************************************************************/
 global function qb_QBPWDSelectHandler [data, selrow, selcol, opts,
         mincut, maxcut, colors]
-
+write ['here 0 qb_QBPWDSelectHandler : {} {} {} {} {} {} \n', selrow, selcol, opts, mincut, maxcut, colors];
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
     if isnull G_surface then return; endif
     if allfalse eqE [G_surface.gobj, GKeyList []] then return; endif
     if isnull Atoms [] then return; endif
-
-	// lmw: the selection of the sequence no longer makes sense.
-	//      @todo: make it so that the sequence is no longer selectable.
+write ['here 1 qb_QBPWDSelectHandler\n'];
+        // lmw: the selection of the sequence no longer makes sense.
+        //      @todo: make it so that the sequence is no longer selectable.
     if selrow === 0 then
         return;
     endif
-
+write ['here 2 qb_QBPWDSelectHandler\n'];
     local [t, sequence, ra, rowdata] = data;
     local [ligtok, la, ld, resnames] = rowdata (selrow);
     local restok = '';
@@ -1519,7 +1898,7 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, opts,
     endif
     local redosurf = UpdateComplex [ligtok, opts];
     UpdateRendering[opts];
-    local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec, 
+    local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec,
         mincut, maxcut, colors];
     UpdateSurfaceMap [opts, redosurf, atomcolors];
     UpdateResidue [restok, selrow, selcol, 0];
@@ -1527,10 +1906,10 @@ global function qb_QBPWDSelectHandler [data, selrow, selcol, opts,
 endfunction
 
 /****************************************************************************
- *
- *                          qb_QBPWDSetupPanel
- *
- ****************************************************************************/
+*
+*                          qb_QBPWDSetupPanel
+*
+****************************************************************************/
 global function qb_QBPWDSetupPanel []
 
     const SHOWHELP = 1;
@@ -1562,12 +1941,14 @@ global function qb_QBPWDSetupPanel []
 
     loop
         local [vals, trig] = WindowWait wkey;
+write ['trig: {}  | vals: {} \n', trig, vals];
         if trig === 'analview' then
-            if second task_fork [statics:'share', 
+            if second task_fork [statics:'share',
                 master:'parent'] === 'child' then
-
+                SplitPWD [];
                 // Load and setup data
-                local data = pwddata (vals.analysis);
+                local data = G_surface.pwddata;
+write ['data in analview: {} | {}\n', length data, data];
                 if isnull data then
                     Warning 'No analysis data to view.';
                     exit [];
@@ -1600,11 +1981,13 @@ global function qb_QBPWDSetupPanel []
                 endif
 
                 local rowdata = last data;
-                CreateSurfaceMap [qbGetHeatMapOpts[], first rowdata (INITSEL), 
-                    last rowdata(INITSEL), pwdfilename];
+                CreateSurfaceMap [qbGetHeatMapOpts[], first rowdata (INITSEL),
+                    third G_surface.pwddata, pwdfilename];
+//                 CreateSurfaceMap [qbGetHeatMapOpts[], first rowdata (INITSEL),
+//                     last rowdata(INITSEL), pwdfilename];
 
                 heatmaptask = task_key -1;
-                qbHeatMapSetupPanel [data,  SIGNIFRES, 
+                qbHeatMapSetupPanel [data,  SIGNIFRES,
                     'qb_QBPWDSelectHandler', INITDIST, SHOWHELP,
                     'qb_QBPWDCloseHandler'];
                 exit [];
@@ -1621,9 +2004,9 @@ global function qb_QBPWDSetupPanel []
                     exit [];
                 endif
 
-                local savefile = twrite ['{} {}.csv', vals.title, 
+                local savefile = twrite ['{} {}.csv', vals.title,
                     ANALYSIS(vals.analysis)];
-                SaveMatrixData [savefile, pwddata (vals.analysis), 
+                SaveMatrixData [savefile, pwddata (vals.analysis),
                     ANALKEYS(vals.analysis)];
                 exit [];
             endif
@@ -1636,7 +2019,7 @@ global function qb_QBPWDSetupPanel []
 
                 if neL [ftype pwdfilename, 'file']
                         or neL [fext pwdfilename, 'mdb'] then
-                    Warning 
+                    Warning
                         twrite ['Cannot find the QMScore/PWD database:\n{}.',
                             pwdfilename];
                     exit [];
@@ -1656,7 +2039,7 @@ global function qb_QBPWDSetupPanel []
             if vals.panel === 'Close' then
                 task_prio 0;
 
-	            if tok_length pwdfilename > 0 then
+                    if tok_length pwdfilename > 0 then
                     pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
                         vals.title,
                         vals.analysis, vals.sf_e_ab, vals.sf_e_abp,
@@ -1670,7 +2053,7 @@ global function qb_QBPWDSetupPanel []
 
             elseif vals.panel === 'Apply' then
 
-                if second task_fork [statics:'share', 
+                if second task_fork [statics:'share',
                         master:'parent'] === 'child' then
                     task_prio 3;
                     task_settitle [-1, 'MOEDivCon PWD Analysis'];
@@ -1678,8 +2061,8 @@ global function qb_QBPWDSetupPanel []
                     //  Destroy current surface
                     heatmapkey = WindowKey 'QB Heat Map';
                     if heatmapkey > 0 then
-                       qb_QBPWDCloseHandler [];
-                       WindowDestroy heatmapkey;
+                    qb_QBPWDCloseHandler [];
+                    WindowDestroy heatmapkey;
 
                         //  Kill child task.
                         if heatmaptask > 0 then
@@ -1690,7 +2073,7 @@ global function qb_QBPWDSetupPanel []
 
                     if neL [ftype pwdfilename, 'file']
                             or neL [fext pwdfilename, 'mdb'] then
-                        Warning 
+                        Warning
                             twrite ['Can\'t find the QMScore/PWD database: {}.',
                             pwdfilename];
                         exit [];
@@ -1736,54 +2119,62 @@ global function qb_QBPWDSetupPanel []
                 endif
 
             elseif vals.panel === 'Load' then
-
+write ['IS NEW .. 3\n'];
                 if second task_fork [master: 'parent',
                         statics:'share'] === 'child' then
                     task_prio 0;
 
-                    local tempfile = first FilePrompt [title: 'Load Database', 
-                        filter: '*.mdb', allowEmptyList: 0];
+                    local tempfile = first FilePrompt [title: 'Load Database',
+                        filter: '*.h5', allowEmptyList: 0];
+                    pwdfilename = tempfile;
+
                     if not isnull tempfile then
+#if 0
                         if neL [ftype tempfile, 'file']
                                 or neL [fext tempfile, 'mdb'] then
-                            Warning 
+                            Warning
                                 twrite ['{}\nis not a QMScore/PWD database.',
                                 tempfile];
                             exit [];
                         endif
-                        pwdfilename = tempfile;
                         local [ldkey, ldrecs, ldligs, ldcoreopts, ldpwdopts]
                             = LoadDB [pwdfilename];
                         db_Close ldkey;
+#endif
                         Close [force:1];
                         local idx = 1;
-                        
-	InitG_surface [];
-    //  Make sure initial receptor/ligand is in MOE Window
-    LoadMols [pwdfilename];
-                        
-                                aSetNucleusLook [cat cAtoms G_surface.ligChains, 'small-sphere'];
-                                aSetBondLook [cat cAtoms G_surface.ligChains, 'cylinder'];
-                                oSetCollection ['QB_LIGAND', cat cAtoms G_surface.ligChains];
-                        pro_Align [Chains []];
-                        View [];
-                        WindowSetData [wkey, ldpwdopts];
-                        pwddata = GetAnalData [pwdfilename, vals.title];
-                        local datam = app isnull pwddata;
-                        if alltrue datam then
-                            WindowSetAttr [wkey, [selbox: [sensitive: 0],
-                                analbox: [sensitive: 1],
-                                panel: [sensitive: [1,1,1]]]];
-                        else
-                            datam = not droplast datam;
-                            WindowSetAttr [wkey, [selbox: [sensitive: 1],
-                                analysis: [text: (ANALYSIS | datam)],
-                                analbox: [sensitive: 1],
-                                panel: [sensitive: [1,1,1]]]];
-                        endif
 
-WindowSetAttr [wkey, [sf_e_r12: [sensitive: 0], //DEBUG
-sf_e_ele: [sensitive: 0]]];//DEBUG
+                            InitG_surface [];
+                        //  Make sure initial receptor/ligand is in MOE Window
+                        LoadMols [pwdfilename];
+
+                        aSetNucleusLook [G_surface.lig, 'small-sphere'];
+                        aSetBondLook [G_surface.lig, 'cylinder'];
+                        oSetCollection ['QB_LIGAND', G_surface.lig];
+//                        pro_Align [Chains []];
+                        View [];
+//                        WindowSetData [wkey, ldpwdopts];
+//                        pwddata = GetAnalData [pwdfilename, vals.title];
+//                        local datam = app isnull G_surface.pwddata;
+//                        if alltrue datam then
+//                            WindowSetAttr [wkey, [selbox: [sensitive: 0],
+//                                analbox: [sensitive: 1],
+//                                panel: [sensitive: [1,1,1]]]];
+//                        else
+//                            datam = not droplast datam;
+//                            WindowSetAttr [wkey, [selbox: [sensitive: 1],
+//                                analysis: [text: (ANALYSIS | datam)],
+//                                analbox: [sensitive: 1],
+//                                panel: [sensitive: [1,1,1]]]];
+//                        endif
+write ['im here\n'];
+                            WindowSetAttr [wkey, [selbox: [sensitive: 1],
+//                                analysis: [text: (ANALYSIS | [1,0,0,0])],
+                                analbox: [sensitive: 1],
+                                panel: [sensitive: [0,1,1]]]];
+
+                        WindowSetAttr [wkey, [sf_e_r12: [sensitive: 0], //DEBUG
+                        sf_e_ele: [sensitive: 0]]];//DEBUG
                     endif
 
                     exit [];

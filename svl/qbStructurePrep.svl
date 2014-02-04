@@ -653,6 +653,25 @@ global function qbPrep2Files [fname_targ, fname_lig, opt]     // x is the functi
 
 endfunction 
 
+global function qbPrepFile [infile,opt,outfile]
+    opt = tagcat[opt, DEFAULTS];
+        
+    pot_Load ['$MOE/lib/mmff94x.ff'];    // switch to OPLS-AA as this will do a better job.
+
+    oDestroy Chains [];
+    
+    if isnull outfile then
+        outfile = twrite ['prepped_{}.{}',fbase ftail infile, fext infile];
+    endif
+    
+    write ['\nReading ... {}\n', infile];
+    ReadAuto infile;
+    
+    qbPrepareSystem [opt];
+    
+    WriteAuto outfile;
+endfunction
+
 global function qbProcessFileGroup [targ_patt,lig_patt,opt]
 
     write ['Running set ... \n'];

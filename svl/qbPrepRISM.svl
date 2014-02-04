@@ -236,6 +236,9 @@ endfunction
 
 //   =========
 
+const WATER_RESIDUES = ['HOH','WAT','TIP','SOL','OH2','DOD','D20'];
+local function is_water_res v = indexof [v, WATER_RESIDUES];
+
 global function qbPrepRISM[infname]
     local globalSystem = SystemPush [];
     oDestroy Chains[];
@@ -245,6 +248,9 @@ global function qbPrepRISM[infname]
     local asymmetricChains = mol_Create molData.mol;
     local crystalChains = mol_Create molData.crystal_shell;
     // clean out all water residues
+    local waterResidues = Residues [] | is_water_res rName Residues [];
+    write ['{}\n', reverse is_water_res rName Residues []];
+    write ['{} | {} \n', length Residues [], length waterResidues];
     local waterChains = uniq rChain (Residues [] | rName Residues [] == 'HOH');
     asymmetricChains = diff [asymmetricChains,waterChains];
     crystalChains = diff [crystalChains,waterChains];
