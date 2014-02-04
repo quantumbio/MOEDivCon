@@ -687,6 +687,7 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     if length ligvals < 1 then
         return;
     endif
+write ['in TruncateAnalData 1\n'];
         //      (1) If max and min are equal (probably zero) the residue is not interesting.
     if length ligvals > 1 then
         for idx = 1, length ligvals(1), 1 loop
@@ -711,7 +712,7 @@ local function TruncateAnalData [ligvals, resnames, sequence]
     for tmpNames in resnames loop
         outNames = append [outNames, tmpNames | mask];
     endloop
-
+write ['in TruncateAnalData 2\n'];
     return [outVals, outNames, sequence | mask];
 
 endfunction
@@ -731,7 +732,7 @@ local function OLDGetAnalData [dbpath, title]
     local function trim [t]
         local i = indexof ["=", string t];
         if i > 0 then return tok_keep [t, i - 1]; else return t; endif
-endfunction
+    endfunction
     local function where [r]
         local rnidx = indexof ["1234567890", string r];
         rnidx = rnidx | rnidx <> 0;
@@ -1094,14 +1095,14 @@ write ['ligSize: {}\n', length G_surface.lig];
 //     G_surface.pwddata = values;
 
 // this will currently assume the ligand atoms vs. the target, but with changes, it could also account for user interaction/fragments.
-    local Aatoms = (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexA+1];
-    local Batoms = (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexB+1];
+    local Aatoms = (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexA];
+    local Batoms = (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexB];
 write ['access G_surface2: {} {}\n',length (cat cAtoms G_surface.allchains), G_surface.rawpwd];
      write ['Aatoms: {} | {}\n', length Aatoms,Aatoms];
      write ['Batoms: {} | {}\n', length Batoms,Batoms];
 
 // DEBUG CODE
-// #if 0
+#if 0
     local testLigVals;
     local tmpAatom, tmpBatom;
     local tmpInteraction = 1;
@@ -1133,7 +1134,7 @@ fclose fnum;
             endif
         endloop
     endloop
-// #endif
+#endif
 // END DEBUG CODE
 
     local Alig = cat indicesof [G_surface.lig,Aatoms];
@@ -1169,12 +1170,9 @@ fclose fnum;
     
     for tmpIndex in interIndices loop
         local tmpRecAtom;
-        write ['indexof Atm: {} {} {} ',tmpIndex, indexof [Aatoms[tmpIndex],recAtoms],indexof [Batoms[tmpIndex],recAtoms]];
         if indexof [Aatoms[tmpIndex],recAtoms] then
-            write ['IN A\n'];
             tmpRecAtom = Aatoms[tmpIndex];
         else
-            write ['IN B\n'];
             tmpRecAtom = Batoms[tmpIndex];
         endif
         if isnull interVals.(totok aResidue tmpRecAtom) then
@@ -1182,8 +1180,6 @@ fclose fnum;
         else
             interVals.(totok aResidue tmpRecAtom) = interVals.(totok aResidue tmpRecAtom) + G_surface.rawpwd.Eab[tmpIndex];
         endif
-//         write ['interVals: {}:{} | {} | {}\n', rName aResidue tmpRecAtom, rUID aResidue tmpRecAtom,
-//             interVals.(totok aResidue tmpRecAtom),G_surface.rawpwd.Eab[tmpIndex]];
     endloop
     for tmpResidue in cat cResidues G_surface.allchains loop
         if not isnull interVals.(totok tmpResidue) then
@@ -1193,18 +1189,36 @@ fclose fnum;
         endif
     endloop
 
-    fulltitle = 'HeatMapTitle';
+// The following was from GetAnalData
+    local function trim [t]
+        local i = indexof ["=", string t];
+        if i > 0 then return tok_keep [t, i - 1]; else return t; endif
+    endfunction
+    local function where [r]
+        local rnidx = indexof ["1234567890", string r];
+        rnidx = rnidx | rnidx <> 0;
+        return  (min rnidx) - 1;
+    endfunction
+    local function abbreviate [rn, ln]
+        local idx = app where rn;
+        local arn = apt tok_drop [rn, idx];
+        arn = apt tok_keep [arn, -3];
+        local aln = app trim ln;
+        aln = apt tok_drop [aln, 3];
+        aln = apt tok_keep [aln, -3];
+        return [arn, aln];
+    endfunction
+
+    [ligvals,resnames,sequence]=TruncateAnalData [ligvals, sequence, sequence];
+    [resabbrevs, ligabbrevs] = abbreviate [resnames, G_surface.lignames];
+    fulltitle = 'Interaction Map';
     write ['sequence: {} | {}\n', length sequence, sequence];
     G_surface.pwddata = [
-        [fulltitle,'Residues','Ligands'],sequence,sequence,
+        [fulltitle,'Ligands','Residues'],sequence,sequence,
         [
-            [G_surface.lignames,G_surface.lignames,ligvals]
+            [G_surface.lignames,ligabbrevs,ligvals,resnames]
         ]
     ];
-    write ['this is it\n'];
-//     qbHeatMapSetupPanel[pwddata, 5,
-//                     'qb_QBPWDSelectHandler', INITDIST, 1,
-//                     'qb_QBPWDCloseHandler'];
 endfunction
 
 /****************************************************************************
@@ -2038,17 +2052,6 @@ write ['data in analview: {} | {}\n', length data, data];
 
             if vals.panel === 'Close' then
                 task_prio 0;
-
-                    if tok_length pwdfilename > 0 then
-                    pwdopts = tag [first tr QBPWD_OPT_DEFAULTS, [
-                        vals.title,
-                        vals.analysis, vals.sf_e_ab, vals.sf_e_abp,
-                        vals.sf_e_abc, vals.sf_e_r6,
-                        vals.sf_e_r12, vals.sf_e_ele, vals.prune_zero,
-                        vals.prune_sd, vals.expact_hdr,
-                        vals.numtopres, vals.numcomps, vals.trainingset]];
-                    SaveOptions [pwdfilename, pwdopts];
-                endif
                 break;
 
             elseif vals.panel === 'Apply' then
