@@ -472,6 +472,7 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         String title=target;
         for(int moleculeCount=0;moleculeCount<cml.getAnyCmlOrAnyOrAny().size();moleculeCount++)
         {
+            if(((JAXBElement)cml.getAnyCmlOrAnyOrAny().get(moleculeCount)).getValue() instanceof com.quantumbioinc.xml.divcon.Symmetry) continue;
             JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbMoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)cml.getAnyCmlOrAnyOrAny().get(moleculeCount);
             Molecule molecule=jaxbMoleculeElement.getValue();
             if(molecule.getTitle()!=null)title=molecule.getTitle();
@@ -2839,6 +2840,7 @@ private SVLVar retrieveLigandSelection(SVLVar var) throws SVLJavaException, IOEx
         Cml cml=(Cml)divcon.getCmlOrTargetOrLigand().get(0);
         for(int moleculeCount=0;moleculeCount<cml.getAnyCmlOrAnyOrAny().size();moleculeCount++)
         {
+            if(((JAXBElement)cml.getAnyCmlOrAnyOrAny().get(moleculeCount)).getValue() instanceof com.quantumbioinc.xml.divcon.Symmetry) continue;
             JAXBElement<com.quantumbioinc.xml.divcon.Molecule> jaxbMoleculeElement=(JAXBElement<com.quantumbioinc.xml.divcon.Molecule>)cml.getAnyCmlOrAnyOrAny().get(moleculeCount);
             Molecule molecule=jaxbMoleculeElement.getValue();
             for(int submoleculeCount=0;submoleculeCount<molecule.getAnyCmlOrAnyOrAny().size();submoleculeCount++)
