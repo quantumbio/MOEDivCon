@@ -410,6 +410,11 @@ function MatchResidue;
 ****************************************************************************/
 local function ColorAtoms [data, ligidx, residx, recatoms,
         mincut, maxcut, colors]
+write ['data(1): {}\n', data(1)];
+write ['data(2): {}\n', data(2)];
+write ['data(3): {}\n', data(3)];
+write ['data(4): {}\n', data(4)];
+write ['data(5): {}\n', data(5)];
 write ['in ColorAtoms: {} | {} | {} | {} | {} | {} | {} \n',data, ligidx, residx, recatoms,mincut, maxcut, colors];
     if ligidx === 0 then
         return rep [G_surface.colconst, length recatoms];
@@ -458,10 +463,10 @@ local function CreatePockets [dist]
     G_surface.pockets = rep [[], G_surface.numgrids];
 
     local ith, rec, recpos, pocket;
-    if isnull G_surface.recmols then
-        rec = G_surface.rec | aElement G_surface.rec <> 'H';
-        recpos = aPos rec;
-    endif
+//    if isnull G_surface.recmols then
+//        rec = G_surface.rec | aElement G_surface.rec <> 'H';
+//        recpos = aPos rec;
+//    endif
 
     for ith = 1, G_surface.numgrids, 1 loop
         if not isnull G_surface.recmols then
@@ -469,6 +474,8 @@ local function CreatePockets [dist]
             recpos = mol_aPos rec;
         endif
 
+        rec = G_surface.rec(ith) | aElement G_surface.rec(ith) <> 'H';
+        recpos = aPos rec;
         local lig = mol_Heavy G_surface.ligmols (ith);
         local ligpos = mol_aPos lig;
 
@@ -767,6 +774,7 @@ local function OLDGetAnalData [dbpath, title]
         ligvals = app second ligdata;
         resnames = app third ligdata;
         [ligvals,resnames,sequence]=TruncateAnalData [ligvals, resnames, sequence];
+write ['2 length ligvals, resnames, sequence: {} | {} | {}\n', length ligvals, length resnames, length sequence];
         [resabbrevs, ligabbrevs] = abbreviate [resnames, lignames];
         // @todo: remove the double reference to sequence. This will require structural change to 'data' and therefore
         //          should come when we change to tagged vectors (or XML).
@@ -1060,46 +1068,50 @@ local function LoadMols [pwdfilename]
 
     if MOE_BATCH then exit ['Should only be run from MOE.']; endif
 
-    if neL [fext pwdfilename, 'h5'] then
-        Warning twrite ['{}\n is not a MOE database.', pwdfilename];
-        exit [];
-    endif
-
-    if neL [ftype pwdfilename, 'file'] then
-        Warning twrite ['Unable to find the QMScore/PWD database:\n'
-            '    {}', pwdfilename];
-        exit [];
-    endif
-    local models = first qbListModels [pwdfilename];
-    G_surface.allchains = ReadHDF5[pwdfilename];
-    G_surface.rawpwd = first qbRetrieveAtomByAtomDecomposition[pwdfilename,models.target,'Initial'];
-write ['access G_surface1: {} {}\n',length (cat cAtoms G_surface.allchains), G_surface.rawpwd];
+    local tmpFile;
+    G_surface.numgrids = 0;
+    for tmpFile in pwdfilename loop
+        
+        if neL [fext tmpFile, 'h5'] then
+            Warning twrite ['{}\n is not a DivCon file.', pwdfilename];
+            exit [];
+        endif
+write ['send 2: {}\n', tmpFile];
+        local models = first qbListModels [tmpFile];
+        G_surface.allchains = append [G_surface.allchains,ReadHDF5[tmpFile]];
+        G_surface.rawpwd = append [G_surface.rawpwd,
+            first qbRetrieveAtomByAtomDecomposition[tmpFile,models.target,'Initial']];
+        G_surface.numgrids = G_surface.numgrids + 1;
+    endloop
+    pro_Align [Chains[]];
 endfunction
 
 local function SplitPWD []
-    // TODO: one-liner opportunity
-//     local i = 1;
-//     local values = [];
-    local tmpAtomsList = cat cAtoms G_surface.allchains;
-//     while i <= length G_surface.rawpwd.Eab loop
-//         values.(getKey[tmpAtomsList[G_surface.rawpwd.indexA[i]+1],
-//                         tmpAtomsList[G_surface.rawpwd.indexB[i]+1]]) = G_surface.rawpwd.Eab[i];
-//         i = i+1;
-//     endloop
-    G_surface.lig = join [_Atoms '$$ligand',cat cAtoms G_surface.allchains];
-    G_surface.rec = diff [cat cAtoms G_surface.allchains,G_surface.lig];
-write ['recSize: {}\n', length G_surface.rec];
-write ['ligSize: {}\n', length G_surface.lig];
-    G_surface.lignames = '1';   // TODO: this needs to be done for multiple ligands!
-    G_surface.molidx = 1;
-//     G_surface.pwddata = values;
+    local tmpChain, ligandAtoms, receptorAtoms;
+    local objPlace = 0;
+    local fulltitle, resnames, sequence, resabbrevs;
+    local ligdata, lignames, ligabbrevs, ligvals;
+    local tmpResidue, tmpAtom, tmpIndex;
+    local interVals;
+    interVals = [];
+    ligvals = [];
+    G_surface.lignames = [];
+write ['G_surface.allchains: {} | {}\n', length G_surface.allchains, G_surface.allchains];
+    for tmpChain in G_surface.allchains loop
+        objPlace = objPlace+1;
+        ligandAtoms = join [_Atoms '$$ligand',cat cAtoms tmpChain];
+        receptorAtoms =  diff [cat cAtoms tmpChain,ligandAtoms];
+        G_surface.lig = append [G_surface.lig, ligandAtoms];
+        G_surface.rec = append [G_surface.rec, receptorAtoms];
+// write ['recSize: {}\n', length G_surface.rec];
+// write ['ligSize: {}\n', length G_surface.lig];
+        G_surface.lignames = append [G_surface.lignames,totok objPlace];
 
-// this will currently assume the ligand atoms vs. the target, but with changes, it could also account for user interaction/fragments.
-    local Aatoms = (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexA];
-    local Batoms = (cat cAtoms G_surface.allchains)[G_surface.rawpwd.indexB];
-write ['access G_surface2: {} {}\n',length (cat cAtoms G_surface.allchains), G_surface.rawpwd];
-     write ['Aatoms: {} | {}\n', length Aatoms,Aatoms];
-     write ['Batoms: {} | {}\n', length Batoms,Batoms];
+    // this will currently assume the ligand atoms vs. the target, but with changes, it could also account for user interaction/fragments.
+//  write ['G_surface.rawpwd[objPlace]: {} \n', length G_surface.rawpwd[objPlace],G_surface.rawpwd[objPlace]];
+        local tmpPWD = cat G_surface.rawpwd[objPlace];
+        local Aatoms = (cat cAtoms tmpChain)[(cat G_surface.rawpwd[objPlace]).indexA];
+        local Batoms = (cat cAtoms tmpChain)[(cat G_surface.rawpwd[objPlace]).indexB];
 
 // DEBUG CODE
 #if 0
@@ -1137,56 +1149,57 @@ fclose fnum;
 #endif
 // END DEBUG CODE
 
-    local Alig = cat indicesof [G_surface.lig,Aatoms];
-    local Blig = cat indicesof [G_surface.lig,Batoms];
-     write ['Alig: {} | {}\n', length Alig,Alig];
-     write ['Blig: {} | {}\n', length Blig,Blig];
+        local Alig = cat indicesof [ligandAtoms,Aatoms];
+        local Blig = cat indicesof [ligandAtoms,Batoms];
+//         write ['Alig: {} | {}\n', length Alig,Alig];
+//         write ['Blig: {} | {}\n', length Blig,Blig];
 
-    local Arec = cat indicesof [G_surface.rec,Aatoms];
-    local Brec = cat indicesof [G_surface.rec,Batoms];
-     write ['Arec: {} | {}\n', length Arec,Arec];
-     write ['Brec: {} | {}\n', length Brec,Brec];
+        local Arec = cat indicesof [receptorAtoms,Aatoms];
+        local Brec = cat indicesof [receptorAtoms,Batoms];
+//         write ['Arec: {} | {}\n', length Arec,Arec];
+//         write ['Brec: {} | {}\n', length Brec,Brec];
 
-    local ligUnion = sortuniq cat [Alig,Blig];     // lig atoms on either "side" of the relation
-    local recUnion = sortuniq cat [Arec,Brec];     // rec atoms on either "side" of the relation
-     write ['ligUnion: {} | {}\n', length ligUnion,ligUnion];
-     write ['recUnion: {} | {}\n', length recUnion,recUnion];
+        local ligUnion = sortuniq cat [Alig,Blig];     // lig atoms on either "side" of the relation
+        local recUnion = sortuniq cat [Arec,Brec];     // rec atoms on either "side" of the relation
+//         write ['ligUnion: {} | {}\n', length ligUnion,ligUnion];
+//         write ['recUnion: {} | {}\n', length recUnion,recUnion];
 
-    local interIndices = sortuniq join [ligUnion,recUnion];  // filter out any intra-interactions
-    interIndices = interIndices | interIndices > 0;
-    write ['interIndices: {} | {}\n', length interIndices,interIndices];
+        local interIndices = sortuniq join [ligUnion,recUnion];  // filter out any intra-interactions
+        interIndices = interIndices | interIndices > 0;
+//        write ['interIndices: {} | {}\n', length interIndices,interIndices];
 
-    local ligAtoms = cat [join [Aatoms[interIndices],G_surface.lig],
-                        join [Batoms[interIndices],G_surface.lig]];     // recover the ligand atoms
-    local recAtoms = cat [join [Aatoms[interIndices],G_surface.rec],
-                        join [Batoms[interIndices],G_surface.rec]];     // recover the receptor atom
-     write ['ligAtoms: {}\n', length ligAtoms];
-     write ['recAtoms: {}\n', length recAtoms];
-
-    local fulltitle, resnames, sequence, resabbrevs;
-    local ligdata, lignames, ligabbrevs, ligvals;
-    local tmpResidue, tmpAtom, tmpIndex;
-    local interVals = [];
-    
-    for tmpIndex in interIndices loop
-        local tmpRecAtom;
-        if indexof [Aatoms[tmpIndex],recAtoms] then
-            tmpRecAtom = Aatoms[tmpIndex];
-        else
-            tmpRecAtom = Batoms[tmpIndex];
-        endif
-        if isnull interVals.(totok aResidue tmpRecAtom) then
-            interVals.(totok aResidue tmpRecAtom) = G_surface.rawpwd.Eab[tmpIndex];
-        else
-            interVals.(totok aResidue tmpRecAtom) = interVals.(totok aResidue tmpRecAtom) + G_surface.rawpwd.Eab[tmpIndex];
-        endif
-    endloop
-    for tmpResidue in cat cResidues G_surface.allchains loop
-        if not isnull interVals.(totok tmpResidue) then
-            ligvals = append [ligvals,interVals.(totok tmpResidue)];
-            sequence = append [sequence,twrite ['{}{}',rName tmpResidue, rUID tmpResidue]];
-//             write ['ligvals: {} | {}\n', length ligvals, ligvals];
-        endif
+        // TODO: are these two lines needed anymore??
+        local ligAtoms = cat [join [Aatoms[interIndices],ligandAtoms],
+                            join [Batoms[interIndices],ligandAtoms]];     // recover the ligand atoms
+        local recAtoms = cat [join [Aatoms[interIndices],receptorAtoms],
+                            join [Batoms[interIndices],receptorAtoms]];     // recover the receptor atom
+        write ['ligAtoms: {}\n', length ligAtoms];
+        write ['recAtoms: {}\n', length recAtoms];
+        interVals = [];
+        for tmpIndex in interIndices loop
+            local tmpRecAtom;
+            if indexof [Aatoms[tmpIndex],recAtoms] then
+                tmpRecAtom = Aatoms[tmpIndex];
+            else
+                tmpRecAtom = Batoms[tmpIndex];
+            endif
+            if isnull interVals.(totok aResidue tmpRecAtom) then
+                interVals.(totok aResidue tmpRecAtom) = (cat G_surface.rawpwd[objPlace]).Eab[tmpIndex];
+            else
+                interVals.(totok aResidue tmpRecAtom) = interVals.(totok aResidue tmpRecAtom) + (cat G_surface.rawpwd[objPlace]).Eab[tmpIndex];
+            endif
+        endloop
+        local tmpLigvals;
+        tmpLigvals = [];
+        for tmpResidue in cat cResidues (cat G_surface.allchains[objPlace]) loop
+            if not isnull interVals.(totok tmpResidue) then
+                tmpLigvals = append [tmpLigvals,interVals.(totok tmpResidue)];
+                sequence = append [sequence,twrite ['{}{}',rName tmpResidue, rUID tmpResidue]];
+    //             write ['ligvals: {} | {}\n', length ligvals, ligvals];
+            endif
+        endloop
+write ['tmpLigvals: {} | {} | {} \n', length ligvals, length tmpLigvals, tmpLigvals];
+        ligvals = append[ligvals,tmpLigvals];
     endloop
 
 // The following was from GetAnalData
@@ -1209,10 +1222,16 @@ fclose fnum;
         return [arn, aln];
     endfunction
 
+    G_surface.molidx = 1;
+write ['1 length ligvals, resnames, sequence: {} | {} | {}\n', length ligvals, length resnames, length sequence];
     [ligvals,resnames,sequence]=TruncateAnalData [ligvals, sequence, sequence];
+write ['2 length ligvals, resnames, sequence: {} | {} | {}\n', length ligvals, length resnames, length sequence];
     [resabbrevs, ligabbrevs] = abbreviate [resnames, G_surface.lignames];
     fulltitle = 'Interaction Map';
     write ['sequence: {} | {}\n', length sequence, sequence];
+    write ['ligvals: {} | {} | {}\n', length ligvals, length cat ligvals, length cat cat ligvals];
+    ligvals = cat ligvals;
+    write ['IN THIS ONE\n'];
     G_surface.pwddata = [
         [fulltitle,'Ligands','Residues'],sequence,sequence,
         [
@@ -1265,6 +1284,7 @@ local function NearestAtomColor [pos, rad, acolor, spos]
 
     const ALPHA = 2.5;
     local maxrad = max [1, max rad];
+write ['acolor: {} | {} \n', length acolor, acolor];
     local argb = bitand [0xFF, bitshr [[acolor],[16,8,0]]];
     local r = rep [0, l_length spos], g = r, b = r;
     local vsum = rep [0, l_length spos];
@@ -1300,6 +1320,7 @@ local function NearestAtomColor [pos, rad, acolor, spos]
     if not length idx then continue; endif
     local w = exp (-ALPHA * maxE [0, sqrt r2 - 0.95 * rad(i)] );
     vsum[idx] = vsum[idx] + w;
+write ['r et al: {} | {} | {} | {}\n',idx,r[idx],w,argb(1)(i)];
     r[idx] = r[idx] + w * argb(1)(i);
     g[idx] = g[idx] + w * argb(2)(i);
     b[idx] = b[idx] + w * argb(3)(i);
@@ -1655,7 +1676,7 @@ write ['in UpdateComplex\n'];
 //    if isnull G_surface.ligmols then return 0; endif
     local molidx = indexof [ligtok, G_surface.lignames];      // UPDATE needed for multiple indecies
 //    if G_surface.molidx === molidx then return 0; endif
-
+    local tmpChains;
     G_surface.molidx = molidx;
     if isnull G_surface.molidx then
         //    @todo: this fixes an error when empty, however we should provide an improved error.
@@ -1683,12 +1704,14 @@ write ['here 2\n'];
 //        local recchn = mol_Create G_surface.recmols (recidx); // Update to not Create
 //        G_surface.rec = cat cAtoms recchn;                    // Update to already use the correct one
         write ['G_surface.rec: {} \n', length G_surface.rec];
-        [vdwR, vdwE] = pboltz_AtomParameters oAtoms G_surface.rec;
-        G_surface.rad = vdwR;
-        G_surface.eps = vdwE;
-        G_surface.resatms = [];
-        G_surface.restok = '';
-write ['set lengths: {} | {} | {}\n', length aPos G_surface.rec, length G_surface.rad, length G_surface.eps];
+        
+        for tmpChains in G_surface.rec loop
+            [vdwR, vdwE] = pboltz_AtomParameters oAtoms tmpChains;
+            G_surface.rad = append [G_surface.rad,vdwR];
+            G_surface.eps = append [G_surface.eps,vdwE];
+            G_surface.resatms = [];
+            G_surface.restok = '';
+        endloop
     elseif G_surface.init then
         local [recatoms, ligatoms, errmess] = qb_SplitComplex [0];
         if recatoms === [] then
@@ -1724,7 +1747,9 @@ write ['set lengths: {} | {} | {}\n', length aPos G_surface.rec, length G_surfac
 
 //    local ligchn = mol_Create G_surface.ligmols (G_surface.molidx);           // UPDATE
 //    G_surface.lig = cat cAtoms ligchn;                                        // UPDATE
-    oSetCollection ['QB_LIGAND', G_surface.lig];
+    for tmpChains in G_surface.lig loop
+        oSetCollection ['QB_LIGAND', tmpChains];
+    endloop
 
 //    if gtL [length G_surface.ligmols, 1]
 //            and (G_surface.init or neL [G_surface.dist, opts.radius]) then
@@ -1736,7 +1761,7 @@ write ['set lengths: {} | {} | {}\n', length aPos G_surface.rec, length G_surfac
     endif
 
  //   if G_surface.init then
-        View G_surface.lig;
+        View G_surface.lig(G_surface.molidx);
  //   endif
 
     return redosurf;
@@ -1823,9 +1848,10 @@ local function UpdateSurfaceMap [opts, redogrid, atomcolors]
             G_surface.grids = grids;
             G_surface.dist = opts.radius;
         endif
-write ['lengths: {} | {} | {}\n', length aPos G_surface.rec, length G_surface.rad, length G_surface.eps];
-        gvtx = msurf_MolecularSurface [aPos G_surface.rec,
-            G_surface.rad, G_surface.eps, aPos G_surface.lig, G_surface.dist,
+
+        gvtx = msurf_MolecularSurface [aPos G_surface.rec(G_surface.molidx),
+            G_surface.rad(G_surface.molidx), G_surface.eps(G_surface.molidx), aPos G_surface.lig(G_surface.molidx), 
+            G_surface.dist,
             G_surface.gridopt];
         [s_idx, s_color, s_vpt, s_vnorm] = gvtx;
         s_idx = grid_isoidx_emit [s_idx, G_surface.surfdim, -1];
@@ -1844,8 +1870,9 @@ write ['lengths: {} | {} | {}\n', length aPos G_surface.rec, length G_surface.ra
     if isnull atomcolors then
         vcolor = G_surface.colconst;
     else
-            vcolor = NearestAtomColor [aPos G_surface.rec, G_surface.rad,
-            atomcolors, s_vpt];
+write ['atomcolors: {} | {} | {}\n', length atomcolors, atomcolors, G_surface.molidx];
+            vcolor = NearestAtomColor [aPos G_surface.rec(G_surface.molidx), G_surface.rad(G_surface.molidx),
+                atomcolors, s_vpt];
     endif
 write ['atomcolors in UpdateSurfaceMap : {} | {}\n', length vcolor, length atomcolors];
     GVertex [G_surface.gobj, G_surface.surfdim, s_idx, vcolor,
@@ -1912,8 +1939,9 @@ write ['here 2 qb_QBPWDSelectHandler\n'];
     endif
     local redosurf = UpdateComplex [ligtok, opts];
     UpdateRendering[opts];
-    local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec,
+    local atomcolors = ColorAtoms [data, selrow, selcol, G_surface.rec(G_surface.molidx),
         mincut, maxcut, colors];
+write ['atomcolors: {} | {} | {} | {} | {}\n', length cat atomcolors, length t, length sequence, length ra, length rowdata];
     UpdateSurfaceMap [opts, redosurf, atomcolors];
     UpdateResidue [restok, selrow, selcol, 0];
 
@@ -2127,10 +2155,10 @@ write ['IS NEW .. 3\n'];
                         statics:'share'] === 'child' then
                     task_prio 0;
 
-                    local tempfile = first FilePrompt [title: 'Load Database',
-                        filter: '*.h5', allowEmptyList: 0];
+                    local tempfile = FilePrompt [title: 'Load Database',
+                        filter: '*.h5', multi:1, mode:'open', allowEmptyList: 0];
                     pwdfilename = tempfile;
-
+write ['return: {} | {}\n', length pwdfilename, pwdfilename];
                     if not isnull tempfile then
 #if 0
                         if neL [ftype tempfile, 'file']
