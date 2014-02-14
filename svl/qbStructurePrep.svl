@@ -432,11 +432,13 @@ global function qbPrepareSystem [opt]
         else
             atomsToProtonate = Atoms[];
         endif
+        // remove protons from list as it makes no sense to include them and this heads off a possible Protonate3D bug
+        atomsToProtonate = diff [atomsToProtonate,(Atoms[] | aElement Atoms[] <> 'H')];
         atomsToProtonate = diff [atomsToProtonate, atomsNotToProtonate];
-        
-        local protOptions = [];
+
+        local protOptions = [d_in:2.00];    // new MOE default
         if not isnull opt.protPH then
-            protOptions=[pH:opt.protPH];
+            protOptions=cat [protOptions,[pH:opt.protPH]];
         endif
         local fixedAtoms;
         if opt.enableLigFix then
