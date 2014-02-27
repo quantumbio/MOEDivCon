@@ -433,7 +433,8 @@ global function qbPrepareSystem [opt]
             atomsToProtonate = Atoms[];
         endif
         // remove protons from list as it makes no sense to include them and this heads off a possible Protonate3D bug
-        atomsToProtonate = diff [atomsToProtonate,(Atoms[] | aElement Atoms[] <> 'H')];
+
+        atomsToProtonate = diff [atomsToProtonate,(Atoms[] | aElement Atoms[] == 'H')];
         atomsToProtonate = diff [atomsToProtonate, atomsNotToProtonate];
 
         local protOptions = [d_in:2.00];    // new MOE default
