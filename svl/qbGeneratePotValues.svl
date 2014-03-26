@@ -1,0 +1,239 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2012 QuantumBio Inc. and/or its affiliates.
+    
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif   
+
+/****************************************************************************
+ *                                qb_GeneratePotValues.svl
+ *
+ *  
+ *
+ *  Main function:
+ *
+ *    qb_GeneratePotValues [affinity, fname_cmplx, fname_targ, fname_lig]
+ *
+ *      affinity = target/ligand affinity in kcal/mol
+ *      fname_cmplx = file name of the complex mol2
+ *      fname_targ = file name of the target mol2
+ *      fname_lig = file name of the ligand mol2
+ *
+ *  Example moebatch call:
+ *
+ *   moebatch -licwait -exec "run ['$HOME/svl/qb_GeneratePotValues.svl',[0.00,'mp_testing.mol2','targ_testing.mol2','lig_testing.mol2']]" -exit
+ *
+ *      NOTE: -licwait is used to wait for a license to free. It will wait forever.
+ *
+ ****************************************************************************/
+
+#set main 'qb_GeneratePotValues' 
+
+function _Atoms;
+function qb_Nearby;
+function qb_RenameAtomsBasedOnRMSD;
+
+const TERM_NAME   = ['str','ang','stb','oop','tor','vdw','ele','sol','res'];
+
+local function writeEline [E,affinity,ofilename,olinename,newFileYN]
+    local allEnergies = cat apt swrite['{n:.3f},',E];
+    local totalEnergy = add E;
+    allEnergies = cat [swrite['{n:.3f},',totalEnergy],allEnergies];
+    allEnergies = cat [swrite['{n:.3f},',affinity],allEnergies];
+    allEnergies = cat [swrite['{},',olinename],allEnergies];
+    allEnergies = cat [swrite['{},',ofilename],allEnergies];
+    
+    local allHeadings = cat apt swrite ['{},', TERM_NAME];
+    allHeadings = cat [swrite['{},','total'],allHeadings];
+    allHeadings = cat [swrite['{},','exp'],allHeadings];
+    allHeadings = cat [swrite['{},','name'],allHeadings];
+    allHeadings = cat [swrite['{},','FF'],allHeadings];
+    
+    ofilename = twrite ['{}.csv',ofilename];
+    
+    local ofile;
+
+// it appears that CCG does not have a way to append file contents!! (checking support now)
+//  in meantime, print everything and post process.    
+//    if isnull newFileYN or newFileYN or isnull ftype ofilename then
+    if newFileYN then
+//        fdelete ofilename;
+//        ofile = fopenw ofilename;
+//        fwrite [ofile,'{}\n',allHeadings];
+        write ['{}\n',allHeadings];
+//        fclose ofile;
+    endif
+//    ofile = fopen ofilename;
+//    fwrite [ofile,'{}\n',allEnergies];
+    write ['{}\n',allEnergies];
+//    fclose ofile;
+    
+endfunction
+
+global function qb_GetEData[atoms]
+    // to be safe, run pot_Setup each time prior to run
+    pot_Setup [
+        strEnable:1, angEnable:1, stbEnable:1, oopEnable:1, torEnable:1,
+        vdwEnable:1, eleEnable:1, solEnable:0, resEnable:1, eleDist:0
+    ];
+    local [E, E_sel, E_int] = tr [
+            pot_strEnergy atoms, pot_angEnergy atoms, pot_stbEnergy atoms,
+            pot_oopEnergy atoms, pot_torEnergy atoms, pot_vdwEnergy atoms,
+            pot_eleEnergy atoms, pot_solEnergy atoms, pot_resEnergy atoms
+        ];
+    local E_remainder = E - E_sel - E_int;
+    return [E, E_sel, E_int, E_remainder];
+endfunction
+
+ global function qb_GeneratePotValues [affinity, fname_cmplx, fname_targ, fname_lig]
+
+    local ff_filelist = flist ['$MOE/lib', '*.ff'];
+    local cur_ff;
+    local E,E_lig,E_int,E_targ;
+    local atoms;
+    local isfirst = 1;
+    local newFileYN = 1;
+    
+    if isnull affinity then
+        affinity = 0.00;
+    endif
+    
+    for cur_ff in ff_filelist loop
+        if isfirst then
+            newFileYN = 1;
+            isfirst = 0;
+        else
+            newFileYN = 0;
+        endif
+//        write ['loading {} ...\n',cur_ff];
+        pot_Load [cur_ff];
+        
+    // unbound target/ligand
+        if not isnull fname_targ and not isnull fname_lig then
+            oDestroy Chains[];
+            ReadAuto fname_targ;
+            ReadAuto fname_lig;
+            [E,E_lig,E_int,E_targ] = qb_GetEData[_Atoms '$$ligand'];
+            writeEline[E_int,affinity,
+                swrite['separated-{}',(untag pot_Info[])(2)(1)],
+                swrite['{}+{}',fname_targ,fname_lig],newFileYN];
+            newFileYN = 0;
+        endif
+        
+    // bound complex
+        oDestroy Chains[];
+        ReadAuto fname_cmplx;
+        [E,E_lig,E_int,E_targ] = qb_GetEData[_Atoms '$$ligand'];
+        writeEline[E_int,affinity,
+            swrite['bound-{}',(untag pot_Info[])(2)(1)],
+            swrite['{}',fname_cmplx],newFileYN]; 
+        newFileYN = 0;
+                       
+    // pure CCG/MOE numbers for the same complex
+        pot_SetCharges[];        
+        [E,E_lig,E_int,E_targ] = qb_GetEData[_Atoms '$$ligand'];
+            writeEline[E_int,affinity,
+                swrite['ccg-{}',(untag pot_Info[])(2)(1)],
+                swrite['{}',fname_cmplx],newFileYN];       
+
+    endloop
+endfunction
+
+
+global function qbMeasurePotential [ligand, receptor]
+    local sys, oldsys;
+    if not isnull ligand and not isnull receptor then
+        local molReceptor = mol_Extract receptor;
+        local molLigand = mol_Extract ligand;
+        sys = SystemOpen[];
+        oldsys = SystemCurrent sys;
+        receptor = mol_Create molReceptor;
+        ligand = mol_Create molLigand;
+    endif
+    if not isnull ligand then
+        aSetSelected [Atoms[],0];
+        aSetSelected [oAtoms ligand, 1];
+    endif
+
+    local atoms = Atoms[];
+    local selmask = aSelected atoms, sel = orE selmask;
+    if sel then atoms = atoms | selmask; endif
+
+    pot_Load '$MOE/lib/Amber12EHT.ff';
+    pot_SetCharges [];
+    pot_Setup [
+        strEnable:1, angEnable:1, stbEnable:1, oopEnable:1, torEnable:1,
+        vdwEnable:1, eleEnable:1, solEnable:0, resEnable:1, eleDist:0
+    ];
+    
+    local Edata = tr [
+    pot_strEnergy atoms, pot_angEnergy atoms, pot_stbEnergy atoms,
+    pot_oopEnergy atoms, pot_torEnergy atoms, pot_vdwEnergy atoms,
+    pot_eleEnergy atoms, pot_solEnergy atoms, pot_resEnergy atoms
+    ];
+
+    local E = tag [TERM_NAME,Edata(1)];
+    local E_sel = tag [TERM_NAME,Edata(2)];
+    local E_int = tag [TERM_NAME,Edata(3)];
+    local E_unsel = tag [TERM_NAME,Edata(1) - Edata(2) - Edata(3)];    
+
+    if not isnull ligand and not isnull receptor then
+        SystemCurrent oldsys;
+        SystemClose sys;
+    endif
+    
+    return [E,E_sel,E_int,E_unsel,selmask];
+endfunction
+
+global function qbOutputMeasurePotential [ligand, receptor]
+
+    local [E,E_sel,E_int,E_unsel,selmask] = qbMeasurePotential [ligand, receptor];
+    function profile p
+    local [t,e] = untag p;
+    t = cat ['E', t];
+    e = cat [add e, e];
+    return [
+        cat apt swrite [' {t:8},', t, "\n"],
+        cat apt swrite [' {n:8.3f},', e]
+    ];
+    endfunction
+
+    local [title, all] = profile E;
+    local text = cat [ "    ", title, "\n", "ALL:", all, "\n" ];
+
+    if orE selmask then
+    text = cat [text, "SEL:", second profile E_sel, "\n" ];
+    text = cat [text, "INT:", second profile E_int, "\n" ];
+    text = cat [text, "USL:", second profile E_unsel, "\n" ];
+    endif
+
+    text = token text;
+    write ['{}', text];
+
+    if not MOE_BATCH then
+    local msg = Message[0,text];
+    sleep (20);
+    Message[msg,[]];
+    endif
+
+endfunction
+
+
+// ted_SaveAndLoad
