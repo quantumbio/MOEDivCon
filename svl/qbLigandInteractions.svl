@@ -1,0 +1,456 @@
+#svl
+
+function prolig_Calculate;
+function _Atoms;
+
+const INTERACTION_TYPES = [
+    'hbond',	// hydrogen bond donor (H goes from A --> B)
+    'metal',	// metal-ligation
+    'ionic',	// electrostatic interaction between (+) and (-)
+    'arene',	// pi-pi, pi-cation, pi-H interactions
+    'covalent'	// an actual bond between ligand & receptor blocks
+    , 'distance'	// interactions by virtue of being close
+];
+
+// Collapse atom:multi-atoms interactions in the data vector to the
+// atom:atom interaction with the shortest distance.
+const COLLAPSE_MULT_ATOM_TO_NEAREST = 1;// how to collapse multi-atom interacts
+local function collapse_mult_atom_interactions [a1, a2]
+
+    local function getnearatoms [a, b]
+	a = stretch [a, length b];
+	b = resize  [b, length a];
+	local min = x_min add sqr sub [aPos a, aPos b];
+	return [a(min), b(min)];
+    endfunction
+
+    if COLLAPSE_MULT_ATOM_TO_NEAREST then
+	local am_mask = gtE [app length a1, 1] or gtE [app length a2, 1];
+	local am1 = a1 | am_mask;
+	local am2 = a2 | am_mask;
+	[am1, am2] = tr app getnearatoms tr [am1, am2];
+	a1 | am_mask = am1;
+	a2 | am_mask = am2;
+    else
+	a1 = app first a1;
+	a2 = app first a2;
+    endif
+    return [a1, a2];
+endfunction
+
+global function qbWriteHeadHTML [fileid,titleTxt]
+
+    fwrite [fileid,'<head><title>{}</title>\n', titleTxt];
+
+    const MYFORMAT =
+#string
+	<script src="jquery-1.10.2.min.js"></script>
+	<script src="lightbox-2.6.min.js"></script>
+	<script src="jquery.scrollTableBody-1.0.0.js"></script>
+	<style>
+	.scrollit {
+    overflow:scroll;
+    width:100%;
+    }
+    </style>
+<link rel="stylesheet" type="text/css" href="http://www.quantumbioinc.com/stylesheets/styles.css" />
+<link href="http://lokeshdhakar.com/projects/lightbox2/css/lightbox.css" rel="stylesheet" />
+</head>
+<body id='no-sidebar'>
+<div id='wrapper'>
+<div id='header'>
+<div class="header-holder">
+  <div class="logo-holder">
+    <object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000" codebase="http://fpdownload.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=7,0,0,0" width="567" height="111" id="picturechanger" align="middle">
+      <param name="allowScriptAccess" value="sameDomain" />
+      <param name="movie" value="http://www.quantumbioinc.com/flash/picturechanger.swf" />
+      <param name="quality" value="high" />
+      <param name="bgcolor" value="#0174DF" />
+      <param name="FlashVars" value="xmlURL=http://www.quantumbioinc.com/flash/config.xml" />
+      <embed src="http://www.quantumbioinc.com/flash/picturechanger.swf" 
+      FlashVars="xmlURL=http://www.quantumbioinc.com/flash/config.xml" 
+      quality="high" bgcolor="#0174DF" width="567" height="111"  name="picturechanger" allowScriptAccess="sameDomain" 
+      type="application/x-shockwave-flash" pluginspage="http://www.macromedia.com/go/getflashplayer" />
+    </object>
+    <strong class="logo"><a href="http://www.quantumbioinc.com/">QuantumBio</a></strong>
+    <strong class="subttl">A Quantum Breakthrough in Drug Discovery</strong>
+  </div>
+</div>
+</div>
+<ul id='nav'>
+<li>
+<a href="http://www.quantumbioinc.com/">Home</a>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/products">Products</a>
+<ul>
+<li>
+<a href="http://www.quantumbioinc.com/products/moe_divcon_gui">MOE/DivCon GUI</a>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/products/qmscore">QMScore</a>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/products/nmrscore">NMRScore</a>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/products/phenix_divcon">Phenix/DivCon</a>
+</li>
+</ul>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/careers">Careers</a>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/news">News & Events</a>
+</li>
+<li class='active'>
+<a href="http://www.quantumbioinc.com/support">Support</a>
+<ul>
+<li>
+<a href="http://www.quantumbioinc.com/support/publications">Published Research</a>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/support/support">Support</a>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/support/manual">Manual: DivCon Discovery Suite</a>
+</li>
+<li class='active'>
+<a href="http://www.quantumbioinc.com/support/manual-phenixdc">Manual: PHENIX/DivCon</a>
+</li>
+</ul>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/about_us">About QuantumBio</a>
+<ul>
+<li>
+<a href="http://www.quantumbioinc.com/about_us/management_team">Management Team</a>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/about_us/board_of_directors">Advisory Board of Directors</a>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/about_us/industry_advisory_board">Industry Advisory Board</a>
+</li>
+</ul>
+</li>
+<li>
+<a href="http://www.quantumbioinc.com/contact_us">Contact Us</a>
+</li>
+
+</ul>
+<div id='main'>
+<div id='container'>
+<div id='content'>
+#;
+
+    fwrite [fileid, '{}', MYFORMAT];
+//    fwrite ['testme.html', 'MYFORMAT' ];
+endfunction
+
+global function qbWriteTailHTML [fileid]
+    const MYFORMAT =
+#string
+    
+</div>
+</div>
+</div>
+
+</body>
+
+#;
+
+    fwrite [fileid, '{}', MYFORMAT ];
+endfunction
+
+function qbMeasurePotential;
+function DrawLigandInteractions;
+
+// moebatch -exec "qbLigandInteractions ['1HWI.pdb','1HWI_refine_001.pdb','115']"
+ 
+global function qbLigandInteractions [firstFile, finalFile, interestLigand]
+
+    oDestroy Chains[];
+
+    local firstChains = ReadAuto firstFile;
+    local firstLigands = _Atoms '$$ligand' | m_join [aChain _Atoms '$$ligand', firstChains];
+    firstLigands = uniq aResidue firstLigands;
+
+    local finalChains = ReadAuto finalFile;
+    local finalLigands = _Atoms '$$ligand' | m_join [aChain _Atoms '$$ligand', finalChains];
+    finalLigands = uniq aResidue finalLigands;
+    
+    if not isnull interestLigand then
+        firstLigands = firstLigands | rName firstLigands == interestLigand;
+        finalLigands = finalLigands | rName finalLigands == interestLigand;
+    endif
+    
+    if length cat rAtoms firstLigands <> length cat rAtoms finalLigands then
+        write ['ERROR: the number of ligand atoms differ between {} and {}\n', firstFile, finalFile];
+        return [];
+    endif
+    
+    if isnull Chains [] then
+        write ['ERROR: Files not found or some sort of parsing error\n'];
+        return [];
+    endif
+    
+    local outfileBase = twrite ['{}-{}', fbase ftail firstFile, fbase ftail finalFile];
+    local htmlFile = fopenw twrite ['{}.html', outfileBase];
+    local csvFile = fopenw twrite ['{}.csv', outfileBase];
+    
+    qbWriteHeadHTML [htmlFile,outfileBase];
+    
+    fwrite [htmlFile, '<div class="scrollit">\n<TABLE cellpadding="5" style="color:#000000;">\n'];
+    local tmpInteraction;
+    // spreadsheet heading
+    fwrite [htmlFile, '<TR><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH colspan=2>{}',
+        ' ',
+        ' ',
+        ' ',
+//        ' ',
+        ' ',
+        'InteractionE'
+    ];
+    fwrite [csvFile,'{},{},{},{},{},{},{}',
+        ' ',
+        ' ',
+        ' ',
+        ' ',
+        ' ',
+        'IntE',
+        ' '
+    ];
+    for tmpInteraction in INTERACTION_TYPES loop
+        fwrite [htmlFile, '</TH><TH colspan=4>{}',
+            tmpInteraction
+        ];
+        fwrite [csvFile,',{},{},{},{}',
+            tmpInteraction,
+            ' ',
+            ' ',
+            ' '
+        ];
+    endloop
+    fwrite [htmlFile, '</TH><TH colspan=2>Maps</TH></TR>\n'];
+    fwrite [csvFile, ',{},{}',
+        'Maps',
+        ''
+    ];
+    fwrite [htmlFile, '<TR><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH>{}',
+        'PDBid',
+        'Ligand',
+        'ID',
+        'Chain',
+//        'atmCount',
+        'Initial',
+        'Final'
+    ];
+    fwrite [csvFile,'\n'];
+    fwrite [csvFile,'{},{},{},{},{},{},{}',
+        'PDBid',
+        'ligName',
+        'ligID',
+        'ligChain',
+        'atmCount',
+        'initial',
+        'final'
+    ];
+    for tmpInteraction in INTERACTION_TYPES loop
+        fwrite [htmlFile, '</TH><TH style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}</TH><TH>{}</TH><TH>{}</TH><TH>{}',
+            'Initial',
+            'Final',
+            'False+',
+            'False-'
+        ];
+        fwrite [csvFile,',{},{},{},{}',
+            'initInts',
+            'lastInts',
+            'false+',
+            'false-'
+        ];
+    endloop
+    fwrite [htmlFile, '</TH><TH style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}</TH><TH>{}',
+        'Initial',
+        'Final'
+    ];
+    fwrite [htmlFile, '</TH></TR>\n'];
+    fwrite [csvFile,',{},{}', 
+        'initialMapFile',
+        'finalMapFile'
+    ];
+    fwrite [csvFile, '\n'];
+    local ligandCount;
+    for ligandCount = 1, length firstLigands, 1 loop
+
+        local firstLigandAtoms = cat rAtoms firstLigands(ligandCount);
+        local firstReceptor = diff [cat cAtoms firstChains, firstLigandAtoms];
+        local firstPotData = qbMeasurePotential[firstLigandAtoms,firstReceptor];
+        local firstInteractions = prolig_Calculate [ INTERACTION_TYPES, firstLigandAtoms, firstReceptor];
+        local [int2,int3] = collapse_mult_atom_interactions[firstInteractions(2),firstInteractions(3)];
+        firstInteractions(2) = int2;
+        firstInteractions(3) = int3;
+
+        local finalLigandAtoms = cat rAtoms finalLigands(ligandCount);
+        local finalReceptor = diff [cat cAtoms finalChains, finalLigandAtoms];
+        local finalPotData = qbMeasurePotential[finalLigandAtoms,finalReceptor];
+        local finalInteractions = prolig_Calculate [ INTERACTION_TYPES, finalLigandAtoms, finalReceptor];
+        [int2,int3] = collapse_mult_atom_interactions[finalInteractions(2),finalInteractions(3)];
+        finalInteractions(2) = int2;
+        finalInteractions(3) = int3;
+
+        local PDBid;
+        PDBid = ' ';
+        if ligandCount == 1 then
+            PDBid = fbase first cTag firstChains;
+        endif
+        
+        //      cTag, ligName, ligUID, ligChain, atmCount, firstIntE, finalIntE, firstLiand, finalLigand, falsePositives, falseNegatives
+        fwrite [htmlFile, '<TR><TD>{}</TD><TD>{}</TD><TD>{}</TD><TD>{}</TD><TD>{}</TD><TD>{}',
+            PDBid,
+            rName firstLigands(ligandCount),
+            rUID firstLigands(ligandCount),
+            fext cName rChain firstLigands(ligandCount),
+//            length cat rAtoms firstLigands(ligandCount),
+            add second untag third firstPotData,
+            add second untag third finalPotData
+        ];
+        fwrite [csvFile,'{},{},{},{},{},{},{}',
+            PDBid,
+            rName firstLigands(ligandCount),
+            rUID firstLigands(ligandCount),
+            fext cName rChain firstLigands(ligandCount),
+            length cat rAtoms firstLigands(ligandCount),
+            add second untag third firstPotData,
+            add second untag third finalPotData
+        ];        
+        
+        for tmpInteraction in INTERACTION_TYPES loop
+
+            local firstLigandMask = 
+                ((m_join [aResidue firstInteractions(2),firstLigands(ligandCount)]) 
+                    or (m_join [aResidue firstInteractions(3),firstLigands(ligandCount)]));
+            local firstIntMask = (m_join [first firstInteractions, tmpInteraction]);
+            local finalLigandMask = 
+                ((m_join [aResidue finalInteractions(2),finalLigands(ligandCount)])
+                    or (m_join [aResidue finalInteractions(3),finalLigands(ligandCount)]));
+            local finalIntMask = (m_join [first finalInteractions, tmpInteraction]);
+
+            firstLigandMask = firstLigandMask and firstIntMask;
+            finalLigandMask = finalLigandMask and finalIntMask;
+            local firstIntTextLig = apt twrite ['{}:{}:{}-{}:{}:{}\n',
+                rName aResidue (firstInteractions(2)) | firstLigandMask, 
+                rUID aResidue (firstInteractions(2)) | firstLigandMask, 
+                aName (firstInteractions(2)) | firstLigandMask,
+                rName aResidue (firstInteractions(3)) | firstLigandMask, 
+                rUID aResidue (firstInteractions(3)) | firstLigandMask, 
+                aName (firstInteractions(3)) | firstLigandMask
+            ];
+            local finalIntTextLig = apt twrite ['{}:{}:{}-{}:{}:{}\n',
+                rName aResidue (finalInteractions(2)) | finalLigandMask, 
+                rUID aResidue (finalInteractions(2)) | finalLigandMask, 
+                aName (finalInteractions(2)) | finalLigandMask,
+                rName aResidue (finalInteractions(3)) | finalLigandMask, 
+                rUID aResidue (finalInteractions(3)) | finalLigandMask, 
+                aName (finalInteractions(3)) | finalLigandMask
+            ];
+
+            firstLigandMask = firstIntMask;
+            finalLigandMask = finalIntMask;            
+            local firstIntTextAll = apt twrite ['{}:{}:{}-{}:{}:{}\n',
+                rName aResidue (firstInteractions(2)) | firstLigandMask, 
+                rUID aResidue (firstInteractions(2)) | firstLigandMask, 
+                aName (firstInteractions(2)) | firstLigandMask,
+                rName aResidue (firstInteractions(3)) | firstLigandMask, 
+                rUID aResidue (firstInteractions(3)) | firstLigandMask, 
+                aName (firstInteractions(3)) | firstLigandMask
+            ];
+            local finalIntTextAll = apt twrite ['{}:{}:{}-{}:{}:{}\n',
+                rName aResidue (finalInteractions(2)) | finalLigandMask, 
+                rUID aResidue (finalInteractions(2)) | finalLigandMask, 
+                aName (finalInteractions(2)) | finalLigandMask,
+                rName aResidue (finalInteractions(3)) | finalLigandMask, 
+                rUID aResidue (finalInteractions(3)) | finalLigandMask, 
+                aName (finalInteractions(3)) | finalLigandMask
+            ];
+
+            fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}({})</TD><TD>{}({})</TD><TD>{}({})</TD><TD>{}({})',
+                length firstIntTextLig,
+                length firstIntTextAll,
+                length finalIntTextLig,
+                length finalIntTextAll,
+                length firstIntTextLig - length pack indexof [firstIntTextLig, finalIntTextLig],
+                length firstIntTextAll - length pack indexof [firstIntTextAll, finalIntTextAll],
+                length finalIntTextLig - length pack indexof [finalIntTextLig, firstIntTextLig],
+                length finalIntTextAll - length pack indexof [finalIntTextAll, firstIntTextAll]
+            ];
+            fwrite [csvFile,',{}({}),{}({}),{}({}),{}({})',
+                length firstIntTextLig,
+                length firstIntTextAll,
+                length finalIntTextLig,
+                length finalIntTextAll,
+                length firstIntTextLig - length pack indexof [firstIntTextLig, finalIntTextLig],
+                length firstIntTextAll - length pack indexof [firstIntTextAll, finalIntTextAll],
+                length finalIntTextLig - length pack indexof [finalIntTextLig, firstIntTextLig],
+                length finalIntTextAll - length pack indexof [finalIntTextAll, firstIntTextAll]
+            ];
+
+        endloop
+        
+        // write out the png file associated with the interaction diagram
+        local twoDDiagrams = DrawLigandInteractions [[firstLigandAtoms,finalLigandAtoms],[firstReceptor,finalReceptor], 
+            [simultaneous:1,showconserved:1,rescontacts:1,arenecontacts:1,size:[1000,1000]]];
+        local baseName = twrite ['{}_{}_{}',
+            rName firstLigands(ligandCount),
+            rUID firstLigands(ligandCount),
+            fext cName rChain firstLigands(ligandCount)
+        ];
+        
+        local initialPNG = twrite ['initial-{}.png',baseName];
+        local finalPNG = twrite ['final-{}.png',baseName];
+
+        fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex"><a href="{}" data-lightbox="{}">{}</a></TD><TD><a href="{}" data-lightbox="{}">{}</a>', initialPNG,baseName,initialPNG,finalPNG,baseName,finalPNG];
+        fwrite [csvFile, ',{},{}', initialPNG, finalPNG];
+        gr_fwrite [ twrite ['initial-{}.png',baseName], twoDDiagrams(1), 'image/png'];
+        gr_fwrite [ twrite ['final-{}.png',baseName], twoDDiagrams(2), 'image/png'];
+
+        fwrite [htmlFile, '</TD></TR>\n'];
+        fwrite [csvFile, '\n'];
+
+    endloop
+
+    fwrite [htmlFile, '</TABLE></div>\n'];
+
+    const MYFORMAT =
+#string
+<BR><BR>
+<p>
+Interaction Energy = AMBER12EHT (in kcal/mol)<BR>
+Value(Value) = count of interactions between target:ligand (count of interactions within immediate network)<BR>
+False+ = interactions observed in conventional refinement but lost in QM-based refinement<BR>
+False- = interactions observed in QM-based refinement but lost in conventional refinement<BR>
+</p>
+#;
+
+    fwrite [htmlFile, '{}', MYFORMAT ];
+
+    qbWriteTailHTML [htmlFile];
+    
+    fclose htmlFile;
+    fclose csvFile;
+
+endfunction
+
+global function qbAnalSelectedInteractions []
+    local tmpAtomA, tmpAtomB;
+    local selAtoms = Atoms [] | aSelected Atoms[];
+    for tmpAtomA in selAtoms loop
+        for tmpAtomB in selAtoms loop
+            local finalPotData = qbMeasurePotential[tmpAtomA,tmpAtomB];
+            write ['{}-{} {}\n', aName tmpAtomA, aName tmpAtomB, finalPotData];
+//            exit[];
+        endloop
+    endloop
+endfunction
+
