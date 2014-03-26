@@ -44,17 +44,16 @@ global function qbWriteHeadHTML [fileid,titleTxt]
 
     const MYFORMAT =
 #string
-	<script src="jquery-1.10.2.min.js"></script>
-	<script src="lightbox-2.6.min.js"></script>
-	<script src="jquery.scrollTableBody-1.0.0.js"></script>
+	<script src="http://downloads.quantumbioinc.com.s3.amazonaws.com/js/jquery-1.10.2.min.js"></script>
+	<script src="http://downloads.quantumbioinc.com.s3.amazonaws.com/js/lightbox-2.6.min.js"></script>
 	<style>
-	.scrollit {
-    overflow:scroll;
-    width:100%;
-    }
+	    .scrollit {
+        overflow:scroll;
+        width:100%;
+        }
     </style>
 <link rel="stylesheet" type="text/css" href="http://www.quantumbioinc.com/stylesheets/styles.css" />
-<link href="http://lokeshdhakar.com/projects/lightbox2/css/lightbox.css" rel="stylesheet" />
+<link href="http://downloads.quantumbioinc.com.s3.amazonaws.com/css/lightbox.css" rel="stylesheet" />
 </head>
 <body id='no-sidebar'>
 <div id='wrapper'>
@@ -72,71 +71,32 @@ global function qbWriteHeadHTML [fileid,titleTxt]
       quality="high" bgcolor="#0174DF" width="567" height="111"  name="picturechanger" allowScriptAccess="sameDomain" 
       type="application/x-shockwave-flash" pluginspage="http://www.macromedia.com/go/getflashplayer" />
     </object>
-    <strong class="logo"><a href="http://www.quantumbioinc.com/">QuantumBio</a></strong>
+    <strong class="logo"><a href="http://www.quantumbioinc.com/" target="QBWEB">QuantumBio</a></strong>
     <strong class="subttl">A Quantum Breakthrough in Drug Discovery</strong>
   </div>
 </div>
 </div>
 <ul id='nav'>
 <li>
-<a href="http://www.quantumbioinc.com/">Home</a>
+<a href="http://www.quantumbioinc.com/" target="QBWEB">Home</a>
 </li>
 <li>
-<a href="http://www.quantumbioinc.com/products">Products</a>
-<ul>
-<li>
-<a href="http://www.quantumbioinc.com/products/moe_divcon_gui">MOE/DivCon GUI</a>
+<a href="http://www.quantumbioinc.com/products" target="QBWEB">Products</a>
 </li>
 <li>
-<a href="http://www.quantumbioinc.com/products/qmscore">QMScore</a>
+<a href="http://www.quantumbioinc.com/careers" target="QBWEB">Careers</a>
 </li>
 <li>
-<a href="http://www.quantumbioinc.com/products/nmrscore">NMRScore</a>
-</li>
-<li>
-<a href="http://www.quantumbioinc.com/products/phenix_divcon">Phenix/DivCon</a>
-</li>
-</ul>
-</li>
-<li>
-<a href="http://www.quantumbioinc.com/careers">Careers</a>
-</li>
-<li>
-<a href="http://www.quantumbioinc.com/news">News & Events</a>
+<a href="http://www.quantumbioinc.com/news" target="QBWEB">News & Events</a>
 </li>
 <li class='active'>
-<a href="http://www.quantumbioinc.com/support">Support</a>
-<ul>
-<li>
-<a href="http://www.quantumbioinc.com/support/publications">Published Research</a>
+<a href="http://www.quantumbioinc.com/support" target="QBWEB">Support</a>
 </li>
 <li>
-<a href="http://www.quantumbioinc.com/support/support">Support</a>
+<a href="http://www.quantumbioinc.com/about_us" target="QBWEB">About QuantumBio</a>
 </li>
 <li>
-<a href="http://www.quantumbioinc.com/support/manual">Manual: DivCon Discovery Suite</a>
-</li>
-<li class='active'>
-<a href="http://www.quantumbioinc.com/support/manual-phenixdc">Manual: PHENIX/DivCon</a>
-</li>
-</ul>
-</li>
-<li>
-<a href="http://www.quantumbioinc.com/about_us">About QuantumBio</a>
-<ul>
-<li>
-<a href="http://www.quantumbioinc.com/about_us/management_team">Management Team</a>
-</li>
-<li>
-<a href="http://www.quantumbioinc.com/about_us/board_of_directors">Advisory Board of Directors</a>
-</li>
-<li>
-<a href="http://www.quantumbioinc.com/about_us/industry_advisory_board">Industry Advisory Board</a>
-</li>
-</ul>
-</li>
-<li>
-<a href="http://www.quantumbioinc.com/contact_us">Contact Us</a>
+<a href="http://www.quantumbioinc.com/contact_us" target="QBWEB">Contact Us</a>
 </li>
 
 </ul>
@@ -146,13 +106,22 @@ global function qbWriteHeadHTML [fileid,titleTxt]
 #;
 
     fwrite [fileid, '{}', MYFORMAT];
-//    fwrite ['testme.html', 'MYFORMAT' ];
+    
 endfunction
 
 global function qbWriteTailHTML [fileid]
+
+    local version = getenv 'QBBUILDNUM';
+    if isnull version then
+        version = 'UNKNOWN';
+    endif    
+    fwrite [fileid, '<BR><div align="right">Data processed using DivCon Discovery Suite build-{} at {}</div>\n', version , asctime []];
+
+    fwrite [fileid, '<div align="left"><p class="copyright">&copy; {} QuantumBio Inc. All Rights Reserved.</p></div>\n', first time [] ];
+
     const MYFORMAT =
 #string
-    
+
 </div>
 </div>
 </div>
@@ -167,7 +136,7 @@ endfunction
 function qbMeasurePotential;
 function DrawLigandInteractions;
 
-// moebatch -exec "qbLigandInteractions ['1HWI.pdb','1HWI_refine_001.pdb','115']"
+// qbmoebatch -exec -licwait "qbLigandInteractions ['1HWI.pdb','1HWI_refine_001.pdb','115']"
  
 global function qbLigandInteractions [firstFile, finalFile, interestLigand]
 
@@ -201,6 +170,18 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
     local csvFile = fopenw twrite ['{}.csv', outfileBase];
     
     qbWriteHeadHTML [htmlFile,outfileBase];
+    
+    fwrite [htmlFile, '<H1>Active Site Analysis</H1>\n'];
+    fwrite [htmlFile, '<H3>Initial = {}</H3>\n', firstFile];
+    fwrite [htmlFile, '<H3>Final = {}</H3>\n', finalFile];
+    
+    if isnull interestLigand then
+        fwrite [htmlFile, '<H3>Ligand = {}</H3>\n', 'all'];
+    else
+        fwrite [htmlFile, '<H3>Ligand = {}</H3>\n', interestLigand];
+    endif
+    
+    fwrite [htmlFile, '<BR><HR width=80%><BR>\n'];
     
     fwrite [htmlFile, '<div class="scrollit">\n<TABLE cellpadding="5" style="color:#000000;">\n'];
     local tmpInteraction;
@@ -250,12 +231,12 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
     fwrite [csvFile,'\n'];
     fwrite [csvFile,'{},{},{},{},{},{},{}',
         'PDBid',
-        'ligName',
-        'ligID',
-        'ligChain',
+        'Ligand',
+        'ID',
+        'Chain',
         'atmCount',
-        'initial',
-        'final'
+        'Initial',
+        'Final'
     ];
     for tmpInteraction in INTERACTION_TYPES loop
         fwrite [htmlFile, '</TH><TH style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}</TH><TH>{}</TH><TH>{}</TH><TH>{}',
@@ -265,10 +246,10 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
             'False-'
         ];
         fwrite [csvFile,',{},{},{},{}',
-            'initInts',
-            'lastInts',
-            'false+',
-            'false-'
+            'Initial',
+            'Final',
+            'False+',
+            'False-'
         ];
     endloop
     fwrite [htmlFile, '</TH><TH style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}</TH><TH>{}',
@@ -277,8 +258,8 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
     ];
     fwrite [htmlFile, '</TH></TR>\n'];
     fwrite [csvFile,',{},{}', 
-        'initialMapFile',
-        'finalMapFile'
+        'Initial',
+        'Final'
     ];
     fwrite [csvFile, '\n'];
     local ligandCount;
@@ -409,8 +390,15 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
         
         local initialPNG = twrite ['initial-{}.png',baseName];
         local finalPNG = twrite ['final-{}.png',baseName];
-
-        fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex"><a href="{}" data-lightbox="{}">{}</a></TD><TD><a href="{}" data-lightbox="{}">{}</a>', initialPNG,baseName,initialPNG,finalPNG,baseName,finalPNG];
+        
+        fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex"><a href="{}" data-lightbox="{}" title="Initial Refinement: {}">{}</a></TD>',
+            initialPNG,baseName,initialPNG,initialPNG];
+        fwrite [htmlFile, '<TD><a href="{}" data-lightbox="{}" title="Final Refinement: {}">{}</a>',
+            finalPNG,baseName,finalPNG,finalPNG];
+        
+        
+//        <TD><a href="{}" data-lightbox="{}">{}</a>', initialPNG,baseName,initialPNG,finalPNG,baseName,finalPNG];
+        
         fwrite [csvFile, ',{},{}', initialPNG, finalPNG];
         gr_fwrite [ twrite ['initial-{}.png',baseName], twoDDiagrams(1), 'image/png'];
         gr_fwrite [ twrite ['final-{}.png',baseName], twoDDiagrams(2), 'image/png'];
@@ -422,14 +410,15 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
 
     fwrite [htmlFile, '</TABLE></div>\n'];
 
+    fwrite [htmlFile, '<div align="right">See: <a href="http://www.quantumbioinc.com/products/phenix_divcon" target="QBWEB">http://www.quantumbioinc.com/products/phenix_divcon</a></div>\n'];
     const MYFORMAT =
 #string
 <BR><BR>
 <p>
-Interaction Energy = AMBER12EHT (in kcal/mol)<BR>
+Interaction Energy = MOE AMBER12:EHT (in kcal/mol)<BR>
 Value(Value) = count of interactions between target:ligand (count of interactions within immediate network)<BR>
-False+ = interactions observed in conventional refinement but lost in QM-based refinement<BR>
-False- = interactions observed in QM-based refinement but lost in conventional refinement<BR>
+False+ = interactions observed in conventional refinement that are removed in QM-based refinement<BR>
+False- = interactions rescued in QM-based refinement but not captured in conventional refinement<BR>
 </p>
 #;
 
