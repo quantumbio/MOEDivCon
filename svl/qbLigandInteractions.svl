@@ -377,25 +377,48 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
                 aName (finalInteractions(3)) | finalLigandMask
             ];
 
-            fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}({})</TD><TD>{}({})</TD><TD>{}({})</TD><TD>{}({})',
-                length firstIntTextLig,
-                length firstIntTextAll,
-                length finalIntTextLig,
-                length finalIntTextAll,
-                length firstIntTextLig - length pack indexof [firstIntTextLig, finalIntTextLig],
-                length firstIntTextAll - length pack indexof [firstIntTextAll, finalIntTextAll],
-                length finalIntTextLig - length pack indexof [finalIntTextLig, firstIntTextLig],
-                length finalIntTextAll - length pack indexof [finalIntTextAll, firstIntTextAll]
+            local tmpInitialIntLig, tmpInitialIntNet, tmpFinalIntLig, tmpFinalIntNet, 
+                    tmpFalsePosLig, tmpFalsePosNet, tmpFalseNegLig, tmpFalseNegNet;
+                    
+            tmpInitialIntLig = '-';
+            tmpInitialIntNet = '-';
+            tmpFinalIntLig = '-';
+            tmpFinalIntNet = '-';
+            tmpFalsePosLig = '-';
+            tmpFalsePosNet = '-';
+            tmpFalseNegLig = '-';
+            tmpFalseNegNet = '-';
+            
+            if length firstIntTextAll or length finalIntTextAll then
+                tmpInitialIntLig = length firstIntTextLig;
+                tmpInitialIntNet = twrite ['({})',length firstIntTextAll];
+                tmpFinalIntLig = length finalIntTextLig;
+                tmpFinalIntNet = twrite ['({})',length finalIntTextAll];
+                tmpFalsePosLig = length firstIntTextLig - length pack indexof [firstIntTextLig, finalIntTextLig];
+                tmpFalsePosNet = twrite ['({})',length firstIntTextAll - length pack indexof [firstIntTextAll, finalIntTextAll]];
+                tmpFalseNegLig = length finalIntTextLig - length pack indexof [finalIntTextLig, firstIntTextLig];
+                tmpFalseNegNet = twrite ['({})',length finalIntTextAll - length pack indexof [finalIntTextAll, firstIntTextAll]];
+            endif
+
+            fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}{}</TD><TD>{}{}</TD><TD>{}{}</TD><TD>{}{}',
+                tmpInitialIntLig,
+                tmpInitialIntNet,
+                tmpFinalIntLig,
+                tmpFinalIntNet,
+                tmpFalsePosLig,
+                tmpFalsePosNet,
+                tmpFalseNegLig,
+                tmpFalseNegNet
             ];
-            fwrite [csvFile,',{}({}),{}({}),{}({}),{}({})',
-                length firstIntTextLig,
-                length firstIntTextAll,
-                length finalIntTextLig,
-                length finalIntTextAll,
-                length firstIntTextLig - length pack indexof [firstIntTextLig, finalIntTextLig],
-                length firstIntTextAll - length pack indexof [firstIntTextAll, finalIntTextAll],
-                length finalIntTextLig - length pack indexof [finalIntTextLig, firstIntTextLig],
-                length finalIntTextAll - length pack indexof [finalIntTextAll, firstIntTextAll]
+            fwrite [csvFile,',{}{},{}{},{}{},{}{}',
+                tmpInitialIntLig,
+                tmpInitialIntNet,
+                tmpFinalIntLig,
+                tmpFinalIntNet,
+                tmpFalsePosLig,
+                tmpFalsePosNet,
+                tmpFalseNegLig,
+                tmpFalseNegNet
             ];
 
         endloop
