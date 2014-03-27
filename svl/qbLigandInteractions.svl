@@ -183,7 +183,7 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
     
     fwrite [htmlFile, '<BR><HR width=80%><BR>\n'];
     
-    fwrite [htmlFile, '<div class="scrollit">\n<TABLE cellpadding="5" style="color:#000000;">\n'];
+    fwrite [htmlFile, '<div class="scrollit">\n<TABLE cellpadding="5" style="color:#000000;  font-size:13px">\n'];
     local tmpInteraction;
     // spreadsheet heading
     fwrite [htmlFile, '<TR><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH colspan=2>{}',

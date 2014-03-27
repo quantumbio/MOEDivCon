@@ -426,6 +426,7 @@ local function CalculateMinMax [data, num]
 
     local rowdata = data (DATA_ROWDATA);
     local numbers = cat app third rowdata;
+write ['numbers: {} | {} | {}\n', length third rowdata, length numbers, numbers];
     local minnum = min numbers;
     local maxnum = max numbers;
 
