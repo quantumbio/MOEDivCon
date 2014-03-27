@@ -47,9 +47,30 @@ global function qbWriteHeadHTML [fileid,titleTxt]
 	<script src="http://downloads.quantumbioinc.com.s3.amazonaws.com/js/jquery-1.10.2.min.js"></script>
 	<script src="http://downloads.quantumbioinc.com.s3.amazonaws.com/js/lightbox-2.6.min.js"></script>
 	<style>
-	    .scrollit {
-        overflow:scroll;
-        width:100%;
+        .custom_scrollbar {
+            margin: 20px auto;
+            overflow: scroll;
+            padding: 0 20px 0 0;
+        }
+        .custom_scrollbar::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        .custom_scrollbar::-webkit-scrollbar-track {
+            background-color: rgba(113,112,107,0.1);
+            -webkit-border-radius: 5px;
+        }
+        .custom_scrollbar::-webkit-scrollbar-thumb:vertical {
+            background-color: rgba(0,0,0,.2);
+            -webkit-border-radius: 6px;
+        }
+        .custom_scrollbar::-webkit-scrollbar-thumb:vertical:hover,
+        .custom_scrollbar::-webkit-scrollbar-thumb:horizontal:hover {
+            background: gray;
+        }
+        .custom_scrollbar::-webkit-scrollbar-thumb:horizontal {
+            background-color: rgba(0,0,0,.2);
+            -webkit-border-radius: 6px;
         }
     </style>
 <link rel="stylesheet" type="text/css" href="http://www.quantumbioinc.com/stylesheets/styles.css" />
@@ -183,7 +204,7 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
     
     fwrite [htmlFile, '<BR><HR width=80%><BR>\n'];
     
-    fwrite [htmlFile, '<div class="scrollit">\n<TABLE cellpadding="5" style="color:#000000;  font-size:13px">\n'];
+    fwrite [htmlFile, '<div class="custom_scrollbar">\n<TABLE cellpadding="5" style="color:#000000;  font-size:13px">\n'];
     local tmpInteraction;
     // spreadsheet heading
     fwrite [htmlFile, '<TR><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH colspan=2>{}',
@@ -415,10 +436,10 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
 #string
 <BR><BR>
 <p>
-Interaction Energy = MOE AMBER12:EHT (in kcal/mol)<BR>
+Interaction Energy = MOE Amber12EHT (in kcal/mol)<BR>
 Value(Value) = count of interactions between target:ligand (count of interactions within immediate network)<BR>
-False+ = interactions observed in conventional refinement that are removed in QM-based refinement<BR>
-False- = interactions rescued in QM-based refinement but not captured in conventional refinement<BR>
+False+ = interactions observed in the Initial model that are removed in the Final model<BR>
+False- = interactions rescued in the Final model but not captured in the Initial model<BR>
 </p>
 #;
 
