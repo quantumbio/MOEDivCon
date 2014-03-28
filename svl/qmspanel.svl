@@ -341,7 +341,9 @@ endfunction
  *
  ****************************************************************************/
 global function qb_QMScoreSetupPanel []
-
+    
+    exit ['This tool is coming soon!\nPlease contact support@quantumbioinc.com for more information.'];
+    
     static status;                     //  Shared with child tasks.
     static origligmol;                 //  Probably not necessary for QMScore
     static ligatoms;
