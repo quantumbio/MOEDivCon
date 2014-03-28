@@ -91,14 +91,14 @@ function qbSelectWatOnRadius;
 // statics
 static wasPDB;
 
+// The CORE_DEFAULTS variables are reserved for those items that are used everywhere (including the panel).
+// Other variables should be placed in the DEFAULTS const.
 const CORE_DEFAULTS = [
     enableStripLP:0,        // Remove LPs from file prior doing anything to the structure.
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
     enableOpt:0,            // turn on optimization
     tether_val:100,         // tethers the heavy atoms at a certain restraint.
     enableProtonate:0,      // turns on Protonate3D
-    hnames:'PDB v3.0',           // if =1, do not rename protons in the PDB writer.
-    pmode:'Protonate3D',    // set the mode of the protonation (e.g. Protonate3D or Add_H are acceptable).
     protPH:[],             // set pH in Protonate3D to default
     enablePreciseHOH:0,     // turns on precise waters in Protonate3D (can cause LONG calc if turned on).
     enableLigFix:1,         // but fixes the ligand protonation
@@ -116,6 +116,8 @@ const DEFAULTS = cat [CORE_DEFAULTS, [
     printAtms:[],           // ['LIG',5.0] print the atoms within 5A of residue LIG.
     printRes:[],           // ['LIG',5.0] print the atoms within 5A of residue LIG.
     residueRenumber:0,      // renumbers the residues (not implemented)
+    hnames:'PDB v3.0',           // if =1, do not rename protons in the PDB writer.
+    pmode:'Protonate3D',    // set the mode of the protonation (e.g. Protonate3D or Add_H are acceptable).
     hamiltonian:'pm6',     // the Hamiltonian to be used downstream
     qmApplication:[],       // the particular QM application to be used downstream
     quitonerror:0,          // by default, the run will continue even on error (not good if used in shell script)
