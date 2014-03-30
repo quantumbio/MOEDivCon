@@ -224,6 +224,11 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
         'IntE',
         ' '
     ];
+    fwrite [htmlFile, '</TH><TH colspan=2>Maps\n'];
+    fwrite [csvFile, ',{},{}',
+        'Maps',
+        ''
+    ];
     for tmpInteraction in INTERACTION_TYPES loop
         fwrite [htmlFile, '</TH><TH colspan=4>{}',
             tmpInteraction
@@ -235,11 +240,6 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
             ' '
         ];
     endloop
-    fwrite [htmlFile, '</TH><TH colspan=2>Maps</TH></TR>\n'];
-    fwrite [csvFile, ',{},{}',
-        'Maps',
-        ''
-    ];
     fwrite [htmlFile, '<TR><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH>{}</TH><TH>{}',
         'PDBid',
         'Ligand',
@@ -259,12 +259,20 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
         'Initial',
         'Final'
     ];
+    fwrite [htmlFile, '</TH><TH style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}</TH><TH>{}',
+        'Initial',
+        'Final'
+    ];
+    fwrite [csvFile,',{},{}', 
+        'Initial',
+        'Final'
+    ];
     for tmpInteraction in INTERACTION_TYPES loop
         fwrite [htmlFile, '</TH><TH style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}</TH><TH>{}</TH><TH>{}</TH><TH>{}',
-            'Initial',
-            'Final',
-            'False+',
-            'False-'
+            'I',
+            'F',
+            'F+',
+            'F-'
         ];
         fwrite [csvFile,',{},{},{},{}',
             'Initial',
@@ -273,15 +281,7 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
             'False-'
         ];
     endloop
-    fwrite [htmlFile, '</TH><TH style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}</TH><TH>{}',
-        'Initial',
-        'Final'
-    ];
     fwrite [htmlFile, '</TH></TR>\n'];
-    fwrite [csvFile,',{},{}', 
-        'Initial',
-        'Final'
-    ];
     fwrite [csvFile, '\n'];
     local ligandCount;
     for ligandCount = 1, length firstLigands, 1 loop
@@ -327,6 +327,27 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
             add second untag third firstPotData,
             add second untag third finalPotData
         ];        
+
+        // write out the png file associated with the interaction diagram
+        local twoDDiagrams = DrawLigandInteractions [[firstLigandAtoms,finalLigandAtoms],[firstReceptor,finalReceptor], 
+            [simultaneous:1,showconserved:1,rescontacts:1,arenecontacts:1,size:[1000,1000]]];
+        local baseName = twrite ['{}_{}_{}',
+            rName firstLigands(ligandCount),
+            rUID firstLigands(ligandCount),
+            fext cName rChain firstLigands(ligandCount)
+        ];
+        
+        local initialPNG = twrite ['I-{}.png',baseName];
+        local finalPNG = twrite ['F-{}.png',baseName];
+        
+        fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex"><nobr><a href="{}" data-lightbox="{}" title="Initial Refinement: {}">{}</a></nobr></TD>',
+            initialPNG,baseName,initialPNG,initialPNG];
+        fwrite [htmlFile, '<TD><nobr><a href="{}" data-lightbox="{}" title="Final Refinement: {}">{}</a></nobr>',
+            finalPNG,baseName,finalPNG,finalPNG];
+        
+        fwrite [csvFile, ',{},{}', initialPNG, finalPNG];
+        gr_fwrite [ initialPNG, twoDDiagrams(1), 'image/png'];
+        gr_fwrite [ finalPNG, twoDDiagrams(2), 'image/png'];
         
         for tmpInteraction in INTERACTION_TYPES loop
 
@@ -400,7 +421,7 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
                 tmpFalseNegNet = twrite ['({})',length finalIntTextAll - length pack indexof [finalIntTextAll, firstIntTextAll]];
             endif
 
-            fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}{}</TD><TD>{}{}</TD><TD>{}{}</TD><TD>{}{}',
+            fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex"><nobr>{}{}</nobr></TD><TD><nobr>{}{}</nobr></TD><TD><nobr>{}{}</nobr></TD><TD><nobr>{}{}</nobr>',
                 tmpInitialIntLig,
                 tmpInitialIntNet,
                 tmpFinalIntLig,
@@ -423,30 +444,6 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
 
         endloop
         
-        // write out the png file associated with the interaction diagram
-        local twoDDiagrams = DrawLigandInteractions [[firstLigandAtoms,finalLigandAtoms],[firstReceptor,finalReceptor], 
-            [simultaneous:1,showconserved:1,rescontacts:1,arenecontacts:1,size:[1000,1000]]];
-        local baseName = twrite ['{}_{}_{}',
-            rName firstLigands(ligandCount),
-            rUID firstLigands(ligandCount),
-            fext cName rChain firstLigands(ligandCount)
-        ];
-        
-        local initialPNG = twrite ['initial-{}.png',baseName];
-        local finalPNG = twrite ['final-{}.png',baseName];
-        
-        fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex"><a href="{}" data-lightbox="{}" title="Initial Refinement: {}">{}</a></TD>',
-            initialPNG,baseName,initialPNG,initialPNG];
-        fwrite [htmlFile, '<TD><a href="{}" data-lightbox="{}" title="Final Refinement: {}">{}</a>',
-            finalPNG,baseName,finalPNG,finalPNG];
-        
-        
-//        <TD><a href="{}" data-lightbox="{}">{}</a>', initialPNG,baseName,initialPNG,finalPNG,baseName,finalPNG];
-        
-        fwrite [csvFile, ',{},{}', initialPNG, finalPNG];
-        gr_fwrite [ twrite ['initial-{}.png',baseName], twoDDiagrams(1), 'image/png'];
-        gr_fwrite [ twrite ['final-{}.png',baseName], twoDDiagrams(2), 'image/png'];
-
         fwrite [htmlFile, '</TD></TR>\n'];
         fwrite [csvFile, '\n'];
 
@@ -458,12 +455,20 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
     const MYFORMAT =
 #string
 <BR><BR>
+<div style="border: 1px solid blue;padding:10px">
 <p>
-Interaction Energy = MOE Amber12EHT (in kcal/mol)<BR>
-Value(Value) = count of interactions between target:ligand (count of interactions within immediate network)<BR>
-False+ = interactions observed in the Initial model that are removed in the Final model<BR>
-False- = interactions rescued in the Final model but not captured in the Initial model<BR>
+<h2>Legend</h2>
+<ul>
+<li>Interaction Energy = MOE Amber12EHT (in kcal/mol)</li>
+<li>Value(Value) = count of interactions between target:ligand (count of interactions within immediate network)</li>
+<li>F+ = False+ = interactions observed in the Initial model that are removed in the Final model</li>
+<li>F- = False- = interactions rescued in the Final model but not captured in the Initial model</li>
+<li>F = Final or the interaction count associated with the final model.</li>
+<li>I = Initial or the interaction count associated with the initial model.</li>
+<li>Distance = counts of atom-atom distances less then or equal to 4.5Å (ultimately a measure of "closeness" between atoms).</li>
+</ul>
 </p>
+</div>
 #;
 
     fwrite [htmlFile, '{}', MYFORMAT ];
