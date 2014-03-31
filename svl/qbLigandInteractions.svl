@@ -87,7 +87,8 @@ global function qbWriteHeadHTML [fileid,titleTxt]
       <param name="quality" value="high" />
       <param name="bgcolor" value="#0174DF" />
       <param name="FlashVars" value="xmlURL=http://www.quantumbioinc.com/flash/config.xml" />
-      <embed src="http://www.quantumbioinc.com/flash/picturechanger.swf" 
+<!--      <embed src="http://www.quantumbioinc.com/flash/picturechanger.swf"    -->
+      <img src="http://www.quantumbioinc.com/flash/home2.jpg"    
       FlashVars="xmlURL=http://www.quantumbioinc.com/flash/config.xml" 
       quality="high" bgcolor="#0174DF" width="567" height="111"  name="picturechanger" allowScriptAccess="sameDomain" 
       type="application/x-shockwave-flash" pluginspage="http://www.macromedia.com/go/getflashplayer" />
@@ -138,7 +139,7 @@ global function qbWriteTailHTML [fileid]
     endif    
     fwrite [fileid, '<BR><div align="right">Data processed using DivCon Discovery Suite build-{} at {}</div>\n', version , asctime []];
 
-    fwrite [fileid, '<div align="left"><p class="copyright">&copy; {} QuantumBio Inc. All Rights Reserved.</p></div>\n', first time [] ];
+    fwrite [fileid, '<BR><BR><div align="left"><p class="copyright">&copy; {} QuantumBio Inc. All Rights Reserved.</p></div>\n', first time [] ];
 
     const MYFORMAT =
 #string
@@ -156,6 +157,48 @@ endfunction
 
 function qbMeasurePotential;
 function DrawLigandInteractions;
+function DrawAnnotationLegend;
+function fwrite_PNG;
+
+local function fcn_delocalize [fcn, file]
+
+    if anytrue app isnull argument[] then
+	exit 'Usage: fcn_delocalize [fcn, file]';
+    endif
+
+    if ftype file <> 'file' then
+	exit 'Invalid file';
+    endif
+
+    if anyfalse app tok_length fcn then
+	exit 'Invalid fcn';
+    endif
+
+    local fcnquery, fnum, fout, foutname, line, seen = 0;
+
+    fcnquery = apt twrite ['local *function *{}*', fcn];
+
+    fnum = fopenr file;
+    fout = fopentemp '$TMP/fcn_delocalize*.svl';
+    foutname = fname fout;
+
+    while length ([line] = freadb [fnum, 'line', 1]) loop
+	if length findmatch [fcnquery, token line] then
+	    line = cat ["global ", drop [line, dec strpos ["function", line]]];
+	    seen =  1;
+	endif
+	fwrite [fout, '{}\n', line];
+    endloop
+    fflush fout;
+
+    if istrue seen then
+	unload file;
+	load fname fout;
+    endif
+
+    fclose fnum;
+    fclose fout;
+endfunction
 
 // qbmoebatch -exec -licwait "qbLigandInteractions ['1HWI.pdb','1HWI_refine_001.pdb','115']"
  
@@ -224,9 +267,9 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
         'IntE',
         ' '
     ];
-    fwrite [htmlFile, '</TH><TH colspan=2>Maps\n'];
+    fwrite [htmlFile, '</TH><TH colspan=2>Analysis Maps\n'];
     fwrite [csvFile, ',{},{}',
-        'Maps',
+        'Analysis Maps',
         ''
     ];
     for tmpInteraction in INTERACTION_TYPES loop
@@ -283,6 +326,12 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
     endloop
     fwrite [htmlFile, '</TH></TR>\n'];
     fwrite [csvFile, '\n'];
+    
+    // get the ligand interaction legend
+    fcn_delocalize ['DrawAnnotationLegend', '$MOE/lib/svl/run/prolig2d.svl'];
+    local grleg = DrawAnnotationLegend[];
+    unload sym_file 'DrawAnnotationLegend'; 
+
     local ligandCount;
     for ligandCount = 1, length firstLigands, 1 loop
 
@@ -328,9 +377,9 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
             add second untag third finalPotData
         ];        
 
-        // write out the png file associated with the interaction diagram
+    // write out the png file associated with the interaction diagram
         local twoDDiagrams = DrawLigandInteractions [[firstLigandAtoms,finalLigandAtoms],[firstReceptor,finalReceptor], 
-            [simultaneous:1,showconserved:1,rescontacts:1,arenecontacts:1,size:[1000,1000]]];
+            [simultaneous:1,showconserved:1,rescontacts:1,arenecontacts:1,implicit_hydrogens:0,size:[1000,1000]]];
         local baseName = twrite ['{}_{}_{}',
             rName firstLigands(ligandCount),
             rUID firstLigands(ligandCount),
@@ -340,14 +389,28 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
         local initialPNG = twrite ['I-{}.png',baseName];
         local finalPNG = twrite ['F-{}.png',baseName];
         
-        fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex"><nobr><a href="{}" data-lightbox="{}" title="Initial Refinement: {}">{}</a></nobr></TD>',
+        fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex"><nobr><a href="{}" data-lightbox="{}" title="Initial Refinement: {} (click for next)">{}</a></nobr></TD>',
             initialPNG,baseName,initialPNG,initialPNG];
-        fwrite [htmlFile, '<TD><nobr><a href="{}" data-lightbox="{}" title="Final Refinement: {}">{}</a></nobr>',
+        fwrite [htmlFile, '<TD><nobr><a href="{}" data-lightbox="{}" title="Final Refinement: {} (click for previous)">{}</a></nobr>',
             finalPNG,baseName,finalPNG,finalPNG];
         
         fwrite [csvFile, ',{},{}', initialPNG, finalPNG];
-        gr_fwrite [ initialPNG, twoDDiagrams(1), 'image/png'];
-        gr_fwrite [ finalPNG, twoDDiagrams(2), 'image/png'];
+
+        local size = cat [
+            (gr_header twoDDiagrams(1)).size,
+            (gr_header grleg).size
+        ];
+        size = [max size[[1,3]], add size[[2,4]]];  // [width, height]
+        const padding = 10;
+        size = size + (2 * padding);
+        local pminit = rep [rep [0x00FFFFFF, size(2)], size(1)];
+        pminit = gr_render_pixmap [pminit, grleg,  [first size - padding - first (gr_header grleg).size,padding,1,1] ];
+
+        twoDDiagrams(1) = gr_render_pixmap [pminit, twoDDiagrams(1),  [padding, second (gr_header grleg).size + padding,1,1] ];
+        twoDDiagrams(2) = gr_render_pixmap [pminit, twoDDiagrams(2),  [padding, second (gr_header grleg).size + padding,1,1] ];
+  
+        fwrite_PNG [ initialPNG, twoDDiagrams(1)];
+        fwrite_PNG [ finalPNG, twoDDiagrams(2)];
         
         for tmpInteraction in INTERACTION_TYPES loop
 
@@ -455,7 +518,7 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
     const MYFORMAT =
 #string
 <BR><BR>
-<div style="border: 1px solid blue;padding:10px">
+<div style="border:1px solid blue;padding:10px;width:80%">
 <p>
 <h2>Legend</h2>
 <ul>
@@ -465,7 +528,7 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
 <li>F- = False- = interactions rescued in the Final model but not captured in the Initial model</li>
 <li>F = Final or the interaction count associated with the final model.</li>
 <li>I = Initial or the interaction count associated with the initial model.</li>
-<li>Distance = counts of atom-atom distances less then or equal to 4.5Å (ultimately a measure of "closeness" between atoms).</li>
+<li>Distance = counts of atom-atom distances less then or equal to 4.5 &#8491;.</li>
 </ul>
 </p>
 </div>
