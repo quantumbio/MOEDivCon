@@ -21,6 +21,9 @@ fi
 
 . $QBHOME/etc/qbenv.sh
 
+export LD_LIBRARY_PATH=${QB_LD_LIBRARY_PATH}
+export DYLD_LIBRARY_PATH=${QB_LD_LIBRARY_PATH}
+
 CLASSPATH=$QBHOME/$PLTFM_VER/lib/netcdf.jar:$QBHOME/$PLTFM_VER/lib/fits.jar:${CLASSPATH} ; export CLASSPATH
 
 java -Xmx${QBJVMXmx} -Djava.library.path=$LD_LIBRARY_PATH -classpath $CLASSPATH ncsa.hdf.view.HDFView -root $QBHOME $*
