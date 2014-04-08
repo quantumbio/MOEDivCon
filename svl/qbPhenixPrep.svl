@@ -1417,7 +1417,12 @@ global function qbPhenixPrepPanel[]
                     [
                         name: 'setMemLabel',
                         title: 'Memory (GB): ',
-                        text: '--'
+                        text: '--',
+                        bubbleHelp: 'The amount approximately equates to the maximum amount of memory for the QM calculation and \n'
+                                    '   the value does not include memory for Phenix or other calculations.\n'
+                                    '   If less then this amount of memory is provided, the calculation may still proceed but\n'
+                                    '   consume more time. For queuing systems (PBS, SGE, etc), account for this memory and \n'
+                                    '   add a reasonable cushion for additional tools.'
                     ],Data : [name:'setMem']
             ]
         ],

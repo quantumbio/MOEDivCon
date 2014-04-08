@@ -3543,7 +3543,8 @@ global function qbCalcMemoryRequirementsInGB [allAtoms,setNP]
 
 // Last part of this equation is empirical to estimate start up memory.
 //  write ['startup: {} \n',  4.3479E-6*(length allAtoms) + 0.01724  ]; 
-    return (ceil ( ( (fullMatrixSize + (setNP * maxAOsize * 3) + eigenVectorSize)   /1024/1024/1024) *10 + 4.3479E-6*(length allAtoms) + 0.01724) / 10);
+//    return (ceil ( ( (fullMatrixSize + (setNP * maxAOsize * 3) + eigenVectorSize)   /1024/1024/1024) *10 + 4.3479E-6*(length allAtoms) + 0.01724) / 10);
+    return (ceil ( ( (fullMatrixSize + (setNP * maxAOsize * 5) + eigenVectorSize)   /1024/1024/1024) *10 + 4.3479E-6*(length allAtoms) + 0.01724) / 10);
 endfunction
 
 
