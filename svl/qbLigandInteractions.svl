@@ -232,6 +232,7 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
     local outfileBase = twrite ['{}-{}', fbase ftail firstFile, fbase ftail finalFile];
     local htmlFile = fopenw twrite ['{}.html', outfileBase];
     local csvFile = fopenw twrite ['{}.csv', outfileBase];
+    write ['Generating: {} and {}\n', twrite ['{}.html', outfileBase], twrite ['{}.csv', outfileBase]];
     
     qbWriteHeadHTML [htmlFile,outfileBase];
     
@@ -334,6 +335,7 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
 
     local ligandCount;
     for ligandCount = 1, length firstLigands, 1 loop
+        write ['Ligand {} of {}\n', ligandCount, length firstLigands];
 
         local firstLigandAtoms = cat rAtoms firstLigands(ligandCount);
         local firstReceptor = diff [cat cAtoms firstChains, firstLigandAtoms];
@@ -541,6 +543,8 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
     fclose htmlFile;
     fclose csvFile;
 
+    write ['Finished. See: {} and {}\n', twrite ['{}.html', outfileBase], twrite ['{}.csv', outfileBase]];
+
 endfunction
 
 global function qbAnalSelectedInteractions []
@@ -555,3 +559,91 @@ global function qbAnalSelectedInteractions []
     endloop
 endfunction
 
+global function qbLigandInteractionsPanel[]
+    local wkey = WindowCreate
+    [
+        name: 'panel',
+	    title: 'Ligand Interaction Comparison and Analysis',
+	    windowName: 'LigandInteractionComparison',
+	    text: ['Run','Cancel'],
+	    onTrigger: ['validate','exit'],
+	    bubbleHelp: [
+	    'Run',
+		'Cancel'
+	    ],
+	    Vbox:
+            [
+                columns: 2,
+                flushLeft:1,
+                extendH:1,
+                Text:
+                [
+                    name: 'initialFile',
+                    sensitive: 1,
+                    title: 'Initial File:',
+                    type: 'char',
+                    extendH:1,
+                    allowBlank: 0,
+                    bubbleHelp:
+                        'Read in the initial PDB file (perhaps pre-refined).'
+                ],
+                Button:
+                [
+                    name: 'button_selectInitialFile', text : 'Browse...',
+                    bubbleHelp:
+                        'Read in the initial PDB file (perhaps pre-refined).'
+                ]
+            ],
+	    Vbox:
+            [
+                columns: 2,
+                flushLeft:1,
+                extendH:1,
+                Text:
+                [
+                    name: 'finalFile',
+                    sensitive: 1,
+                    title: 'Final File:',
+                    type: 'char',
+                    extendH:1,
+                    allowBlank: 0,
+                    bubbleHelp:
+                        'Read in the final PDB file (perhaps pre-refined).'
+                ],
+                Button:
+                [
+                    name: 'button_selectFinalFile', text : 'Browse...',
+                    bubbleHelp:
+                        'Read in the final PDB file (perhaps pre-refined).'
+                ]
+            ]
+    ];
+    WindowShow wkey;
+    local tmpFile;
+    loop
+        local [values, trigger] = WindowWait wkey;
+        if trigger === 'button_selectInitialFile' then
+            tmpFile = FilePrompt [title:'Select Initial Structure File', mode:'open', filter:'', multi:0];
+            if not isnull tmpFile then
+                WindowSetAttr [wkey,
+                [
+                    initialFile:    [value:tmpFile]
+                 ]];              
+            endif
+        elseif trigger === 'button_selectFinalFile' then
+            tmpFile = FilePrompt [title:'Select Final Structure File', mode:'open', filter:'', multi:0];
+            if not isnull tmpFile then
+                WindowSetAttr [wkey,
+                [
+                    finalFile:    [value:tmpFile]
+                 ]];              
+            endif
+        elseif trigger === 'panel' then
+            if values.(trigger) == 'Run' then
+                qbLigandInteractions[values.initialFile, values.finalFile];
+                break;
+            endif
+        endif
+    endloop
+    WindowDestroy wkey;
+endfunction
