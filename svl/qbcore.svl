@@ -3497,7 +3497,7 @@ global function qbCalcMemoryRequirementsInGB [allAtoms,setNP]
 
     local eigenVectorSize = 0;
     local fullMatrixSize = 0;
-    local maxAOsize = 0;
+    local maxAOsize = [];
     local subsystemAtoms;
     local pos = aPos allAtoms;
     if length allAtoms > 700 then       // Divide and conquer calculation
@@ -3515,9 +3515,9 @@ global function qbCalcMemoryRequirementsInGB [allAtoms,setNP]
                residuePairs = append [ residuePairs,[addPair [tmpResidue, pair]] ];
            endloop
            local tmpAOSize = sqr calcAtomicOrbitals [subsystemAtoms];
-           if tmpAOSize > maxAOsize then
-               maxAOsize = tmpAOSize;
-           endif
+//           if tmpAOSize > maxAOsize then
+               maxAOsize = append [maxAOsize,tmpAOSize];
+//           endif
            eigenVectorSize = eigenVectorSize + tmpAOSize;
 
          //   write ['subsystemAtomsSize: {} {} {} {} {} {}\n', rName tmpResidue, rUID tmpResidue, length subsystemAtoms, tmpAOSize, maxAOsize, eigenVectorSize ]; 
@@ -3537,14 +3537,14 @@ global function qbCalcMemoryRequirementsInGB [allAtoms,setNP]
     fullMatrixSize = fullMatrixSize * 8;   // conversion to double
     eigenVectorSize = eigenVectorSize * 8; // conversion to double
     maxAOsize = maxAOsize * 8;              // conversion to double
-// TODO: remove eigenVectorSize in case of Recalculate MOs every SCF - note/warning in bubble about time cost. NEED percentage equation from Josh
-//  TODO: NMR memory * 2
-//  TODO: reengineer junk loops as apps
+    maxAOsize = reverse sort maxAOsize;
 
 // Last part of this equation is empirical to estimate start up memory.
 //  write ['startup: {} \n',  4.3479E-6*(length allAtoms) + 0.01724  ]; 
 //    return (ceil ( ( (fullMatrixSize + (setNP * maxAOsize * 3) + eigenVectorSize)   /1024/1024/1024) *10 + 4.3479E-6*(length allAtoms) + 0.01724) / 10);
-    return (ceil ( ( (fullMatrixSize + (setNP * maxAOsize * 5) + eigenVectorSize)   /1024/1024/1024) *10 + 4.3479E-6*(length allAtoms) + 0.01724) / 10);
+//    return (ceil ( ( (fullMatrixSize + (setNP * maxAOsize * 6) + eigenVectorSize)   /1024/1024/1024) *10 + 4.3479E-6*(length allAtoms) + 0.01724) / 10);
+    return (ceil ( ( (fullMatrixSize + ((add get [maxAOsize, igen setNP]) * 6) + eigenVectorSize)   /1024/1024/1024) *10 + 
+        (1.31893E-8 * (length allAtoms) + 2.3842E-5) /1024/1024/1024) / 10);
 endfunction
 
 

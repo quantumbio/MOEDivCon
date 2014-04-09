@@ -44,6 +44,7 @@ function qbCorrectAtomNames;
 function qbCheckLicense;
 function qbGetResidueOnRadius;
 function qb_cLetter;
+function qbCalcMemoryRequirementsInGB;
 
 // statics
 static transFileName;
@@ -301,7 +302,6 @@ write ['names: {}\n', names];
         residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
         return inResidue;
     else
-        WriteLog[twrite ['WARNING: incomplete representation in CIF for {} residue {}:{}', rName inResidue, cName rChain inResidue, rUID inResidue]];
     endif
 endfunction
 
@@ -667,6 +667,7 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
               //    12345678901234567890123456789012345678901234567890123456789012345678901234567890
     fwrite [shscr, '#!/bin/bash\n\n'];
     fwrite [shscr, 'QBPHENIX={}/bin/qbphenix\n',getenv 'QBHOME'];
+    fwrite [shscr, 'QBMOEBATCH={}/bin/qbmoebatch\n',getenv 'QBHOME'];
     
     if not isnull getenv 'PHENIX' then
         fwrite [shscr, 'QBPHENIX_ENV={}/phenix_env.sh\n',getenv 'PHENIX'];
@@ -1144,8 +1145,6 @@ local function phenix_Window [wparent]
     return success;
 
 endfunction
-
-function qbCalcMemoryRequirementsInGB;
 
 global function qbPhenixPrepPanel[]
 
