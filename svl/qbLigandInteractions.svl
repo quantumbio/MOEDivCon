@@ -219,8 +219,9 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
         finalLigands = finalLigands | rName finalLigands == interestLigand;
     endif
     
-    if length cat rAtoms firstLigands <> length cat rAtoms finalLigands then
-        write ['ERROR: the number of ligand atoms differ between {} and {}\n', firstFile, finalFile];
+    if length (cat rAtoms firstLigands | aAtomicNumber (cat rAtoms firstLigands) > 1)  <> 
+        length (cat rAtoms finalLigands | aAtomicNumber (cat rAtoms finalLigands) > 1) then
+        write ['ERROR: the number of ligand heavy atoms differ between {} and {}\n', firstFile, finalFile];
         return [];
     endif
     
