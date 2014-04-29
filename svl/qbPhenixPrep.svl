@@ -141,17 +141,21 @@ const MONLIB_CIF_DICT = [
 
 local function cif2mol[ cif_file, root ]
     root = tolower root;
-
-    local c = CIF_fread_cif_all [cif_file, MONLIB_CIF_DICT];
+//    local dic = MONLIB_CIF_DICT;
+    local dic = [];
+    local c = CIF_fread_cif_all [cif_file, dic ];
     local tt = tok_cat[ 'comp_', root ];
-    local nn = length c.(tt).'_chem_comp_atom.atom_id';
-    local x0 = rep[ 0, nn ];
-    c.(tt).'_chem_comp_atom.x' = x0;
-    c.(tt).'_chem_comp_atom.y' = x0;
-    c.(tt).'_chem_comp_atom.z' = x0;
-
+    if isnull c.(tt) then
+        tt = root;
+    else
+        local nn = length c.(tt).'_chem_comp_atom.atom_id';
+        local x0 = rep[ 0, nn ];
+        c.(tt).'_chem_comp_atom.x' = x0;
+        c.(tt).'_chem_comp_atom.y' = x0;
+        c.(tt).'_chem_comp_atom.z' = x0;
+    endif
     local d = cif_ExtractInfo [c.(tt), [hetnam: string toupper root,
-	    type:'monlibcif', havechg: 0, verbose:1]];
+	    type:'auto', havechg: 0, verbose:1]];
     return first d.models;
 endfunction
 
@@ -166,7 +170,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
         WriteLog [ twrite ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. not single, complete, small molecule, residue)',rName inResidue, cName rChain inResidue, rUID inResidue] ];
         return [];
     endif
-    
+
 	// Match heavy atoms of each molecule
 	// in a separate system
 	// Idea: strip off hydrogens, set ionization
@@ -188,6 +192,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     sys_info = SystemPush[];
     local adict = first cAtoms first mol_Create cif2mol[ cif_file, root ];
     local name_prio = aName adict[ x_sort aPrioSMI adict ];
+
     m_h = (aElement Atoms[]) == 'H';
     local ion_heavy = aIon (Atoms[]| not m_h);
     local geo_heavy = aGeometry (Atoms[]| not m_h);
@@ -197,7 +202,6 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     local geos_ordered_dict_heavy = geo_heavy[ x_sort aPrioSMI Atoms[] ];
     local cifHeavyCnt = length cat Atoms[];
     SystemPop sys_info;
-    write ['amolHeavyCnt: {} | cifHeavyCnt: {}\n', amolHeavyCnt, cifHeavyCnt];
     if amolHeavyCnt == cifHeavyCnt then
     // first test to make sure that this works as planned.
         sys_info = SystemPush amol;
@@ -207,17 +211,20 @@ local function matchHydrogens[ cif_file, inResidue, root ]
         aSetIon[ amolisorted, ions_ordered_dict_heavy ];
         aSetGeometry[ amolisorted, geos_ordered_dict_heavy ];
         Add_H testAmol;
-        local testAtmCnt = length cat Atoms[];
+        local testAtmCnt = aName cat Atoms[];
+
         SystemPop sys_info;
-        if testAtmCnt == length name_prio then
+        if length testAtmCnt == length name_prio then
             amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
             amolisorted = amoli[ x_sort x_smi_mol_heavy ];
             aSetIon[ amolisorted, ions_ordered_dict_heavy ];
+            aSetGeometry[ amolisorted, geos_ordered_dict_heavy ];
             Add_H amol;
             amol = filterInert cat rAtoms inResidue;
             local x_smi_mol  = aPrioSMI amol;
             aSetName[  amol[ x_sort x_smi_mol ], name_prio ];
         else
+            WriteLog [twrite ['\tProton counts do not agree suggesting incorrect CIF file.']];
             amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
             amolisorted = amoli[ x_sort x_smi_mol_heavy ];
             aSetIon[ amolisorted, ions_ordered_dict_heavy ];
@@ -226,10 +233,12 @@ local function matchHydrogens[ cif_file, inResidue, root ]
             amol = [];
         endif
     else
+        WriteLog [twrite ['\tHeavy atom counts do not agree suggesting truncated residue/ligand.']];
         amol = [];
     endif
     if isnull amol then
         WriteLog [twrite ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. due to disagreement in atom count between CIF and PDB)',rName inResidue, cName rChain inResidue, rUID inResidue]];
+        WriteLog ['\tDouble check protonation on this residue/ligand to verify correctness.\n'];
         errorCifFiles = cat [errorCifFiles,cif_file];
     endif
     return amol;
@@ -287,7 +296,6 @@ local function DoubleCheckCIFNames[inResidue,names]
     fdelete '1234567890-tmp.pdb';
     local newnames = cat aName filterInert cat rAtoms cResidues testChains;
     SystemPop pdata;
-write ['newnames: {}\n   names: {}\n',sort newnames,sort names];
     return sort newnames === sort names;
 endfunction
 
@@ -295,7 +303,6 @@ local function ProcessCIF[ cif_file, inResidue ]
     local atoms = filterInert cat rAtoms inResidue;
     local root = token first wordsplit[ string ftail[ cif_file], ".cif"];
     local names = applycif[ cif_file, root, atoms ];
-write ['names: {}\n', names];
     if not isnull names and DoubleCheckCIFNames[inResidue,names] then
         WriteLog[twrite [' INFO: Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
         aSetName[ atoms, names ];
