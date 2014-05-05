@@ -76,7 +76,7 @@
 //	- null segment vector's don't work
 
 #set title	'Protonate 3D'
-#set version	'2013.07'
+#set version	'2013.07-qb'
 #set class	'MOE:simulation'
 
 const RULEFILE = '$MOE/lib/protonate3d.dat';
