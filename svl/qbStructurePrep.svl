@@ -373,7 +373,7 @@ global function qbPrepareSystem [opt]
     local function filterInert atoms
         return diff [atoms,Atoms [] | aInert Atoms[]];
     endfunction
-
+        
     local atomsToProtonate;
     if not isnull opt.protAtomList then     // needs to be set here because atom numbers can change!
         atomsToProtonate = (Atoms[])[indexof[opt.protAtomList,aNumber Atoms[]]];
@@ -452,7 +452,7 @@ global function qbPrepareSystem [opt]
         if opt.pmode == 'Add_H' then
             Add_H diff [filterInert atomsToProtonate,fixedAtoms];
         elseif opt.pmode == 'Protonate3D' then
-            Protonate3D [filterInert atomsToProtonate,filterInert atomsToProtonate,filterInert atomsToProtonate,filterInert fixedAtoms,filterInert preciseWaters,protOptions];
+             Protonate3D [filterInert atomsToProtonate,filterInert atomsToProtonate,filterInert atomsToProtonate,filterInert fixedAtoms,filterInert preciseWaters,protOptions];
         elseif opt.pmode == 'None' then
             // do nothing
         else
