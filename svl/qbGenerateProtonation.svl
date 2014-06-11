@@ -1,0 +1,170 @@
+#svl
+
+// -------------------------------------
+//
+//  Function:   qbGenerateProtonation
+//  Author:     LMW
+//  Date:       June 11, 2014
+//
+//  Desc:       The function will by default run through all of the nitrogens
+//              within the ligand and try all of the different protonation states.
+//              The surrouding protein will also be manipulated based upon these
+//              protonation states. Finally, the function will write a PDB file
+//              for each of the states.
+//              Optionally, the user can provide specific atoms, residues, chains
+//              for consideration. However, ONLY N-atoms will be manipulated
+//              directly (though indirect effects will be experienced).
+//              The output will include a "run.list" file that will list key information.
+//
+//              To run the calculation on the command line, do the following:
+//
+//  % /path/to/DivConSuite/bin/qbmoebatch -exec "run ['qbGenerateProtonation.svl',['3RZF_5.pdb',[chain:'A',resname:'XNM']]]"
+//
+//  % /path/to/DivConSuite/bin/qbmoebatch -exec "run ['qbGenerateProtonation.svl',['3RZF_5.pdb',[chain:'A',resname:'XNM',atomname:['NBB','NAW']]]]"
+//
+// -------------------------------------         
+
+#set main qbGenerateProtonation
+
+function _Atoms;
+function qbGetResidueOnRadius;
+function Protonate3D;
+function qb_cLetter;
+
+const DEFAULT_OPT = [
+    chain       : [],
+    resid       : [],
+    resname     : [],
+    atomname    : []
+];
+
+local function PrintError [errortext]
+    write ['ERROR: {}\n\tContact support@quantumbioinc.com for more information.\n',errortext];
+endfunction
+
+global function qbGenerateProtonation [pdbfile,opt]
+
+    opt = tagcat [opt, DEFAULT_OPT];
+
+    if not isnull pdbfile then
+        oDestroy Chains[];
+        ReadPDB [pdbfile,[gen_symm:1,install_cryst:1,cell_enable:1]];
+    endif
+    
+    local ligNAtoms;
+
+    if isnull opt.chain and isnull opt.resid and isnull opt.resname and isnull opt.atomname then
+        ligNAtoms = _Atoms '$$ligand';
+    else
+        ligNAtoms = Atoms[];
+
+        if not isnull opt.chain then
+            if isnull (ligNAtoms | qb_cLetter aChain ligNAtoms == opt.chain) then
+                PrintError [twrite ['Chain {} not found!', opt.chain]];
+                return;
+            endif
+            ligNAtoms = ligNAtoms | qb_cLetter aChain ligNAtoms == opt.chain;
+        endif
+        
+        if not isnull opt.resid then
+            if isnull (ligNAtoms | rUID aResidue ligNAtoms == opt.resid) then
+                PrintError [twrite ['ResID {} not found!', opt.resid]];
+                return;
+            endif
+            ligNAtoms = ligNAtoms | rUID aResidue ligNAtoms == opt.resid;
+        endif
+
+        if not isnull opt.resname then
+            if isnull (ligNAtoms | rName aResidue ligNAtoms == opt.resname) then
+                PrintError [twrite ['ResName {} not found!', opt.resname]];
+                return;
+            endif
+            ligNAtoms = ligNAtoms | rName aResidue ligNAtoms == opt.resname;
+        endif
+
+        if not isnull opt.atomname then
+            if isnull cat indicesof [opt.atomname,aName ligNAtoms] then
+                PrintError [twrite ['AtomName {} not found!', opt.atomname]];
+                return;
+            endif
+            ligNAtoms = ligNAtoms[cat indicesof [opt.atomname,aName ligNAtoms]];
+//            if isnull (ligNAtoms | aName ligNAtoms == opt.atomname) then
+//                PrintError [twrite ['AtomName {} not found!', opt.atomname]];
+//                return;
+//            endif
+//            ligNAtoms = ligNAtoms | aName ligNAtoms == opt.atomname;
+        endif
+    endif
+    
+    // only support N-processing for now.
+    ligNAtoms = ligNAtoms | aElement ligNAtoms == 'N';
+    
+    if length ligNAtoms < 1 then
+        PrintError ['No atoms in selection!\n\tNote that this tool is currently built for nitrogen atoms only.'];
+        return;
+    endif
+        
+    local tmpAtomCurrent, tmpAtomOthers;
+    local tmpOxStateCurrent, tmpOxStateOthers;
+    local oxStates = [-1,0,1];
+    local allCombinations = [];
+    
+    for tmpAtomCurrent in ligNAtoms loop
+        aSetIon [tmpAtomCurrent,-1];
+    endloop
+
+    local allcount = 0;
+    
+    // N-dimensional recursion function to try all combinations
+    local function TryCombinations [position,ligNAtoms,oxStates]
+        position=position+1;
+        local tmpOxState;
+        static keptLigands;
+        for tmpOxState in oxStates loop
+            aSetIon [ligNAtoms(position),tmpOxState];
+            if position < length ligNAtoms then
+                TryCombinations[position,ligNAtoms,oxStates];
+            else
+                allcount = allcount + 1;
+                local ligandAtoms = cat rAtoms uniq aResidue ligNAtoms;
+                Add_H ligandAtoms;
+                ligandAtoms = cat rAtoms uniq aResidue ligNAtoms;
+                if length (ligNAtoms | aFCharge ligNAtoms < 0) == 0 then
+                    local tmpAtomNames = sort aName ligandAtoms;
+                    local initLength = length keptLigands;
+                    keptLigands = uniq append [keptLigands,tmpAtomNames];
+                    local finalLength = length keptLigands;
+                    if initLength <> finalLength then
+                        local fileHandle = fopenx 'run.list';
+                        fileHandle = fseek [fileHandle, fsize fileHandle];
+                        local outpdbname = twrite ['{}.pdb',allcount];
+                        fwrite [fileHandle,'{}, {}, [{}], [{}], [{}]\n',
+                            outpdbname,
+                            length (ligandAtoms | aElement ligandAtoms == 'H'),
+                            aIon ligNAtoms, aName ligNAtoms, rName uniq aResidue ligNAtoms];
+                        fclose fileHandle;
+                        local closeatoms = qbGetResidueOnRadius[ligandAtoms,4.0];
+                        aSetSelected [closeatoms,1];
+                        Protonate3D [closeatoms,closeatoms,closeatoms,ligandAtoms,[],[pH:7.4]];
+                        WritePDB[outpdbname,[cryst1:1]];
+                    endif
+                endif
+            endif
+        endloop    
+    endfunction
+    
+    // create the list file
+    local fileHandle = fopenw 'run.list';
+    fwrite [fileHandle,'{}, {}, [{}], [{}], [{}]\n',
+        'Out Filename', 
+        'HAtom Count', 
+        'Ionization States', 
+        'Atom Names',
+        'Residue Names'];
+    fclose fileHandle;
+    
+    // main loop
+    TryCombinations[0,ligNAtoms,oxStates];
+
+endfunction
+
