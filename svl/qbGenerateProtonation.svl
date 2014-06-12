@@ -88,11 +88,6 @@ global function qbGenerateProtonation [pdbfile,opt]
                 return;
             endif
             ligNAtoms = ligNAtoms[cat indicesof [opt.atomname,aName ligNAtoms]];
-//            if isnull (ligNAtoms | aName ligNAtoms == opt.atomname) then
-//                PrintError [twrite ['AtomName {} not found!', opt.atomname]];
-//                return;
-//            endif
-//            ligNAtoms = ligNAtoms | aName ligNAtoms == opt.atomname;
         endif
     endif
     
