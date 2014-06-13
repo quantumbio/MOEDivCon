@@ -231,7 +231,8 @@ global function qbGenerateProtonation [pdbfile,opt]
                 local ligandAtoms = cat rAtoms uniq aResidue ligNAtoms;
                 Add_H ligandAtoms;
                 ligandAtoms = cat rAtoms uniq aResidue ligNAtoms;
-                if length (ligNAtoms | aFCharge ligNAtoms < 0) == 0 then
+                local ligCAtoms = ligandAtoms | aElement ligandAtoms == 'C';
+                if (length (ligNAtoms | aFCharge ligNAtoms < 0) == 0) and (length (ligCAtoms | aFCharge ligCAtoms < 0) == 0) then
                     local tmpAtomNames = sort aName ligandAtoms;
                     local initLength = length keptLigands;
                     keptLigands = uniq append [keptLigands,tmpAtomNames];
