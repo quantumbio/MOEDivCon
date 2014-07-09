@@ -235,8 +235,8 @@ global function qbGenerateProtonation [pdbfile,opt]
                         fwrite [fileHandle,'{}, {}, [{}], [{}], [{}], [{}], [{}]\n',
                             outpdbname,
                             length (ligandAtoms | aElement ligandAtoms == 'H'),
-                            aIon ligNAtoms, aName ligNAtoms, rName uniq aResidue ligNAtoms, 
-                            qb_cLetter rChain aResidue ligNAtoms, rUID uniq aResidue ligNAtoms];
+                            aIon ligNAtoms, aName ligNAtoms, rName aResidue ligNAtoms, 
+                            qb_cLetter rChain aResidue ligNAtoms, rUID aResidue ligNAtoms];
                         fclose fileHandle;
                         local closeatoms = qbGetResidueOnRadius[ligandAtoms,4.0];
                         aSetSelected [closeatoms,1];
