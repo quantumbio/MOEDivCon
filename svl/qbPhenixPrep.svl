@@ -551,7 +551,7 @@ local function ReadInputFiles[inpdbfile,opt]
     local tmpIn;
     tmpIn.alt_loc = opt.enableAltAtoms;
     // turn on PBC
-    tmpIn.gen_symm = tmpIn.install_cryst = tmpIn.cell_enable = 1
+    tmpIn.gen_symm = tmpIn.install_cryst = tmpIn.cell_enable = 1;
     tmpIn.use_element = opt.forceUseElement;
     local inchains = ReadPDB[inpdbfile,tmpIn];
     CellEnable 1;
