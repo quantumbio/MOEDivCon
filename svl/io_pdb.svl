@@ -277,7 +277,7 @@ const SRC_PDB_REMED = '*COMPLIES WITH FORMAT V. 3.*';
 
 const PDB_WRITE_DEFAULTS = [
     use_chain_id:   1,		// try to extract chain id from cname
-    cryst1:	    0,		// write the CRYST1 record
+    cryst1:	    1,		// write the CRYST1 record                      // lmw-qbio set to 1
     hnames:	    'PDB v3.0', // or IUPAC or "old" PDB
     amber:	    0,		// "Amberize"
     atom_prop:	    [],		// B-factor data
@@ -312,7 +312,7 @@ const FREAD_PDB_DEFAULTS = [
 
 const READ_PDB_DEFAULTS = [
     split_hets:		    1,  // Remove trailing hets from protein chains.
-    install_cryst:	    0,  // Set space group & cell dimensions.
+    install_cryst:	    1,  // Set space group & cell dimensions.           // lmw-qbio set to 1
     use_charges:	    0,
     multi_entry:	    1
 ];
