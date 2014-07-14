@@ -269,7 +269,7 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
         'IntE',
         ' '
     ];
-    fwrite [htmlFile, '</TH><TH colspan=2>Analysis Maps\n'];
+    fwrite [htmlFile, '</TH><TH colspan=1>Analysis Maps\n'];
     fwrite [csvFile, ',{},{}',
         'Analysis Maps',
         ''
@@ -304,13 +304,19 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
         'Initial',
         'Final'
     ];
-    fwrite [htmlFile, '</TH><TH style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}</TH><TH>{}',
-        'Initial',
-        'Final'
+    fwrite [htmlFile, '</TH><TH style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}',
+        'Initial+Final'
     ];
-    fwrite [csvFile,',{},{}', 
-        'Initial',
-        'Final'
+//    fwrite [htmlFile, '</TH><TH style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}</TH><TH>{}',
+//        'Initial',
+//        'Final'
+//    ];
+//    fwrite [csvFile,',{},{}', 
+//        'Initial',
+//        'Final'
+//    ];
+    fwrite [csvFile,',{}', 
+        'Initial+Final'
     ];
     for tmpInteraction in INTERACTION_TYPES loop
         fwrite [htmlFile, '</TH><TH style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex">{}</TH><TH>{}</TH><TH>{}</TH><TH>{}',
@@ -391,30 +397,63 @@ global function qbLigandInteractions [firstFile, finalFile, interestLigand]
         
         local initialPNG = twrite ['I-{}.png',baseName];
         local finalPNG = twrite ['F-{}.png',baseName];
+        local jointPNG = twrite ['I+F-{}.png',baseName];
         
-        fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex"><nobr><a href="{}" data-lightbox="{}" title="Initial Refinement: {} (click for next)">{}</a></nobr></TD>',
-            initialPNG,baseName,initialPNG,initialPNG];
-        fwrite [htmlFile, '<TD><nobr><a href="{}" data-lightbox="{}" title="Final Refinement: {} (click for previous)">{}</a></nobr>',
-            finalPNG,baseName,finalPNG,finalPNG];
+        fwrite [htmlFile, '</TD><TD style="border: solid 0 #0000FF; border-left-width:2px; padding-left:0.5ex"><nobr><a href="{}" data-lightbox="{}" title="Initial (left) vs. Final (right) Refinement: {}">{}</a></nobr></TD>',
+            jointPNG,baseName,jointPNG,jointPNG];
         
         fwrite [csvFile, ',{},{}', initialPNG, finalPNG];
 
         local size = cat [
             (gr_header twoDDiagrams(1)).size,
+            (gr_header twoDDiagrams(2)).size,
             (gr_header grleg).size
-        ];
-        size = [max size[[1,3]], add size[[2,4]]];  // [width, height]
+        ];                            //  1  , 2, 3 , 4 , 5  , 6
+//        write ['size1: {}\n', size]; // d1w,d1h,d2w,d2h,ledw,ledh
+        size = [add size[[1,3]], add [max size[[2,4]],size[6]]];  // [width, height]
+//        write ['size2: {}\n', size]; // d1w,d1h,d2w,d2h,ledw,ledh
         const padding = 10;
         size = size + (2 * padding);
-        local pminit = rep [rep [0x00FFFFFF, size(2)], size(1)];
-        pminit = gr_render_pixmap [pminit, grleg,  [first size - padding - first (gr_header grleg).size,padding,1,1] ];
+        local pminit = rep [rep [0x00FFFFFF, size(1)], size(2)];
+        pminit = gr_render_pixmap [pminit, grleg,           [first size - padding - first (gr_header grleg).size,padding,1,1] ];
 
-        twoDDiagrams(1) = gr_render_pixmap [pminit, twoDDiagrams(1),  [padding, second (gr_header grleg).size + padding,1,1] ];
-        twoDDiagrams(2) = gr_render_pixmap [pminit, twoDDiagrams(2),  [padding, second (gr_header grleg).size + padding,1,1] ];
-  
-        fwrite_PNG [ initialPNG, twoDDiagrams(1)];
-        fwrite_PNG [ finalPNG, twoDDiagrams(2)];
+        // add notes for initial vs final
+        local key;
+        key = gr_create [
+            title: 'diagram',
+            size: [first (gr_header grleg).size, second (gr_header grleg).size], 
+            units: 'pt'
+        ];
+        gr_text [key, [0,
+                [first (gr_header grleg).size, second (gr_header grleg).size],
+                'Initial',
+                'sf',
+                icolor'black',
+                28,
+                [position: 'topleft']
+        ]];
+        pminit = gr_render_pixmap [pminit, key,           [padding,padding,1,1] ];
         
+        key = gr_create [
+            title: 'diagram',
+            size: [first (gr_header grleg).size, second (gr_header grleg).size], 
+            units: 'pt'
+        ];
+        gr_text [key, [0,
+                [first (gr_header grleg).size, second (gr_header grleg).size],
+                'Final',
+                'sf',
+                icolor'black',
+                28,
+                [position: 'topleft']
+        ]];
+        pminit = gr_render_pixmap [pminit, key,           [padding + first (gr_header twoDDiagrams(1)).size,padding,1,1] ];
+           
+        pminit = gr_render_pixmap [pminit, twoDDiagrams(1), [padding,second (gr_header grleg).size + padding,1,1] ];
+        pminit = gr_render_pixmap [pminit, twoDDiagrams(2), [first size - padding - first (gr_header twoDDiagrams(2)).size,second (gr_header grleg).size + padding,1,1] ];
+
+        fwrite_PNG [ jointPNG, pminit];
+                
         for tmpInteraction in INTERACTION_TYPES loop
 
             local firstLigandMask = 
@@ -609,13 +648,13 @@ global function qbLigandInteractionsPanel[]
                     extendH:1,
                     allowBlank: 0,
                     bubbleHelp:
-                        'Read in the final PDB file (perhaps pre-refined).'
+                        'Read in the final PDB file (perhaps post-refined).'
                 ],
                 Button:
                 [
                     name: 'button_selectFinalFile', text : 'Browse...',
                     bubbleHelp:
-                        'Read in the final PDB file (perhaps pre-refined).'
+                        'Read in the final PDB file (perhaps post-refined).'
                 ]
             ]
     ];
