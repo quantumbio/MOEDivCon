@@ -221,7 +221,7 @@ global function qbGenerateProtonation [pdbfile,opt]
             else
                 allcount = allcount + 1;
                 local ligandAtoms = cat rAtoms uniq aResidue ligNAtoms;
-                Add_H ligandAtoms;
+                Add_H ligNAtoms;
                 ligandAtoms = cat rAtoms uniq aResidue ligNAtoms;
                 if length (ligNAtoms | aFCharge ligNAtoms < 0) == 0 then
                     local tmpAtomNames = sort aName ligandAtoms;
@@ -239,6 +239,7 @@ global function qbGenerateProtonation [pdbfile,opt]
                             qb_cLetter rChain aResidue ligNAtoms, rUID aResidue ligNAtoms];
                         fclose fileHandle;
                         local closeatoms = qbGetResidueOnRadius[ligandAtoms,4.0];
+                        closeatoms = diff [closeatoms,ligandAtoms];
                         aSetSelected [closeatoms,1];
                         Protonate3D [closeatoms,closeatoms,closeatoms,ligandAtoms,[],[pH:7.4]];
                         WritePDB[outpdbname,[cryst1:1]];
