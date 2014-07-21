@@ -29,7 +29,9 @@
 function _Atoms;
 function qbGetResidueOnRadius;
 function Protonate3D;
+
 function qb_cLetter;
+function qbTetherMMMin;
 
 // MDB/CSV file data information
 function db_ExportASCII;
@@ -223,6 +225,11 @@ global function qbGenerateProtonation [pdbfile,opt]
                 local ligandAtoms = cat rAtoms uniq aResidue ligNAtoms;
                 Add_H ligNAtoms;
                 ligandAtoms = cat rAtoms uniq aResidue ligNAtoms;
+                local ligandProtons = (ligandAtoms | aAtomicNumber ligandAtoms == 1);
+                local tmpFixed = aFixed Atoms[];
+                aSetFixed[diff [cat Atoms [],ligandProtons],1];
+                qbTetherMMMin[0];
+                aSetFixed [Atoms [], tmpFixed];
                 if length (ligNAtoms | aFCharge ligNAtoms < 0) == 0 then
                     local tmpAtomNames = sort aName ligandAtoms;
                     local initLength = length keptLigands;

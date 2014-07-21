@@ -301,6 +301,9 @@ endfunction
 global function qbTetherMMMin [weight,weightedAtoms]
 //    pot_Load ['$MOE/lib/mmff94x.ff'];    // switch to OPLS-AA as this will do a better job.
 
+    if isnull weight then
+        weight = 0;
+    endif
 	pot_SetCharges [];
 
     pot_Setup
