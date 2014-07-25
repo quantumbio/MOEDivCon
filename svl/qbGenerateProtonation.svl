@@ -141,7 +141,105 @@ global function qbGetAtomsInCSV [ascii_file]
 endfunction
 
 // MAIN FUNCTION
+
+function ctab_EnumerateProtomers;
+function WashMoleculeMOE;
+
 global function qbGenerateProtonation [pdbfile,opt]
+
+    opt = tagcat [opt, DEFAULT_OPT];
+
+    if not isnull pdbfile then
+        oDestroy Chains[];
+        ReadPDB [pdbfile,[gen_symm:1,install_cryst:1,cell_enable:1]];
+    endif
+    
+    local ligAtoms;
+
+    if isnull opt.chain and isnull opt.resid and isnull opt.resname and isnull opt.atomname and isnull opt.csvfile then
+        ligAtoms = _Atoms '$$ligand';
+    elseif not isnull opt.csvfile then
+        ligAtoms = qbGetAtomsInCSV opt.csvfile;
+    else
+        ligAtoms = Atoms[];
+
+        if not isnull opt.chain then
+            if isnull (ligAtoms | qb_cLetter aChain ligAtoms == opt.chain) then
+                PrintError [twrite ['Chain {} not found!', opt.chain]];
+                return;
+            endif
+            ligAtoms = ligAtoms | qb_cLetter aChain ligAtoms == opt.chain;
+        endif
+        
+        if not isnull opt.resid then
+            if isnull (ligAtoms | rUID aResidue ligAtoms == opt.resid) then
+                PrintError [twrite ['ResID {} not found!', opt.resid]];
+                return;
+            endif
+            ligAtoms = ligAtoms | rUID aResidue ligAtoms == opt.resid;
+        endif
+
+        if not isnull opt.resname then
+            if isnull (ligAtoms | rName aResidue ligAtoms == opt.resname) then
+                PrintError [twrite ['ResName {} not found!', opt.resname]];
+                return;
+            endif
+            ligAtoms = ligAtoms | rName aResidue ligAtoms == opt.resname;
+        endif
+
+        if not isnull opt.atomname then
+            if isnull cat indicesof [opt.atomname,aName ligAtoms] then
+                PrintError [twrite ['AtomName {} not found!', opt.atomname]];
+                return;
+            endif
+            ligAtoms = ligAtoms[cat indicesof [opt.atomname,aName ligAtoms]];
+        endif
+    endif
+    
+//    local ctab = ctab_Extract [ligAtoms, [heavy:1, aro:0]];
+//    local [ctabs, graphs] = ctab_EnumerateProtomers [ctab];
+    
+    local [ctablist, changed, filtlist] = WashMoleculeMOE [ligAtoms,[dim:3,hydrogens:'add',tautomers:1,protomers:1]];
+    local ctab;
+
+    // create the list file
+    local fileHandle = fopenw 'run.list';
+    fwrite [fileHandle,'{}, {}, [{}], [{}], [{}]\n',
+        'Out Filename', 
+        'HAtom Count', 
+        'Ionization States', 
+        'Atom Names',
+        'Residue Names'];
+    fclose fileHandle;
+    write ['Found {} tautomers/protomers for {} atoms\n', length ctablist, length ligAtoms];
+    local allcount = 0;
+    for ctab in ctablist loop
+        allcount = allcount + 1;
+        local theParent = first uniq cat oParent oAtoms ligAtoms;
+        oDestroy ligAtoms;
+        local tmpMol = mol_Create first mol_ExtractFromCTAB ctab;
+        ligAtoms = cat oAtoms tmpMol;
+        local ligHeavyAtoms = ligAtoms | aAtomicNumber ligAtoms > 1;
+        aSetSelected [ligAtoms,1];
+        oReparent [ligAtoms,theParent];
+        oDestroy tmpMol;
+        local closeatoms = diff [qbGetResidueOnRadius[ligAtoms,4.0], ligAtoms];
+        Protonate3D [closeatoms,closeatoms,closeatoms,ligAtoms,[],[pH:7.4]];
+        local outpdbname = twrite ['{}.pdb',allcount];
+        fileHandle = fopenx 'run.list';
+        fileHandle = fseek [fileHandle, fsize fileHandle];
+        fwrite [fileHandle,'{}, {}, [{}], [{}], [{}], [{}], [{}]\n',
+            outpdbname,
+            length (ligAtoms | aElement ligAtoms == 'H'),
+            aIon ligHeavyAtoms, aName ligHeavyAtoms, rName aResidue ligHeavyAtoms, 
+            qb_cLetter rChain aResidue ligHeavyAtoms, rUID aResidue ligHeavyAtoms];
+        fclose fileHandle;
+        WritePDB[outpdbname,[cryst1:1]];
+    endloop
+
+endfunction
+
+global function qbGenerateProtonationOLD [pdbfile,opt]
 
     opt = tagcat [opt, DEFAULT_OPT];
 
@@ -223,13 +321,15 @@ global function qbGenerateProtonation [pdbfile,opt]
             else
                 allcount = allcount + 1;
                 local ligandAtoms = cat rAtoms uniq aResidue ligNAtoms;
-                Add_H ligNAtoms;
-                ligandAtoms = cat rAtoms uniq aResidue ligNAtoms;
-                local ligandProtons = (ligandAtoms | aAtomicNumber ligandAtoms == 1);
-                local tmpFixed = aFixed Atoms[];
-                aSetFixed[diff [cat Atoms [],ligandProtons],1];
-                qbTetherMMMin[0];
-                aSetFixed [Atoms [], tmpFixed];
+//                Add_H ligNAtoms;
+//                ligandAtoms = cat rAtoms uniq aResidue ligNAtoms;
+//                local ligandProtons = (ligandAtoms | aAtomicNumber ligandAtoms == 1);
+                local ligandHeavyNotNAtoms = diff [ligandAtoms,ligNAtoms];
+                ligandHeavyNotNAtoms = diff [ligandHeavyNotNAtoms,(ligandAtoms | aAtomicNumber ligandAtoms == 1)];
+//                local tmpFixed = aFixed Atoms[];
+//                aSetFixed[diff [cat Atoms [],ligandProtons],1];
+//                qbTetherMMMin[0];
+//                aSetFixed [Atoms [], tmpFixed];
                 if length (ligNAtoms | aFCharge ligNAtoms < 0) == 0 then
                     local tmpAtomNames = sort aName ligandAtoms;
                     local initLength = length keptLigands;
@@ -246,9 +346,9 @@ global function qbGenerateProtonation [pdbfile,opt]
                             qb_cLetter rChain aResidue ligNAtoms, rUID aResidue ligNAtoms];
                         fclose fileHandle;
                         local closeatoms = qbGetResidueOnRadius[ligandAtoms,4.0];
-                        closeatoms = diff [closeatoms,ligandAtoms];
+//                        closeatoms = diff [closeatoms,ligandHeavyNotNAtoms];
                         aSetSelected [closeatoms,1];
-                        Protonate3D [closeatoms,closeatoms,closeatoms,ligandAtoms,[],[pH:7.4]];
+                        Protonate3D [closeatoms,closeatoms,closeatoms,ligandHeavyNotNAtoms,[],[pH:7.4]];
                         WritePDB[outpdbname,[cryst1:1]];
                     endif
                 endif
