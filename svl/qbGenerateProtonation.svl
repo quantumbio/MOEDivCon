@@ -211,6 +211,9 @@ global function qbGenerateProtonation [pdbfile,opt]
     for ligResidue in ligResidues loop
     
         ligAtoms = cat rAtoms ligResidue;
+        
+        local ligHeavyAtoms = ligAtoms | aAtomicNumber ligAtoms > 1;
+        local ligHeavyAtomNames = aName ligHeavyAtoms;
 
     //    local ctab = ctab_Extract [ligAtoms, [heavy:1, aro:0]];
     //    local [ctabs, graphs] = ctab_EnumerateProtomers [ctab];
@@ -226,7 +229,8 @@ global function qbGenerateProtonation [pdbfile,opt]
             oDestroy ligAtoms;
             local tmpMol = mol_Create first mol_ExtractFromCTAB ctab;
             ligAtoms = cat oAtoms tmpMol;
-            local ligHeavyAtoms = ligAtoms | aAtomicNumber ligAtoms > 1;
+            ligHeavyAtoms = ligAtoms | aAtomicNumber ligAtoms > 1;
+            aSetName [ligHeavyAtoms,ligHeavyAtomNames];
             aSetSelected [ligAtoms,1];
             oReparent [ligAtoms,theParent];
             oDestroy tmpMol;
