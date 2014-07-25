@@ -195,12 +195,6 @@ global function qbGenerateProtonation [pdbfile,opt]
             ligAtoms = ligAtoms[cat indicesof [opt.atomname,aName ligAtoms]];
         endif
     endif
-    
-//    local ctab = ctab_Extract [ligAtoms, [heavy:1, aro:0]];
-//    local [ctabs, graphs] = ctab_EnumerateProtomers [ctab];
-    
-    local [ctablist, changed, filtlist] = WashMoleculeMOE [ligAtoms,[dim:3,hydrogens:'add',tautomers:1,protomers:1]];
-    local ctab;
 
     // create the list file
     local fileHandle = fopenw 'run.list';
@@ -211,32 +205,45 @@ global function qbGenerateProtonation [pdbfile,opt]
         'Atom Names',
         'Residue Names'];
     fclose fileHandle;
-    write ['Found {} tautomers/protomers for {} atoms\n', length ctablist, length ligAtoms];
-    local allcount = 0;
-    for ctab in ctablist loop
-        allcount = allcount + 1;
-        local theParent = first uniq cat oParent oAtoms ligAtoms;
-        oDestroy ligAtoms;
-        local tmpMol = mol_Create first mol_ExtractFromCTAB ctab;
-        ligAtoms = cat oAtoms tmpMol;
-        local ligHeavyAtoms = ligAtoms | aAtomicNumber ligAtoms > 1;
-        aSetSelected [ligAtoms,1];
-        oReparent [ligAtoms,theParent];
-        oDestroy tmpMol;
-        local closeatoms = diff [qbGetResidueOnRadius[ligAtoms,4.0], ligAtoms];
-        Protonate3D [closeatoms,closeatoms,closeatoms,ligAtoms,[],[pH:7.4]];
-        local outpdbname = twrite ['{}.pdb',allcount];
-        fileHandle = fopenx 'run.list';
-        fileHandle = fseek [fileHandle, fsize fileHandle];
-        fwrite [fileHandle,'{}, {}, [{}], [{}], [{}], [{}], [{}]\n',
-            outpdbname,
-            length (ligAtoms | aElement ligAtoms == 'H'),
-            aIon ligHeavyAtoms, aName ligHeavyAtoms, rName aResidue ligHeavyAtoms, 
-            qb_cLetter rChain aResidue ligHeavyAtoms, rUID aResidue ligHeavyAtoms];
-        fclose fileHandle;
-        WritePDB[outpdbname,[cryst1:1]];
-    endloop
+    
+    local ligResidues = uniq aResidue ligAtoms;
+    local ligResidue;
+    for ligResidue in ligResidues loop
+    
+        ligAtoms = cat rAtoms ligResidue;
 
+    //    local ctab = ctab_Extract [ligAtoms, [heavy:1, aro:0]];
+    //    local [ctabs, graphs] = ctab_EnumerateProtomers [ctab];
+        
+        local [ctablist, changed, filtlist] = WashMoleculeMOE [ligAtoms,[dim:3,hydrogens:'add',tautomers:1,protomers:1]];
+        local ctab;
+
+        write ['Found {} tautomers/protomers for residue {}:{} \n', length ctablist, rName ligResidue, rUID ligResidue];
+        local allcount = 0;
+        for ctab in ctablist loop
+            allcount = allcount + 1;
+            local theParent = first uniq cat oParent oAtoms ligAtoms;
+            oDestroy ligAtoms;
+            local tmpMol = mol_Create first mol_ExtractFromCTAB ctab;
+            ligAtoms = cat oAtoms tmpMol;
+            local ligHeavyAtoms = ligAtoms | aAtomicNumber ligAtoms > 1;
+            aSetSelected [ligAtoms,1];
+            oReparent [ligAtoms,theParent];
+            oDestroy tmpMol;
+            local closeatoms = diff [qbGetResidueOnRadius[ligAtoms,4.0], ligAtoms];
+            Protonate3D [closeatoms,closeatoms,closeatoms,ligAtoms,[],[pH:7.4]];
+            local outpdbname = twrite ['{}.pdb',allcount];
+            fileHandle = fopenx 'run.list';
+            fileHandle = fseek [fileHandle, fsize fileHandle];
+            fwrite [fileHandle,'{}, {}, [{}], [{}], [{}], [{}], [{}]\n',
+                outpdbname,
+                length (ligAtoms | aElement ligAtoms == 'H'),
+                aIon ligHeavyAtoms, aName ligHeavyAtoms, rName aResidue ligHeavyAtoms, 
+                qb_cLetter rChain aResidue ligHeavyAtoms, rUID aResidue ligHeavyAtoms];
+            fclose fileHandle;
+            WritePDB[outpdbname,[cryst1:1]];
+        endloop
+    endloop
 endfunction
 
 global function qbGenerateProtonationOLD [pdbfile,opt]
