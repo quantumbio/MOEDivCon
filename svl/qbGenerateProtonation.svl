@@ -29,6 +29,8 @@
 function _Atoms;
 function qbGetResidueOnRadius;
 function Protonate3D;
+function ctab_EnumerateProtomers;
+function WashMoleculeMOE;
 
 function qb_cLetter;
 function qbTetherMMMin;
@@ -142,9 +144,6 @@ endfunction
 
 // MAIN FUNCTION
 
-function ctab_EnumerateProtomers;
-function WashMoleculeMOE;
-
 global function qbGenerateProtonation [pdbfile,opt]
 
     opt = tagcat [opt, DEFAULT_OPT];
@@ -214,6 +213,7 @@ global function qbGenerateProtonation [pdbfile,opt]
         
         local ligHeavyAtoms = ligAtoms | aAtomicNumber ligAtoms > 1;
         local ligHeavyAtomNames = aName ligHeavyAtoms;
+        local ligHeavyAtomBfactors = aTempFactor ligHeavyAtoms;
 
     //    local ctab = ctab_Extract [ligAtoms, [heavy:1, aro:0]];
     //    local [ctabs, graphs] = ctab_EnumerateProtomers [ctab];
@@ -231,6 +231,7 @@ global function qbGenerateProtonation [pdbfile,opt]
             ligAtoms = cat oAtoms tmpMol;
             ligHeavyAtoms = ligAtoms | aAtomicNumber ligAtoms > 1;
             aSetName [ligHeavyAtoms,ligHeavyAtomNames];
+            aSetTempFactor [ligHeavyAtoms,ligHeavyAtomBfactors];
             aSetSelected [ligAtoms,1];
             oReparent [ligAtoms,theParent];
             oDestroy tmpMol;
