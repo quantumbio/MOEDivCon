@@ -1152,6 +1152,145 @@ local function phenix_Window [wparent]
 
 endfunction
 
+global function qbCoreResiduesBoxPanel [title]
+    return [
+            Vbox:   
+                [
+                title: title,
+                name: 'coreResidues',
+                    Hbox:
+                    [
+                        columns:4,
+                        Button:
+                            [
+                                name: 'retrieveSelection', 
+                                text: 'Retrieve Selection',
+                                bubbleHelp: 'Retrieve selected residues and add them to region refinement.'
+                            ],
+                        Button:
+                            [
+                                name: 'retrieveCSV', 
+                                text: 'Retrieve CSV',
+                                bubbleHelp: 'Retrieve experimental chemical shift data from QuantumBio-standard CSV NMR file.'
+                            ],
+                        Button:
+                            [
+                                name: 'button_ShowNMRAtoms', text: '?', font: 'mediumBold',
+                                bubbleHelp: 'Displays the approximate number of atoms that will be treated quantum mechanically.'
+                            ],
+                        Button:
+                            [
+                                name: 'deleteSelection', 
+                                text: 'X', font: 'mediumBold',flushLeft: 0,
+                                bubbleHelp: 'Delete selected atom from the list.'
+                            ]
+                    ],
+                    Data: [name:'CSVFileName'],
+                    Listbox :
+                        [
+                        name: 'coreResiduesBox',
+                        text: '',
+                        width:30,
+                        extendH:1,
+                        header: 'Chain\tRes\tUID',
+                        onTrigger: 'return',
+                        type: 'modint',
+                        multiSelect: 0,
+                        sortEnable: 1,
+                        bubbleHelp:
+                            'NMR Chemical shift (CS) calculations will be performed on each of these atoms.\n'
+                            '   If SHIFT is chosen, only the CSs will be calculated.\n'
+                            '   If ShiftP is chosen, the CS Perturbation (CSP) for each bound/unbound atom will be calculated.\n'
+                            '   If NMRScore is chosen, the CSP RMSD (or NMRScore) will be calculated for each atom.\n'
+                            '   The list may be expanded by selecting additional atoms in the MOE window and \n'
+                            '   pressing the Retrieve Selection button above.'
+                        ], Data: [name:'coreList']
+        ]
+    ];
+
+endfunction
+
+function qbGetAtomsInNMRCSV;
+
+local function filterInValidObjects inObjects
+    return (inObjects | oValid inObjects);
+endfunction
+
+local function updateCoreResidueList [coreList]
+    return apt twrite ['{}\t{}\t{}',cName rChain coreList, rName coreList, rUID coreList];
+endfunction
+
+local function qbCoreResiduesBoxLogic [values, trigger, wkey]       // could become global at some point
+
+    local selectedAtomID;
+    local tmpFile;
+    local returnvalue = 0;
+    
+    if trigger === 'coreResiduesBox' then
+        selectedAtomID = bitshr [second values.coreResiduesBox,WMOD_NBITS];
+        if selectedAtomID > 0 then
+            Isolate [values.coreList(selectedAtomID),Atoms[]];
+        endif
+        returnvalue = 1;
+    elseif trigger === 'deleteSelection' then
+        selectedAtomID = first values.coreResiduesBox;
+        if not isnull selectedAtomID then
+            local newSelectedID = selectedAtomID - 1;
+            if selectedAtomID == 1 then
+                newSelectedID = 1;
+            endif
+            local tmpMask;
+            tmpMask = m_id values.coreList;
+            tmpMask(selectedAtomID) = 0;
+            values.coreList = values.coreList | tmpMask;
+            WindowSetAttr[wkey, 
+            [
+                coreResiduesBox: 
+                [ 
+                    text:   updateCoreResidueList[values.coreList],
+                    value:  [newSelectedID]
+                ],
+                coreList: [value: values.coreList]
+            ]];
+        endif
+        returnvalue = 1;
+    elseif trigger === 'retrieveSelection' then
+        local newSelectedList = uniq diff[Residues[] | rSelected Residues[],values.coreList];
+        local newSelected;
+        for newSelected in newSelectedList loop
+            local prevLenCoreList = length values.coreList;
+            values.coreList = cat [values.coreList, newSelected];
+            WindowSetAttr[wkey,
+            [
+                coreResiduesBox: 
+                    [
+                    text:   updateCoreResidueList[values.coreList],
+                    value:  [1]
+                    ],
+                coreList: [value: values.coreList]
+            ]];
+        endloop
+        returnvalue = 1;
+    elseif trigger === 'retrieveCSV' then
+        tmpFile = FilePrompt [title:'Select QuantumBio Standard CSV file', mode:'open', filter:'*.csv', multi:0];
+        local [tmpCoreList,tmpBoundData,tmpUnboundData] = qbGetAtomsInNMRCSV [tmpFile];
+        values.coreList = uniq cat [values.coreList,tmpCoreList];
+        WindowSetAttr[wkey,
+        [
+            coreResiduesBox: 
+                [
+                text:   updateCoreResidueList[values.coreList],
+                value:  [1]
+                ],
+            coreList: [value: values.coreList],
+            CSVFileName: [value:tmpFile]
+        ]];
+        returnvalue = 1;
+    endif
+
+    return returnvalue;
+endfunction
+
 global function qbPhenixPrepPanel[]
 
 	if WindowShow ['PhenixDivConPanel', 1] then
@@ -1187,13 +1326,16 @@ global function qbPhenixPrepPanel[]
     strprep_info = twrite['Not performed and {f.1}% of atoms are protons',100*hPercent];
 
     local residueList = ResiduePreparation[];
+    
+    local coreResiduesBoxPanel = qbCoreResiduesBoxPanel['Core Residues:'];
 
     local testResidues = cat
         [pro_StandardRes[],'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C','SO4'];
 //    local coreList = uniq (Residues[] | m_join [rName Residues [], testResidues] == 0);
     local coreList = uniq aResidue _Atoms '$$ligand';
-	local wkey = WindowCreate
-	[
+    
+    local wkey = WindowCreate
+    [
 	    name: 'panel',
 	    title: 'Phenix/DivCon Preparation',
 	    windowName: 'PhenixDivConPanel',
@@ -1226,6 +1368,7 @@ global function qbPhenixPrepPanel[]
         Separator : [flushLeft:1],
             Vbox:
             [
+                name: 'mtzSetupSection1',
                 columns: 2,
                 flushLeft:1,
                 extendH:1,
@@ -1249,6 +1392,7 @@ global function qbPhenixPrepPanel[]
             ],
             Vbox:
             [
+                name: 'mtzSetupSection2',
                 columns: 2,
                 Option:
                 [
@@ -1268,6 +1412,7 @@ global function qbPhenixPrepPanel[]
         Separator : [flushLeft:1],
             Mbox:
             [
+                name: 'structurePrepSection',
                 columns: 2,
                 Button:
                 [
@@ -1307,7 +1452,6 @@ global function qbPhenixPrepPanel[]
         ],
 
         Separator : [flushLeft:1],
-        
         Group:
         [
             Checkbox: [ name: 'regionRefine', text: 'Region Refinement',onTrigger: 'return'],
@@ -1315,31 +1459,43 @@ global function qbPhenixPrepPanel[]
             [
                 Vbox:   
                 [
-                title: 'Core Residues:',
+                title: 'Core Residues',
                 name: 'coreResidues',
-                    Button:
-                        [
-                            name: 'retrieveSelection', 
-                            text: 'Retrieve Selection',
-                            bubbleHelp: 'Retrieve selected residues and add them to region refinement.'
-                        ],
+                    Hbox:
+                    [
+                        columns:4,
+                        Button:
+                            [
+                                name: 'retrieveSelection', 
+                                text: 'Retrieve Selection',
+                                bubbleHelp: 'Retrieve selected residues and add them to region refinement.'
+                            ],
+
+                        Button:
+                            [
+                                name: 'deleteSelection', 
+                                text: 'X', font: 'mediumBold',flushLeft: 0,
+                                bubbleHelp: 'Delete selected residue from the list.'
+                            ]
+                    ],
+                    Data: [name:'CSVFileName'],
                     Listbox :
                         [
                         name: 'coreResiduesBox',
                         text: '',
                         width:30,
+                        extendH:1,
                         header: 'Chain\tRes\tUID',
                         onTrigger: 'return',
                         type: 'modint',
-                        multiSelect: 1,
+                        multiSelect: 0,
                         sortEnable: 1,
                         bubbleHelp:
-                            'This list of residues automatically includes ligand(s), cofactor(s), and metals.\n'
-                            '   All selected residues will be included as core residues in the QM Region Refinement.\n'
-                            '   To remove a residue from the list, simply unselect it.\n'
-                            '   The list may be expanded by selecting additional residues in the MOE window and \n'
-                            '   pressing the Retrieve Selection button above.'
-                        ]
+                            'Phenix/DivCon refinement calculations will be performed on each of these residues.\n'
+                            '   Residues within the core are treated quantum mechanically and all gradients are used.\n'
+                            '   Residues within the main region are treated quantum mechanically and all gradients are used.\n'
+                            '   Residues within the buffer region are treated quantum mechanically and all gradients are NOT used.'
+                        ], Data: [name:'coreList']
                 ],
                 Hbox:
                 [
@@ -1382,6 +1538,7 @@ global function qbPhenixPrepPanel[]
         Mbox:
         [
             columns:2,
+            name: 'jobSetupSection',
             Hbox:
             [
                 columns:1,
@@ -1463,11 +1620,40 @@ global function qbPhenixPrepPanel[]
                 Label : [ name: 'warning_info' ]
             ]
 	];
-	
-	local function updateCoreResidueList [coreList]
-	    return apt twrite ['{}\t{}\t{}',cName rChain coreList, rName coreList, rUID coreList];
-	endfunction
-    
+
+    local function brick_regionRefine [wkey,values]
+        if isnull values then
+            values = WindowValues wkey;
+        endif
+        if values.regionRefine then
+            WindowSetAttr[wkey,[coreResidues: [sensitive:1]]];
+            WindowSetAttr[wkey,[regionSizes: [sensitive:1]]];
+        else
+            WindowSetAttr[wkey,[coreResidues: [sensitive:0]]];
+            WindowSetAttr[wkey,[regionSizes: [sensitive:0]]];
+        endif
+    endfunction
+
+    local function brick_panel [wkey, val]
+        WindowSetAttr [wkey, [
+            panel		: [sensitive : val],
+            baseName		: [sensitive : val],
+            mtzSetupSection1	: [sensitive : val],
+            mtzSetupSection2	: [sensitive : val],
+            structurePrepSection	: [sensitive : val],
+            regionRefine		: [sensitive : val],
+            coreResidues		: [sensitive : val],
+            regionSizes		: [sensitive : val],
+            jobSetupSection		: [sensitive : val],
+            button_PhenixSetup		: [sensitive : val],
+            button_ShowAtomCount		: [sensitive : val],
+            button_ShowWarnings	: [sensitive : val]
+        ]];
+        if val == 1 then
+            brick_regionRefine [wkey];
+        endif
+    endfunction
+		    
     local function ShowWarnings [wkey,trigger,values,status,allAtoms]
     
             local message = [];
@@ -1513,14 +1699,14 @@ global function qbPhenixPrepPanel[]
             return 1;
     endfunction
 
-	local function updateAtomCount [wkey, values, coreList]
+	local function updateAtomCount [wkey, values]
 	    local atomList;
 	    local qmCoreAtoms;
 	    local qmBufferAtoms;
 	    if not values.regionRefine then
 	        atomList = Atoms[];
 	    else
-	        qmCoreAtoms = qbGetResidueOnRadius[filterInert cat rAtoms coreList[first values.coreResiduesBox],values.qmCore];
+	        qmCoreAtoms = qbGetResidueOnRadius[filterInert cat rAtoms values.coreList,values.qmCore];
 	        qmBufferAtoms = diff [qbGetResidueOnRadius[qmCoreAtoms,values.qmBuffer],qmCoreAtoms];
 	        atomList = uniq cat [qmCoreAtoms,qmBufferAtoms];
         endif
@@ -1531,8 +1717,8 @@ global function qbPhenixPrepPanel[]
 	    return [atomList,qmCoreAtoms,qmBufferAtoms];
 	endfunction
 	
-	local function highlightAtoms [wkey, values, trigger, coreList]
-	    local [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount [wkey, values, coreList];
+	local function highlightAtoms [wkey, values, trigger]
+	    local [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount [wkey, values];
 	    aSetSelected [Atoms[], 0];
 	    if trigger === 'button_ShowRegionAtoms' then
             aSetSelected [qmCoreAtoms, 1];
@@ -1547,6 +1733,7 @@ global function qbPhenixPrepPanel[]
         [
             coreResiduesBox:
                 [text : updateCoreResidueList[coreList],value: [igen length coreList]],
+            coreList:   [value:coreList],
             regionRefine: [value: 1],
             qmCore: [value: 3.0],
             qmBuffer: [value: 2.5],
@@ -1562,18 +1749,43 @@ global function qbPhenixPrepPanel[]
     local values, trigger, allAtoms,qmCoreAtoms,qmBufferAtoms;
     local ynMemIsSet = 0;
     values = WindowValues wkey;
-    [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
+    [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values];
 	local status;
-	status.cif_success = []; status.phenix_success = [];status.ran_protonate = 0;status.ran_structprep = 0;status.structprep_changed = 0;
-	
+	status.cif_success = []; status.phenix_success = [];status.ran_protonate = 0;status.ran_structprep = 0;status.structprep_changed = 0;        
+
+// Threads to take care of processing, calculating, and updating atom counts and memory size requirements.
     if second task_fork [] == 'child' then
         task_settitle [ task_key -1, 'update_QBmemory'];
-        status.memory = qbCalcMemoryRequirementsInGB[allAtoms,values.setNP];
-        WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
-        ShowWarnings [wkey,trigger,values,status,allAtoms];
-        exit[];
+        loop
+            if WindowKey wkey == 0 then
+                exit[];
+            else
+                values = WindowValues wkey;
+                values.coreList = filterInValidObjects values.coreList;
+                [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values, values.coreList];
+                if WindowKey wkey == 0 then
+                    exit[];
+                else
+                    status.memory = qbCalcMemoryRequirementsInGB[filterInValidObjects allAtoms,values.setNP];
+                    WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
+                    ShowWarnings [wkey,trigger,values,status,filterInValidObjects allAtoms];
+                    values.coreList = filterInValidObjects values.coreList;
+                    WindowSetAttr[wkey, [ coreResiduesBox: [ text:   updateCoreResidueList[values.coreList] ], coreList: [value: values.coreList] ]];
+                endif
+            endif         
+            sleep 2;
+        endloop
     endif
-    
+    if second task_fork [] == 'child' then
+        loop
+            if WindowKey wkey == 0 then
+                task_kill (task_keylist [] | task_title task_keylist [] == 'update_QBmemory');    // kill other memory update tasks
+                exit[];
+            endif
+        sleep 0.5;
+        endloop
+    endif
+
 	WindowShow wkey;
 	local ciffiles;
 	local tmpFile;
@@ -1591,16 +1803,18 @@ global function qbPhenixPrepPanel[]
             else
                 WindowSetAttr[wkey,[cif_info: [text:'Finished with CIF preparation']]];
             endif
+        elseif trigger === 'button_ShowWarnings' then
+            ShowWarnings [wkey,trigger,WindowValues wkey,status,allAtoms];
         elseif trigger === 'button_ShowAtomCount' 
                 or trigger === 'button_ShowRegionAtoms' 
                 or trigger === 'button_ShowBufferAtoms' then
-            highlightAtoms [wkey, values, trigger, coreList];
+            highlightAtoms [wkey, values, trigger, values.coreList];
         elseif trigger === 'button_MOEPreparation' then
             local before_run = length cat Atoms[];
+            brick_panel[wkey,0];
             StructurePreparationGUI[cmd:'interactive'];
             status.ran_structprep = 1;
             sleep 2.0;      // needs a couple of seconds to init StructurePrep function
-            WindowShow [wkey, 0];
             while WindowKey 'Structure Preparation' loop
                 sleep 0.15;
                 if WindowKey 'Protonate3D' then
@@ -1618,29 +1832,11 @@ global function qbPhenixPrepPanel[]
                 WindowSetAttr[wkey,[strprep_info: [text:'MOE preparation Ran']]];
                 status.structprep_changed = 1;
             endif
-            WindowShow[wkey,1];
+            brick_panel[wkey,1];
         elseif trigger === 'regionRefine' then
-            if values.regionRefine then
-                WindowSetAttr[wkey,[coreResidues: [sensitive:1]]];
-                WindowSetAttr[wkey,[regionSizes: [sensitive:1]]];
-            else
-                WindowSetAttr[wkey,[coreResidues: [sensitive:0]]];
-                WindowSetAttr[wkey,[regionSizes: [sensitive:0]]];
-            endif
-        elseif trigger === 'coreResiduesBox' then
-            local selectedResidueID = bitshr [second values.coreResiduesBox,WMOD_NBITS];
-            if selectedResidueID > 0 then
-                Isolate [coreList(selectedResidueID),Atoms[]];
-            endif
-        elseif trigger === 'retrieveSelection' then
-            local newSelected = diff[Residues [] | rSelected Residues [],coreList];
-            local prevLenCoreList = length coreList;
-            coreList = cat [coreList, newSelected];
-            WindowSetAttr[wkey,[
-                coreResiduesBox: [
-                    text:   updateCoreResidueList[coreList],
-                    value:  [cat [first values.coreResiduesBox, igen length newSelected + prevLenCoreList]]
-                    ]]];
+            brick_regionRefine [wkey,values];
+        elseif qbCoreResiduesBoxLogic [values, trigger, wkey]   then
+            // already done
         elseif trigger === 'button_selectMTZ' then
             tmpFile = FilePrompt [title:'Select Structure Factor File', mode:'open', filter:'', multi:0];
             if not isnull tmpFile then
@@ -1683,7 +1879,6 @@ global function qbPhenixPrepPanel[]
                 if not isnull batchname then
                     WriteLog[twrite ['Creating {}',batchname],twrite ['{}-phenix',values.baseName]];
                     local [mainPDBfilename,resPDBfilenames] = WriteInputFiles[residueList,ciffiles,values.baseName,values];
-                    values.coreList = coreList[first values.coreResiduesBox];
                     if fext values.mtzFile == 'mtz' then
                         values.labelList = twrite['{},{}',mtzFColumns[values.column_F],mtzQColumns[values.column_Q]];
                     else
@@ -1697,37 +1892,8 @@ global function qbPhenixPrepPanel[]
                 LaunchDocument '$QBHOME/doc/help-refine.html';
             endif
         endif
-        [allAtoms,qmCoreAtoms,qmBufferAtoms] = updateAtomCount[wkey,values,coreList];
-        
-        task_kill (task_keylist [] | task_title task_keylist [] == 'update_QBmemory');    // kill other memory update tasks
-        if second task_fork[master:'parent'] == 'child' then
-            task_settitle [ task_key -1, 'update_QBmemory'];
-            
-            if second task_fork [master:'parent'] === 'child' then          // this will give the user some feedback
-                task_settitle [ task_key -1, 'mem_progress'];
-                local loopCount = '|';
-                loop
-                    sleep 0.5;
-                    if loopCount == '|' then
-                        loopCount = '/';
-                    elseif loopCount == '/' then
-                        loopCount = '-';
-                    elseif loopCount == '-' then
-                        loopCount = '\\';
-                    elseif loopCount == '\\' then
-                        loopCount = '|';
-                    endif
-                    WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',loopCount] ]], setMem: [value: [twrite['-10']]] ]];
-                endloop
-            endif
-
-            status.memory = qbCalcMemoryRequirementsInGB [allAtoms,values.setNP];
-            task_kill (task_keylist [] | task_title task_keylist [] == 'mem_progress');
-            WindowSetAttr[wkey, [ setMemLabel: [text: [twrite['{}',status.memory] ]], setMem: [value: [twrite['{}',status.memory]]] ]];
-            ShowWarnings [wkey,trigger,WindowValues wkey,status,allAtoms];
-            exit[];
-        endif
     endloop
+    task_kill (task_keylist [] | task_title task_keylist [] == 'update_QBmemory');    // kill other memory update tasks
     WindowDestroy wkey;
 endfunction
 
