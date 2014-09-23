@@ -3472,7 +3472,8 @@ endfunction
 // lmw - 9/2013
 //  Determine the amount of memory required for a calculation.
 global function qbCalcMemoryRequirementsInGB [allAtoms,setNP]
-    
+    local syskeys = SystemPush allAtoms;    // limit the chances of concurrent molecule object editing errors
+    allAtoms = Atoms[];
     local qmResidues = uniq cat aResidue allAtoms;
     local tmpResidue;
     local residuePairs;
@@ -3538,7 +3539,8 @@ global function qbCalcMemoryRequirementsInGB [allAtoms,setNP]
     eigenVectorSize = eigenVectorSize * 8; // conversion to double
     maxAOsize = maxAOsize * 8;              // conversion to double
     maxAOsize = reverse sort maxAOsize;
-
+    SystemPop syskeys;
+    
 // Last part of this equation is empirical to estimate start up memory.
 //  write ['startup: {} \n',  4.3479E-6*(length allAtoms) + 0.01724  ]; 
 //    return (ceil ( ( (fullMatrixSize + (setNP * maxAOsize * 3) + eigenVectorSize)   /1024/1024/1024) *10 + 4.3479E-6*(length allAtoms) + 0.01724) / 10);

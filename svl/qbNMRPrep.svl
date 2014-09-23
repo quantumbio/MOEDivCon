@@ -305,7 +305,7 @@ function qbSendAtomsToNMRCSV;
 
 global function qbNMRPrepPanel[]
 
-        exit ['This tool is coming soon!\nPlease contact support@quantumbioinc.com for more information.'];
+//        exit ['This tool is coming soon!\nPlease contact support@quantumbioinc.com for more information.'];
 
 	if WindowShow ['NMRPrepPanel', 1] then
 	    return;
