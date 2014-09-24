@@ -254,18 +254,13 @@ local function applycif[ cif_file, root, atoms ]
     endif
         
     local mol = cif2mol[ cif_file, root ];
-    local dict_ckeys = mol_Create mol;
-    local dict_akeys = cat cAtoms dict_ckeys;
-
-    oDestroy dict_ckeys;
     
 	// Map the names using unique smiles sorting
-
     local sys_info = SystemPush atoms;
     atoms = Atoms[];
 
-    dict_ckeys = mol_Create mol;
-    dict_akeys = cat cAtoms dict_ckeys;
+    local dict_ckeys = mol_Create mol;
+    local dict_akeys = cat cAtoms dict_ckeys;
 
     if length dict_akeys === length atoms then
 
@@ -301,7 +296,10 @@ endfunction
 
 local function ProcessCIF[ cif_file, inResidue ]
     local atoms = filterInert cat rAtoms inResidue;
-    local root = token first wordsplit[ string ftail[ cif_file], ".cif"];
+
+// It is unclear why this is here. TODO: delete this line!
+//    local root = token first wordsplit[ string ftail[ cif_file], ".cif"];
+    local root = rName inResidue;
     local names = applycif[ cif_file, root, atoms ];
     if not isnull names and DoubleCheckCIFNames[inResidue,names] then
         WriteLog[twrite [' INFO: Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
@@ -309,6 +307,7 @@ local function ProcessCIF[ cif_file, inResidue ]
         residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
         return inResidue;
     else
+        WriteLog[twrite [' WARNING: Cant Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
     endif
 endfunction
 
@@ -795,7 +794,7 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '        fi  \n'];
     fwrite [shscr, '    fi  \n'];
     fwrite [shscr, '        \n'];
-    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation PostMOE --NP $setNP --m ${}gb --ncycles $macroCount "\n','{setMem}'];
+    fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation PostMOE --Nproc $setNP --m ${}gb --ncycles $macroCount "\n','{setMem}'];
     fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
     fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
@@ -1810,7 +1809,7 @@ global function qbPhenixPrepPanel[]
                 or trigger === 'button_ShowBufferAtoms' then
             highlightAtoms [wkey, values, trigger, values.coreList];
         elseif trigger === 'button_MOEPreparation' then
-            local before_run = length cat Atoms[];
+            local before_run = cat Atoms[];
             brick_panel[wkey,0];
             StructurePreparationGUI[cmd:'interactive'];
             status.ran_structprep = 1;
@@ -1822,10 +1821,12 @@ global function qbPhenixPrepPanel[]
                 endif
             endloop
             hPercent = PercentProton[];
-            local after_run = length cat Atoms[];
+            aSetOccupancy[oGetCollection ['STRUCTPREP_NEWATOMS'],0];
+            aSetOccupancy[cat (Atoms [] | aElement Atoms[] == 'H'), 0];
+            local after_run = cat Atoms[];
             if hCutOff > hPercent then
                 WindowSetAttr[wkey,[strprep_info: [text:twrite['Warning: only {}% of atoms are protons', 100*hPercent]]]];
-            elseif before_run == after_run then
+            elseif length before_run == length after_run then
                 WindowSetAttr[wkey,[strprep_info: [text:'Note: no change in structure.']]];
                 status.structprep_changed = 0;
             else
