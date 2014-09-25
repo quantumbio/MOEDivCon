@@ -154,9 +154,18 @@ local function cif2mol[ cif_file, root ]
         c.(tt).'_chem_comp_atom.y' = x0;
         c.(tt).'_chem_comp_atom.z' = x0;
     endif
+// need to check to make sure of what sort of cif this file is
+    local hasrestraints = not (
+        isnull c.(tt).'_chem_comp_bond.value_dist' and
+        isnull c.(tt).'_chem_comp_bond.value_dist_esd' and
+        isnull c.(tt).'_chem_comp_angle.value_angle' and
+        isnull c.(tt).'_chem_comp_angle.value_angle_esd' and
+        isnull c.(tt).'_chem_comp_tor.value_angle' and
+        isnull c.(tt).'_chem_comp_tor.value_angle_esd' );
+        
     local d = cif_ExtractInfo [c.(tt), [hetnam: string toupper root,
 	    type:'auto', havechg: 0, verbose:1]];
-    return first d.models;
+    return [hasrestraints, first d.models];
 endfunction
 
 // JT: takes atom keys from a template (dictionary), modify the ionization
@@ -190,7 +199,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     SystemPop sys_info;
 
     sys_info = SystemPush[];
-    local adict = first cAtoms first mol_Create cif2mol[ cif_file, root ];
+    local adict = first cAtoms first mol_Create second cif2mol[ cif_file, root ];
     local name_prio = aName adict[ x_sort aPrioSMI adict ];
 
     m_h = (aElement Atoms[]) == 'H';
@@ -253,7 +262,7 @@ local function applycif[ cif_file, root, atoms ]
         return newnames;
     endif
         
-    local mol = cif2mol[ cif_file, root ];
+    local [hasrestraints, mol] = cif2mol[ cif_file, root ];
     
 	// Map the names using unique smiles sorting
     local sys_info = SystemPush atoms;
@@ -277,7 +286,7 @@ local function applycif[ cif_file, root, atoms ]
     endif
 
     SystemPop sys_info;
-    return newnames;
+    return [hasrestraints, newnames];
 
 endfunction
 
@@ -300,12 +309,17 @@ local function ProcessCIF[ cif_file, inResidue ]
 // It is unclear why this is here. TODO: delete this line!
 //    local root = token first wordsplit[ string ftail[ cif_file], ".cif"];
     local root = rName inResidue;
-    local names = applycif[ cif_file, root, atoms ];
+    local [hasrestraints, names] = applycif[ cif_file, root, atoms ];
     if not isnull names and DoubleCheckCIFNames[inResidue,names] then
-        WriteLog[twrite [' INFO: Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
+    // only some CIF files can be used for parameters
         aSetName[ atoms, names ];
-        residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
-        return inResidue;
+        if hasrestraints then
+            residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
+            WriteLog[twrite [' INFO: Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
+            return inResidue;
+        else
+            WriteLog[twrite [' WARNING: Dont Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
+        endif
     else
         WriteLog[twrite [' WARNING: Cant Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
     endif
