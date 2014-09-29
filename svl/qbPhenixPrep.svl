@@ -64,7 +64,8 @@ const PREPDEFAULTS = cat [CORE_DEFAULTS,[
     forceUseElement:1,         // force reading of the element in the PDB file. Not a good idea if file format broken.
     enableAltAtoms:0,       // enable reading of alternative atoms - warning: HIGHLY EXERPERIMENTAL!
     qmApplication:[],       // Skip the DivCon tests - we will be running no matter what since this is refinement.
-    enableCIFprotons:1      // protonates structure based on CIF file prior to further processing
+    enableCIFprotons:1,      // protonates structure based on CIF file prior to further processing
+    procPhenixCIFLib:1   // designator used to turn on/off the phenix set of CIF files.
 ]];
 
 local function WriteLog [line,basename,state]
@@ -119,54 +120,75 @@ local function filterInert atoms
     return diff [atoms,Atoms [] | aInert Atoms[]];
 endfunction
 
-// Source code between  // ===================== lines based on code provided by CCG 1/2013
-// ===================== 
-const MONLIB_CIF_DICT = [
-    '_chem_comp.number_atoms_all':'int',
-    '_chem_comp.number_atoms_nh':'int',
-    '_chem_comp_atom.charge':'float',
-    '_chem_comp_atom.partial_charge':'float',
-    '_chem_comp_atom.x':'float',
-    '_chem_comp_atom.y':'float',
-    '_chem_comp_atom.z':'float',
-    '_chem_comp_bond.value_dist':'float',
-    '_chem_comp_bond.value_dist_esd':'float',
-    '_chem_comp_angle.value_angle':'float',
-    '_chem_comp_angle.value_angle_esd':'float',
-    '_chem_comp_tor.value_angle':'float',
-    '_chem_comp_tor.value_angle_esd':'float',
-    '_chem_comp_tor.period':'float',
-    '_chem_comp_plane_atom.dist_esd':'float'
-];
-
-local function cif2mol[ cif_file, root ]
+// Process one of the various CIF file types and return a MOE MOL structure.
+global function qbCIF2MOL[ cif_file, root ]
     root = tolower root;
-//    local dic = MONLIB_CIF_DICT;
     local dic = [];
     local c = CIF_fread_cif_all [cif_file, dic ];
     local tt = tok_cat[ 'comp_', root ];
+    
+    function checkExistence [c,tt,instring,yesprint]
+        if isnull yesprint then
+            yesprint = 0;
+        endif
+        if isnull c.(tt).(instring) and yesprint then
+                write ['    WARNING: {} not found\n', instring];
+        endif
+        return not isnull c.(tt).(instring);
+    endfunction
+    
     if isnull c.(tt) then
         tt = root;
     else
         local nn = length c.(tt).'_chem_comp_atom.atom_id';
         local x0 = rep[ 0, nn ];
-        c.(tt).'_chem_comp_atom.x' = x0;
-        c.(tt).'_chem_comp_atom.y' = x0;
-        c.(tt).'_chem_comp_atom.z' = x0;
+        if not (
+          checkExistence [c,tt,'_chem_comp_atom.x'] or
+          checkExistence [c,tt,'_chem_comp_atom.y'] or
+          checkExistence [c,tt,'_chem_comp_atom.z'] ) then
+            c.(tt).'_chem_comp_atom.x' = x0;
+            c.(tt).'_chem_comp_atom.y' = x0;
+            c.(tt).'_chem_comp_atom.z' = x0;
+        endif
     endif
-// need to check to make sure of what sort of cif this file is
-    local hasrestraints = not (
-        isnull c.(tt).'_chem_comp_bond.value_dist' and
-        isnull c.(tt).'_chem_comp_bond.value_dist_esd' and
-        isnull c.(tt).'_chem_comp_angle.value_angle' and
-        isnull c.(tt).'_chem_comp_angle.value_angle_esd' and
-        isnull c.(tt).'_chem_comp_tor.value_angle' and
-        isnull c.(tt).'_chem_comp_tor.value_angle_esd' );
-        
+// Check the CIF file concerning its contents vis-a-vie restraints.
+    local hasrestraints = (
+        checkExistence [c,tt,'_chem_comp_bond.value_dist'] and
+        checkExistence [c,tt,'_chem_comp_bond.value_dist_esd'] and
+        checkExistence [c,tt,'_chem_comp_angle.value_angle'] and
+        checkExistence [c,tt,'_chem_comp_angle.value_angle_esd'] and
+        checkExistence [c,tt,'_chem_comp_tor.value_angle'] and
+        checkExistence [c,tt,'_chem_comp_tor.value_angle_esd'] );
+
     local d = cif_ExtractInfo [c.(tt), [hetnam: string toupper root,
 	    type:'auto', havechg: 0, verbose:1]];
     return [hasrestraints, first d.models];
 endfunction
+
+local function getCIFRoots [cif_files]
+    local cif_file, allRoots;
+    for cif_file in cif_files loop
+        local c = CIF_fread_cif_all [cif_file];
+        local tmpTag, tmpRoot, tagParts;
+        for tmpTag in tags c loop
+            tmpTag = tolower tmpTag;
+            tmpRoot = [];
+            tagParts = app token wordsplit [string tmpTag,"_"];
+            if length tagParts == 2 then
+                tmpRoot = second tagParts;
+            elseif length tagParts == 1 then
+                tmpRoot = tagParts;
+            endif
+            if not isnull tmpRoot then
+                allRoots.(tmpRoot) = cif_file;
+            endif
+        endloop
+    endloop
+    return allRoots;
+endfunction
+
+// Source code between  // ===================== lines based on code provided by CCG 1/2013
+// ===================== 
 
 // JT: takes atom keys from a template (dictionary), modify the ionization
 //     state of the molecule and assign all the matching names from the
@@ -199,7 +221,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     SystemPop sys_info;
 
     sys_info = SystemPush[];
-    local adict = first cAtoms first mol_Create second cif2mol[ cif_file, root ];
+    local adict = first cAtoms first mol_Create second qbCIF2MOL[ cif_file, root ];
     local name_prio = aName adict[ x_sort aPrioSMI adict ];
 
     m_h = (aElement Atoms[]) == 'H';
@@ -262,7 +284,7 @@ local function applycif[ cif_file, root, atoms ]
         return newnames;
     endif
         
-    local [hasrestraints, mol] = cif2mol[ cif_file, root ];
+    local [hasrestraints, mol] = qbCIF2MOL[ cif_file, root ];
     
 	// Map the names using unique smiles sorting
     local sys_info = SystemPush atoms;
@@ -289,6 +311,7 @@ local function applycif[ cif_file, root, atoms ]
     return [hasrestraints, newnames];
 
 endfunction
+// ===================== 
 
 // lmw - occasionally the MOE PDB read/writer will manipulate atom names.
 //      This function will return whether or not this is the case.
@@ -318,7 +341,7 @@ local function ProcessCIF[ cif_file, inResidue ]
             WriteLog[twrite [' INFO: Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
             return inResidue;
         else
-            WriteLog[twrite [' WARNING: Dont Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
+            WriteLog[twrite [' WARNING: No restraints for residue {} {}:{} in {}',rName inResidue, cName rChain inResidue, rUID inResidue,cif_file]];
         endif
     else
         WriteLog[twrite [' WARNING: Cant Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
@@ -334,7 +357,7 @@ local function recursiveDirectoryList[directory]
     for tmpdir in list loop
         if ftype tmpdir == 'dir' then
             filelist = append [filelist, recursiveDirectoryList[tmpdir]];
-        else
+        elseif fext tmpdir == 'cif' then
             filelist = append [filelist, tmpdir];
         endif
     endloop  
@@ -344,30 +367,20 @@ endfunction
 local function getCIFlist [directory]
     if isnull directory then
         if not isnull getenv 'PHENIX' then
-            directory = tok_cat [getenv 'PHENIX', '/chem_data/'];
+        // 9/2014: According to Nat Echols, these are the three directories to consider (in order).
+            directory = tok_cat [getenv 'PHENIX', '/chem_data/chemical_components'];
+            directory = append [directory, tok_cat [getenv 'PHENIX', '/chem_data/geostd']];
+            directory = append [directory, tok_cat [getenv 'PHENIX', '/chem_data/mon_lib']];
+        else
+            return [];
         endif
     endif
-    local filelist = recursiveDirectoryList[directory];
-    return diff [cat filelist,errorCifFiles];
-endfunction
-
-local function GetRNamesFromCIF[ciffiles,tmpResidue]
-    local tmpCIFfile = [];
-    if isnull ciffiles then
-        return tmpCIFfile;
-    endif
-    
-    for tmpCIFfile in ciffiles loop
-        local c = CIF_fread_cif_all [tmpCIFfile, MONLIB_CIF_DICT];
-    
-        local x;
-        local availableResEntries = [];
-        for x = 2, length c, 1 loop
-            availableResEntries = cat [availableResEntries, token toupper second fieldsplit[string first cat c[x], "_"]];
-        endloop
-        if length join [availableResEntries, rName tmpResidue] > 0 then ; return tmpCIFfile; endif
+    local filelist;
+    local tmpDir;
+    for tmpDir in directory loop
+        filelist = append [filelist, recursiveDirectoryList[tmpDir]];
     endloop
-    return [];
+    return diff [cat filelist,errorCifFiles];
 endfunction
 
 local function GetCIFileFromList [filelist, tmpResidue]
@@ -381,21 +394,25 @@ local function GetCIFileFromList [filelist, tmpResidue]
     return cifFile;
 endfunction
 
-local function ProtonateBasedOnCif [residueList,ciffiles]
+local function ProtonateBasedOnCif [residueList,ciffiles,procPhenixCIFLib]
+    if isnull procPhenixCIFLib then
+        procPhenixCIFLib = 1;
+    endif
     local filelist = [];
     local fixedAtoms;
-    filelist = getCIFlist[];
+    if procPhenixCIFLib then
+        filelist = getCIFlist[];
+    endif
 
     if isnull cat [ciffiles,filelist] then
         WriteLog[twrite ['NOTE: No CIF files processed for protonation.']];
         return fixedAtoms;
     endif
+    // the order in the call to getCIFRoots matters: the last will stomp on the first
+    local allRoots = getCIFRoots [cat [filelist,ciffiles]];
     local tmpResidue;
     for tmpResidue in residueList loop
-        local cifFile = GetRNamesFromCIF[ciffiles,tmpResidue];
-        if isnull cifFile then
-            cifFile = GetCIFileFromList [filelist,tmpResidue];
-        endif
+        local cifFile = allRoots.(tolower rName tmpResidue);
         if not isnull cifFile then
             WriteLog[twrite [' INFO: Attempting to use {} for protonation of {} residue {}:{}', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
             fixedAtoms = cat [fixedAtoms, matchHydrogens[cifFile, tmpResidue, rName tmpResidue]];
@@ -416,7 +433,10 @@ local function RenameProtonsInOrder[inResidue]
     endloop
 endfunction
 
-local function RenameBasedOnCIF [residueList,ciffiles]
+local function RenameBasedOnCIF [residueList,ciffiles,procPhenixCIFLib]
+    if isnull procPhenixCIFLib then
+        procPhenixCIFLib = 1;
+    endif
 
     if not isnull getenv 'PHENIX' then
         WriteLog[twrite ['NOTE: Using Phenix cif database found at {}', tok_cat [getenv 'PHENIX', '/chem_data/']]];
@@ -436,12 +456,14 @@ local function RenameBasedOnCIF [residueList,ciffiles]
 
     local tmpResidue;
     local residuesToRemove;
-    local filelist = getCIFlist[];
+    local filelist = [];
+    if procPhenixCIFLib then
+        filelist = getCIFlist[];
+    endif
+    // the order in the call to getCIFRoots matters: the last will stomp on the first
+    local allRoots = getCIFRoots [cat [filelist,ciffiles]];
     for tmpResidue in residueList loop
-        local cifFile = GetRNamesFromCIF[ciffiles,tmpResidue];
-        if isnull cifFile then
-            cifFile = GetCIFileFromList [filelist,tmpResidue];
-        endif
+        local cifFile = allRoots.(tolower rName tmpResidue);
         if not isnull cifFile then
             WriteLog[twrite [' INFO: Attempting to use {} for {} residue {}:{}', cifFile, rName tmpResidue, cName rChain tmpResidue, rUID tmpResidue]];
             residuesToRemove = cat [residuesToRemove, ProcessCIF[cifFile,tmpResidue]];
@@ -457,7 +479,6 @@ local function RenameBasedOnCIF [residueList,ciffiles]
     endloop
     return residuesToRemove;
 endfunction
-// ===================== 
 
 local function WriteResidue [outResidues]
     local fileHandle;
@@ -598,7 +619,7 @@ local function WriteInputFiles[residueList,ciffiles,filebase,opt]
         endif
 
     transFileName = twrite['{}-phenix.translation',filebase];
-    residueList = diff [residueList,RenameBasedOnCIF[residueList,ciffiles]];
+    residueList = diff [residueList,RenameBasedOnCIF[residueList,ciffiles,opt.procPhenixCIFLib]];
 
     harmonize_H[]; // called immediately before the files are written to address any naming issues.
 
@@ -950,7 +971,7 @@ local function cif_Window [wparent,residueList]
             name: 'cifftxt',
             Listbox :
                 [
-                name: 'ciffilesBox',text: '',
+                name: 'ciffilesBox',text: '',type: 'char',
                 width:50,
                 bubbleHelp:
                     'If PHENIX environment variable is set per PHENIX documentation,\n'
@@ -966,11 +987,13 @@ local function cif_Window [wparent,residueList]
         phenixdb = tok_cat [getenv 'PHENIX', '/chem_data/'];
         local filelist = getCIFlist[];
         local tmpResidue;
+        write ['residueList: {} | {} \n', length residueList, rName residueList];
         for tmpResidue in residueList loop
             cifFiles = cat [cifFiles, GetCIFileFromList [filelist,tmpResidue]];
         endloop
-
     endif
+    
+    cifFiles = uniq cifFiles;
     
     if isnull phenixdb then
         WindowSetAttr[wkey, [   phenixStatus: [text:'WARNING: Phenix NOT installed'] ] ];
@@ -981,22 +1004,25 @@ local function cif_Window [wparent,residueList]
     WindowSetAttr[wkey, [   ciffilesBox:    [text : cifFiles]   ]];   
     local success = []; 
     WindowShow wkey;
+    local procPhenixCIFLib = 0;
     loop
         local [values, trigger] = WindowWait wkey;
         if trigger === 'panel' then
             if values.panel == 'Cancel' then break; endif
             if values.panel == 'Run' then
                 Warning 'After running CIF-based preparation,\nyou should (re-)run Protonate3D or double-check protonation.';
-                aSetSelected [ ProtonateBasedOnCif[residueList,ciffiles] ,1 ]; 
+                aSetSelected [ ProtonateBasedOnCif[residueList,cifFiles,procPhenixCIFLib] ,1 ]; 
                 success = 1;
                 break;
             endif        
         elseif trigger === 'browse_ciffiles' then
             ciffiles = FilePrompt [title:'Select User CIF Files', mode:'open', filter:'*.cif', multi:1];
-            WindowSetAttr[wkey,[ciffilesBox: [text:ciffiles]]];
+            cifFiles = uniq cat [cifFiles, ciffiles];
+            WindowSetAttr[wkey,[ciffilesBox: [text:cifFiles]]];
         endif
     endloop
     WindowDestroy wkey;
+    ciffiles = cifFiles;
     return [ciffiles,success];
     
 endfunction
@@ -1461,7 +1487,7 @@ global function qbPhenixPrepPanel[]
                         '   Noted, if there was no change to the structure before and after structure preparation.\n'
                         '   Noted, if not performed.'
                 ]
-            ]
+            ],Data : [name:'procPhenixCIFLib']
         ],
 
         Separator : [flushLeft:1],
@@ -1756,7 +1782,8 @@ global function qbPhenixPrepPanel[]
             onoff_macroskip: [value:0],
             column_F:   [sensitive:0],
             column_Q:   [sensitive:0],
-            baseName:   [value:fbase ftail pdbfile]
+            baseName:   [value:fbase ftail pdbfile],
+            procPhenixCIFLib: [value:1]
         ]
     ];
     local values, trigger, allAtoms,qmCoreAtoms,qmBufferAtoms;
@@ -1806,7 +1833,7 @@ global function qbPhenixPrepPanel[]
 	local mtzQColumns = [];
     loop
         [values, trigger] = WindowWait wkey;
-//  write ['DEBUG: {} | {}\n', values, trigger];
+  write ['DEBUG: {} | {}\n', values, trigger];
         if trigger === 'button_CIFsetup' then
             local tmpcif_success;
             [ciffiles,tmpcif_success] = cif_Window[wkey,residueList];
@@ -1815,6 +1842,7 @@ global function qbPhenixPrepPanel[]
                 WindowSetAttr[wkey,[cif_info: [text:cif_info]]];
             else
                 WindowSetAttr[wkey,[cif_info: [text:'Finished with CIF preparation']]];
+                WindowSetAttr[wkey,[procPhenixCIFLib: [value:0]]];
             endif
         elseif trigger === 'button_ShowWarnings' then
             ShowWarnings [wkey,trigger,WindowValues wkey,status,allAtoms];
