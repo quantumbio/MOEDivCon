@@ -728,6 +728,8 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     
     fwrite [shscr, 'moeLogName={}\n',ftail moeLog];
     fwrite [shscr, 'regionRefine={}\n',opt.regionRefine];
+    fwrite [shscr, 'exploreFlip={}\n',opt.exploreFlip];
+    fwrite [shscr, 'exploreProtonation={}\n',opt.exploreProtonation];
     fwrite [shscr, 'qmCore={}\n',opt.qmCore];
     fwrite [shscr, 'qmBuffer={}\n',opt.qmBuffer];
     fwrite [shscr, 'macroSkip={}\n',opt.onoff_macroskip];
@@ -830,8 +832,10 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, '    fi  \n'];
     fwrite [shscr, '        \n'];
     fwrite [shscr, '    qbphenixopt="--sfFile $mtzFileName --pdbFile $pdbFileName --protonation PostMOE --Nproc $setNP --m ${}gb --ncycles $macroCount "\n','{setMem}'];
-    fwrite [shscr, '    if [ $regionRefine -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
-    fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;   fi    \n'];
+    fwrite [shscr, '    if [ $regionRefine -eq 1 ] || [ $exploreFlip -eq 1 ] || [ $exploreProtonation -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --selection \'$selection\' --region-radius $qmCore --buffer-radius $qmBuffer"  ;   fi    \n'];
+    fwrite [shscr, '    if [ $exploreFlip -eq 1 ] ; then    qbphenixopt="$qbphenixopt --exploreFlip" ;  fi     \n'];
+    fwrite [shscr, '    if [ $exploreProtonation -eq 1 ] ; then    qbphenixopt="$qbphenixopt --exploreProtonation" ;  fi     \n'];
+    fwrite [shscr, '    if [ $macroSkip -eq 1 ] ; then    qbphenixopt="$qbphenixopt  --skipcycle 1"  ;  fi    \n'];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --paramFile $phenixFileName"  ;   fi    \n',"{phenixFileName}"];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --phenixOptions \'$phenixOptions\'"  ;   fi    \n',"{phenixOptions}"];
     fwrite [shscr, '    if [ ! -z "${}" ] ; then    qbphenixopt="$qbphenixopt  --labels \'$labelList\'"  ;   fi    \n',"{labelList}"];
@@ -1493,12 +1497,24 @@ global function qbPhenixPrepPanel[]
         Separator : [flushLeft:1],
         Group:
         [
-            Checkbox: [ name: 'regionRefine', text: 'Region Refinement',onTrigger: 'return'],
+            Checkbox: [ name: 'regionRefine', text: 'Region Refinement',onTrigger: 'return',bubbleHelp:
+                'Choose to center the selection on any Core Residues defined below.'
+            ],
+            Hbox:
+            [
+                title: 'Explore:',
+                Checkbox: [ name: 'exploreFlip', text: 'Flip States',onTrigger: 'return',bubbleHelp:
+                    'Explore flip states for any Core Residues during the refinement.'
+                ],
+                Checkbox: [ name: 'exploreProtonation', text: 'Protonation States',onTrigger: 'return',bubbleHelp:
+                    'Explore protonation states for any Core Residues during the refinement.'
+                ]
+            ],
             Group : 
             [
                 Vbox:   
                 [
-                title: 'Core Residues',
+                title: 'Core Residues:',
                 name: 'coreResidues',
                     Hbox:
                     [
@@ -1664,13 +1680,15 @@ global function qbPhenixPrepPanel[]
         if isnull values then
             values = WindowValues wkey;
         endif
-        if values.regionRefine then
-            WindowSetAttr[wkey,[coreResidues: [sensitive:1]]];
-            WindowSetAttr[wkey,[regionSizes: [sensitive:1]]];
-        else
-            WindowSetAttr[wkey,[coreResidues: [sensitive:0]]];
-            WindowSetAttr[wkey,[regionSizes: [sensitive:0]]];
-        endif
+        // the core residues will be defined and used if any of the following boxes are checked.
+        WindowSetAttr[wkey,[coreResidues:   [sensitive:(
+            values.regionRefine or 
+            values.exploreFlip  or
+            values.exploreProtonation
+        )  ]]];
+        // the region sizes are only defined if the following box is checked.
+        WindowSetAttr[wkey,[regionSizes:    [sensitive:(values.regionRefine)  ]]];
+
     endfunction
 
     local function brick_panel [wkey, val]
@@ -1681,6 +1699,8 @@ global function qbPhenixPrepPanel[]
             mtzSetupSection2	: [sensitive : val],
             structurePrepSection	: [sensitive : val],
             regionRefine		: [sensitive : val],
+            exploreFlip         : [sensitive : val],
+            exploreProtonation  : [sensitive : val],
             coreResidues		: [sensitive : val],
             regionSizes		: [sensitive : val],
             jobSetupSection		: [sensitive : val],
@@ -1876,7 +1896,7 @@ global function qbPhenixPrepPanel[]
                 status.structprep_changed = 1;
             endif
             brick_panel[wkey,1];
-        elseif trigger === 'regionRefine' then
+        elseif trigger === 'regionRefine' or trigger === 'exploreFlip' or trigger === 'exploreProtonation' then
             brick_regionRefine [wkey,values];
         elseif qbCoreResiduesBoxLogic [values, trigger, wkey]   then
             // already done
