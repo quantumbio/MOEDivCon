@@ -1833,7 +1833,7 @@ global function qbPhenixPrepPanel[]
 	local mtzQColumns = [];
     loop
         [values, trigger] = WindowWait wkey;
-  write ['DEBUG: {} | {}\n', values, trigger];
+//  write ['DEBUG: {} | {}\n', values, trigger];
         if trigger === 'button_CIFsetup' then
             local tmpcif_success;
             [ciffiles,tmpcif_success] = cif_Window[wkey,residueList];
