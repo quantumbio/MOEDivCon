@@ -218,7 +218,16 @@ global function qbGenerateProtonation [pdbfile,opt]
     //    local ctab = ctab_Extract [ligAtoms, [heavy:1, aro:0]];
     //    local [ctabs, graphs] = ctab_EnumerateProtomers [ctab];
         
-        local [ctablist, changed, filtlist] = WashMoleculeMOE [ligAtoms,[dim:3,hydrogens:'add',tautomers:1,protomers:1]];
+        local [ctablist, changed, filtlist] = WashMoleculeMOE [ligAtoms,[
+            dim:3,
+            hydrogens:'add',
+            tautomers:1,
+            protomers:1,
+            enumsize:300,
+            enumdup:1,
+            exclacids:1,
+            exclbases:1
+        ]];
         local ctab;
 
         write ['Found {} tautomers/protomers for residue {}:{} \n', length ctablist, rName ligResidue, rUID ligResidue];
