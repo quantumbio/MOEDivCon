@@ -248,9 +248,11 @@ global function qbGenerateProtonation [pdbfile,opt]
             oDestroy tmpMol;
         // the closeatoms are the atoms that will be protonated. ligAtoms will be fixed in their protonation state.
         //      Only protonating atoms within a certain distance will speed up the protonation
-            local closeatoms = diff [Atoms[],ligAtoms];
+//            local closeatoms = diff [Atoms[],ligAtoms];
+            local closeatoms = Atoms[];
             if opt.protDist > 0 then
-                closeatoms = diff [qbGetResidueOnRadius[ligAtoms,opt.protDist], ligAtoms];
+//                closeatoms = diff [qbGetResidueOnRadius[ligAtoms,opt.protDist], ligAtoms];
+                closeatoms = qbGetResidueOnRadius[ligAtoms,opt.protDist];
             endif
             Protonate3D [closeatoms,closeatoms,closeatoms,ligAtoms,[],[pH:opt.protPH]];
             local outpdbname = twrite ['{}.pdb',allcount];
