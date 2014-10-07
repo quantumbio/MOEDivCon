@@ -48,7 +48,9 @@ const DEFAULT_OPT = [
     resid       : [],
     resname     : [],
     atomname    : [],
-    csvfile     : []
+    csvfile     : [],
+    protPH      : 7.4,      // Call to Protonate3D with this pH
+    protDist    : 4.0       // Only reprotonate non-selected atoms within this distance from selected atoms
 ];
 
 local function PrintError [errortext]
@@ -244,8 +246,13 @@ global function qbGenerateProtonation [pdbfile,opt]
             aSetSelected [ligAtoms,1];
             oReparent [ligAtoms,theParent];
             oDestroy tmpMol;
-            local closeatoms = diff [qbGetResidueOnRadius[ligAtoms,4.0], ligAtoms];
-            Protonate3D [closeatoms,closeatoms,closeatoms,ligAtoms,[],[pH:7.4]];
+        // the closeatoms are the atoms that will be protonated. ligAtoms will be fixed in their protonation state.
+        //      Only protonating atoms within a certain distance will speed up the protonation
+            local closeatoms = diff [Atoms[],ligAtoms];
+            if opt.protDist > 0 then
+                closeatoms = diff [qbGetResidueOnRadius[ligAtoms,opt.protDist], ligAtoms];
+            endif
+            Protonate3D [closeatoms,closeatoms,closeatoms,ligAtoms,[],[pH:opt.protPH]];
             local outpdbname = twrite ['{}.pdb',allcount];
             fileHandle = fopenx 'run.list';
             fileHandle = fseek [fileHandle, fsize fileHandle];
