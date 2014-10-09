@@ -93,12 +93,15 @@ local function FindAtoms values
     endif
 
     local interestAtoms = cat rAtoms interestResidue;
-
-    local centeredAtom = interestAtoms | aName interestAtoms == token values.'Atom Name';
-    if length centeredAtom > 1 then
-        write ['ERROR: There is more then one atom of name {} in residue {}:{}\n', token values.'Atom Name', token values.Chain,values.Sequence];
-        centeredAtom = [];
+    local centeredAtom = interestAtoms;           // in the event that the user DID NOT choose an atom
+    if not isnull values.'Atom Name' then
+        centeredAtom = interestAtoms | aName interestAtoms == token values.'Atom Name';
+        if length centeredAtom > 1 then
+            write ['ERROR: There is more then one atom of name {} in residue {}:{}\n', token values.'Atom Name', token values.Chain,values.Sequence];
+            centeredAtom = [];
+        endif
     endif
+
     return centeredAtom;
 endfunction
 
@@ -119,7 +122,6 @@ local function qbCSVtoMDB opt
     db_Close db_Open [opt.db_file,'create'];
     opt = __db_ImportASCII_DetectOptions opt;
     opt = __db_ImportASCII_ReadFile opt;
-    opt.types = ['char','char','int','char'];
     db_ImportASCII opt;
     // read in MDB file and return the corresponding atoms in the MOE window
     local mdbKey = db_Open [opt.db_file,'read'];
