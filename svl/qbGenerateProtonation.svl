@@ -29,6 +29,7 @@
 function _Atoms;
 function qbGetResidueOnRadius;
 function Protonate3D;
+function _StructurePreparation;
 function ctab_EnumerateProtomers;
 function WashMoleculeMOE;
 
@@ -246,14 +247,16 @@ global function qbGenerateProtonation [pdbfile,opt]
             aSetName [ligHeavyAtoms,ligHeavyAtomNames];
             aSetTempFactor [ligHeavyAtoms,ligHeavyAtomBfactors];
             aSetSelected [ligAtoms,1];
+            local prepTypes = _StructurePreparation [uniq aChain ligAtoms, [cmd:'_types']];
+            _StructurePreparation [uniq aChain ligAtoms,[disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0]];
+
             oReparent [ligAtoms,theParent];
             oDestroy tmpMol;
+
         // the closeatoms are the atoms that will be protonated. ligAtoms will be fixed in their protonation state.
         //      Only protonating atoms within a certain distance will speed up the protonation
-//            local closeatoms = diff [Atoms[],ligAtoms];
             local closeatoms = Atoms[];
             if opt.protDist > 0 then
-//                closeatoms = diff [qbGetResidueOnRadius[ligAtoms,opt.protDist], ligAtoms];
                 closeatoms = qbGetResidueOnRadius[ligAtoms,opt.protDist];
             endif
             Protonate3D [closeatoms,closeatoms,closeatoms,ligAtoms,[],[pH:opt.protPH]];
