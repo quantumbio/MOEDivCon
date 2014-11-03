@@ -6667,7 +6667,7 @@ local function proprep_diagnose_cb res
     ];
     local ch_nfix = cat [
 	rep ['Charge', length x_ntrl],
-	rep ['Cap', length x_cap],
+	rep ['Charge', length x_cap],   // LMW (11/14) - change from 'Cap' to 'Charge'
 	rep ['Delete', length x_del]
     ];
     ch_nfix = ch_nfix[x_sort indexof [keys, ch_nterm]];
@@ -6742,7 +6742,7 @@ local function proprep_diagnose_cb res
     ];
     local ch_cfix = cat [
 	rep ['Charge', length x_ntrl],
-	rep ['Cap', length x_cap],
+	rep ['Charge', length x_cap],   // LMW (11/14) - change from 'Cap' to 'Charge'
 	rep ['Delete', length x_del]
     ];
     ch_cfix = ch_cfix[x_sort indexof [keys, ch_cterm]];
@@ -6813,7 +6813,7 @@ local function proprep_diagnose_cb res
 
 	// Deal with cap, loop and bond cases.
 
-    local cb_fix = rep ['Cap', length c_term];
+    local cb_fix = rep ['Charge', length c_term];     // LMW (11/14) - Change from 'Cap' to 'Charge'
 
 	// Get loop length remove caps from calculation.
 
@@ -6827,7 +6827,7 @@ local function proprep_diagnose_cb res
 
     local rdist = indexof [i_n_term,res] - indexof [i_c_term, res];
     local mrdist = rdist > 1 and rdist <= MAX_SIZE_BLDLOOP;
-    cb_fix | mrdist = 'Build Loop';
+    cb_fix | mrdist = 'Charge';         // LMW (11/14) - Change from 'Build Loop' to 'Charge'
 
 	// If really big loop then cap termini.
 	// This is the default setting for the cb_fix.
@@ -7004,7 +7004,7 @@ local function proprep_fix_cb [res,prob,override]
     if override <> '' then
 	fix = rep [override,length fix];
     endif
-
+write ['fix: {}\n', fix];
     local m,txt;
     local bldAtms=[],chrgAtms=[],capAtms=[],capFlag, bndAtms=[];
     local fixflag = one rkeys;
