@@ -654,7 +654,7 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
         opt.notProtAtomList = aNumber ProtonateBasedOnCif[residueList,ciffiles];
     endif
     qbPrepareSystem [opt];
-
+    aSetOccupancy [oGetCollection ['STRUCTPREP_NEWATOMS'],0];
     // set the occupancy based upon the occupancy of the heavy atom to which the proton is bound.
     aSetOccupancy [Atoms [] | aAtomicNumber Atoms[] == 1, aOccupancy aBonds Atoms [] | aAtomicNumber Atoms [] == 1];
     return WriteInputFiles[residueList,ciffiles,filebase,opt];
@@ -1884,7 +1884,7 @@ global function qbPhenixPrepPanel[]
             endloop
             hPercent = PercentProton[];
             aSetOccupancy[oGetCollection ['STRUCTPREP_NEWATOMS'],0];
-            aSetOccupancy[cat (Atoms [] | aElement Atoms[] == 'H'), 0];
+            aSetOccupancy [Atoms [] | aAtomicNumber Atoms[] == 1, aOccupancy aBonds Atoms [] | aAtomicNumber Atoms [] == 1];
             local after_run = cat Atoms[];
             if hCutOff > hPercent then
                 WindowSetAttr[wkey,[strprep_info: [text:twrite['Warning: only {}% of atoms are protons', 100*hPercent]]]];

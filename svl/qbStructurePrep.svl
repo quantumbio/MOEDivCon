@@ -393,7 +393,7 @@ global function qbPrepareSystem [opt]
     endif
     
     if opt.enableAutoPrep then
-        StructurePreparation[disableTypes : ['Alternates','Break'],batch_protonate3d:0];
+        StructurePreparation[disableTypes : ['Alternates'],batch_protonate3d:0];
     endif
 
     local ligandAtoms = cat _Atoms '$$ligand';
