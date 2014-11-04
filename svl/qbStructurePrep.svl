@@ -377,11 +377,11 @@ global function qbPrepareSystem [opt]
         return diff [atoms,Atoms [] | aInert Atoms[]];
     endfunction
         
-    local atomsToProtonate;
+    local atomsToProtonate = [];
     if not isnull opt.protAtomList then     // needs to be set here because atom numbers can change!
         atomsToProtonate = (Atoms[])[indexof[opt.protAtomList,aNumber Atoms[]]];
     endif
-    local atomsNotToProtonate;
+    local atomsNotToProtonate = [];
     if not isnull opt.notProtAtomList then  // needs to be set here because atom numbers can change!
         atomsNotToProtonate = (Atoms[])[indexof[opt.notProtAtomList,aNumber Atoms[]]];
     endif
@@ -433,25 +433,26 @@ global function qbPrepareSystem [opt]
         endif
 
         if not isnull opt.protAtomList then
-            atomsToProtonate = join [Atoms[], atomsToProtonate];
+            atomsToProtonate = Atoms[];
         else
             atomsToProtonate = Atoms[];
         endif
+        
         // remove protons from list as it makes no sense to include them and this heads off a possible Protonate3D bug
-
         atomsToProtonate = diff [atomsToProtonate,(Atoms[] | aElement Atoms[] == 'H')];
-        atomsToProtonate = diff [atomsToProtonate, atomsNotToProtonate];
 
         local protOptions = [d_in:2.00];    // new MOE default
         if not isnull opt.protPH then
             protOptions=cat [protOptions,[pH:opt.protPH]];
         endif
+        
         local fixedAtoms;
         if opt.enableLigFix then
-            fixedAtoms = _Atoms '$$ligand';
+            fixedAtoms = uniq cat [_Atoms '$$ligand',atomsNotToProtonate];
         else
-            fixedAtoms = [];
+            fixedAtoms = atomsNotToProtonate;
         endif
+        
         if opt.pmode == 'Add_H' then
             Add_H diff [filterInert atomsToProtonate,fixedAtoms];
         elseif opt.pmode == 'Protonate3D' then
