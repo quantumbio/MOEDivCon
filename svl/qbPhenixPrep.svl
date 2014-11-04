@@ -599,7 +599,7 @@ local function ReadInputFiles[inpdbfile,opt]
             for altCollection in findmatch ['PDB_ALTLOC_[A-Z,a-z,0-9]', oCollections[]] loop
                 oSetCollection [altCollection, [] ];    // alt designator cleared from output
             endloop
-            aSetOccupancy [Atoms[],1.00];
+//            aSetOccupancy [Atoms[],1.00];     // we should not be cleaning these out
         endif
     endif
     return length inchains;
@@ -618,7 +618,7 @@ local function WriteInputFiles[residueList,ciffiles,filebase,opt]
             for altCollection in findmatch ['PDB_ALTLOC_[A-Z,a-z,0-9]', oCollections[]] loop
                 oSetCollection [altCollection, [] ];    // alt designator cleared from output
             endloop
-            aSetOccupancy [Atoms[],1.00];
+//            aSetOccupancy [Atoms[],1.00];     // we should not be cleaning these out
         endif
 
     transFileName = twrite['{}-phenix.translation',filebase];
