@@ -151,17 +151,20 @@ global function qbCIF2MOL[ cif_file, root ]
             c.(tt).'_chem_comp_atom.z' = x0;
         endif
     endif
-// Check the CIF file concerning its contents vis-a-vie restraints.
-    local hasrestraints = (
-        checkExistence [c,tt,'_chem_comp_bond.value_dist'] and
-        checkExistence [c,tt,'_chem_comp_bond.value_dist_esd'] and
-        checkExistence [c,tt,'_chem_comp_angle.value_angle'] and
-        checkExistence [c,tt,'_chem_comp_angle.value_angle_esd'] and
-        checkExistence [c,tt,'_chem_comp_tor.value_angle'] and
-        checkExistence [c,tt,'_chem_comp_tor.value_angle_esd'] );
 
     local d = cif_ExtractInfo [c.(tt), [hetnam: string toupper root,
 	    type:'auto', havechg: 0, verbose:1]];
+	    
+// Check the CIF file concerning its contents vis-a-vie restraints.
+    local hasrestraints = (
+        checkExistence [c,tt,'_chem_comp_bond.value_dist'] or
+        checkExistence [c,tt,'_chem_comp_bond.value_dist_esd'] or
+        checkExistence [c,tt,'_chem_comp_angle.value_angle'] or
+        checkExistence [c,tt,'_chem_comp_angle.value_angle_esd'] or
+        checkExistence [c,tt,'_chem_comp_tor.value_angle'] or
+        checkExistence [c,tt,'_chem_comp_tor.value_angle_esd'] 
+        );
+
     return [hasrestraints, first d.models];
 endfunction
 
@@ -573,7 +576,7 @@ function Seq_NameToLetter;
 local function ResiduePreparation []
     local testResidues = uniq (rName Residues [] | Seq_NameToLetter rName Residues [] <> 'X');
     testResidues = uniq cat [pro_StandardRes[], testResidues,
-        'HOH','ASH','CYX','DA','DT','DG','DC','A','U','G','C',toupper el_Elements[]];
+        'HOH','ASH','CYX','SO4','DA','DT','DG','DC','A','U','G','C',toupper el_Elements[]];
     local residueList = Residues[] | m_join [rName Residues [], testResidues] == 0;
     WriteLog[twrite ['Residues to treat: {}', uniq rName residueList]];
     return residueList;
