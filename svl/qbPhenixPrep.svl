@@ -659,6 +659,7 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     endif
     aSetSelected [opt.notProtAtomList,1];
     qbPrepareSystem [opt];
+    residueList = ResiduePreparation[]; // lmw (11/14) - CCG StructurePreparation will rename items sometimes so the list needs rebuilt after run.
     aSetOccupancy [oGetCollection ['STRUCTPREP_NEWATOMS'],0];
     // set the occupancy based upon the occupancy of the heavy atom to which the proton is bound.
     aSetOccupancy [Atoms [] | aAtomicNumber Atoms[] == 1, aOccupancy aBonds Atoms [] | aAtomicNumber Atoms [] == 1];

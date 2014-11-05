@@ -7004,7 +7004,7 @@ local function proprep_fix_cb [res,prob,override]
     if override <> '' then
 	fix = rep [override,length fix];
     endif
-write ['fix: {}\n', fix];
+
     local m,txt;
     local bldAtms=[],chrgAtms=[],capAtms=[],capFlag, bndAtms=[];
     local fixflag = one rkeys;
