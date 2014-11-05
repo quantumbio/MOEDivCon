@@ -101,7 +101,7 @@ const CORE_DEFAULTS = [
     enableProtonate:0,      // turns on Protonate3D
     protPH:[],             // set pH in Protonate3D to default
     enablePreciseHOH:0,     // turns on precise waters in Protonate3D (can cause LONG calc if turned on).
-    enableLigFix:1,         // but fixes the ligand protonation
+    enableLigFix:0,         // but fixes the ligand protonation
     enableCutWat:0,         // it will not remove all waters beyond ligand
     wat_radius:4.5,         // using this distance from ligand
     enableCropOnLig:0,      // turns off cropping target around ligand
@@ -383,9 +383,10 @@ global function qbPrepareSystem [opt]
     endif
     local atomsNotToProtonate = [];
     if not isnull opt.notProtAtomList then  // needs to be set here because atom numbers can change!
-        atomsNotToProtonate = (Atoms[])[indexof[opt.notProtAtomList,aNumber Atoms[]]];
+//        atomsNotToProtonate = (Atoms[])[indexof[opt.notProtAtomList,aNumber Atoms[]]];
+        atomsNotToProtonate = opt.notProtAtomList;
     endif
-    
+
     write ['Running Options: {}\n', opt];
     
     if opt.enableStripLP then
@@ -438,9 +439,6 @@ global function qbPrepareSystem [opt]
             atomsToProtonate = Atoms[];
         endif
         
-        // remove protons from list as it makes no sense to include them and this heads off a possible Protonate3D bug
-        atomsToProtonate = diff [atomsToProtonate,(Atoms[] | aElement Atoms[] == 'H')];
-
         local protOptions = [d_in:2.00];    // new MOE default
         if not isnull opt.protPH then
             protOptions=cat [protOptions,[pH:opt.protPH]];
@@ -453,6 +451,16 @@ global function qbPrepareSystem [opt]
             fixedAtoms = atomsNotToProtonate;
         endif
         
+        // 11/2014 - the following lines were added to address a problem with 3DXG (het:U5P) where StructurePreparation
+        //      cleaned out atoms that gave wrong hybridization.
+        atomsToProtonate = atomsToProtonate | oValid atomsToProtonate;
+        fixedAtoms = fixedAtoms | oValid fixedAtoms;
+        preciseWaters = preciseWaters | oValid preciseWaters;
+
+        // remove protons from list as it makes no sense to include them and this heads off a possible Protonate3D bug
+        atomsToProtonate = diff [atomsToProtonate,(Atoms[] | aElement Atoms[] == 'H')];
+//        fixedAtoms = diff [fixedAtoms,(Atoms[] | aElement Atoms[] == 'H')];
+                
         if opt.pmode == 'Add_H' then
             Add_H diff [filterInert atomsToProtonate,fixedAtoms];
         elseif opt.pmode == 'Protonate3D' then

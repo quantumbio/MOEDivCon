@@ -654,8 +654,10 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     local residueList = ResiduePreparation[];
     
     if opt.enableCIFprotons then
-        opt.notProtAtomList = aNumber ProtonateBasedOnCif[residueList,ciffiles];
+//        opt.notProtAtomList = aNumber ProtonateBasedOnCif[residueList,ciffiles];
+        opt.notProtAtomList = ProtonateBasedOnCif[residueList,ciffiles];
     endif
+    aSetSelected [opt.notProtAtomList,1];
     qbPrepareSystem [opt];
     aSetOccupancy [oGetCollection ['STRUCTPREP_NEWATOMS'],0];
     // set the occupancy based upon the occupancy of the heavy atom to which the proton is bound.
