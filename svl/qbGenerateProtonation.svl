@@ -230,8 +230,8 @@ global function qbGenerateProtonation [pdbfile,opt]
             protomers:1,
             enumsize:300,
             enumdup:1,
-            exclacids:1,
-            exclbases:1
+            exclacids:0,
+            exclbases:0
         ]];
         local ctab;
 
