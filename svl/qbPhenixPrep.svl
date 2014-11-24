@@ -205,6 +205,27 @@ local function matchHydrogens[ cif_file, inResidue, root ]
         return [];
     endif
 
+    local function OrganizeBonds inAtoms
+        local m_h = (aElement inAtoms) == 'H';
+        local BondDB;
+        BondDB.AllAtoms = inAtoms[x_sort aPrioSMI inAtoms];
+        BondDB.HeavyAtoms = (inAtoms | not m_h);
+        BondDB.HeavyAtoms = BondDB.HeavyAtoms[x_sort aPrioSMI BondDB.HeavyAtoms];
+        BondDB.HeavyAtomNames = aName BondDB.HeavyAtoms;
+        local tmpBonds;
+        for tmpBonds in aBonds BondDB.HeavyAtoms loop
+            tmpBonds = tmpBonds[x_sort aPrioSMI tmpBonds];
+            BondDB.aBonds = append [BondDB.aBonds,tmpBonds];
+            BondDB.aBondNames = append [BondDB.aBondNames, aName tmpBonds];
+        endloop
+// write ['BondDB.AllAtoms: {} | {}\n', length BondDB.AllAtoms, BondDB.AllAtoms];
+// write ['BondDB.HeavyAtoms: {} | {}\n', length BondDB.HeavyAtoms, BondDB.HeavyAtoms];
+write ['BondDB.HeavyAtomNames: {} | {}\n', length BondDB.HeavyAtomNames, BondDB.HeavyAtomNames];
+// write ['BondDB.aBonds: {} | {}\n', length BondDB.aBonds, BondDB.aBonds];
+write ['BondDB.aBondNames: {} | {}\n', length BondDB.aBondNames, apt twrite ['{} |', BondDB.aBondNames]];
+        return BondDB;
+    endfunction
+
 	// Match heavy atoms of each molecule
 	// in a separate system
 	// Idea: strip off hydrogens, set ionization
@@ -225,8 +246,9 @@ local function matchHydrogens[ cif_file, inResidue, root ]
 
     sys_info = SystemPush[];
     local adict = first cAtoms first mol_Create second qbCIF2MOL[ cif_file, root ];
+    local cifBondDB = OrganizeBonds adict;
+fwrite_PDB [ twrite ['cif-{}.pdb',first rName uniq aResidue Atoms[]], Atoms[] ];
     local name_prio = aName adict[ x_sort aPrioSMI adict ];
-
     m_h = (aElement Atoms[]) == 'H';
     local ion_heavy = aIon (Atoms[]| not m_h);
     local geo_heavy = aGeometry (Atoms[]| not m_h);
@@ -236,6 +258,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     local geos_ordered_dict_heavy = geo_heavy[ x_sort aPrioSMI Atoms[] ];
     local cifHeavyCnt = length cat Atoms[];
     SystemPop sys_info;
+    
     if amolHeavyCnt == cifHeavyCnt then
     // first test to make sure that this works as planned.
         sys_info = SystemPush amol;
@@ -246,8 +269,8 @@ local function matchHydrogens[ cif_file, inResidue, root ]
         aSetGeometry[ amolisorted, geos_ordered_dict_heavy ];
         Add_H testAmol;
         local testAtmCnt = aName cat Atoms[];
-
         SystemPop sys_info;
+        
         if length testAtmCnt == length name_prio then
             amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
             amolisorted = amoli[ x_sort x_smi_mol_heavy ];
@@ -255,8 +278,18 @@ local function matchHydrogens[ cif_file, inResidue, root ]
             aSetGeometry[ amolisorted, geos_ordered_dict_heavy ];
             Add_H amol;
             amol = filterInert cat rAtoms inResidue;
-            local x_smi_mol  = aPrioSMI amol;
-            aSetName[  amol[ x_sort x_smi_mol ], name_prio ];
+//            local x_smi_mol  = aPrioSMI amol;
+//            aSetName[  amol[ x_sort x_smi_mol ], name_prio ];
+            local molBondDB = OrganizeBonds amol;
+            if length molBondDB.aBonds == length cifBondDB.aBonds then
+                write ['they match up\n'];
+                aSetName [molBondDB.HeavyAtoms, cifBondDB.HeavyAtomNames];
+                aSetName [molBondDB.aBonds,cifBondDB.aBondNames];
+            else
+                write ['WARNING: Bound atom counts do not match\n'];
+                amol = [];
+            endif
+fwrite_PDB [ twrite ['test1-{}.pdb',first rName uniq aResidue amol], amol ];
         else
             WriteLog [twrite ['\tProton counts do not agree suggesting incorrect CIF file.']];
             amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
