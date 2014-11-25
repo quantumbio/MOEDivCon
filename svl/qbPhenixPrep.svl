@@ -206,14 +206,23 @@ local function OrganizeBonds inAtoms
         BondDB.aBondNames = append [BondDB.aBondNames, aName tmpBonds];
         BondDB.aBondElements = append [BondDB.aBondElements, aElement tmpBonds];
     endloop
-// write ['BondDB.AllAtoms: {} | {}\n', length BondDB.AllAtoms, BondDB.AllAtoms];
-// write ['BondDB.HeavyAtoms: {} | {}\n', length BondDB.HeavyAtoms, BondDB.HeavyAtoms];
-write ['BondDB.HeavyAtomNames: {} | {}\n', length BondDB.HeavyAtomNames, BondDB.HeavyAtomNames];
-// write ['BondDB.aBonds: {} | {}\n', length BondDB.aBonds, BondDB.aBonds];
-write ['BondDB.aBondNames: {} | {}\n', length BondDB.aBondNames, apt twrite ['{} |', BondDB.aBondNames]];
     return BondDB;
 endfunction
 
+local function CompareBondDBs [leftBondDB, rightBondDB]
+    local content = 0;
+    local lengths = (
+        (length cat leftBondDB.HeavyAtomNames == length cat rightBondDB.HeavyAtomNames) and
+        (length cat leftBondDB.aBondNames == length cat rightBondDB.aBondNames) and
+        (length cat leftBondDB.aBondElements == length cat rightBondDB.aBondElements)
+    );
+    if lengths then
+        content = (
+            (leftBondDB.aBondElements === rightBondDB.aBondElements)
+        );
+    endif
+    return content;
+endfunction
 
 // Source code between  // ===================== lines based on code provided by CCG 1/2013
 // ===================== 
@@ -245,87 +254,42 @@ local function matchHydrogens[ cif_file, inResidue, root ]
     
     sys_info = SystemPush amol;
     molBondDB = OrganizeBonds Atoms[];
-//    m_h = (aElement Atoms[]) == 'H';
-//    oDestroy (Atoms[] | m_h);
-//    aSetIon[ Atoms[], 0 ];
-//    local x_smi_mol_heavy = aPrioSMI Atoms[];
-//    local s_heavy_mol = oSerialNumber Atoms[];
-//    local amolHeavyCnt = length cat Atoms[];
     SystemPop sys_info;
 
     sys_info = SystemPush[];
-//    local adict = first cAtoms first mol_Create second qbCIF2MOL[ cif_file, root ];
     mol_Create second qbCIF2MOL[ cif_file, root ];
     cifBondDB = OrganizeBonds Atoms[];
-fwrite_PDB [ twrite ['cif-{}.pdb',first rName uniq aResidue Atoms[]], Atoms[] ];
-//    local name_prio = aName adict[ x_sort aPrioSMI adict ];
-//    m_h = (aElement Atoms[]) == 'H';
-//    local ion_heavy = aIon (Atoms[]| not m_h);
-//    local geo_heavy = aGeometry (Atoms[]| not m_h);
-//    oDestroy (Atoms[] | m_h );
-//    aSetIon[ Atoms[], 0 ];
-//    local ions_ordered_dict_heavy = ion_heavy[ x_sort aPrioSMI Atoms[] ];
-//    local geos_ordered_dict_heavy = geo_heavy[ x_sort aPrioSMI Atoms[] ];
-//    local cifHeavyCnt = length cat Atoms[];
     SystemPop sys_info;
     
     if length molBondDB.HeavyAtoms == length cifBondDB.HeavyAtoms then
-//    if amolHeavyCnt == cifHeavyCnt then
     // first test to make sure that this works as planned.
         sys_info = SystemPush amol;
-//        local testAmol = cat Atoms[];
         molBondDB = OrganizeBonds Atoms[];
-//        local amoli = testAmol[ pack indexof[ s_heavy_mol, oSerialNumber testAmol ]];
-//        local amolisorted = amoli[ x_sort x_smi_mol_heavy ];
-//        aSetIon[ amolisorted, ions_ordered_dict_heavy ];
-//        aSetGeometry[ amolisorted, geos_ordered_dict_heavy ];
-// write ['lengths1: {} | {} | {}\n', length molBondDB.HeavyAtoms, length cifBondDB.HeavyIon, length cifBondDB.HeavyGeo];
-// write ['lengths1: {} | {} | {}\n',  molBondDB.HeavyAtoms,  cifBondDB.HeavyIon, cifBondDB.HeavyGeo];
         aSetIon[ molBondDB.HeavyAtoms, cifBondDB.HeavyIon ];
-// write ['after aSetIon\n'];
         aSetGeometry[ molBondDB.HeavyAtoms, cifBondDB.HeavyGeo ];
-// write ['after aSetGeometry\n'];
         Add_H Atoms[];
-// write ['after Add_H\n'];
-//        local testAtmCnt = aName cat Atoms[];
-// write ['after testAtmCnt\n'];
         molBondDB = OrganizeBonds Atoms[];
         SystemPop sys_info;
         
-// write ['lengths2: {} | {} | {}\n', length molBondDB.HeavyAtoms, length cifBondDB.HeavyIon, length cifBondDB.HeavyGeometry];
-// write ['lengths2: {} | {} | {}\n',  molBondDB.HeavyAtoms,  cifBondDB.HeavyIon, cifBondDB.HeavyGeometry];
         if length molBondDB.AllAtoms == length cifBondDB.AllAtoms then
             molBondDB = OrganizeBonds amol;
-//        if length testAtmCnt == length name_prio then
-//            amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
-//            amolisorted = amoli[ x_sort x_smi_mol_heavy ];
-//            aSetIon[ amolisorted, ions_ordered_dict_heavy ];
-//            aSetGeometry[ amolisorted, geos_ordered_dict_heavy ];
             aSetIon[ molBondDB.HeavyAtoms, cifBondDB.HeavyIon ];
             aSetGeometry[ molBondDB.HeavyAtoms, cifBondDB.HeavyGeo ];
             m_h = (aElement amol) == 'H';
             oDestroy (amol | m_h );
             Add_H amol;
             amol = filterInert cat rAtoms inResidue;
-//            local x_smi_mol  = aPrioSMI amol;
-//            aSetName[  amol[ x_sort x_smi_mol ], name_prio ];
             molBondDB = OrganizeBonds amol;
-            if length cat molBondDB.aBonds == length cat cifBondDB.aBonds then
-                write ['they match up\n'];
+            if CompareBondDBs [molBondDB,cifBondDB] then
                 aSetName [molBondDB.HeavyAtoms, cifBondDB.HeavyAtomNames];
                 aSetName [molBondDB.aBonds,cifBondDB.aBondNames];
             else
-                write ['WARNING: Bound atom counts do not match\n'];
+                WriteLog [twrite ['\tBound atom/element counts do not match suggesting incorrect CIF file.']];
                 amol = [];
             endif
-fwrite_PDB [ twrite ['test1-{}.pdb',first rName uniq aResidue amol], amol ];
         else
             molBondDB = OrganizeBonds amol;
             WriteLog [twrite ['\tProton counts do not agree suggesting incorrect CIF file.']];
-//            amoli = amol[ pack indexof[ s_heavy_mol, oSerialNumber amol ]];
-//            amolisorted = amoli[ x_sort x_smi_mol_heavy ];
-//            aSetIon[ amolisorted, ions_ordered_dict_heavy ];
-//            aSetGeometry[ amolisorted, geos_ordered_dict_heavy ];
             aSetIon[ molBondDB.HeavyAtoms, cifBondDB.HeavyIon ];
             aSetGeometry[ molBondDB.HeavyAtoms, cifBondDB.HeavyGeometry ];
             Add_H amol;
@@ -344,7 +308,6 @@ fwrite_PDB [ twrite ['test1-{}.pdb',first rName uniq aResidue amol], amol ];
 endfunction
 
 local function applycif[ cif_file, root, atoms ]
-
     local newnames = [];
     local cifBondDB, molBondDB;
     if ftype cif_file === '' then
@@ -360,11 +323,7 @@ local function applycif[ cif_file, root, atoms ]
     cifBondDB = OrganizeBonds Atoms[];
     SystemPop sys_info;
     molBondDB = OrganizeBonds atoms;
-write ['length cifBondDB.AllAtoms == length molBondDB.AllAtoms: {} | {}\n', length cat cifBondDB.AllAtoms, length cat molBondDB.AllAtoms];
-write ['length cifBondDB.aBonds == length molBondDB.aBonds: {} | {}\n', length cat cifBondDB.aBonds, length cat molBondDB.aBonds];
-    if (length cat cifBondDB.AllAtoms == length cat molBondDB.AllAtoms) and 
-        (length cat cifBondDB.aBonds == length cat molBondDB.aBonds) then
-        write ['they match up\n'];
+    if CompareBondDBs [molBondDB,cifBondDB] then
         aSetName [molBondDB.HeavyAtoms, cifBondDB.HeavyAtomNames];
         aSetName [molBondDB.aBonds,cifBondDB.aBondNames];
         newnames = cifBondDB.HeavyAtomNames;
@@ -376,60 +335,29 @@ write ['length cifBondDB.aBonds == length molBondDB.aBonds: {} | {}\n', length c
     
     return [hasrestraints, newnames];
 endfunction
-
-local function applycifOLD[ cif_file, root, atoms ]
-
-    local newnames = [];
-    
-    if ftype cif_file === '' then
-        WriteLog[twrite ['WARNING: CIF filename {} not found!', cif_file]];
-        return newnames;
-    endif
-        
-    local [hasrestraints, mol] = qbCIF2MOL[ cif_file, root ];
-    
-	// Map the names using unique smiles sorting
-    local sys_info = SystemPush atoms;
-    atoms = Atoms[];
-
-    local dict_ckeys = mol_Create mol;
-    local dict_akeys = cat cAtoms dict_ckeys;
-
-    if length dict_akeys === length atoms then
-
-        local x_smi_dict = aPrioSMI dict_akeys;
-    
-        local sorted_dictname = aName ( dict_akeys[ x_sort x_smi_dict ] );
-    
-        local x_smi_mol = aPrioSMI atoms;
-        local x_mol = x_sort x_smi_mol;
-        local sorted_akeys = atoms[ x_sort x_smi_mol ];
-        if sort aPrioZQH atoms === sort aPrioZQH dict_akeys then
-            newnames = sorted_dictname[ x_smi_mol ];
-        endif
-    endif
-
-    SystemPop sys_info;
-    return [hasrestraints, newnames];
-
-endfunction
 // ===================== 
 
 // lmw - occasionally the MOE PDB read/writer will manipulate atom names.
 //      This function will return whether or not this is the case.
-local function DoubleCheckCIFNames[inResidue,names]
+local function DoubleCheckCIFNames[inResidue]
+    local pdbBondDB, molBondDB;
     local mol = mol_Extract filterInert cat rAtoms inResidue;
     local pdata = SystemPush [];
     mol_Create mol;
-    names = cat aName filterInert cat Atoms[];
+    molBondDB = OrganizeBonds filterInert cat Atoms[];
     fwrite_PDB ['1234567890-tmp.pdb',Atoms[]];
     SystemPop pdata;
+    
     pdata = SystemPush [];
     ReadPDB['1234567890-tmp.pdb'];
     fdelete '1234567890-tmp.pdb';
-    local newnames = cat aName filterInert cat Atoms[];
+    pdbBondDB = OrganizeBonds filterInert cat Atoms[];
     SystemPop pdata;
-    return sort newnames === sort names;
+    if CompareBondDBs [pdbBondDB,molBondDB] then
+        return pdbBondDB.aBondNames === molBondDB.aBondNames;
+    else
+        return 0;
+    endif
 endfunction
 
 local function ProcessCIF[ cif_file, inResidue ]
@@ -439,9 +367,8 @@ local function ProcessCIF[ cif_file, inResidue ]
 //    local root = token first wordsplit[ string ftail[ cif_file], ".cif"];
     local root = rName inResidue;
     local [hasrestraints, names] = applycif[ cif_file, root, atoms ];
-    if not isnull names and DoubleCheckCIFNames[inResidue,names] then
+    if not isnull names and DoubleCheckCIFNames[inResidue] then
     // only some CIF files can be used for parameters
-//        aSetName[ atoms, names ];
         if hasrestraints then
             residueNamesTaken = uniq sort cat [rName inResidue, residueNamesTaken];
             WriteLog[twrite [' INFO: Use  {} for residue {} {}:{}', cif_file, rName inResidue, cName rChain inResidue, rUID inResidue]];
