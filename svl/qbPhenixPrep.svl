@@ -291,7 +291,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
             molBondDB = OrganizeBonds amol;
             WriteLog [twrite ['\tProton counts do not agree suggesting incorrect CIF file.']];
             aSetIon[ molBondDB.HeavyAtoms, cifBondDB.HeavyIon ];
-            aSetGeometry[ molBondDB.HeavyAtoms, cifBondDB.HeavyGeometry ];
+            aSetGeometry[ molBondDB.HeavyAtoms, cifBondDB.HeavyGeo ];
             Add_H amol;
             amol = [];
         endif
