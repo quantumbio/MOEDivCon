@@ -199,17 +199,30 @@ local function OrganizeBonds inAtoms
     BondDB.HeavyIon = cat aIon BondDB.HeavyAtoms;
     BondDB.HeavyGeo = cat aGeometry BondDB.HeavyAtoms;
     BondDB.HeavyAtomNames = aName BondDB.HeavyAtoms;
-    local tmpBonds;
-    for tmpBonds in aBonds BondDB.HeavyAtoms loop
+    local tmpBonds, tmpAtom;
+    for tmpAtom in BondDB.HeavyAtoms loop
+        tmpBonds = cat aBonds tmpAtom;
         tmpBonds = tmpBonds[x_sort aPrioSMI tmpBonds];
         BondDB.aBonds = append [BondDB.aBonds,tmpBonds];
         BondDB.aBondNames = append [BondDB.aBondNames, aName tmpBonds];
         BondDB.aBondElements = append [BondDB.aBondElements, aElement tmpBonds];
+        m_h = (aElement tmpBonds) == 'H';
+        tmpBonds = tmpBonds | m_h;
+        tmpBonds = tmpBonds[x_sort aPrioSMI tmpBonds];
+        BondDB.hBonds = append [BondDB.hBonds,tmpBonds];
+        BondDB.hBondNames = append [BondDB.hBondNames,aName tmpBonds];
+        BondDB.FingerPrint = cat [BondDB.FingerPrint,aName tmpAtom,aName tmpBonds];
     endloop
     return BondDB;
 endfunction
 
-local function CompareBondDBs [leftBondDB, rightBondDB]
+const COMPBONDDBSDEFAULTS = [
+    enableFingerPrint:0,      // compare finger prints
+    enableElements:1       // compare the complement of elements
+];
+
+local function CompareBondDBs [leftBondDB, rightBondDB, opt]
+    opt = tagcat[opt, COMPBONDDBSDEFAULTS];
     local content = 0;
     local lengths = (
         (length cat leftBondDB.HeavyAtomNames == length cat rightBondDB.HeavyAtomNames) and
@@ -217,9 +230,13 @@ local function CompareBondDBs [leftBondDB, rightBondDB]
         (length cat leftBondDB.aBondElements == length cat rightBondDB.aBondElements)
     );
     if lengths then
-        content = (
-            (leftBondDB.aBondElements === rightBondDB.aBondElements)
-        );
+        if opt.enableFingerPrint then
+            content = (leftBondDB.FingerPrint === rightBondDB.FingerPrint);
+        elseif opt.enableElements then
+            content = (leftBondDB.aBondElements === rightBondDB.aBondElements);
+        else
+            content = lengths;
+        endif
     endif
     return content;
 endfunction
@@ -234,6 +251,7 @@ endfunction
 local function matchHydrogens[ cif_file, inResidue, root ]
     local amol = filterInert cat rAtoms inResidue;
     local amol_num = uniq aMoleculeNumber amol;
+
     if length amol_num <> 1 or 
         length cat amol <> length cat [Atoms[] | indexof[ aMoleculeNumber Atoms[], amol_num ]] then
         WriteLog [ twrite ['WARNING: {} residue {}:{} can not be processed with CIF-protonation\n\t(e.g. not single, complete, small molecule, residue)',rName inResidue, cName rChain inResidue, rUID inResidue] ];
@@ -282,7 +300,7 @@ local function matchHydrogens[ cif_file, inResidue, root ]
             molBondDB = OrganizeBonds amol;
             if CompareBondDBs [molBondDB,cifBondDB] then
                 aSetName [molBondDB.HeavyAtoms, cifBondDB.HeavyAtomNames];
-                aSetName [molBondDB.aBonds,cifBondDB.aBondNames];
+                aSetName [molBondDB.hBonds,cifBondDB.hBondNames];
             else
                 WriteLog [twrite ['\tBound atom/element counts do not match suggesting incorrect CIF file.']];
                 amol = [];
@@ -325,7 +343,7 @@ local function applycif[ cif_file, root, atoms ]
     molBondDB = OrganizeBonds atoms;
     if CompareBondDBs [molBondDB,cifBondDB] then
         aSetName [molBondDB.HeavyAtoms, cifBondDB.HeavyAtomNames];
-        aSetName [molBondDB.aBonds,cifBondDB.aBondNames];
+        aSetName [molBondDB.hBonds,cifBondDB.hBondNames];
         newnames = cifBondDB.HeavyAtomNames;
     else
         write ['WARNING: Bound atom counts do not match\n'];
@@ -363,8 +381,6 @@ endfunction
 local function ProcessCIF[ cif_file, inResidue ]
     local atoms = filterInert cat rAtoms inResidue;
 
-// It is unclear why this is here. TODO: delete this line!
-//    local root = token first wordsplit[ string ftail[ cif_file], ".cif"];
     local root = rName inResidue;
     local [hasrestraints, names] = applycif[ cif_file, root, atoms ];
     if not isnull names and DoubleCheckCIFNames[inResidue] then
@@ -518,12 +534,12 @@ local function WriteResidue [outResidues]
     static newResidueName;
     if isnull newResidueName then
         fdelete transFileName;
-        newResidueName = '100'; 
+        newResidueName = '10'; 
     endif;
     local residueName = toupper rName first outResidues;
     if length pack indexof [residueNamesTaken,residueName] then
         fileHandle = fopenx transFileName;
-        if newResidueName == '100' then
+        if newResidueName == '10' then
             fileHandle = fopenw transFileName;
                             //            1         2         3         4         5         6         7         8
                             //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
@@ -537,11 +553,11 @@ local function WriteResidue [outResidues]
             fileHandle = fseek [fileHandle, fsize fileHandle];
         endif
         local oldResidueName = residueName;
-        residueName = totok [atoi newResidueName + 1];
-        newResidueName = residueName;
-        rSetName [outResidues, newResidueName];
-        WriteLog[twrite ['NOTE (residue name conversion): {} = {} < {} >', newResidueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]]];
-        fwrite [fileHandle, ' {} = {} < {} >\n', newResidueName, oldResidueName, apt twrite ['{}:{}',qb_cLetter rChain outResidues,rUID outResidues]];
+        newResidueName = totok [atoi newResidueName + 1];
+        residueName = twrite ['{}_',newResidueName];
+        rSetName [outResidues, residueName];
+        WriteLog[twrite ['NOTE (residue name conversion): {} = {} < {} >', residueName, oldResidueName, apt twrite ['{}:{}',cName rChain outResidues,rUID outResidues]]];
+        fwrite [fileHandle, ' {} = {} < {} >\n', residueName, oldResidueName, apt twrite ['{}:{}',qb_cLetter rChain outResidues,rUID outResidues]];
         fclose fileHandle;
     endif
 
@@ -648,17 +664,15 @@ local function WriteInputFiles[residueList,ciffiles,filebase,opt]
             for altCollection in findmatch ['PDB_ALTLOC_[A-Z,a-z,0-9]', oCollections[]] loop
                 oSetCollection [altCollection, [] ];    // alt designator cleared from output
             endloop
-//            aSetOccupancy [Atoms[],1.00];     // we should not be cleaning these out
         endif
 
     transFileName = twrite['{}-phenix.translation',filebase];
     residueList = diff [residueList,RenameBasedOnCIF[residueList,ciffiles,opt.procPhenixCIFLib]];
 
     harmonize_H[]; // called immediately before the files are written to address any naming issues.
-
-    local data = app filterInert rAtoms residueList;
-    data = app aName data;
-    data = app sort data;
+    
+    local data = app OrganizeBonds app filterInert rAtoms residueList;
+    data = apt tagpeek [data, 'FingerPrint'];
     residueList = uniq residueList[x_sort data];
 
     local resPDBfilenames;
@@ -666,7 +680,7 @@ local function WriteInputFiles[residueList,ciffiles,filebase,opt]
     for tmpIndexGrp in indicesof [uniq x_fsort data,x_fsort data] loop
         resPDBfilenames = uniq cat [resPDBfilenames, WriteResidue[residueList[tmpIndexGrp]]];
     endloop
-
+    
     FindPeptideBreaks[];
 
     local mainPDBfilename = twrite['{}-phenix.pdb',filebase];
@@ -732,6 +746,7 @@ global function qbPostPhenixFile [inpdbfile,trFile]
         return;
     endif
     qbPostPhenix[inpdbfile,trFile];
+    WriteAuto twrite ['{}-tr.{}',fbase inpdbfile, fext inpdbfile];
 endfunction
 
 // lmw - GUI window tool kit functions associated with our DivCon/Phenix MOE interface.
