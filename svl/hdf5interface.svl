@@ -53,6 +53,7 @@ global function qbRetrieveModel  arg = jvmqb ['retrieveModel' , [arg] ];
 global function qbRetrievePosingModel  arg = jvmqb ['retrievePosingModel' , [arg] ];
 global function qbRetrieveHamiltonian  arg = jvmqb ['retrieveHamiltonian' , [arg] ];
 global function qbRetrieveDefaultProgramOptions  arg = jvmqb ['retrieveDefaultProgramOptions' , [arg] ];
+global function qbRetrieveScalars  arg = jvmqb ['retrieveScalars' , [arg] ];
 global function qbRetrieveLigandSelection  arg = jvmqb ['retrieveLigandSelection' , [arg] ];
 global function qbRetrieveTopologyClassNumbers  arg = jvmqb ['retrieveTopologyClassNumbers' , [arg] ];
 
@@ -99,6 +100,7 @@ global function qbTesth5Main [h5file]
    // qbSetNMRAtomSelection [h5file, modelTags.target, [0,1,2,10]];
    // print  qbRetrieveHamiltonian [modelTags.target, 'pm6'];
     print  qbRetrieveDefaultProgramOptions [];
+    print  qbRetrieveScalars [h5file, modelTags.target];
     print  qbRetrieveLigandSelection [h5file, modelTags.target];
 print  modelTags.target;
     local [newmol, errorcode2] = qbRetrieveModel [h5file, modelTags.target];

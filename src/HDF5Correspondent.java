@@ -100,6 +100,9 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
                 case "retrievePosingModel":
                 res = retrievePosingModel(res);
                     break;
+                case "retrieveScalars":
+                    res=retrieveScalars(res);
+                    break;
                 case "retrieveQMScore":
                 res = retrieveQMScore(res);
                     break;
@@ -1031,6 +1034,39 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         return new SVLVar(new SVLVar(new SVLVar(model)), new SVLVar("",true));
     }
 
+private SVLVar retrieveScalars(SVLVar var) throws SVLJavaException, IOException, Exception
+{
+    String filename = var.peek(1).getTokn(1);
+    String target = var.peek(1).getTokn(2);
+    H5File h5File=new H5File(filename, H5File.READ);
+    h5File.open();
+//   java.lang.System.out.println("h5 opened ");
+    String xPath="/DivCon/"+target;
+    H5Group targetGroup=(H5Group)findHDF5Object(h5File, xPath);
+    SVLVar[] scalars=new SVLVar[1];
+    String[] tags=new String[1];
+    if(targetGroup!=null)
+    {
+        List scalarRow=targetGroup.getMetadata();
+        scalars=new SVLVar[scalarRow.size()];
+        tags=new String[scalarRow.size()];
+        for(int memberIndex=0;memberIndex<scalarRow.size();memberIndex++)
+        {
+            ncsa.hdf.object.Attribute member=(ncsa.hdf.object.Attribute)scalarRow.get(memberIndex);
+            tags[memberIndex]=member.getName();
+            System.out.println(member.getName()+" value class "+member.getValue().getClass().getName());
+            scalars[memberIndex]=new SVLVar(((double[])member.getValue())[0]);
+        }
+    }
+    else
+    {
+        scalars[0]=new SVLVar(new String[]{filename, target});
+    }
+    SVLVar data=new SVLVar(tags, scalars);
+    h5File.close();
+    return new SVLVar(new SVLVar(data), new SVLVar("",true));
+}
+    
     private SVLVar retrieveQMScore(SVLVar var) throws SVLJavaException, IOException, Exception
 {
     String filename = var.peek(1).getTokn(1);
