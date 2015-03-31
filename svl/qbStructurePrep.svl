@@ -394,10 +394,12 @@ global function qbPrepareSystem [opt]
     endif
     
     if opt.enableAutoPrep then
-//        local tmpResidueNames = rName Residues[];
+        local tmpResidueNames;
+        tmpResidueNames.residues = cat Residues [];
+        tmpResidueNames.names = rName tmpResidueNames.residues;
         StructurePreparation[disableTypes : ['Alternates','Break'],batch_protonate3d:0];
         // StructurePreparation 'Library' problem type not only builds missing atoms but also renames residues.
-//        rSetName [Residues[], tmpResidueNames];
+        rSetName [tmpResidueNames.residues, tmpResidueNames.names];
     endif
 
     local ligandAtoms = cat _Atoms '$$ligand';
