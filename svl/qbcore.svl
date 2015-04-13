@@ -3549,4 +3549,12 @@ global function qbCalcMemoryRequirementsInGB [allAtoms,setNP]
         (1.31893E-8 * (length allAtoms) + 2.3842E-5) /1024/1024/1024) / 10);
 endfunction
 
+global function qbDriveMemoryCalcFromFile [infilename,setNP]
+    local syskeys = SystemPush[];
+    ReadAuto infilename;
+    Add_H Atoms[];
+    local size = qbCalcMemoryRequirementsInGB [Atoms[],setNP];
+    write ['{}\n', ceil (size*1.1)];
+    SystemPop syskeys;
+endfunction
 
