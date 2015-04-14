@@ -706,8 +706,24 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     residueList = ResiduePreparation[]; // lmw (11/14) - CCG StructurePreparation will rename items sometimes so the list needs rebuilt after run.
     aSetOccupancy [oGetCollection ['STRUCTPREP_NEWATOMS'],0];
     // set the occupancy based upon the occupancy of the heavy atom to which the proton is bound. Do the same for OXT
-    aSetOccupancy [Atoms [] | aAtomicNumber Atoms[] == 1, aOccupancy aBonds Atoms [] | aAtomicNumber Atoms [] == 1];
-    aSetOccupancy [Atoms [] | aName Atoms[] == 'OXT', aOccupancy (aBonds (Atoms [] | aName Atoms [] == 'OXT') | aName aBonds (Atoms [] | aName Atoms [] == 'OXT') == 'C') ];
+    local keyAtoms = Atoms[];
+    local workAtoms = keyAtoms | aAtomicNumber keyAtoms == 1;
+    local boundAtoms = aBonds keyAtoms | aAtomicNumber keyAtoms == 1;
+    if length workAtoms == length boundAtoms then
+//        aSetOccupancy [Atoms [] | aAtomicNumber Atoms[] == 1, aOccupancy aBonds Atoms [] | aAtomicNumber Atoms [] == 1];
+        aSetOccupancy [workAtoms, aOccupancy boundAtoms];
+    else
+        WriteLog ['WARNING: problem in Hydrogen Occupancy. Check for protons with multiple bonds.\n'];
+    endif
+    keyAtoms = cat rAtoms (Residues [] | m_join [rName Residues[],pro_StandardRes[]]);
+    workAtoms = keyAtoms | aName keyAtoms == 'OXT';
+    boundAtoms =  aBonds (workAtoms | aName workAtoms == 'OXT') | aName aBonds (workAtoms | aName workAtoms == 'OXT') == 'C';
+    if length workAtoms == length boundAtoms then
+//        aSetOccupancy [Atoms [] | aName Atoms[] == 'OXT', aOccupancy (aBonds (Atoms [] | aName Atoms [] == 'OXT') | aName aBonds (Atoms [] | aName Atoms [] == 'OXT') == 'C') ];
+        aSetOccupancy [workAtoms, boundAtoms ];
+    else
+        WriteLog ['WARNING: problem in OXT Occupancy. Check for odd atoms named OXT.\n'];
+    endif
     return WriteInputFiles[residueList,ciffiles,filebase,opt];
 endfunction
 
