@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# clear out excess LD_LIBRARY_PATH info and only provide ONLY our libs
+unset LD_LIBRARY_PATH
+unset DYLD_LIBRARY_PATH
+
 # where the HDFView is installed
 if [ ! "$QBHOME" ]; then
     PRG=$0
@@ -20,9 +24,6 @@ if [ ! "$QBHOME" ]; then
 fi
 
 . $QBHOME/etc/qbenv.sh
-
-export LD_LIBRARY_PATH=${QB_LD_LIBRARY_PATH}
-export DYLD_LIBRARY_PATH=${QB_LD_LIBRARY_PATH}
 
 CLASSPATH=$QBHOME/$PLTFM_VER/lib/netcdf.jar:$QBHOME/$PLTFM_VER/lib/fits.jar:${CLASSPATH} ; export CLASSPATH
 
