@@ -50,6 +50,7 @@ const DEFAULT_OPT = [
     resname     : [],
     atomname    : [],
     csvfile     : [],
+    tgen        : 1,        // turn on (1) or off (0) the automatic tautomer/protomer call.
     protPH      : 7.4,      // Call to Protonate3D with this pH
     protDist    : 4.0       // Only reprotonate non-selected atoms within this distance from selected atoms
 ];
@@ -222,37 +223,40 @@ global function qbGenerateProtonation [pdbfile,opt]
 
     //    local ctab = ctab_Extract [ligAtoms, [heavy:1, aro:0]];
     //    local [ctabs, graphs] = ctab_EnumerateProtomers [ctab];
-        
-        local [ctablist, changed, filtlist] = WashMoleculeMOE [ligAtoms,[
-            dim:3,
-            hydrogens:'add',
-            tautomers:1,
-            protomers:1,
-            enumsize:300,
-            enumdup:1,
-            exclacids:1,
-            exclbases:1
-        ]];
+        if opt.tgen then
+            local [ctablist, changed, filtlist] = WashMoleculeMOE [ligAtoms,[
+                dim:3,
+                hydrogens:'add',
+                tautomers:1,
+                protomers:1,
+                enumsize:300,
+                enumdup:1,
+                exclacids:1,
+                exclbases:1
+            ]];
+        else
+            ctablist = [ctab_Extract [ligAtoms]];
+        endif
         local ctab;
 
         write ['Found {} tautomers/protomers for residue {}:{} \n', length ctablist, rName ligResidue, rUID ligResidue];
         local allcount = 0;
         for ctab in ctablist loop
             allcount = allcount + 1;
-            local theParent = first uniq cat oParent oAtoms ligAtoms;
-            oDestroy ligAtoms;
-            local tmpMol = mol_Create first mol_ExtractFromCTAB ctab;
-            ligAtoms = cat oAtoms tmpMol;
-            ligHeavyAtoms = ligAtoms | aAtomicNumber ligAtoms > 1;
-            aSetName [ligHeavyAtoms,ligHeavyAtomNames];
-            aSetTempFactor [ligHeavyAtoms,ligHeavyAtomBfactors];
-            aSetSelected [ligAtoms,1];
-            local prepTypes = _StructurePreparation [uniq aChain ligAtoms, [cmd:'_types']];
-            _StructurePreparation [uniq aChain ligAtoms,[disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0]];
-
-            oReparent [ligAtoms,theParent];
-            oDestroy tmpMol;
-
+            if opt.tgen then        // if we want to use the protonation as it stands in the input file, then we shouldn't destroy it.
+                local theParent = first uniq cat oParent oAtoms ligAtoms;
+                oDestroy ligAtoms;
+                local tmpMol = mol_Create first mol_ExtractFromCTAB ctab;
+                ligAtoms = cat oAtoms tmpMol;
+                ligHeavyAtoms = ligAtoms | aAtomicNumber ligAtoms > 1;
+                aSetName [ligHeavyAtoms,ligHeavyAtomNames];
+                aSetTempFactor [ligHeavyAtoms,ligHeavyAtomBfactors];
+                aSetSelected [ligAtoms,1];
+                local prepTypes = _StructurePreparation [uniq aChain ligAtoms, [cmd:'_types']];
+                _StructurePreparation [uniq aChain ligAtoms,[disableTypes : diff [prepTypes, ['HName','AName']], batch_protonate3d:0]];
+                oReparent [ligAtoms,theParent];
+                oDestroy tmpMol;
+            endif
         // the closeatoms are the atoms that will be protonated. ligAtoms will be fixed in their protonation state.
         //      Only protonating atoms within a certain distance will speed up the protonation
             local closeatoms = Atoms[];
