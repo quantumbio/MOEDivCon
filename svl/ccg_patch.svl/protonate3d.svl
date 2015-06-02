@@ -1,0 +1,3230 @@
+#svl
+//      protonate3d.svl  	    		Add Hydrogens
+//
+//  01-jun-2015 (lmw-QB) Residues with a single atom are removed from Protonate3D
+//	17-jul-2013 (cc) Charge system using ff partial charge method.
+//	30-oct-2012 (cc) StructPrep P3D is used on rIsAmino.
+//	27-sep-2012 (cc) Use oValid in PartitionSystem
+//	05-sep-2012 (cc) Used canvasBackground for proprep_P3D
+//	01-jun-2012 (pl) honor input d_in
+//	26-oct-2011 (cc) driver returns unique var to define a uniq prob
+//	03-oct-2011 (pl) adjusted proprep driver, fixed env add_h bug
+//	09-sep-2011 (pl) proprep driver
+//	08-jun-2011 (ms) safer cleanup (draw contacts)
+//	01-oct-2010 (pl) disable contacts during group state generation
+//	03-aug-2010 (pl) protect group generation with task_prio 0
+//	05-oct-2009 (pl) added mod config to mself calculation (hack)
+//	20-mar-2009 (pl) don't quench
+//	18-mar-2009 (al) updated for new meaning of '[#G2]'
+//	14-oct-2008 (kk) copy temp factors of hydrogens
+//	26-sep-2008 (pl) copy temp factors of hydrogens
+//	03-sep-2008 (pl) added Quench
+//	28-jul-2008 (pl) conformational search unknown groups
+//	28-nov-2007 (pl) added flipped set creation
+//	19-oct-2007 (pl) fixed flip atom names
+//	25-sep-2007 (pl) corrected HID,HIE,HIP disagreements
+//	14-aug-2007 (pl) fixed rendering mode on created objects
+//	04-jul-2007 (pl) added titrate/flip/protect/water sets
+//	10-may-2007 (pl) cleanup
+//  	15-sep-2006 (pl) created
+//
+// COPYRIGHT (C) 2006-2013 CHEMICAL COMPUTING GROUP INC.  ALL RIGHTS RESERVED.
+//
+// PERMISSION TO USE, COPY, MODIFY AND DISTRIBUTE THIS SOFTWARE IS HEREBY
+// GRANTED PROVIDED THAT: (1) UNMODIFIED OR FUNCTIONALLY EQUIVALENT CODE
+// DERIVED FROM THIS SOFTWARE MUST CONTAIN THIS NOTICE; (2) ALL CODE DERIVED
+// FROM THIS SOFTWARE MUST ACKNOWLEDGE THE AUTHOR(S) AND INSTITUTION(S); (3)
+// THE NAMES OF THE AUTHOR(S) AND INSTITUTION(S) NOT BE USED IN ADVERTISING
+// OR PUBLICITY PERTAINING TO THE DISTRIBUTION OF THE SOFTWARE WITHOUT
+// SPECIFIC, WRITTEN PRIOR PERMISSION; (4) ALL CODE DERIVED FROM THIS SOFTWARE
+// BE EXECUTED WITH THE MOLECULAR OPERATING ENVIRONMENT (MOE) LICENSED FROM
+// CHEMICAL COMPUTING GROUP INC.
+//
+// CHEMICAL COMPUTING GROUP INC. DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS
+// SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS,
+// AND IN NO EVENT SHALL CHEMICAL COMPUTING GROUP INC. BE LIABLE FOR ANY
+// SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+// RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF
+// CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//
+// References
+//
+//	[ENGHUB]
+//	Engh, R.A., Huber, R.
+//	Accurate Bond and Angle Parameters for X-ray Protein
+//	Structure Refinement
+//	Acta Cryst. A47 (1991) 392-400
+//
+//	[AMBER 99]
+//	Cornell,W.D., Cieplak,P., Bayly,C.I., Gould,I.R., Merz,K.M.Jr.,
+//	Ferguson,D.M., Spellmeyer,D.C., Fox,T., Caldwell,J.W., Kollman,P.A.
+//	A second generation force field for the simulation of proteins
+//	and nucleic acids
+//	J. Am. Chem. Soc. 177 (1995) 5179-5197
+//
+//	[OPLS-AA]
+//	Jorgensen W.L., Maxwell, D.S., Tirado-Rives, J.
+//	Development and Testing of the OPLS All-Atom Force Field on
+//	Conformational Energetics and Properties of Organic Liquids
+//	J. Am. Chem. Soc. 117 (1996) 11225-11236
+//
+// TO DO:
+//	- periodic systems
+//	- total charge zero constraint for crystals ?
+//	- conformation energies, flip secondary nitrogens
+//	- titration simulation
+//	- null segment vector's don't work
+
+#set title	'Protonate 3D'
+#set version	'2013.07-qb'
+#set class	'MOE:simulation'
+
+const RULEFILE = '$MOE/lib/protonate3d.dat';
+const DEBUG = 0;
+
+const P3D_PROTECT_SET = 'Protonate3d_Protect';
+
+function IncidentalWaters;
+
+const DEFAULTS = [
+    mdisconnect:	1,		// enable auto disconnect of metals
+    ele:		'GB',		// use electrostatics term
+    ele_cutoff:		15.0,		// distance cutoff for ele
+    d_in:		1.0,		// solute dielectric
+    d_out:		80.0,		// solvent dielectric
+    T:			300,		// temperature in Kelvin
+    ionC:		0.1,		// ionic concentration (mol/L)
+    pH:			7.0,		// the global pH of the system
+    vdw:		'800R3',	// use repulsive term
+    vdw_cutoff:		10.0,		// distance cutoff for vdw
+    render:		1,		// render the system nicely?
+    rulefile:		RULEFILE,	// rule file
+    verbose:		1		// verbosity level : 0, 1, 2, ...
+];
+
+const ABIT_ELFIX	= 0x0001;	// disallow element changes (flip)
+const ABIT_NOTITRATE	= 0x0002;	// no atom/group "titrate"
+const ABIT_PROTECT	= 0x0004;	// protect atom state
+
+local function AtomBit [ctx, atoms, amask]
+    if not ctx then
+	return zero atoms;
+    endif
+    local [seg,idx] = prox_find [
+	*ctx.aflag_prox, [oSerialNumber atoms], 0.25
+    ];
+    return notnot s_add [bitand [amask, *ctx.aflag_bits[idx]], seg];
+endfunction
+
+function opt_UQO, opt_UQO_MeanField, opt_UQO_DeadEnd, opt_UQO_Quench;
+function uqo_MatrixVDW, uqo_MatrixELE, uqo_BornSelfEnergy;
+
+function PartialCharge;
+function conf_Automorphisms;
+
+const QMETHOD = 'MMFF94*';		// partial charge method
+
+local function Light atoms
+    if not isflat atoms then return app Light atoms; endif
+    return sm_Match ['[!#QX1Q1!$(*[#T])]', atoms];
+endfunction
+
+local function LightBonds atoms		// return "light" neighbors
+    local nbr = aBonds atoms;
+    return nbr || Light nbr;
+endfunction
+
+local function ExtendLight atoms	// add light neighbors
+    atoms = uniq cat append [LightBonds atoms, atoms];
+    atoms = atoms[x_sort aNumber atoms];
+    return atoms;
+endfunction
+
+local function aClearLabel atoms
+    aSetLabelElement [atoms, 1];
+    aSetLabelName    [atoms, 0];
+    aSetLabelCharge  [atoms, 0];
+    aSetLabelRes     [atoms, 0];
+    aSetLabelChain   [atoms, 0];
+    aSetLabelMMType  [atoms, 0];
+endfunction
+
+local function AdjustValence atoms
+    atoms = atoms | aHCount atoms <> aExplicitHCount atoms;
+    if not length atoms then return; endif
+
+    AddHydrogens atoms;
+    local i;
+
+	// fix up forced planar hydrogens that may not have been placed OK
+	// !!! MOVE TO ADD HYDROGENS
+
+    local Hatoms = uniq cat append [aBonds atoms, atoms];
+    Hatoms = Hatoms | aAtomicNumber Hatoms == 1;
+
+    const HPLANAR = tr [
+	[ 0, '[#1D1]*#*'				],
+	[ 1, '[#1D1][NH1X3!i!r3]C=[#G6]'		],
+	[ 1, '[#1D1][NH1X3!i!r3][PX4][OX1]'		],
+	[ 1, '[#1D1][NH1X3!i!r3][SX4][OX1]'		],
+	[ 0, '*'					]
+    ];
+
+    Hatoms = Hatoms | HPLANAR(1)[sm_Indexof [Hatoms, HPLANAR(2)]];
+
+    for i = 1, length Hatoms loop
+	local org = first aBonds Hatoms(i);
+	local nbr = diff [cat aBonds org, Hatoms(i)];
+	local opos = aPos org;
+	local u = vnormalize (opos - aPos nbr(1));
+	local v = vnormalize (opos - aPos nbr(2));
+	aSetPos [Hatoms(i), opos + vnormalize (u+v) * aDist [Hatoms(i),org]];
+    endloop
+endfunction
+
+// SetCharges assigns partial charges to atoms, first extending the
+// atom set to all attached light aotms
+
+local function SetCharges atoms
+    atoms = ExtendLight atoms;
+    aSetCharge [atoms, first PartialCharge [atoms, QMETHOD]];
+endfunction
+
+// ---------------------------------- PROGRESS -------------------------------
+
+// We maintain a progress indicator on the main MOE window since many
+// portions of the calculation may take time.
+
+local function Progress_open [ctx, echo_cli]	// initialize the progress
+    if ctx then
+	*ctx.progress_msg = 0;
+	*ctx.progress_extra_text = [];
+	*ctx.progress_state = '';
+	*ctx.progress_cli = istrue echo_cli;
+	*ctx.progress_timing = [];
+    endif
+endfunction
+
+local function Progress_close ctx		// close the progress
+    if isnull ctx then return; endif
+    if not ctx then return; endif
+    *ctx.progress_cli = [];
+    *ctx.progress_state = [];
+    *ctx.progress_extra_text = [];
+    *ctx.progress_timing = [];
+    if not MOE_BATCH then
+	Message [*ctx.progress_msg, []];
+    endif
+endfunction
+
+local function Progress [completion, ctx]
+    if not ctx then return; endif
+
+    local state = *ctx.progress_state;
+    local extra_text = *ctx.progress_extra_text;
+
+    const NBAR = 20;
+    local nbar = round (NBAR * add completion);
+
+    local text = twrite ['Protonate 3D: {}', token state];
+
+    if completion <= 0 then
+	if *ctx.progress_cli then
+	    write ['Protonate 3D: {}\n', state];
+	endif
+	*ctx.progress_time0 = clock [];
+    elseif completion >= 1 then
+	local sec = clock[] - *ctx.progress_time0;
+
+	local idx = indexof [state, app first *ctx.progress_timing];
+
+	if not idx then
+	    *ctx.progress_timing = append [*ctx.progress_timing, [state,sec]];
+	else
+	    *ctx.progress_timing = poke [
+		*ctx.progress_timing,
+		idx,
+		[state, *ctx.progress_timing(idx)(2) + sec]
+	    ];
+	endif
+
+	text = tok_cat [text, twrite [' ({n:.2f} sec)', sec]];
+    else
+	text = token cat [
+	    string text, " [", rep ["|", nbar], rep [" ", NBAR-nbar], "]"
+	];
+    endif
+
+    if length *ctx.progress_timing then
+	local [stage,stage_time] = tr *ctx.progress_timing;
+	local tfmt = twrite [
+	    '\n    {{-{}} : {{n:8.2f} sec\n', max [2, max tok_length stage]
+	];
+	text = tok_cat cat [
+	    text, apt twrite [tfmt, stage, stage_time]
+	];
+    endif
+
+    if length (extra_text = string extra_text) then
+	extra_text = wordsplit [string extra_text, "\012\015"];
+	extra_text = apt cat [ ["\n    "], extra_text ];
+	text = cat [text, token cat extra_text];
+    endif
+
+    *ctx.progress_msg = Message [*ctx.progress_msg, text];
+endfunction
+
+// =================== MOLECULE EXTRACTION & PARAMETERIZATION ================
+
+// The following is indexed by a numerical atom type and contains information
+// needed to calculate the van der Waals energy and Born solvation energy
+// including a volume integral term (GB/VI)
+//
+// The parameters are largely [ENGHUB] agumented with [AMBER] and [OPLS-AA]
+
+const AT_SYM = 1, AT_VDWR = 2, AT_VDWE = 3, AT_SOLR = 4, AT_SOLX = 5;
+
+const ATOM_TYPE = tr [
+//    pattern			vdwR,  vdwE,	solR,  solX
+
+    [ '[#1][#7]',		0.000, 0.000,	1.25 ,  1.0461		],
+    [ '[#1][#8]',		0.000, 0.000,	1.00 ,  2.2465		],
+    [ '[#1][#16]',		1.000, 0.020,	1.25 ,  0.8739		],
+    [ '[#1][#15]',		1.000, 0.020,	1.00 ,  1.4322		],
+    [ '[#1]',			1.380, 0.030,	1.25 ,  0.2437		],
+
+    [ '[#6;i]',			1.871, 0.120,   2.00 , -0.1199		],
+    [ '[#6]',			1.871, 0.120,   1.80 , -0.2863		],
+
+    [ '[#7;i]',			1.425, 0.238,	1.65 , -0.6263		],
+    [ '[N+0X3!i!r3]C=[#G6]',	1.425, 0.238,	1.65 , -0.6263		],
+    [ '[N+0X3!i!r3]C=[N]',	1.425, 0.238,	1.65 , -0.6263		],
+    [ '[#7]',			1.425, 0.238,	1.65 , -4.0443		],
+
+    [ '[O;i]',			1.425, 0.159,	1.40 ,  5.0707		],
+    [ '[OX1]*=[OX1]',		1.425, 0.159,	1.40 ,  5.0707		],
+    [ '[OX1][+*]',		1.425, 0.159,	1.40 ,  5.0707		],
+    [ '[#8]',			1.425, 0.159,	1.35 ,  0.6859		],
+
+    [ '[#16]',			1.688, 0.043,	1.95 , -1.0215		],
+    [ '[#15]',			1.688, 0.043,	2.15 , -4.1181		],
+
+    [ '[#9]',	1.750, 0.100,	1.50,  1.9309		], // GROUP VII [OPLS]
+    [ '[#17]',	1.948, 0.265,	1.80,  0.0131		],
+    [ '[#35]',	2.220, 0.320,	2.40,  1.1648		],
+    [ '[#G7]',	2.350, 0.400,	2.60,  0.0869		],
+
+    [ '[#3]',	1.192, 0.0183,	1.477,  0		], // GROUP I [OPLS]
+    [ '[#11]',	1.869, 0.0028,	1.885,  0		],
+    [ '[#19]',	2.769, 0.0003,	2.309,  0		],
+    [ '[#G1]',	3.155, 0.0002,	3.155,  0		],
+
+    [ '[#12]',	0.923, 0.8750,	1.500,  0		], // GROUP II [OPLS]
+    [ '[#20]',	1.354, 0.4497,	1.821,  0		],
+    [ '[Sr]',	1.741, 0.1182,	1.9  ,  0		],
+    [ '[Ba]',	2.142, 0.0471,	2.1  ,  0		],
+    [ '[Ra]',	2.142, 0.0471,	2.1  ,  0		],
+
+    [ '[#5]',	2.042, 0.180,	2.0  ,  0		], // GROUP III [OPLS]
+    [ '[Al]',	2.250, 0.505,	2.1  ,  0		], // [UFF]
+
+    [ '[He]',	1.435, 0.020,	1.4   , 0		], // GROUP VIII [OPLS]
+    [ '[Ne]',	1.560, 0.069,	1.5   , 0		],
+    [ '[Ar]',	1.909, 0.234,	1.9   , 0		],
+    [ '[Kr]',	2.034, 0.317,	2.0   , 0		],
+    [ '[Xe]',	2.208, 0.433,	2.2   , 0		],
+
+    [ '[#0]',	0.000, 0.000,	1.0   , 0		], // LP
+    [ '[#T]',	1.500, 0.100,	1.5   , 0		], // t-metal
+
+    [ '*',	2.100, 0.150,	2.0   , 0		]  // default
+];
+
+local function AtomType atoms
+    return sm_Indexof [atoms, ATOM_TYPE(1)];
+endfunction
+
+// IntegrationRadius calculates the integration radius of a given set
+// of atoms assumed to be bonded by a given bond graph.  From the volume
+// of each atom we subtract half the overlap volume with its neighbors
+
+local function IntegrationRadius [solR, catxbond, bondlen, seg]
+    local r1 = stretch [solR, seg], r2 = solR[catxbond];
+    local d = maxE [abs (r1 - r2), minE [bondlen, (r1 + r2)]];
+
+    local h1 = (sqr r2 - sqr (r1 - d)) / (d + d);
+    local h2 = (sqr r1 - sqr (r2 - d)) / (d + d);
+
+    local ov = s_add [ 0.5 * (sqr h1 * (3*r1-h1) + sqr h2 * (3*r2-h2)), seg ];
+    local V = (PI/3) * maxE [0, 4 * cube solR - ov];
+
+    return 0.95 * cbrt (V * (3/(4*PI)));
+endfunction
+
+// We add additional atom properties to the mol:
+
+const	MOL_ATOM_ASERIAL = 13		// serial number of extracted atom
+,	MOL_ATOM_VDW_R	 = 14		// van der Waals radius
+,	MOL_ATOM_VDW_E	 = 15		// sqrt van der Waals epsilon
+,	MOL_ATOM_SOL_R	 = 16		// solvation radius
+,	MOL_ATOM_SOL_S	 = 17		// integration radius
+,	MOL_ATOM_SOL_X	 = 18		// solvent exposure coefficient
+,	MOL_ATOM_SOL_G0	 = 19		// isolated born self energy
+;
+const MOL_ATOM_SOL_G = MOL_ATOM_SOL_S;	// S becomes self energy
+
+local function ExtractMOL atoms
+    if not ltE aNumber atoms then
+	atoms = atoms[x_sort aNumber atoms];
+    endif
+
+	// calculate the integration radius for each of the extracted atoms
+	// by extending the subset to the immediately bonded neighbors
+
+    local s_atoms = uniq cat prepend [aBonds atoms, atoms];
+
+    if not ltE aNumber s_atoms then
+	s_atoms = s_atoms[x_sort aNumber s_atoms];
+    endif
+
+    local xbond = BondGraph s_atoms, s_deg = app length xbond;
+    local catxbond = cat xbond;
+
+    local solS = IntegrationRadius [
+	ATOM_TYPE(AT_SOLR)[AtomType s_atoms],
+	catxbond,
+	aDist [ stretch [s_atoms, s_deg], s_atoms[catxbond] ],
+	s_deg
+    ];
+
+	// populate the extended mol structure with information
+	// required for the upcoming calculation
+
+    local i = AtomType atoms;
+    local mol = mol_Extract atoms;
+
+    mol(4)(MOL_ATOM_ASERIAL) = oSerialNumber atoms;
+    mol(4)(MOL_ATOM_VDW_R  ) = ATOM_TYPE(AT_VDWR)[i];
+    mol(4)(MOL_ATOM_VDW_E  ) = ATOM_TYPE(AT_VDWE)[i];
+    mol(4)(MOL_ATOM_SOL_R  ) = ATOM_TYPE(AT_SOLR)[i];
+    mol(4)(MOL_ATOM_SOL_X  ) = ATOM_TYPE(AT_SOLX)[i];
+    mol(4)(MOL_ATOM_SOL_S  ) = solS[indexof [atoms, s_atoms]];
+
+	// determine the group name
+
+    local mask;
+
+    local bb = (add aBackbone atoms >= 0.5 * length atoms);
+
+    local res = oParent atoms;		// get most popular residue
+    [i,mask] = sam res;
+    res = split [res[i], mtoc mask];
+    res = first first res[x_sort neg app length res];
+
+    mol(1)(MOL_NAME) = twrite [
+	'{}:{}{}{}{}',
+	cNumber oParent res,
+	select ['BB_', '', bb],
+	rName res,
+	rUID res,
+	select ['', token rINS res, rINS res === " "]
+    ];
+
+    return mol;
+endfunction
+
+local function BuildMOL mol
+    local i;
+
+    local a_serial = mol(4)(MOL_ATOM_ASERIAL);
+    local atno = el_Protons mol(4)(MOL_ATOM_EL);
+    local xbond = mol(4)(MOL_ATOM_BONDS);
+    local deg = app length xbond;
+
+    local mlight = (
+	atno <= 1 and deg == 1 and s_add [(atno>1)[cat xbond], deg] == 1
+    );
+
+    local dst = rep [0, l_length mol(4)];
+    local atoms = Atoms[];
+    local idx = indexof [a_serial, oSerialNumber atoms];
+    (dst | idx) = atoms[pack idx];
+
+	// for each atom try to map its attached light atoms to atom
+	// keys that are already in the sytem.
+
+    local destroy = [];				// atom keys to delete
+    local create = [];				// [i,par] atoms to create
+
+    for i in x_pack idx loop
+	local nbr = xbond(i) | mlight[xbond(i)];	// light neighbors
+	local anbr = cat aBonds dst(i);			// available keys
+	anbr = anbr | Light anbr;
+
+	if length nbr <= length anbr then
+	    dst[nbr] = keep [anbr, length nbr];
+	    destroy = append [destroy, drop [anbr, length nbr]];
+	else
+	    dst[keep [nbr, length anbr]] = anbr;
+	    nbr = drop [nbr, length anbr];
+	    create = append [create, [nbr, rep[i, length nbr]]];
+	endif
+    endloop
+
+    oDestroy destroy;
+
+    if length create then
+	local [xnew,xpar] = apt cat create;
+	dst[xnew] = oCreate dst[xpar];
+	aSetNucleusLook [dst[xnew], aNucleusLook dst[xpar]];
+	aSetBondLook [dst[xnew], aBondLook dst[xpar]];
+	Bond [dst[xnew], dst[xpar]];
+    endif
+
+    aSetPos	 [dst, mol_aPos mol		];
+    aSetElement  [dst, mol(4)(MOL_ATOM_EL)	];
+    aSetGeometry [dst, mol(4)(MOL_ATOM_GEOM)	];
+    aSetHintLP   [dst, mol(4)(MOL_ATOM_HINTLP)	];
+    aSetIon	 [dst, mol(4)(MOL_ATOM_ION)	];
+    aSetName	 [dst, mol(4)(MOL_ATOM_NAME)	];
+    aSetCharge   [dst, mol(4)(MOL_ATOM_CHARGE)	];
+
+    dst = dst | aAtomicNumber dst <= 1;
+
+    aSetLabelChain [dst, 0];
+    aSetLabelRes [dst, 0];
+    aSetLabelName [dst, 0];
+    aSetLabelCharge [dst, 0];
+    aSetLabelElement [dst, 0];
+    aSetLabelMMType [dst, 0];
+
+    dst = dst | Light dst;
+    aSetHidden [dst, app orE aHidden aBonds dst];
+endfunction
+
+// =========================== PROTON CONFORMATIONS ==========================
+
+// quat2mat takes a quaternion (unnormalized) and returns the corresponding
+// rotation matrix.  WARNING: don't change the order of items since derivative
+// functions below depend on this calculation.
+
+local function quat2mat [x,y,z,w]		// quaternion -> 3x3rot matrix
+    local x2 = sqr x, y2 = sqr y, z2 = sqr z, w2 = sqr w;
+    return (2 * invz add [x2,y2,z2,w2]) * [
+	[ 0.5 * (x2 + w2 - y2 - z2), x * y + w * z, x * z - w * y ],
+	[ x * y - w * z, 0.5 * (y2 + w2 - x2 - z2), y * z + w * x ],
+	[ x * z + w * y, y * z - w * x, 0.5 * (z2 + w2 - x2 - y2) ]
+    ];
+endfunction
+
+// FibonacciSphere returns the polar coordinates for a unit sphere sampling
+// of directions.  F is the number of directions (>1).
+
+local function FibonacciSphere F
+    local idx = dec igen F;
+    local sin_phi = -1 + (2 / dec F) * idx;
+    local cos_phi = sqrt (1 - sqr sin_phi);
+    local theta = (2*PI) * inv (0.5 * (1 + sqrt 5)) * idx;
+    return [ cos theta * cos_phi, sin theta * cos_phi, sin_phi ];
+endfunction
+
+// SingleHeavyOrientations generates all the orientations of a single
+// heavy atom with possible attached hydrogens and lone pairs
+
+local function SingleHeavyOrientations [atoms, tol]
+    local i, j;
+
+    atoms = ExtendLight atoms;
+
+    local light  = Light atoms;
+    local nlight = iadd light;
+    local mol    = ExtractMOL atoms;
+    local atno   = el_Protons mol(4)(MOL_ATOM_EL);
+
+    local H_idx  = x_pack not light;
+    local H_pos  = apt get [mol_aPos mol, [H_idx]];
+
+    local L_idx  = x_pack light;
+    local L_pos  = apt get [mol_aPos mol, [L_idx]];
+
+    if l_length H_pos > 1 then
+	exit 'Cannot sample orientations for >1 heavy atom (internal error)';
+    endif
+
+    if nlight == 0 then
+	return [mol];
+    endif
+
+	// if there is only one heavy atom and only one non-heavy then
+	// we place the light atom around the Fibonacci sphere
+	// !!! USE TOL
+
+    if nlight == 1 then
+	const NFIB = 144;			// 55, 89, 144, 233
+
+	local fpos = FibonacciSphere NFIB;
+	local flist = rep [mol, l_length fpos];
+	local dist = norm (H_pos - L_pos);
+
+	for i = 1, length flist loop
+	    mol(4)(MOL_ATOM_X) = put [mol(4)(MOL_ATOM_X), L_idx, fpos(1)(i)];
+	    mol(4)(MOL_ATOM_Y) = put [mol(4)(MOL_ATOM_Y), L_idx, fpos(2)(i)];
+	    mol(4)(MOL_ATOM_Z) = put [mol(4)(MOL_ATOM_Z), L_idx, fpos(3)(i)];
+	    flist(i) = mol;
+	endloop
+
+	return flist;
+    endif
+
+	// we maintin a cache of small molecule orientations for use
+	// !!! DON'T PUT FIXED ATOMS IN THE CACHE (OR PART OF NAME!)
+
+    static cache;
+
+    local usmi = sm_ExtractUnique atoms(H_idx);	// just use a token!
+    local mlist = cache.(usmi);
+
+    if not length mlist then
+	local pos0 = mol_aPos mol - H_pos;
+	mol = mol_aSetPos [mol, pos0];
+
+	local aidx = conf_Automorphisms [
+	    put [ igen l_length mol(4), L_idx, -atno[L_idx] ],
+	    mol(4)(MOL_ATOM_BONDS),
+	    0
+	];
+
+	local MAXDEV = max [0.1, tol];		// 0.40;
+	local old_seed = randseed 1234;
+	local nconf = 0, conf = [];
+
+	function maxdev p0
+	    local i;
+	    for i = 1, length aidx loop
+		local p = apt get [p0, [aidx(i)]];
+		local d = app max app norm (conf - [p]);
+		if min d < MAXDEV then return 0; endif
+	    endloop
+	    return 1;
+	endfunction
+
+	local nfail = 0;
+
+	while nfail < 100 loop
+	    local R = quat2mat vnormalize (randU [2,2,2,2] - 1);
+	    local p = matmul [R, pos0];
+	    if maxdev p then
+		conf(nconf = inc nconf) = p;
+		nfail = 0;
+	    else
+		nfail = inc nfail;
+	    endif
+	endloop
+
+	for i = 1, nconf loop
+	    mlist(i) = mol_aSetPos [mol, conf(i)];
+	endloop
+
+	cache.(usmi) = mlist;
+	randseed old_seed;
+    endif
+
+    for i = 1, length mlist loop
+	mlist(i) = mol_aSetPos [mol, mol_aPos mlist(i) + H_pos];
+    endloop
+
+    return mlist;
+endfunction
+
+local function RigidRotations [atoms, opt]
+    atoms = atoms[x_sort aNumber atoms];
+
+    local pos = aPos atoms;
+    local mol = ExtractMOL atoms;
+
+    if length atoms <= 1 then return [atoms, [mol], 0]; endif
+
+    local light = Light atoms;
+    local mlist = [], mself = [], nconf = 0;
+    local i;
+
+	// if there is only one heavy atom, we generate orientations
+	// about that heavy atom
+
+    if add not light == 1 then
+	local h0 = SingleHeavyOrientations [atoms, 0.30];
+	return [atoms, h0, rep [0, length h0]];
+    endif
+
+    // !!! handle linear systems
+    // !!! HANDLE ENTHANE ROTATIONS AXISROT
+
+    atoms = atoms | not Light atoms;
+    return [atoms, mlist, mself];
+endfunction
+
+// GenerateConformations takes a collection of atoms, possibly connected
+// to the remaining system, and generates proton conformations.  The
+// atoms are labeled by the "heavy" atoms which define the "light" atoms
+//
+// WARNING! WE RELY ON AN INITIAL GOOD QUALITY HYDROGEN PLACEMENT
+
+local function GenerateConformations [ctx, atoms, opt]
+    // !!!! CHIRALITY OF SECONDARY NITROGENS -NH-PO : planar?
+
+    AdjustValence atoms;
+    atoms = ExtendLight atoms;
+
+    local mol = ExtractMOL atoms;
+    local xbond = mol(4)(MOL_ATOM_BONDS);
+    local deg   = app length xbond;
+    local A = stretch [x_id xbond, deg];
+    local B = cat xbond;
+
+    local light = Light atoms and not AtomBit [ctx, atoms, ABIT_PROTECT];
+    local Qdeg  = s_add [ (not light)[B], deg ] + aBondCount atoms - deg;
+
+    if	   andE light					// H2, H-LP, etc.
+	or andE (light or Qdeg == 0)			// H2O, NH3 
+    then
+	return RigidRotations [atoms, opt];
+    endif
+
+	// generate a list of bond rotations X-O-{H,LP} where X and O
+	// are heavy and O is terminal heavy
+
+    [A,B] = [A,B] || [A < B];			// one bond only
+    [A,B] = [					// B has smallest Qdeg
+	select [A, B, Qdeg[A] >= Qdeg[B]],
+	select [B, A, Qdeg[A] >= Qdeg[B]]
+    ];
+    [A,B] = [A,B] || [not light[A] and not light[B]];
+    [A,B] = [A,B] || [deg[B] > 1 and deg[B] < 5];
+    [A,B] = [A,B] || [Qdeg[B] == 1];			// !!! NH2
+
+	// for each A-B rotatable bond, produce a list of light
+	// neighbors to rotate in a conformational search as well
+	// as a set of angles to serve as perturbations
+
+    local L = xbond[B] || apt get [[light], xbond[B]];
+    local Latoms = apt get [[atoms], L];
+
+    [A,B,L] = [A,B,L] || [not app orE aFixed Latoms];
+
+    const ANGLIST = tr [
+	[ '[!D2!D3!D4]',	[0.00,0.00],	[0],	[0]		],
+	[ '[Q4]',		[0.00,0.00],	[0],	[0]		],
+	[ '*#*',		[0.00,0.00],	[0],	[0]		],
+	[ '*(=*)=*',		[0.00,0.00],	[0],	[0]		],
+	[ '[i!Q1]=*',		[0.00,0.00],	[0],	[0]		],
+	[ '[iQ1!H1]=*',		[0.00,0.00],	[0],	[0]		],
+	[ '[iQ1H1]=*',		[0.00,0.00],	[0,180],[0,0]		],
+	[ '[C+1Q1!H1][#N!Q4]',	[0.00,0.00],	[0],	[0]		],
+	[ '[C+1Q11H1][#N!Q4]',	[0.00,0.00],	[0,180],[0,0]		],
+	[ '[B+0Q1!H1][#N!Q4]',	[0.00,0.00],	[0],	[0]		],
+	[ '[B+0Q11H1][#N!Q4]',	[0.00,0.00],	[0,180],[0,0]		],
+	[ '[Q3]',		[0.00,0.00],	[0],	[0]		],
+	[ '[Q2H2]',		[0.00,0.00],	[0],	[0]		],
+
+	[ '[NX4H3][#Q!Q1]',	[0.00,1.50],	[0,60], [0,1.0]		],
+	[ '[NX3+0!iQ1H2][CX4]',	[0.00,0.00],
+		[0,60,120,180,240,300],
+		[0, 1,  0,  1,  0,  1]
+	],
+
+	[ '[CX4H3][A#G6Q2+0]',	[0.00,1.50],	[0,60],	[0,1.0]		],
+	[ '[*X4H3]',		[0.00,1.50],	[0],	[0]		],
+
+	[ '[#G6H][*X4]',	[0.00,0.00],
+		[  0, 60,120,180,240,300],
+		[  0,0.5,  0,0.5,  0,0.5]
+	],
+	[ '[#G6H][CX3]=[OX1]',	[0.00,0.00],	[0],	[0]		],
+
+	[ '[#G6H][i]',		[0.00,0.00],
+	    [0, 30, 60, 120, 150, 180, 210, 240, 300, 330],
+	    [0,0.2,0.4, 0.4, 0.2,   0, 0.2, 0.4, 0.4, 0.2]
+	],
+
+	// !!! NITROGEN -NH2 sp3
+	// !!! X4
+	[ '[N!X2][C+1]',	[0.00,0.00],	[0],	[0]		],
+	[ '[N!X2][B+0]',	[0.00,0.00],	[0],	[0]		],
+	[ '[N!X2]C=N',		[0.00,0.00],	[0],	[0]		],
+	[ '[N!X2]C=[#G6]',	[0.00,0.00],	[0],	[0]		],
+	[ '[N!X2][i]',		[0.00,0.00],	[0],	[0]		],
+
+	[ '[NX2][C+1]',		[0.00,0.00],	[0,180],[0]		],
+	[ '[NX2][C+0]=N',	[0.00,0.00],	[0,180],[0]		],
+	[ '[NX2][B+0]',		[0.00,0.00],	[0,180],[0]		],
+
+	[ '*',
+	    [0,0],
+	    [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330],
+	    [0,  0,  0,  0,   0,   0,   0,   0,   0,   0,   0,   0]
+	]
+    ];
+
+    local aidx = sm_Indexof [atoms[B], ANGLIST(1)];
+    local Lpot = ANGLIST(4)[aidx];
+    local Lang = mod [ANGLIST(3)[aidx], 360];
+
+    [A,B,L,Lpot,Lang] = [A,B,L,Lpot,Lang] || [app orE (Lang <> 0)];
+
+	// perform the conformational search and calculate the self
+	// energies for each of the conformations including the
+	// electrostatic term
+
+    local cs = CSearchInit [
+	aPos atoms, [ A, B, (app rotl Lang - Lang) * (PI/180), L ]
+    ];
+
+    local mlist = [], mconfig = [], mself = [], nconf = 0;
+
+    local q = mol(4)(MOL_ATOM_CHARGE);
+    local qA = stretch [x_id q, length q];
+    local qB = cat rep [x_id q, length q];
+
+    [qA,qB] = [qA,qB] || [ qA < qB ];
+    [qA,qB] = [qA,qB] || [ q[qA] <> 0 and q[qB] <> 0 ];
+    [qA,qB] = [qA,qB] || [ indexof[qA, cat L] or indexof [qB, cat L] ];
+
+    local qS = bInteraction[atoms[qA],atoms[qB]];
+
+    [qA,qB,qS] = [qA,qB,qS] || [qS == 0 or qS == 4];
+    qS = COULOMB_SCALE/4 * q[qA] * q[qB] * select [0.5, 1.0, qS == 4];
+
+    loop
+	local [conf, progress, pos, config] = CSearchNext cs;
+	if not conf then break; endif
+	if nconf > 0 then
+	    if config === mconfig(1) then break; endif
+	endif
+	nconf = nconf + 1;
+
+	config = mod [config, app length Lpot];	// !!! shouldn't be needed
+	mconfig(nconf) = config;
+
+	mself(nconf) = (
+	    add apt peek [Lpot, inc config]
+	  + add (qS / sqr(1 + norm (apt get [pos,[qA]] - apt get [pos,[qB]])))
+	);
+	mol(4)(MOL_ATOM_X) = pos(1);
+	mol(4)(MOL_ATOM_Y) = pos(2);
+	mol(4)(MOL_ATOM_Z) = pos(3);
+	mlist(nconf) = mol;
+    until nconf > 500 endloop
+
+    mself = mself - min mself;
+
+    CSearchClose cs;
+    atoms = atoms | not light;
+
+#   if DEBUG
+    if orE (Light atoms) then
+	exit 'protonate_GenerateConformations: Internal Error (light atom)';
+    endif
+    if not andE (oType atoms == 'atom') then
+	exit 'protonate_GenerateConformations: Internal Error (non-atom)';
+
+    endif
+    if not ltE (indexof [atoms, Atoms[]]) then
+	exit 'protonate_GenerateConformations: Internal Error (bad order)';
+    endif
+#   endif
+
+    return [atoms, mlist, mself];
+endfunction
+
+// ================================== RULES ==================================
+
+// A group configuration is a vector indexed by
+
+const	GC_SMILES	= 3		// smiles build string
+,	GC_ESELF	= 1		// self energy within tautomer
+,	GC_PKA		= 2		// pKa (same for all tautomers)
+,	GC_FCHARGE	= 4		// total formal charge of group
+,	GC_CTAB		= 5		// sm_BuildParse GC_SMILES
+,	GC_MOL		= 6		// mol_ExtractFromCTAB GC_CTAB
+;
+
+const	G_NAME		= 1		// rule name
+,	G_SMARTS	= 2		// smarts pattern
+,	G_CONFIGS	= 3		// configuration lists
+,	G_GMASK		= 4		// pattern->group mask
+;
+
+// ParseGroup parses the group lines from the rule file.  The format of
+// the group block is
+//
+//	group <name> <SMARTS>
+//	    <Eself> <pKa> <SMILES>
+//	endgroup 
+//
+// We accept a vector of word-splitted lines - block(i) is a list of
+// word strings for the line
+
+local function ParseGroup [groups, lineno, gblock]
+    local linebase = dec lineno, errmsg = '';
+
+    local name = token gblock(1)(2);
+    local pattern = token gblock(1)(3);
+    local acount = sm_MatchAtomCount pattern;
+    local gmask = rep [0, acount];			// group "take" mask
+
+	// parse and verify the group line : group name smarts_pattern
+
+    if name == '' then
+	return [groups, lineno, 'Illegal group name'];
+    endif
+    if not isnull groups.(name) then
+	return [groups, lineno, tok_cat ['Duplicate group name : ', name]];
+    endif
+
+    if pattern == '' or not sm_MatchSyntax pattern then
+	return [groups, lineno, 'Unsupported SMARTS pattern syntax'];
+    endif
+
+	// parse the group configuration lines : Eself pKa smiles
+	// - verify the syntactic correctness of the smiles pattern
+	// - make sure it contains fewer atoms than the match pattern
+
+    local configlist = [];
+
+    while (lineno = inc lineno) <= linebase + length gblock loop
+	local line = gblock(lineno - linebase);
+	if line(1) === "endgroup" then break; endif
+
+	if length line < 3 then
+	    return [groups,lineno,'Expected <Eself pKa SMILES> on group line'];
+	endif
+
+	if     line(2) === "-" then line(2) = "-99";
+	elseif line(2) === "+" then line(2) = "99";
+	endif
+
+	local Eself = atof token line(1);
+	local pKa = atof token line(2);
+	local smi = token line(3);
+
+	if not sm_BuildSyntax smi then
+	    return [groups, lineno, 'Unsupported syntax in SMILES string'];
+	endif
+
+	local ctab = sm_BuildParse smi;
+	local Q = add ctab(1)(CTAB_A_CHARGE);
+
+	if orE (ctab(1)(CTAB_A_NUM) < 1) then
+	    return [groups, lineno, 'Missing atom numbers in SMILES string'];
+	endif
+	if not andE m_uniq ctab(1)(CTAB_A_NUM) then
+	    return [groups, lineno, 'Duplicate atom numbers in SMILES string'];
+	endif
+	if orE (ctab(1)(CTAB_A_NUM) > acount) then
+	    return [groups, lineno, 'Illegal atom number in SMILES string'];
+	endif
+
+	if not orE gmask then
+	    gmask[ctab(1)(CTAB_A_NUM)] = 1;
+	elseif not (gmask === put [zero gmask, ctab(1)(CTAB_A_NUM), 1]) then
+	    return [groups, lineno, 'Inconsistent group atom numbering'];
+	endif
+
+	local config = [];
+
+	config(GC_SMILES)  = smi;
+	config(GC_ESELF)   = Eself;
+	config(GC_PKA)	   = pKa;
+	config(GC_FCHARGE) = Q;
+	config(GC_CTAB)    = ctab;
+	config(GC_MOL)     = first mol_ExtractFromCTAB ctab;
+
+	configlist = append [configlist, config];
+    endloop
+
+	// add the group data to the group tagged vector with the
+	// line number priority of the group
+
+    // !!! USE INDICES
+
+    groups.(name) = [int inc linebase, pattern, configlist, gmask];
+
+    return [groups, lineno, ''];
+endfunction
+
+// ReadContinuedLine reads a backslash-continued line from a given file.
+// We update a given linenumber to reflect the number of lines read
+
+local function ReadContinuedLine [fnum, lineno]
+    local line = [];
+
+    loop
+	local newl = freadb [fnum, 'line', 1];
+	if not length newl then break; endif
+	lineno = lineno + 1;
+	line = append [line, first newl];
+	if not (last line(length line) === "\\") then break; endif
+	line(length line) = droplast line(length line);
+    endloop
+
+    if not length line then return [line, lineno]; endif
+    return [[cat line], lineno];
+endfunction
+
+// LoadRules loads the hydrogen placement rules from the rule file given
+// as an argument.  We return a vector [rule1, rule2, ...] where
+// ruleK(G_NAME) is the rule name, ruleK(G_SMARTS) is the smarts match
+// pattern and ruleK(G_CONFIGS) is the list of configurations for that
+// group.  These configurations must be adjusted according to pH
+
+local function LoadRules [filename, dict, opt]
+    opt = tagcat [opt, DEFAULTS];
+
+    if isnull dict then dict = 0; endif
+    local defs = [];
+
+    if token filename == '' then
+	filename = RULEFILE;
+    endif
+
+    local fnum = fopenr filename;
+    local lineno = 0, line;
+    local i;
+
+    local Groups = [];
+
+    function getline []				// read next line
+	local i;
+
+	loop
+	    [line, lineno] = ReadContinuedLine [fnum, lineno];
+	    if not length line then return 0; endif
+	    line = wordsplit [first line, " \t\012\015"];
+	    if length (i = first x_pack (app first line == "#")) then
+		line = keep [line, dec i];
+	    endif
+	until length line endloop
+
+	return 1;
+    endfunction
+
+    function error msg
+	if not MOE_BATCH then
+	    write ['>>> {}, line {} : {}\n', fname fnum, lineno, msg];
+	endif
+	exit twrite ['Protonate 3D (LoadRules)\n{}\n({}, line {}) {}',
+	    msg, fname fnum, lineno
+	];
+    endfunction
+
+    while getline [] loop
+	if line(1) === "eof" then break; endif
+
+	if line(1) === "group" then
+	    local gline = lineno, gblock = [line], gerrmsg = '';
+
+	    while getline [] loop
+		if length line then
+		    gblock = append [gblock, line];
+		endif
+		if line(1) === "endgroup" then break; endif
+		if line(1) === "eof" then break; endif
+		if line(1) === "map" then break; endif
+		if line(1) === "define" then break; endif
+	    endloop
+
+	    if not ((last gblock)(1) === "endgroup") then
+		lineno = gline;
+		error 'Missing endgroup line';
+	    endif
+
+	    [Groups, gline, gerrmsg] = ParseGroup [Groups, gline, gblock];
+	    if gerrmsg <> '' then
+		lineno = gline;
+		error gerrmsg;
+	    endif
+
+	elseif line(1) === "map" then
+	    if length line < 4 then
+		error 'Expected <map name SMARTS SMILES> on map line';
+	    endif
+
+	    local merrmsg = '', mblock = [
+		["group", line(2), line(3)],
+		["0", "0", line(4)],
+		["endgroup"]
+	    ];
+
+	    [Groups, [], merrmsg] = ParseGroup [Groups, lineno, mblock];
+	    if merrmsg <> '' then
+		error merrmsg;
+	    endif
+
+	elseif line(1) === "define" then
+	    local dname = token line(2);
+	    for i = 3, length line loop
+		defs.(dname) = uniq append [defs.(dname), token line(i)];
+	    endloop
+	    sm_Undefine [dict, dname];
+	    sm_Define [dict, tag [dname, [defs.(dname)]]];
+
+	else
+	    error 'Syntax error : expected { group | map | define | eof }';
+	endif
+    endloop
+
+    fclose fnum;
+
+	// return the group data in the lineno-prioritized form required
+
+    local [gname, gdata] = untag Groups;
+    [gname, gdata] = apt get [[gname, gdata], [x_sort app first gdata]];
+
+    local rules = [];
+
+    rules(G_NAME)    = gname;
+    rules(G_SMARTS)  = apt peek [gdata, 2];
+    rules(G_CONFIGS) = apt peek [gdata, 3];
+    rules(G_GMASK)   = apt peek [gdata, 4];
+
+    return tr rules;
+endfunction
+
+// SetGroupConfiguration maps a particular configuration onto a set of
+// atoms.  The configuration smiles order is assumed to be the same as the
+// atom order.
+
+local function SetGroupConfiguration [atomsets, gmasks, configs] 
+
+    [atomsets,gmasks,configs] = apt resize [
+	[atomsets,gmasks,configs], l_length [atomsets,gmasks,configs]
+    ];
+
+    function _SetGroupConfiguration [atoms, config]
+	local ctab  = config(GC_CTAB); // sm_BuildParse config(GC_SMILES);
+	local cmol  = config(GC_MOL); // first mol_ExtractFromCTAB ctab;
+	local cidx  = ctab(1)(CTAB_A_NUM);
+	local gmask = put [zero x_id atoms, cidx, 1];
+	local gidx  = x_pack gmask;
+	return [
+	    atoms[cidx],
+	    cmol(4)(MOL_ATOM_EL),
+	    cmol(4)(MOL_ATOM_ION),
+	    cmol(4)(MOL_ATOM_HINTLP),
+	    cmol(4)(MOL_ATOM_GEOM),
+	    aName    atoms[gidx],
+	    aColorBy atoms[gidx],
+	    aRGB     atoms[gidx]
+	];
+    endfunction
+
+    local [idx, mask] = sam tr [gmasks, configs];
+
+    atomsets = split [atomsets[idx], mtoc mask];
+    configs = configs[idx] | mask;
+
+#if 0
+    if length atomsets > 1 then
+	if not andE m_uniq cat atomsets then
+	    exit 'Illegal system partition (internal error)';
+	endif
+    endif
+#endif
+
+    local aset = rep [[], l_length [atomsets, configs]];
+
+    for idx = 1, l_length [atomsets, configs] loop
+	aset(idx) = _SetGroupConfiguration [tr atomsets(idx), configs(idx)];
+    endloop
+
+    aset = apt cat aset;
+
+    if not call [] then
+	return aset;	// [ atoms, el, ion, hintlp, geom, name, colorby, rgb ]
+    endif
+
+    aSetElement  [aset(1), aset(2)];
+    aSetIon	 [aset(1), aset(3)];
+    aSetHintLP	 [aset(1), aset(4)];
+    aSetGeometry [aset(1), aset(5)];
+    aSetName	 [aset(1), aset(6)];
+    aSetColorBy	 [aset(1), aset(7)];
+    aSetRGB	 [aset(1), aset(8)];
+endfunction
+
+// AdjustSelfEnergies takes a list of configurations (as per the rules file)
+// and adjusts the self energies to take into account the pH titration data.
+// The input self energies are assumed to be tautomer relative and all
+// pKa's for the same tautomeric state should be the same
+//
+// !!! COMMENT
+// If a species has formal charges Q(1),Q(2),..Q(n) with Q(1)>...>Q(n) with
+// disassociation constants pKa(1),pKa(2),...,pKa(n-1) we have the following
+// set of equations:
+//
+//	pH - pKa(i) = log10 p[Q(i+1)] - log10 p[Q(i)]	i=1,...,n-1
+//	[Q(1)] + ... + [Q(n)] = 1
+//
+// For a monoprotic acid, pH - pKa = log10 ([A-] / [HA])
+
+local function AdjustSelfEnergies [configlist, pH, T]
+    local kT = KBOLTZ * T;
+
+    function BoltzmannPopulation E		// boltzmann log probabilities
+	local p = E - min E;
+	return p + kT * logaddexp (-inv kT * p);
+    endfunction
+
+    function ProticPopulation [Q, pKa]		// polyprotic acid population
+	if not gtE Q or not andE m_uniq Q then
+	    exit 'Internal Error (ProticPopulation)';
+	endif
+	// !!! MUST BE CONTIGUOUS +2, +1, 0, -1, ...
+
+	local K = pscan rotrpoke [pKa, 0];
+	local P = pH * (dec length Q - dec igen length Q);	// !!! CHARGES
+	local prob = (kT * log 10) * (K + P);
+
+	return BoltzmannPopulation prob;
+    endfunction
+
+    configlist = tr configlist;
+
+    local [Qidx,Qmask] = sam neg configlist(GC_FCHARGE);
+    local Qseg = mtoc Qmask;
+
+    configlist = apt get [configlist, [Qidx]];
+
+    local Eself = configlist(GC_ESELF   );
+    local pKa   = configlist(GC_PKA	);
+    local Q	= configlist(GC_FCHARGE );
+
+    Eself = (
+	  cat app BoltzmannPopulation split [Eself, Qseg]
+	+ stretch [ ProticPopulation [Q|Qmask, pKa|Qmask], Qseg ]
+    );
+
+    configlist(GC_ESELF) = Eself;
+    configlist = apt get [configlist, [x_sort Eself]];
+
+    return tr configlist;
+endfunction
+
+// ======================== PREPARATION AND SIMULATION =======================
+
+// ReportParition prints a textual report related to the partition of the
+// system.  We print a residue summary, atom summary and group summary.
+
+local function ReportPartition [
+    groups, env, [atomset, configlist, amask, rname]
+]
+    local i, C, R;
+
+    local atoms = uniq cat append [atomset, env];
+    atoms = atoms[x_sort indexof [atoms, Atoms[]]];
+
+    local res    = uniq oParent atoms;
+    local chains = uniq oParent res;
+
+    local aridx  = indexof [oParent atoms, res];
+    local acidx  = indexof [oParent oParent atoms, chains];
+    local rcidx  = indexof [oParent res, chains];
+
+    local rrules = rep [[], length res];
+
+	// decide which rules apply to which side chains residues
+
+    local asetidx = split [indexof [cat atomset, atoms], app length atomset];
+    local rsetidx = split [ aridx[cat asetidx], app length asetidx ];
+
+    for i = 1, length rsetidx loop
+	R = rsetidx(i);
+	rrules[R] = apt cat [rrules[R], rname(i)];
+	rrules[R] = app uniq rrules[R];
+    endloop
+
+    rrules = app uniq rrules;
+
+	// write out the report
+
+    for C = 1, length chains loop
+	write ['chain {4} : ({}) {} {}\n',
+	    C, cTag chains(C), cName chains(C), cHeader chains(C)
+	];
+	for R in x_pack (rcidx == C and app length rrules) loop
+	    write ['    [{4}] {-4} {4}{1} : {}\n',
+		rNumber res(R), rName res(R), rUID res(R), rINS res(R),
+		rrules(R)
+	    ];
+	endloop
+    endloop
+endfunction
+
+// DisconnectMetals searches for particular bonds to disconnect.  Group I, II
+// bonds are always disconnected if they have no bond to group 4.
+
+local function DisconnectMetals atoms
+    local i, idx;
+
+	// disconnect Group I and Group II atoms from everything if they
+	// have no group 4 bonds
+
+#if 0
+    const GROUP_12 = [ '[#G1#Q]', '[#G2#Q!#T]' ];	// disconnect atoms
+#else
+    const GROUP_12 = [ '[#G1#Q]', '[#G2#Q]' ];	// disconnect atoms
+#endif
+    local g12 = atoms | sm_Indexof [atoms, GROUP_12];
+
+    if length g12 then
+	g12 = g12 | not s_add [
+	    sm_Match ['[#G4]', cat aBonds g12], aBondCount g12
+	];
+	oDestroy LightBonds g12;
+	Unbond [g12, aBonds g12];
+    endif
+
+	// disconnect transition metals if they are in their own residue
+	// with nothing else
+
+    local itm = atoms | sm_Match [ '[#T]', atoms ];
+    itm = itm | rAtomCount oParent itm == 1;
+
+    oDestroy LightBonds itm;
+    Unbond [itm, aBonds itm];
+endfunction
+
+// PrepareSystem partitions the system and assigns group patterns in order
+// to identify the states for UQO
+
+local function PartitionSystem [ctx, groups, dict, atoms0, opt]
+    opt = tagcat [opt, DEFAULTS];
+    local time0 = clock[];
+
+    function MatchAtoms [pattern, atoms]
+	local match = sm_MatchAtoms [pattern, atoms, dict];
+	if length (match = match | app length match) then
+	    match = match | m_uniq app sort match;
+	endif
+	return match;
+    endfunction
+
+    function AtomELFIX atoms = AtomBit [ctx, atoms, ABIT_ELFIX];
+    function AtomNOTITRATE atoms = AtomBit [ctx, atoms, ABIT_NOTITRATE];
+    function AtomPROTECT atoms = AtomBit [ctx, atoms, ABIT_PROTECT];
+
+    local atoms = atoms0 | oValid atoms0;
+    local Qmask = not aIsLight atoms;
+    atoms = atoms | Qmask;
+
+    local taken = zero atoms;			// removed from analysis
+    local idx = x_pack not taken;		// remaining atoms
+    local i, j, mask;
+
+    local Gconfig = [[],[],[],[]];
+    local env = [];				// environment atoms
+
+    if istrue opt.mdisconnect then
+	local patoms = atoms | AtomPROTECT atoms;
+	patoms = uniq cat append [aBonds patoms, patoms];
+	DisconnectMetals diff [atoms,patoms];
+	patoms = [];
+    endif
+
+	// fully protected molecules (all atoms protected and explicit) are
+	// removed to the environment - this is mostly to handle waters
+
+    function FullyProtected alist
+	if not andE (aExplicitHCount alist == aHCount alist) then
+	    return 0;
+	endif
+	if not andE AtomPROTECT alist then
+	    return 0;
+	endif
+	return 1;
+    endfunction
+
+    function StripProtectedMolecules []
+	local [i,m] = sam aMoleculeNumber atoms[idx];
+	local matoms = split [atoms[idx][i], mtoc m];
+	matoms = matoms | app FullyProtected matoms;
+	i = pack indexof [matoms, atoms];
+	taken[i] = 1;
+	idx = idx | not indexof [idx, i];
+    endfunction
+
+    StripProtectedMolecules [];
+
+	// pure alkane carbons are left as-is (in an attempt to rapidly
+	// partition the system).
+
+    const AS_IS = tr [
+	[ 0, '[CX4][i]'		],
+	[ 0, '[CX4][#X]'	],
+	[ 1, '[CX4]'		],
+	[ 0, '*'		]
+    ];
+
+    if orE (mask = AS_IS(1)[sm_Indexof [atoms[idx], AS_IS(2)]]) then
+	taken[idx|mask] = 1;
+	env = cat [env, atoms[idx|mask]];
+	idx = idx | not mask;
+    endif
+
+	// extract out the groups by searching the rules dictionary and
+	// then make sure that the system forms a partition.
+
+    local g;
+
+    for g = 1, length groups		// for each group...
+    while length idx			// while there are atoms...
+    loop
+
+	    // locate the groups of atoms that match the pattern and
+	    // make sure that the entire group is contained in the
+	    // set of so-far untaken atoms
+
+	local gmatch = MatchAtoms [groups(g)(G_SMARTS), atoms[idx]];
+	if not length gmatch then continue; endif
+
+	local gmask = groups(g)(G_GMASK);
+	local gmatoms = cat (gmatch || [gmask]);
+
+	gmatch = gmatch | app andE split [
+	    indexof [gmatoms, atoms[idx]], add gmask
+	];
+	if not length gmatch then continue; endif
+
+	local g_configs = rep [ [groups(g)(G_CONFIGS)], length gmatch];
+
+	    // remove those configurations that violate any of the
+	    // protection sets (element, etc.) that have been set up
+	    // also disallow charge changes on non-titratable groups
+
+	local f_at, f_el, f_ion, f_lp, f_geom;
+
+	for i = 1, length g_configs loop
+	    mask = (
+		   apt peek [g_configs(i), GC_FCHARGE] == add aIon gmatch(i)
+		or andE (Light gmatch(i) or not AtomNOTITRATE gmatch(i))
+	    );
+
+	    for j = 1, length g_configs(i) loop
+		if not mask(j) then continue; endif
+
+		[f_at,f_el,f_ion,f_lp,f_geom] = SetGroupConfiguration [
+		    [gmatch(i)], [gmask], [g_configs(i)(j)]
+		];
+
+		mask(j) = andE (not AtomELFIX f_at or (aElement f_at == f_el));
+		if not mask(j) then continue; endif
+
+		mask(j) = andE (not AtomPROTECT f_at or (
+			aHintLP f_at == f_lp
+		    and aIon f_at == f_ion
+		    and aGeometry f_at == f_geom
+		    and aElement f_at == f_el
+		));
+	    endloop
+
+	    g_configs(i) = g_configs(i) | mask;
+	endloop
+
+	    // add the groups and configurations to the list and remove
+	    // the taken atoms from the pool of unmatched atoms
+
+	Gconfig = apt cat [ Gconfig, [
+	    gmatch,
+	    g_configs,
+	    rep [ gmask, length gmatch],
+	    rep [ groups(g)(G_NAME), length gmatch]
+	]];
+
+	mask = indexof [atoms[idx], gmatoms];
+	taken[idx|mask] = 1;
+	idx = idx | not mask;
+    endloop
+
+//    taken = mput [zero atoms0, Qmask, taken];
+//    idx = x_pack not taken;
+//    print [t: clock[] - time0];
+
+    return [Gconfig, taken, idx, env, atoms];
+endfunction
+
+local function PrepareSystem [ctx, groups, dict, atoms0, opt]
+    opt = tagcat [opt, DEFAULTS];
+
+    function MatchAtoms [pattern, atoms]
+	local match = sm_MatchAtoms [pattern, atoms, dict];
+	if length (match = match | app length match) then
+	    match = match | m_uniq app sort match;
+	endif
+	return match;
+    endfunction
+
+    function AtomELFIX atoms = AtomBit [ctx, atoms, ABIT_ELFIX];
+    function AtomNOTITRATE atoms = AtomBit [ctx, atoms, ABIT_NOTITRATE];
+    function AtomPROTECT atoms = AtomBit [ctx, atoms, ABIT_PROTECT];
+
+    local atoms = atoms0 | not Light atoms0;
+
+    local taken = zero atoms;			// removed from analysis
+    local idx = x_pack not taken;		// remaining atoms
+    local i, j, mask;
+
+    local Gconfig = [[],[],[],[]];
+    local env = [];				// environment atoms
+
+    if ctx then
+	*ctx.progress_state = 'System Partition';
+    endif
+    Progress [0.0, ctx];
+
+    if istrue opt.mdisconnect then
+	local patoms = atoms | AtomPROTECT atoms;
+	patoms = uniq cat append [aBonds patoms, patoms];
+	DisconnectMetals diff [atoms,patoms];
+	patoms = [];
+    endif
+
+#if 0
+	// fully protected molecules (all atoms protected and explicit) are
+	// removed to the environment - this is mostly to handle waters
+
+    function FullyProtected alist
+	if not andE (aExplicitHCount alist == aHCount alist) then
+	    return 0;
+	endif
+	if not andE AtomPROTECT alist then
+	    return 0;
+	endif
+	return 1;
+    endfunction
+
+    function StripProtectedMolecules []
+	local [i,m] = sam aMoleculeNumber atoms[idx];
+	local matoms = split [atoms[idx][i], mtoc m];
+	matoms = matoms | app FullyProtected matoms;
+	i = pack indexof [matoms, atoms];
+	taken[i] = 1;
+	idx = idx | not indexof [idx, i];
+    endfunction
+
+    StripProtectedMolecules [];
+
+	// pure alkane carbons are left as-is (in an attempt to rapidly
+	// partition the system).
+
+    const AS_IS = tr [
+	[ 0, '[CX4][i]'		],
+	[ 0, '[CX4][#X]'	],
+	[ 1, '[CX4]'		],
+	[ 0, '*'		]
+    ];
+
+    if orE (mask = AS_IS(1)[sm_Indexof [atoms[idx], AS_IS(2)]]) then
+	taken[idx|mask] = 1;
+	env = cat [env, atoms[idx|mask]];
+	idx = idx | not mask;
+    endif
+
+	// extract out the groups by searching the rules dictionary and
+	// then make sure that the system forms a partition.
+
+    local g;
+
+    for g = 1, length groups		// for each group...
+    while length idx			// while there are atoms...
+    loop
+
+	    // locate the groups of atoms that match the pattern and
+	    // make sure that the entire group is contained in the
+	    // set of so-far untaken atoms
+
+	local gmatch = MatchAtoms [groups(g)(G_SMARTS), atoms[idx]];
+	if not length gmatch then continue; endif
+
+	local gmask = groups(g)(G_GMASK);
+	local gmatoms = cat (gmatch || [gmask]);
+
+	gmatch = gmatch | app andE split [
+	    indexof [gmatoms, atoms[idx]], add gmask
+	];
+	if not length gmatch then continue; endif
+
+	local g_configs = rep [ [groups(g)(G_CONFIGS)], length gmatch];
+
+	    // remove those configurations that violate any of the
+	    // protection sets (element, etc.) that have been set up
+	    // also disallow charge changes on non-titratable groups
+
+	local f_at, f_el, f_ion, f_lp, f_geom;
+
+	for i = 1, length g_configs loop
+	    mask = (
+		   apt peek [g_configs(i), GC_FCHARGE] == add aIon gmatch(i)
+		or andE (Light gmatch(i) or not AtomNOTITRATE gmatch(i))
+	    );
+
+	    for j = 1, length g_configs(i) loop
+		if not mask(j) then continue; endif
+
+		[f_at,f_el,f_ion,f_lp,f_geom] = SetGroupConfiguration [
+		    [gmatch(i)], [gmask], [g_configs(i)(j)]
+		];
+
+		mask(j) = andE (not AtomELFIX f_at or (aElement f_at == f_el));
+		if not mask(j) then continue; endif
+
+		mask(j) = andE (not AtomPROTECT f_at or (
+			aHintLP f_at == f_lp
+		    and aIon f_at == f_ion
+		    and aGeometry f_at == f_geom
+		    and aElement f_at == f_el
+		));
+	    endloop
+
+	    g_configs(i) = g_configs(i) | mask;
+	endloop
+
+	    // add the groups and configurations to the list and remove
+	    // the taken atoms from the pool of unmatched atoms
+
+	Gconfig = apt cat [ Gconfig, [
+	    gmatch,
+	    g_configs,
+	    rep [ gmask, length gmatch],
+	    rep [ groups(g)(G_NAME), length gmatch]
+	]];
+
+	mask = indexof [atoms[idx], gmatoms];
+	taken[idx|mask] = 1;
+	idx = idx | not mask;
+    endloop
+#else
+    [Gconfig,taken,idx,env,atoms] = PartitionSystem [
+	ctx, groups, dict, atoms0, opt
+    ];
+#endif
+
+	// groups not found in the rules table are assigned default
+	// rules from here on
+
+    function RenderIon atoms
+	if isfalse opt.render then return; endif
+	aClearLabel atoms;
+	aSetColorBy [atoms, 'element'];
+	aSetNucleusLook [atoms, 'small-sphere'];
+	aSetLabelElement [atoms, 1];
+    endfunction
+
+	// force Group I, II, VII, VII isolated atoms as ions and
+	// add them directly to the environment
+
+    const ISOLATED = tr [
+	[ '[#Q#G1;Q0]',		 1	],
+#if 0
+	[ '[#G2!#T;Q0]',	 2	],
+#else
+	[ '[#G2;Q0]',		 2	],
+#endif
+	[ '[#G7;Q0]',		-1	],
+	[ '[#G8;Q0]',		 0	]
+    ];
+
+    if orE (i = sm_Indexof [atoms[idx], ISOLATED(1)]) then
+	i | AtomPROTECT atoms[idx] = 0;
+	local iso_atoms = atoms[idx] | i;
+	taken[idx|i] = 1;
+	idx = idx | not i;
+	env = cat [env, iso_atoms];
+	aSetIon [iso_atoms, ISOLATED(2)[pack i]];
+	oDestroy cat LightBonds iso_atoms;
+	RenderIon iso_atoms;
+    endif
+
+	// extend the environment to include include alkane carbons
+	// that are attached solely to alkane carbons or taken atoms
+
+    local alkane = sm_Match ['[CX4]', atoms];	// starting alkanes
+    local xbond = BondGraph atoms;		// get bond graph
+    local deg = app length xbond;
+
+    loop
+	mask = alkane[idx] and (
+	    app andE split [(alkane or taken)[cat xbond[idx]], deg[idx]]
+	);
+	if not orE mask then break; endif
+	taken[idx|mask] = 1;
+	env = cat [env, atoms[idx|mask]];
+	idx = idx | not mask;
+    endloop
+
+    alkane = xbond = deg = [];
+
+	// the remaining connected components consist of molecules
+	// for which we need tautomer / pKa data and have not been
+	// partitioned or identified by the rules.  We create/invent
+	// rules for these groups
+
+    local unksmi = [];
+    local add_env = [];
+
+    if length idx then
+	local unklist = graph_ccomponent_list BondGraph atoms[idx];
+	unklist = split [atoms[idx[cat unklist]], app length unklist];
+
+	unksmi = app sm_ExtractUnique unklist;
+
+#if 1
+	local uconfigs = rep [[], length unksmi];
+
+	for i = 1, length unklist loop
+	    local uctab = ctab_Extract [unklist(i)];
+	    uctab(1)(CTAB_A_NUM) = x_id unklist(i);
+
+	    local uc = [];
+	    uc(GC_ESELF) = 0;
+	    uc(GC_PKA) = 0;
+	    uc(GC_FCHARGE) = add aCharge unklist(i);
+	    uc(GC_SMILES) = sm_ExtractFromCTAB [uctab];
+
+//	    local sm_order = (sm_BuildParse uc(GC_SMILES))(1)(CTAB_A_NUM);
+	    local sm_order = uc(GC_CTAB)(1)(CTAB_A_NUM);
+
+	    add_env = append [add_env, diff [unklist(i), unklist(i)[sm_order]]];
+	    unklist(i) = unklist(i)[sm_order];
+
+	    uctab = ctab_Extract [unklist(i)];
+	    uctab(1)(CTAB_A_NUM) = x_id unklist(i);
+	    uc(GC_SMILES) = sm_ExtractFromCTAB [uctab];
+
+	    uconfigs(i) = tr uc;
+	endloop
+#else
+	local uconfigs = rep [[], length unklist];
+#endif
+
+	local uname = tok_cat ['>>', unksmi, '<<'];
+	local upattern = '?';
+	local ugmask = apt rep [1, app length unklist];
+
+	Gconfig = apt cat [ Gconfig, [
+	    unklist,
+	    uconfigs,
+	    ugmask,
+	    uname
+	]];
+
+	unksmi = uniq unksmi;
+	env = cat append [add_env, env];
+    endif
+
+    RenderIon (atoms | sm_Match ['[#Q;Q0!+0]', atoms]);
+    Progress [1.0, ctx];
+
+	// collect the configurations by atom set and merge the configuration
+	// lists and identify those groups with a single configuration and
+	// promote them to the environment provided that they are not
+	// subject to rigid rotations
+
+#   if 0
+    [idx, mask] = sam tr [Gconfig(1), Gconfig(3)];
+
+    Gconfig = [
+	Gconfig(1)[idx] | mask,
+	app cat split [Gconfig(2)[idx], mtoc mask],
+	Gconfig(3)[idx] | mask,
+	Gconfig(4)[idx] | mask
+    ];
+#   endif
+
+    if opt.verbose then
+	ReportPartition [groups, env, Gconfig];
+	if length unksmi then
+	    write 'unknown groups:\n';
+	    apt write ['    {}\n', unksmi];
+	endif
+    endif
+
+    local xgroup = graph_hyperneighbors (Gconfig(1) || Gconfig(3));
+
+    if orE app length xgroup then
+	write ['>>> WARNING! INVALID PARITION OF THE SYSTEM\n'];
+	aSetSelected [Gconfig(1) | app length xgroup, 1];
+	exit 'Internal Error (invalid partition of the system)';
+    endif
+
+	// remove any groups that have no configurations and promote
+	// them to the environment (where they will be left as-is)
+
+    if orE (mask = (app length Gconfig(2) <= 0)) then
+	idx = x_pack mask;
+	env = cat append [Gconfig(1)[idx], env];
+	Gconfig = Gconfig || [not mask];
+    endif
+
+	// Adjust the self energies of all of the configurations to
+	// include the pH-dependent energies based upon titrations
+
+    for i = 1, l_length Gconfig loop
+	Gconfig(2)(i) = AdjustSelfEnergies [Gconfig(2)(i), opt.pH, opt.T];
+    endloop
+
+	// adjust the hydrogens of the atoms in the environment; that is,
+	// those not in tautomer/titratable groups
+
+    mask = (aHCount env <> aExplicitHCount env and not AtomPROTECT env);
+    oDestroy LightBonds (env | mask);
+    AdjustValence env;
+
+    env = ExtendLight env;
+    SetCharges env;
+
+	// extract conformations from the groups while minimizing the
+	// number of system edits
+
+    *ctx.progress_state = 'Conformer Generation';
+
+    Progress [0, ctx];
+    Progress [1e-6, ctx];
+
+    local Gconf = [
+	rep [[], l_length Gconfig],
+	rep [[], l_length Gconfig],
+	rep [[], l_length Gconfig]
+    ];
+
+    local Gidx = igen l_length Gconfig;
+    local Gi = 0;
+    local Glength = max [0, max app length Gconfig(2)];
+
+	// Temporarily disable drawing of VDW contacts and H-bonds,
+	// which would slow down the calculation if left on.
+
+    local dvar = dvar_open [];			// disable (slow) contacts
+    dvar_lock dvar;
+    *dvar.draw_hbonds = DrawHBonds [];
+    *dvar.draw_vdw = DrawVDWContacts [];
+    DrawHBonds 0;
+    DrawVDWContacts 0;
+
+	// Cleanup: this task will wake up if the main task is killed
+	// and restore the state of drawing the VDW contacts and H-bonds
+	// to its original value.
+
+    local [tid, tcode]= task_fork [prio:0];
+    if tcode == 'child' then
+	dvar = dvar_open dvar;
+	dvar_lock dvar;
+	DrawHBonds *dvar.draw_hbonds;
+	DrawVDWContacts *dvar.draw_vdw;
+	dvar_close dvar;
+	exit[];
+    endif
+
+    loop
+	Gi = Gi + 1;
+	Gidx = Gidx | Gi <= app length Gconfig(2)[Gidx];
+	if not length Gidx then break; endif
+
+	local old_prio = task_prio 0;
+	local old_ion    = aIon      Gconfig(1)[Gidx];
+	local old_hintlp = aHintLP   Gconfig(1)[Gidx];
+	local old_geom   = aGeometry Gconfig(1)[Gidx];
+	local old_el     = aElement  Gconfig(1)[Gidx];
+	local old_name   = aName     Gconfig(1)[Gidx];
+
+	SetGroupConfiguration [
+	    Gconfig(1)[Gidx],
+	    Gconfig(3)[Gidx],
+	    apt peek [Gconfig(2)[Gidx], Gi]
+	];
+
+	local ga = cat (Gconfig(1)[Gidx] || Gconfig(3)[Gidx]);
+
+	mask = (aHCount ga <> aExplicitHCount ga and not AtomPROTECT ga);
+	oDestroy LightBonds (ga | mask);
+	AdjustValence ga;
+	SetCharges ExtendLight ga;
+
+	for i in Gidx loop
+	    local [gatoms, gmols, gself] = GenerateConformations [
+		ctx, Gconfig(1)(i) | Gconfig(3)(i), opt
+	    ];
+
+	    local [self, pKa] = Gconfig(2)(i)(Gi)[[1,2]];
+	    if isnull Gconf(1)(i) then Gconf(1)(i) = gatoms; endif
+
+	    Gconf(2)(i) = cat [Gconf(2)(i), gmols];
+	    Gconf(3)(i) = cat [Gconf(3)(i), gself + self];
+	endloop
+
+	ga = Gconfig(1)[Gidx];
+	aSetName     [ga, old_name  ];
+	aSetElement  [ga, old_el    ];
+	aSetHintLP   [ga, old_hintlp];
+	aSetGeometry [ga, old_geom  ];
+	aSetIon      [ga, old_ion   ];
+	task_prio old_prio;
+
+	Progress [Gi / (Glength + 1e-6), ctx];
+    endloop
+
+    Progress [1.0, ctx];
+
+    if orE (mask = (app length Gconf(2) == 1)) then
+	idx = x_pack mask;
+	BuildMOL mol_Cat app first Gconf(2)[idx];
+	env = uniq cat append [Gconf(1)[idx], env];
+	env = ExtendLight env;
+	Gconf = Gconf || [not mask];
+	SetCharges env;
+    endif
+
+	// Cleanup: restore the state of drawing contacts & h-bonds.
+	// If possible, it is safer to do it immediately here,
+	// so that we don't have to rely on the cleanup task
+	// finishing before this functions is called again.
+
+    DrawHBonds *dvar.draw_hbonds;
+    DrawVDWContacts *dvar.draw_vdw;
+    task_kill tid;		// cleanup task not needed any more
+    dvar_unlock dvar;
+    dvar_close dvar;
+
+	// prepare the final data structures for the system
+
+    local Iseg = app length Gconf(2);
+    local mlist = cat Gconf(2);
+    local Eself = cat Gconf(3);
+    local envmol = ExtractMOL env;
+
+    if opt.verbose then
+	local smean = add Iseg * invz length Iseg;
+	write ['    states  : {n:4}\n', uniq sort Iseg];
+	write ['            : {n:4}\n', freq [uniq sort Iseg, Iseg]];
+	write ['    average : {n:.1f} (deviation {n:.2f})\n',
+	    smean,
+	    sqrt (invz max [0, dec length Iseg] * add sqr (Iseg - smean))
+	];
+    endif
+
+    return [Gconf(1), Iseg, Eself, envmol, mlist];
+endfunction
+
+#if 0
+// WaterExposure returns the fractional solvent exposure of a given
+// water molecule.  We use a dot surface
+
+local function WaterExposure [OH2, atoms]
+    atoms = atoms | aAtomicNumber atoms > 1;	// truly heavy only
+
+    const WRAD = 1.4;				// water radius
+
+    local vdwR = ATOM_TYPE(AT_VDWR)[AtomType atoms] + WRAD;
+    local max_vdwR = max [1, max vdwR];
+
+    local prox = prox_open [max_vdwR, aPos atoms, max_vdwR];
+    local fibsphere = (WRAD + WRAD) * FibonacciSphere 610;
+    local frac = zero OH2;
+
+    local i;
+
+    for i = 1, length OH2 loop
+	local [seg,idx,r2] = prox_find [prox, aPos OH2(i) + fibsphere, 0];
+	frac(i) = add not seg / l_length fibsphere;
+    endloop
+
+    prox_close prox;
+
+    return frac;
+endfunction
+#endif
+
+// SystemOptimization takes a problem instance [Iseg,E0,Eself,Eij,Eint] and
+// calls the UQO function to determine the optimal configuration
+
+local function EmitUQO [x, E, iter, mlist]
+    BuildMOL mol_Cat mlist[x];
+    return 0;
+endfunction
+
+local function SystemOptimization [ctx, mlist, [Iseg,E0,Eself,Eij,Eint], opt]
+    *ctx.progress_state = 'System Optimization';
+    Progress [0, ctx];
+
+    local [x] = opt_UQO [ [Iseg, E0, Eself, Eij, Eint], [
+	maxnoemit:	15000,
+	maxit:		100000,
+	cutoff:		0,
+	emit_fcn:	#EmitUQO,
+	emit_fcn_arg:	mlist,
+	verbose:	istrue opt.verbose
+    ]];
+#   if 0
+    x = first opt_UQO_Quench [ [Iseg, E0, Eself, Eij, Eint], x, [
+	verbose: istrue opt.verbose
+    ]];
+#   endif
+
+    Progress [1.0, ctx];
+    return x;
+endfunction
+
+// CorrectResNames corrects inconsistently named HIE,HID,etc. names
+
+local function CorrectResNames atoms
+    const HIS_TABLE = tr [
+	[ 'HID', '[nX3H]1[cX3H][nX2][cX3H][cX3]1[CX4][CX4]'	], // d
+	[ 'HID', '[nX2-]1[cX3H][nX2][cX3H][cX3]1[CX4][CX4]'	], // d (-)
+	[ 'HIE', '[nX2]1[cX3H][nX3H][cX3H][cX3]1[CX4][CX4]'	], // e
+	[ 'HIE', '[nX2]1[cX3H][nX2-][cX3H][cX3]1[CX4][CX4]'	], // e (-)
+	[ 'HIP', '[nX3H]1[cX3H][nX3H][cX3H][cX3]1[CX4][CX4]'	]  // +
+    ];
+
+    local idx = sm_Indexof [atoms, HIS_TABLE(2)];
+
+    [atoms,idx] = [atoms,idx] || [idx];
+    [atoms,idx] = [atoms,idx] || [m_uniq oParent atoms];
+    [atoms,idx] = [atoms,idx] || [rName oParent atoms <> HIS_TABLE(1)[idx]];
+    [atoms,idx] = [atoms,idx] || [
+//	indexof [rName oParent atoms, cat['HIS',HIS_TABLE(1)]]
+	indexof [rName oParent atoms, HIS_TABLE(1)]
+    ];
+
+    rSetName [oParent atoms, HIS_TABLE(1)[idx]];
+endfunction
+
+// Protonate3D is the main entry point for effecting the protonation
+// calculation.  We accept the collection of atoms upon which we operate
+// and we partition the system accordingly and set the states.
+
+global function Protonate3D [
+    calcatoms, titratoms, flipatoms, protatoms, watratoms, opt
+]
+
+// lmw - addition START (5/5/2014)
+    local function filterSingleAtomResAtoms atoms
+        local resatoms = atoms | aElement atoms <> 'H';
+        local tmpResidues = uniq cat aResidue atoms;        
+        local singleAtomResidueAtoms = uniq cat rAtoms (tmpResidues | freq [tmpResidues,aResidue resatoms] == 1);
+        return diff [atoms, singleAtomResidueAtoms];
+    endfunction
+    flipatoms = filterSingleAtomResAtoms flipatoms;
+// lmw - addition END
+
+    opt = tagcat [opt, DEFAULTS];
+    opt = opt | indexof [tags opt, tags DEFAULTS];
+
+    opt.verbose = istrue opt.verbose;
+
+    opt.ele_cutoff  = max [1.0, opt.ele_cutoff];
+    opt.vdw_cutoff  = max [1.0, opt.vdw_cutoff];
+    opt.d_in	    = max [1.0, opt.d_in];
+    opt.d_out	    = max [1.0, opt.d_out];
+    opt.T	    = max [1.0, opt.T];
+    opt.ionC	    = max [0.0, opt.ionC];
+    opt.pH	    = max [-10.0, opt.pH];
+
+    local idx, mask;
+
+    local Qatoms = calcatoms | aAtomicNumber calcatoms > 1;
+    local Qel = aElement Qatoms;
+
+	// if verbose then write out our command and start the logging
+	// and load up our rule file
+
+    if opt.verbose then
+	write ['Protonate 3D [\n'];
+	write ['    [] // ... {} atoms ...\n', length calcatoms];
+	write [',   [] // ... {} titrate atoms ...\n', length titratoms];
+	write [',   [] // ... {} flip atoms ...\n', length flipatoms];
+	write [',   [] // ... {} protected atoms ...\n', length protatoms];
+	write [',   [] // ... {} precise atoms ...\n', length watratoms];
+	write [',   [\n'						];
+	write ['    ,   vdw        : \'{}\'\n',		opt.vdw		];
+	write ['    ,   vdw_cutoff : {n:.2f}\n',	opt.vdw_cutoff	];
+	write ['    ,   ele        : \'{}\'\n',		opt.ele		];
+	write ['    ,   ele_cutoff : {n:.2f}\n',	opt.ele_cutoff	];
+	write ['    ,   d_in       : {n:.2f}\n',	opt.d_in	];
+	write ['    ,   d_out      : {n:.2f}\n',	opt.d_out	];
+	write ['    ,   T          : {n:.2f}\n',	opt.T		];
+	write ['    ,   ionC       : {n:.2f}\n',	opt.ionC	];
+	write ['    ,   pH         : {n:.2f}\n',	opt.pH		];
+	write ['    ,   rulefile   : \'{}\'\n',		opt.rulefile	];
+	write ['    ,   verbose    : {}\n',		opt.verbose	];
+	write ['    ]\n'						];
+	write ['];\n'];
+	write ['Protonate 3D ({n:.2f}) started {}\n',
+	    (modenv[]).version, asctime[]
+	];
+    endif
+
+    local time0 = clock[];				// base time
+    local dict = sm_Create [];				// matching dictionary
+    local groups = LoadRules [opt.rulefile, dict];	// load the rules
+    local ctx = dvar_open [];				// our context
+
+    Progress_open [ctx, opt.verbose];
+
+	// prepare the atoms by removing inert atoms and dummy atoms
+	// then decide which waters are to be treated as incidental.
+	// analyze the protected atoms' hydrogens to see which hydrogens
+	// we must keep if at all possible
+
+    function GetAtoms obj
+	local atoms = uniq cat oAtoms obj;
+	atoms = atoms | not (
+		aAtomicNumber atoms == 0 and aBondCount atoms == 0
+	    and aCharge atoms == 0
+	);
+	atoms = atoms | not aInert atoms;
+	return atoms[x_sort aNumber atoms];
+    endfunction
+
+    calcatoms = GetAtoms calcatoms;
+    titratoms = GetAtoms titratoms;
+    flipatoms = GetAtoms flipatoms;
+    protatoms = GetAtoms protatoms;
+    watratoms = GetAtoms watratoms;
+
+    protatoms = uniq cat append [			// extend protection
+	aBonds (protatoms | Light protatoms), protatoms
+    ];
+
+    function FreeWater atoms				// unprotected H's OH2
+	atoms = atoms | sm_Match [ '[OQ0]', atoms ];
+	atoms = atoms | not indexof [ atoms, watratoms ];
+	local nbr = LightBonds atoms;
+	local f = s_add [notnot indexof [cat nbr, protatoms], app length nbr];
+	return atoms | not f;
+    endfunction
+
+    local incidental_OH2 = FreeWater calcatoms;
+
+    local atoms = diff [
+	calcatoms,
+	uniq cat append [LightBonds incidental_OH2, incidental_OH2]
+    ];
+
+	// prepare our flag set lookup context 'aflag' by creating a
+	// prox and a bitmask for each atom.
+
+    flipatoms = join [atoms, flipatoms];
+    flipatoms = diff [flipatoms, protatoms];
+    flipatoms = flipatoms | not Light flipatoms;
+
+    titratoms = join [atoms, titratoms];
+    titratoms = diff [titratoms, protatoms];
+    titratoms = titratoms | not Light titratoms;
+
+    local allatoms = uniq cat [atoms, flipatoms, titratoms, protatoms];
+    local aflag_prox = prox_open [0.25, [oSerialNumber allatoms], 0.25];
+
+    local aflag_bits = zero allatoms;
+
+    idx = x_pack not indexof [allatoms, flipatoms];
+    aflag_bits[idx] = bitor [aflag_bits[idx], ABIT_ELFIX];
+
+    idx = x_pack not indexof [allatoms, titratoms];
+    aflag_bits[idx] = bitor [aflag_bits[idx], ABIT_NOTITRATE];
+
+    idx = x_pack indexof [allatoms, protatoms];
+    aflag_bits[idx] = bitor [aflag_bits[idx], ABIT_PROTECT];
+
+    *ctx.aflag_prox = aflag_prox;
+    *ctx.aflag_bits = aflag_bits;
+
+    allatoms = titratoms = flipatoms = [];
+
+	// start the calculation in earnest
+
+    local [atomset, Iseg, Eself, envmol, mlist] = PrepareSystem [
+	ctx, groups, dict, atoms, opt
+    ];
+    BuildMOL mol_Cat apt peek [
+	split [mlist, Iseg], app x_min split [Eself,Iseg]
+    ];
+    atoms = ExtendLight (atoms | oValid atoms);
+
+    local E0 = 0, Eij = rep [[], length Eself], Eint = Eij;
+    local r;
+
+	// create the van der Waals interaction matrix by applying
+	// the requested functional form to the system
+
+    if not (token opt.vdw === '' or token opt.vdw === 'None') then
+	*ctx.progress_state = 'Energy Matrix VDW';
+	[Iseg,E0,Eself,Eij,Eint] = uqo_MatrixVDW [
+	    [Iseg,E0,Eself,Eij,Eint], envmol, mlist,
+	    [
+		vdwfcn:		opt.vdw,
+		rcutoff:	max [3.0, opt.vdw_cutoff],
+		EE:		0,
+		EM:		1,
+		MM:		1,
+		Mself:		0,
+		progfcn:	#Progress,
+		progfcn_arg:	ctx,
+		verbose:	0
+	    ],
+	    /* MEM */ Iseg = E0 = Eself = Eij = Eint = []
+	];
+    endif
+
+	// if we are using generalized born then calculate the self
+	// energies with mean field analysis
+
+    if opt.ele == 'GB' then
+	*ctx.progress_state = 'Born Self Energy';
+	[envmol, mlist] = uqo_BornSelfEnergy [
+	    [Iseg, E0, Eself, Eij, Eint], envmol, mlist,
+	    [
+		rcutoff:	max [3.0, opt.ele_cutoff],
+		MOL_ATOM_SOL_R:	MOL_ATOM_SOL_R,
+		MOL_ATOM_SOL_S:	MOL_ATOM_SOL_S,
+		MOL_ATOM_SOL_G:	MOL_ATOM_SOL_G,
+		MOL_ATOM_SOL_G0:MOL_ATOM_SOL_G0,
+		progfcn:	#Progress,
+		progfcn_arg:	ctx,
+		verbose:	0
+	    ],
+	    /* MEM */ envmol = mlist = []
+	];
+    endif
+
+	// calculate the electrostatic contribution to the UQO problem:
+	//    -	calculate the interactions using the full born factors
+	//    -	if titrating, subtract out the isolated group energies
+
+    local ele_opt = [
+	elefcn:		opt.ele,
+	d_in:		opt.d_in,
+	d_out:		opt.d_out,
+	T:		opt.T,
+	ionC:		opt.ionC,
+	rcutoff:	max [3.0, opt.ele_cutoff],
+	EE:		0,
+	EM:		1,
+	MM:		1,
+	Mself:		0,
+	MOL_ATOM_SOL_X:	MOL_ATOM_SOL_X,
+	verbose:	0
+    ];
+
+    if not (token opt.ele === '' or token opt.ele === 'None') then
+	if opt.ele == 'GB' then
+	    *ctx.progress_state = 'Isolated Group Energy';
+	    Progress [0, ctx];
+
+	    for r = 1, length mlist loop
+		Eself(r) = Eself(r) - second uqo_MatrixELE [
+		    [[], 0, 0, [], []], mlist(r), [],
+		    tagcat reverse [ele_opt, [
+			EE:		1,
+			EM:		0,
+			MM:		0,
+			Mself:		0,
+			MOL_ATOM_SOL_G:	MOL_ATOM_SOL_G0
+		    ]]
+		];
+	    endloop
+
+	    Progress [1, ctx];
+	endif
+
+	*ctx.progress_state = 'Energy Matrix ELE';
+	[Iseg,E0,Eself,Eij,Eint] = uqo_MatrixELE [
+	    [Iseg,E0,Eself,Eij,Eint], envmol, mlist,
+	    tagcat reverse [ele_opt, [
+		EE:		0,
+		EM:		1,
+		MM:		1,
+		Mself:		opt.ele == 'GB',
+		MOL_ATOM_SOL_G:	MOL_ATOM_SOL_G,
+		progfcn:	#Progress,
+		progfcn_arg:	ctx
+	    ]],
+	    /* MEM */ Iseg = E0 = Eself = Eij = Eint = []
+	];
+    endif
+
+	// simplify the interaction matrix by removing zero (small)
+	// energies and recenter the self energies
+
+    for r = 1, l_length [Eij, Eint] loop
+	if orE (mask = abs Eint(r) < 1e-6) then
+	    mask = not mask;
+	    Eij(r) = Eij(r) | mask;
+	    Eint(r) = Eint(r) | mask;
+	endif
+    endloop
+
+    local Emin = s_min [Eself, Iseg];
+    E0 = E0 + add Emin;
+    Eself = Eself - stretch [Emin, Iseg];
+
+    Emin = mask = [];
+
+    if opt.verbose then
+	write 'Protonate 3D: Matrix:\n';
+	write ['    size    : {n:.9g} x {n:.9g}, {n:.2f}% fill-in\n',
+	    length Eij, length Eij,
+	    100 * add app length Eij * invz sqr length Eij
+	];
+	write ['    values  : min: {}, max: {}\n',
+	    min minE [0, app min Eint],
+	    max maxE [0, app max Eint]
+	];
+	write ['    Eself   : min: {}, max: {}\n',
+	    min Eself,
+	    max Eself
+	];
+    endif
+
+    local x = SystemOptimization [ctx, mlist, [Iseg,E0,Eself,Eij,Eint], opt];
+    BuildMOL mol_Cat mlist[x];
+    atoms = ExtendLight (atoms | oValid atoms);
+    SetCharges atoms;
+
+    CorrectResNames atoms;
+
+	// place the remaining water molecules separately using the
+	// current solution as the environment atoms
+
+    if length incidental_OH2 then
+	IncidentalWaters [ctx, atoms, incidental_OH2, opt];
+    endif
+
+	// Calculate charge using forcefield method
+
+    local qatoms = Atoms [];
+    qatoms = qatoms | m_join [
+	aMoleculeNumber qatoms,
+	uniq aMoleculeNumber atoms
+    ];
+    local q = first PartialCharge [qatoms, 'FF'];
+    [qatoms, q] = [qatoms, q] || [indexof [qatoms, atoms]];
+    aSetCharge [qatoms, q];
+
+
+	// write out some (interesting) information and then close shop
+
+    if opt.verbose then
+	local [stage,stage_time] = tr *ctx.progress_timing;
+	if l_length [stage,stage_time] then
+	    write ['Protonate 3D: Timing:\n'];
+	    local tfmt = twrite [
+		'    {{-{}} : {{n:8.2f} sec\n', max [2, max tok_length stage]
+	    ];
+	    apt write [tfmt, stage, stage_time];
+	endif
+    endif
+
+	// prepare a list of "flipped" residues
+
+    if opt.verbose then
+	Qatoms = Qatoms | Qel <> aElement Qatoms;
+	Qatoms = Qatoms[x_sort aNumber Qatoms];
+	local fres = uniq oParent Qatoms;
+
+	oSetCollection ['Protonate3D_Flipped', fres];
+
+	if length fres then
+	    write 'Protonate 3D: Flipped Residues\n';
+	    fres = apt write [
+		'    {n:4} : {t:-4}{n:4}{c:1}\n',
+		cNumber oParent fres,
+		rName fres, rUID fres, rINS fres
+	    ];
+	endif
+
+    endif
+
+	// copy the temperature factors of unprotected protons
+
+    atoms = diff [Atoms[], protatoms];
+    atoms = atoms | sm_Match ['[#1X1Q1]', atoms];
+    aSetTempFactor [atoms, aTempFactor app first aBonds atoms];
+
+    if opt.verbose then
+	write ['Protonate 3D ({n:.2f}) done {} ({n:.2f} seconds total)\n',
+	    (modenv[]).version, asctime[], clock[] - time0
+	];
+    endif
+
+    local timing = *ctx.progress_timing;
+
+    prox_close aflag_prox;			// close sets
+    Progress_close ctx;
+    dvar_close ctx;
+    sm_Destroy dict;
+
+    // return second untag timing;	// uncomment for rk's timing loop
+endfunction
+
+// --------------------- INCIDENTAL WATER OPTIMIZATION ------------------------
+
+// We optimize incidental waters by freezing the solute atoms and adding
+// the waters one at a time in order of the estimated binding energy.
+
+const TIP3P = tr [
+	      [0,0,0],
+     0.9572 * [cos (PI/180 *  104.52/2), sin (PI/180 *  104.52/2), 0],
+     0.9572 * [cos (PI/180 * -104.52/2), sin (PI/180 * -104.52/2), 0]
+];
+const TIP3P_Q = [-0.834, 0.417, 0.417];
+
+const TIP5P = tr [
+	      [0,0,0],
+     0.9572 * [cos (PI/180 *  104.52/2), sin (PI/180 *  104.52/2), 0],
+     0.9572 * [cos (PI/180 * -104.52/2), sin (PI/180 * -104.52/2), 0],
+    -0.7000 * [cos (PI/180 *  109.47/2), 0, sin (PI/180 *  109.47/2)],
+    -0.7000 * [cos (PI/180 * -109.47/2), 0, sin (PI/180 * -109.47/2)]
+];
+const TIP5P_Q = [ 0.000, 0.241, 0.241, -0.241, -0.241 ];
+
+local function WaterGeometry [model, tol]
+    local MAXDEV = max [0.1, tol];			// 0.35 is good
+
+    local pos0 = TIP3P, watQ = TIP3P_Q, sym  = [1,3,2];
+
+    if model == 'TIP5P' then
+	pos0 = TIP5P;
+	watQ = TIP5P_Q;
+	sym  = [1,3,2,5,4];
+    endif
+
+    local nconf = 0, conf = [], geom = [];
+
+    function maxdev p0
+	local i;
+	local p1 = apt get [p0, [sym]];
+
+	for i = 1, nconf loop
+	    if max norm (conf(i) - p0) < MAXDEV then return 0; endif
+	    if max norm (conf(i) - p1) < MAXDEV then return 0; endif
+	endloop
+
+	return 1;
+    endfunction
+
+    local old_seed = randseed 1234;
+    local nfail = 0;
+
+    for 10000 while nfail < 500 loop
+	local R = quat2mat vnormalize (randU [2,2,2,2] - 1);
+	local p = matmul [R, pos0];
+	if maxdev p then
+	    conf(nconf = inc nconf) = p;
+	    geom(nconf) = cat tr p;
+	    nfail = 0;
+	else
+	    nfail = inc nfail;
+	endif
+    endloop
+
+    return [apt cat geom, watQ];
+endfunction
+
+#if 0
+local function WaterELE [r, rcutoff]
+    r = maxE [0.5, r];
+    return (inv r - inv rcutoff + (r - rcutoff) * inv sqr rcutoff);
+endfunction
+#elseif 0
+local function WaterELE [r, rcutoff]
+    r = maxE [0.5, r];
+    return (inv r - inv rcutoff);
+endfunction
+#else
+local function WaterELE [r, rcutoff]
+    r = maxE [0.5, r];
+    return 0.25 * (inv sqr r - inv sqr rcutoff);
+endfunction
+#endif
+
+// WaterSelfEnergy calculates the water self energy block for a given set of
+// point charges.  We adapt to the water geometry
+
+local function WaterSelfEnergy [wgeom, watQ, pos, q, rcut]
+    local i, j;
+    local Eself = rep [0, l_length wgeom];
+
+    watQ = COULOMB_SCALE * watQ;
+
+    for i = 1, l_length wgeom loop
+	local watA = split [apt peek [wgeom, i], 3];
+	for j in x_pack (watQ <> 0) loop
+	    Eself(i) = Eself(i) + (
+		watQ(j) * add (q * WaterELE [norm (watA(j) - pos), rcut])
+	    );
+	endloop
+    endloop
+
+    return Eself + 1e-6 * frank Eself;	// in case no environment!
+endfunction
+
+#if 0
+// WaterInteractionMatrix calculates an Ngeom by Ngeom matrix of interaction
+// energies for two waters one of which is assumed to be at the origin.
+
+local function WaterInteractionMatrix [wgeom, watQ, O2pos, rcutoff]
+    local i, j, k;
+
+    local CwatQ = COULOMB_SCALE * watQ;
+    local watB = split [wgeom,3] + [O2pos];
+    local Emat = rep [ [], l_length wgeom ];
+
+    for i = 1, l_length wgeom loop
+	local watA = split [apt peek [wgeom, i], 3];
+	local E = 0;
+
+	for j in x_pack (watQ <> 0) loop
+	for k in x_pack (watQ <> 0) loop
+	    E = E + CwatQ(j) * watQ(k) * (
+		WaterELE [ norm (watA(j) - watB(k)), rcutoff ]
+	    );
+	endloop
+	endloop
+
+	Emat(i) = E;
+    endloop
+
+    return Emat;
+endfunction
+#endif
+
+// EmitWaterConfig outputs the geometries of a bunch of water molecules during
+// the UQO optimization.  We assigne the charges.
+
+local function EmitWaterConfig [x, E, iter, [Oatoms, wgeom, watQ]]
+    local i;
+
+    x = inc mod [dec x, l_length wgeom];
+
+    for i = 1, length Oatoms loop
+	local H = cat aBonds Oatoms(i);
+	local Hpos = tr (split [apt peek [wgeom, x(i)],3])[[2,3]];
+	aSetPos [H, Hpos + aPos Oatoms(i)];
+    endloop
+
+    return 0;
+endfunction
+
+// IncidentalWaters is the entry point to assign hydrogen atoms to water
+// molecules assuming that the remaining solute is fixed and complete.
+// We use a clustering procedure to divide the water molecules into smaller
+// and (assumed) independent groups.
+
+local function IncidentalWaters [ctx, atoms, OH2, opt]
+    OH2 = OH2 | aAtomicNumber OH2 > 1;
+    if not length OH2 then return; endif
+    local Nwat = length OH2;
+
+    *ctx.progress_state = 'Incidental Waters';
+    Progress [0,ctx];
+
+	// make sure that there are no lone pairs and exactly two hydrogens
+	// on each of the oxygen atoms
+
+    local Odel = cat aBonds OH2;
+    oDestroy (Odel = Odel | aAtomicNumber Odel <> 1);
+
+    aSetIon [OH2, 0];
+    aSetGeometry [OH2, 'sp3'];
+    Add_H OH2;
+
+    local Hatoms = aBonds OH2;
+
+    aSetIon [Hatoms, 0];
+    aSetGeometry [Hatoms, 'sp3'];
+    aSetName [Hatoms, [['H1','H2']]];
+
+    aSetCharge [Hatoms, 0.417];
+    aSetCharge [OH2, -0.834];
+
+	// calculate the external electric field vector at each
+	// water position this will be the external dipole field
+
+    function DipoleField [dip, pos, q]
+	local dir = (dip - pos), r = norm dir;
+	return -COULOMB_SCALE * app add ([q * invz cube r] * dir);
+    endfunction
+
+    const ELE_CUTOFF = 15.0;
+
+    local Opos = aPos OH2;
+    local env_pos = aPos atoms, env_Q = aCharge atoms;
+
+    local prox = prox_open [ELE_CUTOFF, env_pos, ELE_CUTOFF];
+    local Evec = rep [[], length OH2];
+
+    local i, seg, idx, r2, Oi;
+
+    for i = 1, l_length Opos loop
+	Oi = apt peek [Opos, i];
+	[seg,idx,r2] = prox_find [prox, Oi, 0];
+	Evec(i) = DipoleField [Oi, apt get [env_pos,[idx]], env_Q[idx]];
+    endloop
+
+    prox_close prox;
+
+	// generate the water geometry and repeatedly solve for the
+	// most bound water of the remaining waters
+
+    local [wgeom,watQ] = WaterGeometry ['TIP3P', 0.35];
+
+	// BindingEnergy calculates a binding energy of water modeled
+	// as a dipole free energy in an external field
+
+    function BindingEnergy Evec
+	local pE = 0.489 * maxE [1e-8, norm Evec];
+	local kT = KBOLTZ * 300;
+	local x = pE / kT, exp_x = exp x, exp_mx = exp (-x);
+	return -pE * ( (exp_x + exp_mx) / (exp_x - exp_mx) - inv x );
+    endfunction
+
+    local dE = app BindingEnergy Evec;		// [OH2, dE, Evec]
+    local nplace = 0, n;
+    local last_prog = clock[];
+
+    while l_length [OH2,dE,Evec] loop
+	local wkeep = rep [1, l_length [OH2,dE,Evec]];
+
+	    // cluster the waters so that we can place the most bound
+	    // water out of each cluster with a fixed environment
+
+	local wprox = prox_open [5.5, aPos OH2, 5.5];
+	local [wseg, widx] = prox_find [wprox, aPos OH2, 0];
+	prox_close wprox;
+
+	local wcluster = graph_ccomponent_list split [widx, wseg];
+	local w, Oatom;
+
+	env_pos = aPos atoms;
+	env_Q = aCharge atoms;
+
+	for w = 1, length wcluster loop
+	    i = x_min dE[wcluster(w)];		// most bound
+	    Oatom = OH2[wcluster(w)](i);	// the atom in question
+	    wkeep(wcluster(w)(i)) = 0;		// eliminate
+
+	    local gE = WaterSelfEnergy [
+		wgeom, watQ, env_pos - aPos Oatom, env_Q, ELE_CUTOFF
+	    ];
+	    EmitWaterConfig [x_min gE, 0, 0, [Oatom, wgeom, watQ]];
+	    nplace = inc nplace;
+
+	    Progress [nplace / (Nwat + 1e-6), ctx];
+	endloop
+
+	    // eliminate the placed waters from the list and update the
+	    // dipole field vectors and energies for the remaining waters
+
+	local patoms = OH2 | not wkeep;
+	[OH2,dE,Evec] = [OH2,dE,Evec] || [wkeep];
+
+	const WCUTOFF = 5.5;
+	prox = prox_open [WCUTOFF, aPos OH2, WCUTOFF];
+
+	for Oatom in patoms loop
+	    local watoms = cat prepend [aBonds Oatom, Oatom];
+	    local wpos = aPos watoms, wQ = aCharge watoms;
+
+	    [seg,idx,r2] = prox_find [prox, aPos Oatom, 0];
+
+	    for i in idx loop
+		local v = DipoleField [aPos OH2(i), wpos, wQ];
+		Evec(i) = Evec(i) + v;
+		dE(i) = BindingEnergy Evec(i);
+	    endloop
+	endloop
+
+	prox_close prox;
+	atoms = cat [atoms, patoms, cat aBonds patoms];
+    endloop
+
+    Progress [1.0, ctx];
+endfunction
+
+// ========================== SYSTEM PREPARATION =============================
+
+function DepictionCoordinatesCTAB;
+function Draw2DStructureCTAB;
+
+local function Protect atoms
+    atoms = uniq cat append [
+	oAtoms oGetCollection P3D_PROTECT_SET
+    ,   ExtendLight cat atoms
+    ];
+    oSetCollection [P3D_PROTECT_SET, atoms];
+endfunction
+
+// SetState_Trigger handles the setting of states.  We do this only
+// for those atom sets that are the same with the same states.
+
+local function SetState_Trigger [wkey, trig, val, Gconfig]
+    const DRAW_ESELF = 0;
+
+    task_prio 0;
+    local systemTopologyState = SystemTopologyState[];
+
+    Gconfig = tr Gconfig;
+    local [g_atom, g_state, g_mask, g_name] = Gconfig;
+    if not length g_state or not eqL g_state then exit[]; endif
+
+    g_state = first g_state;
+    g_mask = first g_mask;
+    if not length g_state then exit []; endif
+
+	// create the graphics objects for each of the states
+
+    local grkey = rep [0, length g_state];
+    local i, j;
+
+    local ctab = ctab_ExtractFromSMI g_state(1)(GC_SMILES);
+    local pos = DepictionCoordinatesCTAB [ctab];
+    ctab(1)(CTAB_A_X) = pos(1);
+    ctab(1)(CTAB_A_Y) = pos(2);
+    ctab(1)(CTAB_A_Z) = pos(3);
+
+    const WIDTH = 100, HEIGHT = 100;
+    const DROPT = [
+	boundary: [WIDTH, HEIGHT, 'pt'],
+	colorcode: 1,
+	fontsize: 0.75
+    ];
+
+    local emin = min apt peek [g_state, GC_ESELF];
+    local is_flip = rep [0, length g_state];
+
+    for i = 1, length g_state loop
+	local ct = ctab_ExtractFromSMI g_state(i)(GC_SMILES);
+	local dst = x_sort ct(1)(CTAB_A_NUM);
+
+	ct(1) = apt get [ct(1), [dst]];
+	ct(2)(CTAB_B_FROM) = dst[ct(2)(CTAB_B_FROM)];
+	ct(2)(CTAB_B_TO  ) = dst[ct(2)(CTAB_B_TO  )];
+
+	ct(1)(CTAB_A_X) = ctab(1)(CTAB_A_X);
+	ct(1)(CTAB_A_Y) = ctab(1)(CTAB_A_Y);
+	ct(1)(CTAB_A_Z) = ctab(1)(CTAB_A_Z);
+
+	local psys = SystemPush [];
+	    local chains = mol_Create first mol_ExtractFromCTAB ct;
+	    local atoms = cat cAtoms chains;
+	    local a_el = aElement atoms;
+	    local a_ion = aIon atoms;
+	    local a_degree = aDegree atoms;
+	SystemPop psys;
+
+	grkey(i) = first Draw2DStructureCTAB [ct, DROPT];
+	local is_there = 0;
+
+	for j = 1, length g_atom loop
+	    local chk = g_atom(j) | g_mask;
+	    if      (aElement  chk === a_el    )
+		and (aDegree   chk === a_degree)
+		and andE (aIon chk == a_ion or not sm_Match ['[#T]',chk])
+	    then
+		is_there = 1;
+		break;
+	    endif
+	endloop
+
+	if is_there then
+	    local gk = gr_create gr_header grkey(i);
+	    gr_box [ gk, [
+		0, [1,1], [WIDTH-1,HEIGHT-1], 'canvasForeground', 1.0, -1 
+	    ]];
+	    gr_draw [ gk, grkey(i) ];
+	    gr_destroy grkey(i);
+	    grkey(i) = gk;
+	endif
+
+	if (is_flip(i) = not ltE(dst)) then
+	    gr_text [ grkey(i), [
+		0, [5,5]
+	    ,	'FLIP'
+	    ,	'sf', 0x000000, 8.0
+	    ,   [position:'baselineleft']
+	    ]];
+	endif
+	if DRAW_ESELF then			// strain
+	    gr_text [ grkey(i), [
+		0, [WIDTH-5,5]
+	    ,	select [
+		    twrite ['+{n:.1f}', g_state(i)(GC_ESELF) - emin ]
+		,   ''
+		,   g_state(i)(GC_ESELF) - emin > 0.05
+	 	]
+	    ,	'sf', 0x000000, 8.0
+	    ,   [position:'baselineright']
+	    ]];
+	endif
+    endloop
+
+    local idx = x_sort is_flip;
+    Gconfig(2)(1) = Gconfig(2)(1)[idx]; // apt get [Gconfig, [idx]];
+    grkey = grkey[idx];
+    g_state = g_state[idx];
+
+	// Create the panel with the drawings
+
+    local pkey = WindowCreate [
+	location: [wkey, trig, 17],
+	mode: 'popup',
+	Button : [
+	    name: 'tbutton', type: 'int',
+	    columns: min [length grkey, 4],
+	    uniformCols: 1,
+	    graphics: grkey,
+	    background : 'canvasBackground'
+	]
+    ];
+    gr_destroy grkey;
+
+    WindowShow pkey;				// prompt for the state
+    [val,trig] = WindowWait pkey;
+    WindowDestroy pkey;
+
+    if SystemTopologyState [] == systemTopologyState then
+	local [f_at,f_el,f_ion,f_lp,f_geom,f_nam,f_cby,f_rgb] = (
+	    SetGroupConfiguration[
+		Gconfig(1), Gconfig(3), [ Gconfig(2)(1)(val.tbutton) ]
+	    ]
+	);
+	local cmask = orE [
+	    aElement  f_at <> f_el
+	,   aIon      f_at <> f_ion
+	,   aGeometry f_at <> f_geom
+	,   aHintLP   f_at <> f_lp
+	];
+	aSetElement  [f_at, f_el  ];
+	aSetIon      [f_at, f_ion ];
+	aSetGeometry [f_at, f_geom];
+	aSetHintLP   [f_at, f_lp  ];
+	aSetName     [f_at, f_nam ];
+	aSetColorBy  [f_at, f_cby ];
+	aSetRGB      [f_at, f_rgb ];
+	aSetForceRS  [f_at||cmask,0];
+	oDestroy LightBonds cat (f_at || cmask);
+	Add_H cat f_at;
+	Protect cat f_at;
+    endif
+
+    exit[];
+endfunction
+
+// pprep_Diagnose determines the problems with the given system.  We return
+// a laminated vector of issues.
+//
+//	[res, 'ptype', 'emsg', private_data]
+
+local function pprep_P3D_diagnose res
+    local i, j;
+
+    res = res | rIsAmino res or m_join [rType res, ['dna', 'rna']];
+
+	// Diagnose the system by scanning for the protonate3d rules
+
+    local dict = sm_Create [];			// matching dictionary
+    local groups = LoadRules [RULEFILE, dict];	// load the rules
+    local sstate = SystemNonviewState[];
+    local atoms = cat rAtoms res;
+
+    local [Gconfig] = PartitionSystem [0, groups, dict, atoms, [
+	mdisconnect: 0
+    ]];
+    sm_Destroy dict;
+
+	// Adjust the self energies of all of the configurations to
+	// include the pH-dependent energies based upon titrations
+
+    local opt = [
+	pH : 7,
+	T  : 300
+    ];
+
+    for i = 1, l_length Gconfig loop
+	Gconfig(2)(i) = AdjustSelfEnergies [Gconfig(2)(i), opt.pH, opt.T];
+    endloop
+
+	// Remove any of the configurations with a single state
+	// whose atoms are already in that state.
+	// Gconfig = [key, states, mask, name]
+
+    local mask = rep [1, l_length Gconfig];
+
+    for i in x_pack (app length Gconfig(2) == 1) loop
+	local g_smi = Gconfig(2)(i)(1)(GC_SMILES);
+
+#	if 0
+	if length Gconfig(1)(i) == 1 then
+	    if aHeavyValence Gconfig(1)(i) <= 1 then
+		continue;
+	    endif
+	endif
+#	endif
+
+	local [f_at,f_el,f_ion,f_lp,f_geom] = SetGroupConfiguration [
+	    Gconfig(1)[i], Gconfig(3)[i], Gconfig(2)(i)[1]
+	];
+
+	mask(i) = not andE (
+		aHintLP   f_at == f_lp
+	    and aIon      f_at == f_ion
+	    and aGeometry f_at == f_geom
+	    and aElement  f_at == f_el
+	);
+    endloop
+
+    Gconfig = Gconfig || [mask];
+
+	// Prepare the text diagnoses
+
+    function mainResidue atoms
+	local res = aResidue atoms;
+	local [idx,seg] = sac res;
+	res = split [res[idx], seg];
+	res = res(x_max app length res);
+	return first res;
+    endfunction
+
+#   if 0
+    if sstate <> SystemNonviewState[] then
+	write '*** state change in p3d diagnose\n';
+    endif
+#   endif
+
+    local p_atoms = cat oAtoms oGetCollection P3D_PROTECT_SET;
+    local g_atoms = Gconfig(1) || Gconfig(3);
+    local g_seg = app length g_atoms;
+    local prot = s_add [notnot indexof [cat g_atoms, p_atoms], g_seg];
+    local serial = tr [Gconfig(4), oSerialNumber Gconfig(1)];
+
+    local prob = [
+	app mainResidue Gconfig(1)
+    ,	Gconfig(4)
+    ,	select [ 'Protected', '', prot ]
+    ,	tr Gconfig
+    ,	0
+    ,	serial
+    ];
+
+    return prob;
+endfunction
+
+// pprep_P3D_Widgets returns the widgets we will use to fix the P3D problems.
+
+local function pprep_P3D_Widgets []
+    local panel = [
+	extendH : 1,
+	centerV: 1,
+	Hbox : [
+	    extendH: 1,
+	    uniformCols: 1,
+	    Button : [
+		extendH: 1,
+		name: 'P3D_state', text: 'State',
+		bubbleHelp: 'Change the protonation state.'
+	    ],
+	    Button : [
+		extendH: 1,
+		name: 'P3D_profile', text: 'Dihedral',
+		bubbleHelp: 'Change the dihedral angle of a terminal group.'
+	    ],
+	    Button : [
+		extendH: 1,
+		name: 'P3D_protect', text: 'Protect',
+		bubbleHelp: 'Protect group from change by Protonate3D.'
+	    ],
+	    Button : [
+		extendH: 1,
+		name: 'P3D_unprotect', text: 'Unprotect',
+		bubbleHelp: 'Allow group to change by Protonate3D.'
+	    ]
+#	    if 0
+	    Button : [
+		extendH: 1,
+		name: 'P3D_settings', text: 'Settings'
+	    ]
+#	    endif
+	]
+    ];
+    return panel;
+endfunction
+
+local function pprep_P3D_Event [wkey, val, trig, prob]
+    local Gconfig, atoms;
+
+    function DihedralProfileAtoms prob
+	if l_length prob <> 1 then return[]; endif
+	prob = prob(4)(1);				// Gconfig
+
+	local dih = prob(1) | prob(3);
+	dih = dih | aHeavyValence dih == 1 and aDegree dih > 1;
+
+	local nbr = first aBonds dih;
+	nbr = nbr | not aIsLight nbr;
+
+	[dih,nbr] = [dih,nbr] || [app length nbr == 1];
+	if length dih <> 1 or length nbr <> 1 then return []; endif
+
+	return [nbr,dih];
+    endfunction
+
+    if trig == 'sensitivity' then
+	local sens_state = eqL app dropfirst prob(4);
+	local sens_profile = notnot length DihedralProfileAtoms prob;
+
+	Gconfig = tr prob(4);
+	atoms = cat (Gconfig(1) || Gconfig(3));
+	local p_atoms = indexof [
+	    atoms, cat oAtoms oGetCollection P3D_PROTECT_SET
+	];
+	local sens_protect = orE not p_atoms;
+	local sens_unprotect = orE p_atoms;
+
+	WindowSetAttr [wkey, [
+	    P3D_state     : [ sensitive: sens_state     ]
+	,   P3D_profile   : [ sensitive: sens_profile   ]
+	,   P3D_protect   : [ sensitive: sens_protect   ]
+	,   P3D_unprotect : [ sensitive: sens_unprotect ]
+	]];
+
+    elseif trig == 'P3D_state' then
+	task_call [
+	    #SetState_Trigger
+	,   [wkey,trig,val,prob(4)]
+	,   [errmsg:'ignore']
+	];
+
+    elseif trig == 'P3D_profile' then
+	local dih = DihedralProfileAtoms prob;
+	if length dih then
+	    Add_H dih;
+	    local dih_pos = aPos ExtendLight dih;
+	    local dih_tstate = SystemTopologyState [];
+	    local dih_arg = [ [wkey, trig, 28], [
+		dihedralProfileAtoms: dih
+	    ,   dihedralProfileIgnoreFixedAtoms: 1
+	    ]];
+	    task_run [ 'dihplot.svl', dih_arg, [], 'DihedralProfile' ];
+	    if dih_tstate == SystemTopologyState [] then
+		if not (dih_pos === aPos ExtendLight dih) then
+		    Protect dih;
+		endif
+	    endif
+	endif
+
+    elseif trig == 'P3D_protect' then
+	Gconfig = tr prob(4);
+	Protect (Gconfig(1) || Gconfig(3));
+
+    elseif trig == 'P3D_unprotect' then
+	Gconfig = tr prob(4);
+	atoms = Gconfig(1) || Gconfig(3);
+	atoms = uniq cat diff [
+	    oAtoms oGetCollection P3D_PROTECT_SET
+	,   ExtendLight cat atoms
+	];
+	oSetCollection [P3D_PROTECT_SET, atoms];
+
+    elseif trig == 'P3D_settings' then
+    endif
+endfunction
+
+// proprep_P3D is a handler function for protonation and protonate3d.
+
+global function proprep_P3D [cmd,arg]
+    if cmd == 'type' then
+	local dict = sm_Create [];
+	local groups = LoadRules [RULEFILE, dict];
+	sm_Destroy dict;
+	return [apt peek [groups,1], 2.0, 'Protonation', 'Protonate3D'];
+
+    elseif cmd == 'panel' then		// arg = []
+	return pprep_P3D_Widgets [];
+
+    elseif cmd == 'panel_update' then	// arg = [res,prob,wkey]
+	pprep_P3D_Event [
+	    arg(3), [], 'sensitivity', arg(2)
+	];
+	return '';
+
+    elseif cmd == 'panel_event' then	// arg = [res,prob,wkey,val,trig]
+	pprep_P3D_Event [
+	    arg(3), arg(4), arg(5), arg(2)
+	];
+	return [];
+
+    elseif cmd == 'diagnose' then	// arg = res
+	return pprep_P3D_diagnose arg;
+
+    elseif cmd == 'isolate' then	// arg = [all_res,prob]
+	return arg(2)(1);
+
+    elseif cmd == 'fix' then		// arg = [all_res,prob]
+	return [];
+
+    elseif cmd == 'report' then		// arg = [all_res,prob]
+	return "";
+
+    endif
+endfunction
+
+// -------------
+
+local function main []
+    Protonate3D [Atoms[], Atoms[], Atoms[], [], [], []];
+endfunction
+
+// ============================== TESTING ===================================
+
+#eof
+
+global function VerifyReduce file
+
+    if ftype file === 'dir' then
+	for file in flist file loop
+	    VerifyReduce file;
+	endloop
+    elseif ftype file <> 'file' then
+	exit 'Illegal file/directory';
+    endif
+
+    Close [force:1];
+    ReadPDB file;
+
+	// delete any water molecules
+
+    local atoms = Atoms[];
+    atoms = atoms | sm_Match ['[OQ0]', atoms];
+    atoms = ExtendLight atoms;
+    oDestroy atoms;
+
+    atoms = Atoms[];
+    atoms = atoms | sm_Match ['[!#QQ0]', atoms];
+    oDestroy atoms;
+
+    View[];
+
+    local chains1 = Chains[];
+    local res1 = cat cResidues chains1;
+    local mol = mol_Extract chains1;		// save reduce data
+
+    main [];
+
+    local chains0 = mol_Create mol;		// original
+    local res0 = cat cResidues chains0;
+
+    function HideResidue res
+	local a = cat rAtoms res;
+	a = a | not aBackbone a;
+	aSetHidden [a, 1];
+	aSetHidden [LightBonds a, 1];
+    endfunction
+
+    local r0, r1, a0, a1;
+
+    for [r0,r1] in tr [res0,res1] loop
+	if not eqE rName [r0,r1] then exit 'Internal Error'; endif
+	local name = rName r0;
+
+	const ALWAYSHIDE = [
+	    'ALA','GLY', 'ILE', 'LEU', 'PHE', 'PRO', 'VAL'
+	];
+	if indexof [name, ALWAYSHIDE] then
+	    HideResidue [r0,r1];
+	    continue;
+	endif
+
+	a0 = cat rAtoms r0;
+	a0 = a0 | not aBackbone a0 and not Light a0;
+
+	a1 = cat rAtoms r1;
+	a1 = a1 | not aBackbone a1 and not Light a1;
+
+	if name == 'ARG' then
+	    if add (aIon a0 == 1) == 1 and add (aIon a1 == 1) == 1 then
+		HideResidue [r0,r1];
+		continue;
+	    endif
+	endif
+
+	if name == 'TRP' then
+	    if andE (aIon a0 == 0) and andE (aIon a1 == 0) then
+		HideResidue [r0,r1];
+		continue;
+	    endif
+	endif
+
+	if name == 'GLU' or name == 'ASP' then
+	    if add (aIon a0 == -1) == 1 and add (aIon a1 == -1) == 1 then
+		HideResidue [r0,r1];
+		continue;
+	    endif
+	endif
+
+	if name == 'HIS' then
+	    if add (aIon a0 == 1) == 1 and add (aIon a1 == 1) == 1 then
+		HideResidue [r0,r1];
+		continue;
+	    endif
+	endif
+
+	if name == 'ASN' or name == 'GLN' then
+	    local asnO_0 = a0 | aElement a0 == 'O';
+	    local asnO_1 = a1 | aElement a1 == 'O';
+
+	    if length asnO_0 == 1 and length asnO_1 == 1 then
+		if aDist [asnO_0,asnO_1] < 0.1 then
+		    HideResidue [r0,r1];
+		    continue;
+		endif
+	    endif
+	endif
+
+    endloop
+
+    function HideSidechain resname
+	local r0 = res0 | rName res0 == token resname;
+	local r1 = res1 | rName res1 == token resname;
+	HideResidue cat [r0,r1];
+/*
+	local a = cat rAtoms cat [r0,r1];
+	a = a | not aBackbone a;
+	aSetHidden [a, 1];
+	aSetHidden [LightBonds a, 1];
+*/
+    endfunction
+
+    const AHIDE = tr [
+	[1, '[#1][CX4!H3]'						],
+	[1, '[#1]c'							],
+
+	[1, '[CX4H1]([CX4])([CX4])[CX4]'				],
+	[1, '[CX4H2]([CX4])[CX4]'					],
+	[1, '[CX4H3][CX4!Q1]'						],
+
+	[1, '[CX4]([N+0X3!Q1!i!r3]C=[OX1])C(=[OX1])[N+0X3!i!r3!Q1]'	],
+	[1, '[N+0X3!Q1!i!r3](C=[OX1])[CX4]'				],
+	[1, '[OX1]=C[N+0X3!Q1!i!r3][CX4]'				],
+	[1, 'C(=[OX1])[N+0X3!Q1!i!r3][CX4]'				],
+
+	[0, '*'								]
+    ];
+
+    atoms = cat cAtoms cat [chains0,chains1];
+    atoms = atoms | AHIDE(1)[sm_Indexof [atoms, AHIDE(2)]];
+    aSetHidden [atoms, 1];
+    aSetHidden [LightBonds atoms, 1];
+
+    aSetColorBy [Atoms[], 'chain'];
+endfunction
+
