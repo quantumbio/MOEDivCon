@@ -1,0 +1,3952 @@
+#svl
+//	save.svl	Save current system in various file formats
+//
+//	04-mar-2014 (hf) added v3000 save support
+//	03-oct-2013 (al) moe_graphics default 'All'
+//	02-oct-2013 (al) emptyText for PDB File Prefix
+//	24-sep-2013 (al) ^C: no graphics; Copy As | MOE: graphics of selected
+//	20-sep-2013 (al) changed checkbox text; added emptyText, bubbleHelp
+//	21-jun-2013 (al) fix auto-ext if '.' anywhere in path
+//	24-may-2013 (al) add *.mol to filter for MDLSDfiles and molfiles
+//	24-may-2013 (al) multifile: fix filenames; don't need name in fsb
+//	24-may-2013 (al) when write, save filename to shortcut
+//	24-may-2013 (al) fix auto-ext beep, preserve filename if chg dir
+//	19-apr-2013 (mk) Remove GIF format + ciconvert
+//	06-feb-2013 (al) write to text on Windows machines too
+//	05-nov-2012 (cc) Added bubble help for save panel.
+//	05-nov-2012 (al) fix check for format type for multifile save
+//	02-nov-2012 (ms) _SetRecentPath
+//	22-oct-2012 (al) don't save EMF on ^C (to avoid flash)
+//	19-oct-2012 (al) fix mdlct save to clipboard
+//	12-oct-2012 (ms) msg on empty system, FSB now uses fullname on val(2)
+//	12-oct-2012 (al) fix when save_file called with *.<ext> pattern
+//	10-oct-2012 (al) extendV Pager parent of FSB
+//	03-oct-2012 (al) only change ext when original matches a standard ext
+//	26-sep-2012 (al) set command button sensitivity
+//	24-sep-2012 (al) change multirecord for multifile
+//	21-sep-2012 (al) add cIsPrivate: do not save private chains
+//	18-sep-2012 (al) use FSB modint
+//	17-sep-2012 (al) fix overwrite existing file confirmation
+//	06-sep-2012 (mk) color fixes
+//	04-sep-2012 (al) empty system: don't put up confirmation dialog
+//	30-aug-2012 (al) recover missing line in change_dir
+//	28-aug-2012 (al) Use FSB instead of Listbox.
+//	25-aug-2012 (mk) add gr_icon recolor parameter
+//	20-aug-2012 (al) save molecules to multiple file option (mdlmol, pdb)
+//	14-aug-2012 (al) Save just lig to MDLCT; save text in COPYMOE
+//	10-jul-2012 (al) ^C
+//	05-jul-2012 (al) added RAW
+//	17-apr-2012 (hf) Formatted Sequence writer added
+//	19-mar-2012 (al) Mac only supports PNG on clipboard
+//	16-mar-2012 (al) make PNG default for non windows
+//	12-mar-2012 (al) added BMP, JPG, TIF to clipboard formats
+//	07-mar-2012 (al) added PNG to clipboard formats
+//	07-nov-2011 (al/mk) CopySeqEdit: allow all formats + specify residues
+//	26-oct-2011 (ms) new look of sortable list with name/size/date fields
+//	26-oct-2011 (ms) err.msg for non-listable directories
+//	28-jan-2010 (kk) fix TER bubblehelp
+//	26-jan-2010 (kk) PDB: Force TER record option
+//	01-dec-2009 (jd) povray themes
+//	13-nov-2009 (mk) fix typo
+//	05-nov-2009 (mk) add high quality option (max focal blur + ribbon qual)
+//	05-nov-2009 (ms) rewrote CopySeqEdit and added SEL_RESCHAINS logic
+//	03-nov-2009 (mk) add white background option to copy pic to clipboard
+//	16-oct-2009 (ms) fix mkdir dialog
+//	27-aug-2009 (al) fix fd_env
+//	21-aug-2009 (al) rename TempFactor with B-Factor
+//	13-aug-2009 (mk) fix png quality/compression problem
+//	11-aug-2009 (mk) change copy picture to clipboard panel
+//	03-aug-2009 (kk) AMBER option
+//	21-jul-2009 (mk) change focal blur handling when saving images
+//	19-may-2009 (mk) fix spelling of ViewPixelDimensions
+//	07-may-2009 (mk) added TIF picture format
+//	06-may-2009 (mk) change handling of transparent background + small fixes
+//	01-may-2009 (mk) added EMF picture to clipboard
+//	27-apr-2009 (al) added MAE
+//	20-apr-2009 (mk) added support of high resolution images
+//	08-apr-2009 (al) added _ClipboardEncodeBinData
+//	12-mar-2009 (al) CopyMainWindow: write 'bin/moe/molecule' format
+//	05-mar-2009 (kk) hnames options now passed in
+//	03-mar-2009 (ms) renamed _fenvpath to _fenvpathS etc.
+//	21-jan-2009 (kk) PDB Crystal Parameters
+//	15-jan-2009 (kk) PDB Solvent Accessible Surface option
+//	30-sep-2008 (kk) PDB v2.0, PBD v3.0 & IUPAC PDB Write Options
+//	14-aug-2008 (jd) flattened mol_object vector when saving selected obj
+//	10-jul-2008 (jd) moved pov settings panel to io_pov.svl
+//	10-jul-2008 (jd) added pov scene file picture format
+//	18-mar-2008 (jd) remove trailling newline in clipboard SMILES
+//	11-feb-2008 (jd) added POV-Ray support, resolution, colormap
+//	06-aug-2007 (pl) added SMILES to CopyMainWindow
+//	03-nov-2006 (kk) added IUPAC option to PDB_WRITE
+//	14-jul-2006 (jd) workaround file listbox returning null selection
+//	06-jul-2006 (jd) new moe file default: save all grobj, view
+//	06-jul-2006 (jd) allow saving of moe file with no molecular data
+//	10-feb-2006 (jd) cd into the directory when the fsb specifies a path
+//	13-jun-2005 (jd) MDLCT support to paste into IsisDraw/ChemDraw
+//	30-may-2005 (jd) Depict as 2D option for MDLMOL page
+//	27-may-2005 (ac) CopyMainWindow supports MOL2D and MOL3D "formats"
+//	05-may-2005 (jd) no warning on empty system when saving a picture
+//	14-apr-2005 (jd) desensitize save button while saving
+//	27-jan-2005 (jd) inverted the order of DataFilename, DataModified
+//	29-sep-2004 (jd) ClipboardSaveAs, CopyMainWindow, CopySeqEdit
+//	23-sep-2004 (jd) check to see if panel already exist
+//	15-sep-2004 (jd) filename parameter to main
+//	13-sep-2004 (jd) created
+//
+// COPYRIGHT (C) 1996-2014 CHEMICAL COMPUTING GROUP INC.  ALL RIGHTS RESERVED.
+//
+// PERMISSION TO USE, COPY, MODIFY AND DISTRIBUTE THIS SOFTWARE IS HEREBY
+// GRANTED PROVIDED THAT: (1) UNMODIFIED OR FUNCTIONALLY EQUIVALENT CODE
+// DERIVED FROM THIS SOFTWARE MUST CONTAIN THIS NOTICE; (2) ALL CODE DERIVED
+// FROM THIS SOFTWARE MUST ACKNOWLEDGE THE AUTHOR(S) AND INSTITUTION(S); (3)
+// THE NAMES OF THE AUTHOR(S) AND INSTITUTION(S) NOT BE USED IN ADVERTISING
+// OR PUBLICITY PERTAINING TO THE DISTRIBUTION OF THE SOFTWARE WITHOUT
+// SPECIFIC, WRITTEN PRIOR PERMISSION.
+//
+// CHEMICAL COMPUTING GROUP INC. DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS
+// SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS,
+// AND IN NO EVENT SHALL CHEMICAL COMPUTING GROUP INC. BE LIABLE FOR ANY
+// SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER
+// RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF
+// CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+// CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+#set title	'System Save'
+#set class	'MOE:interactive'
+#set version	'2014.03'
+
+#set main save_file
+
+// Return 1 on OK and 0 on Cancel.
+
+local function _OKCancel msg = allfalse second task_call ['OKCancel', msg];
+
+const ABSFNAME = 1;	// FSB will eventually return absolute filenames
+
+function fwrite_MOE;
+function fwrite_MDLMOL;
+function fwrite_TriposMOL2;
+function fwrite_PDB;
+function fwrite_MacroModel;
+function fwrite_XTL;
+
+function fwrite_PIR;
+function fwrite_GCG;
+function fwrite_Fasta;
+function fwrite_IG;
+function fwrite_GB;
+function fwrite_EMBL;
+function fwrite_MSF;
+function fwrite_Phylip;
+function fwrite_Clustal;
+function fwrite_FormattedSeq;
+
+function fwrite_PNG;
+function fwrite_JPG;
+function fwrite_BMP;
+function fwrite_TIF;
+function fwrite_ClipboardBMP;
+function fwrite_ClipboardEMF;
+function fwrite_ImageEPS;
+function fwrite_POV;
+
+function mdl_fwrite_MOL;
+function mdl_fwrite_MOL_v3000;
+
+function pov_SetupPanel;
+function pov_DefaultSetup;
+
+const ALL_MOLOBJ = 0, SEL_ATOMS = 1, SEL_RES = 2,
+    SEL_CHAINS = 3, SEL_OBJECTS = 4, SEL_RESCHAINS = 5,
+    SPC_OBJECTS = 6, SEL_MOLECULES = 7, LIGAND = 8;
+
+const CHANGE_DIR = 1, CHANGE_FORMAT = 2, SINGLE_CLICK = 3, DOUBLE_CLICK = 4;
+
+    // list of widgets that can trigger a change of format
+
+const FORMAT_TYPE_WIDGET = [
+    'format_type', 'mol_option', 'seq_option', 'pic_option'
+];
+
+const ASK_CWD = 'Set current working directory to ';
+
+const COMP_SHORTCUTS = [
+    ' 1', ' 2', ' 3', ' 4', ' 5', ' 6', ' 7', ' 8', ' 9', '10'
+];
+
+const RESOLUTION_DEFAULT = 300;
+
+const NAMED_DEFAULTS = [
+    ['PowerPoint',	[1000,750],	100,	'pixels/inch (dpi)'],
+    ['Journal',		[2100,1500],	300,	'pixels/inch (dpi)'],
+    ['Journal Small',	[1050,750],	300,	'pixels/inch (dpi)']
+];
+
+const INCH_DIMENSIONS = cat [
+    (tr NAMED_DEFAULTS)(1),
+    ['Current Window'],
+    ['6x4', '7x5', '11x8.5', '20x16', '30x20']
+];
+
+const CM_DIMENSIONS = cat [
+    (tr NAMED_DEFAULTS)(1),
+    ['Current Window'],
+    ['13x9', '15x10', '20x15', '30x20', '45x30', '60x40', '75x50']
+];
+
+const PIXEL_DIMENSIONS = cat [
+    (tr NAMED_DEFAULTS)(1),
+    ['Current Window'],
+    ['800x600', '1024x768', '1280x1024', '1600x1200', '1920x1200', '2560x1600']
+];
+
+const PERCENT_DIMENSIONS = cat [
+    (tr NAMED_DEFAULTS)(1),
+    ['Current Window'],
+    ['200x200', '300x300', '400x400']
+];
+
+const RESOLUTIONS = ['100', '150', '200', '300', '600'];
+
+const COPYMOE = 'ctrlc_moe';
+
+// -------------------- utilities, extensions ------------------------
+
+local function cIsPrivate chains
+    const PRIVATE = '[[]PRIVATE]*';
+    return m_findmatch [PRIVATE, cName chains];
+endfunction
+
+local function is_win [] = OS_MSWIN;
+local function is_mac [] = indexof [MOE_ARCH, ['mx86','mac64']];
+local function is_lnx [] = indexof [MOE_ARCH, ['lnux','lnx64']];
+
+local function get_rcnameroot rctag
+    local roots = GetRC rctag;
+    if allfalse roots then return []; endif
+    roots = uniq tok_unpack roots;
+    return (roots | app anytrue roots);	// remove empty tokens
+endfunction
+
+local function set_rcnameroot [rctag, rcval]
+    const MAX_NROOTS = 5;
+    local roots = get_rcnameroot rctag;
+    roots = roots | app anytrue roots;
+    roots = cat [rcval, drop [
+	roots,
+	-select [length roots - MAX_NROOTS, 0, (length roots > MAX_NROOTS)]
+    ]];
+    SetRC [rctag, tok_pack roots];
+endfunction
+
+// ------------------------ POV-Ray setup panel  -----------------------
+
+local function pov_sensitize [save_wkey, pov_opt]
+    local state = tok_length pov_opt.pov_engine_path;
+
+    WindowSetAttr [save_wkey, [png_pov : [sensitive : state]]];
+    WindowSetAttr [save_wkey, [jpg_pov : [sensitive : state]]];
+    WindowSetAttr [save_wkey, [tif_pov : [sensitive : state]]];
+    WindowSetAttr [save_wkey, [bmp_pov : [sensitive : state]]];
+endfunction
+
+// -------- Parameters Page for Formats (in alphabetical order) --------
+
+const BMP_ID = 'BMP';
+const BMP_DESC = 'Bitmap Image (.bmp)';
+const BMP_EXT = 'bmp';
+const BMP_DEFAULT = [bmp_alpha : 0, bmp_clipboard : 0, bmp_version: '3'];
+const BMP_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save BMP Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Mbox: [
+	    columns : 2,
+	    Hbox : [
+		extendH : 1,
+		Text : [
+		    extendH : 1,
+		    title: 'Dimension:', name: 'bmp_dimension', len: 15,
+		    shortcut : PIXEL_DIMENSIONS,
+		    onTrigger : 'return'
+		],
+		Option : [
+		    name : 'bmp_dimension_unit',
+		    text : ['pixel', 'inch', 'cm', 'percent'],
+		    onTrigger : 'return'
+		]
+	    ],
+	    Checkbox: [
+		name : 'bmp_antialias', flushLeft : 1,
+		text : 'Anti-Alias Picture',
+		onTrigger : 'return'
+	    ],
+	    Hbox: [
+		extendH : 1,
+		Text : [
+		    title: 'Resolution:', name: 'bmp_resolution', len: 6,
+		    min : 1, max: INT_MAX, type: 'int', extendH: 1,
+		    shortcut: RESOLUTIONS,
+		    onTrigger : 'return'
+		],
+		Option : [
+		    name: 'bmp_units', type: 'char',
+		    text: ['pixels/inch (dpi)', 'pixels/cm (dpc)'],
+		    onTrigger : 'return'
+		]
+	    ],
+	    Checkbox : [
+		name : 'bmp_high_quality', flushLeft : 1,
+		text : 'High Quality',
+		onTrigger : 'return',
+		bubbleHelp :
+		    'If on, set ribbon and focal blur quality\n'
+		    'to maximum for the picture creation.'
+	    ],
+	    Checkbox : [
+		name : 'bmp_alpha', title: 'Options:',
+		text: 'Transparent Background',
+		sensitive : 0,
+		bubbleHelp :
+		    'If on, then mark the background color of\n'
+		    'the picture as transparent. This option is\n'
+		    'only available when RGBA color channels\n'
+		    'are selected.'
+	    ],
+	    Option : [
+		title: ' BMP Version:', name: 'bmp_version',
+		type: 'char', text: ['2', '3', '4', '5'],
+		onTrigger : 'return',
+		bubbleHelp :
+		    'Select BMP Format Version:\n'
+		    'Version 4 and 5 support transparency,\n'
+		    'but only few programs read such files.'
+	    ],
+	    Checkbox : [
+		name: 'bmp_pov',
+		text : 'Render with POV-Ray',
+		onTrigger : 'return',
+		bubbleHelp : [
+		    'If on, POV-Ray (Persistence of Vision Raytracer)\n'
+		    'will be used to render the molecular system.'
+		]
+	    ],
+	    Button : [
+		flushLeft : 1,
+		name : 'bmp_povsetup', text : 'POV-Ray Settings...',
+		font : 'mediumBold', onTrigger : 'return'
+	    ],
+	    Pager : [
+		name : 'bmp_winspecific',
+		Label : [],
+		Checkbox : [
+		    name : 'bmp_clipboard',
+		    text: 'Save to Clipboard',
+		    onTrigger : 'return'
+		]
+	    ]
+	]
+    ]
+];
+
+const BH_RESET_ALIGN =	'Reset the alignment positions of residues.\n'
+			'Residues become positioned according to\n'
+			'cardinal numbering.';
+const CLUSTAL_ID = 'CLUSTAL';
+const CLUSTAL_DESC = 'Clustal (.aln)';
+const CLUSTAL_EXT = 'aln';
+const CLUSTAL_DEFAULT = [Clustal_reset_align : 0];
+const CLUSTAL_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save Clustal Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Checkbox : [
+	    name : 'Clustal_reset_align', text : 'Reset Alignment',
+	    bubbleHelp : BH_RESET_ALIGN
+	]
+    ]
+];
+
+const EMBL_ID = 'EMBL';
+const EMBL_DESC = 'European Mol. Biology Lab (.embl)';
+const EMBL_EXT = 'embl';
+const EMBL_DEFAULT = [EMBL_reset_align : 0];
+const EMBL_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save EMBL Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Checkbox : [
+	    name : 'EMBL_reset_align', text : 'Reset Alignment',
+	    bubbleHelp : BH_RESET_ALIGN
+	]
+    ]
+];
+
+const EMF_ID = 'EMF';
+const EMF_DESC = 'Enhanced Windows Metafile (.emf)';
+const EMF_EXT = 'emf';
+const EMF_DEFAULT = [];
+const EMF_PANEL = [Label: []];
+
+const EPS_ID = 'EPS';
+const EPS_DESC = 'Encapsulated PostScript (.eps)';
+const EPS_EXT = 'eps';
+const EPS_DEFAULT = [eps_colormap : 'Color'];
+const EPS_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save EPS Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Mbox: [
+	    columns : 2,
+	    Hbox : [
+		extendH : 1,
+		Text : [
+		    extendH : 1,
+		    title: 'Dimension:', name: 'eps_dimension', len: 15,
+		    shortcut : PIXEL_DIMENSIONS,
+		    onTrigger : 'return'
+		],
+		Option : [
+		    name : 'eps_dimension_unit',
+		    text : ['pixel', 'inch', 'cm', 'percent'],
+		    onTrigger : 'return'
+		]
+	    ],
+	    Checkbox: [
+		name : 'eps_antialias', flushLeft : 1,
+		text : 'Anti-Alias Picture',
+		onTrigger : 'return'
+	    ],
+	    Hbox: [
+		extendH : 1,
+		Text : [
+		    title: 'Resolution:', name: 'eps_resolution', len: 6,
+		    min : 1, max: INT_MAX, type: 'int', extendH: 1,
+		    shortcut: RESOLUTIONS,
+		    onTrigger : 'return'
+		],
+		Option : [
+		    name: 'eps_units', type: 'char',
+		    text: ['pixels/inch (dpi)', 'pixels/cm (dpc)'],
+		    onTrigger : 'return'
+		]
+	    ],
+	    Checkbox : [
+		name : 'eps_high_quality', flushLeft : 1,
+		text : 'High Quality',
+		onTrigger : 'return',
+		bubbleHelp :
+		    'If on, set ribbon and focal blur quality\n'
+		    'to maximum for the picture creation.'
+	    ]
+	],
+	Radio : [
+	    title : 'Colormap:', name : 'eps_colormap', type : 'char',
+	    text: [ 'Color', 'Grayscale']
+	]
+    ]
+];
+
+const FASTA_ID = 'FASTA';
+const FASTA_DESC = 'Fasta (.fst)';
+const FASTA_EXT = ['fst', 'fasta'];
+const FASTA_DEFAULT = [Fasta_reset_align : 0];
+const FASTA_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save Fasta Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Checkbox : [
+	    name : 'Fasta_reset_align', text : 'Reset Alignment',
+	    bubbleHelp : BH_RESET_ALIGN
+	]
+    ]
+];
+
+const GB_ID = 'GENBANK';
+const GB_DESC = 'GenBank (.gb)';
+const GB_EXT = 'gb';
+const GB_DEFAULT = [GB_reset_align : 0];
+const GB_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save GenBank Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Checkbox : [
+	    name : 'GB_reset_align', text : 'Reset Alignment',
+	    bubbleHelp : BH_RESET_ALIGN
+	]
+    ]
+];
+
+const GCG_ID = 'GCG';
+const GCG_DESC = 'Genetics Computer Group (.gcg)';
+const GCG_EXT = 'gcg';
+const GCG_DEFAULT = [GCG_reset_align : 0];
+const GCG_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save GCG Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Checkbox : [
+	    name : 'GCG_reset_align', text : 'Reset Alignment',
+	    bubbleHelp : BH_RESET_ALIGN
+	]
+    ]
+];
+
+const IG_ID = 'IG';
+const IG_DESC = 'Stanford/Intelligenetics (.ig)';
+const IG_EXT = 'ig';
+const IG_DEFAULT = [IG_reset_align : 0];
+const IG_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save IG Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Checkbox : [
+	    name : 'IG_reset_align', text : 'Reset Alignment',
+	    bubbleHelp : BH_RESET_ALIGN
+	]
+    ]
+];
+
+const JPG_ID = 'JPG';
+const JPG_DESC = 'JPEG Bitmap (.jpg)';
+const JPG_EXT = ['jpg', 'jpeg', 'jpe'];
+const JPG_DEFAULT = [jpg_quality : 75];
+const JPG_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save JPEG Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Mbox : [
+	    columns : 2,
+	    Hbox : [
+		extendH : 1,
+		Text : [
+		    extendH : 1,
+		    title: 'Dimension:', name: 'jpg_dimension', len: 15,
+		    shortcut : PIXEL_DIMENSIONS,
+		    onTrigger : 'return'
+		],
+		Option : [
+		    name : 'jpg_dimension_unit',
+		    text : ['pixel', 'inch', 'cm', 'percent'],
+		    onTrigger : 'return'
+		]
+	    ],
+	    Checkbox: [
+		name : 'jpg_antialias', flushLeft : 1,
+		text : 'Anti-Alias Picture',
+		onTrigger : 'return'
+	    ],
+	    Hbox: [
+		extendH : 1,
+		Text : [
+		    title: 'Resolution:', name: 'jpg_resolution', len: 6,
+		    min : 1, max: INT_MAX, type: 'int', extendH: 1,
+		    shortcut: RESOLUTIONS,
+		    onTrigger : 'return'
+		],
+		Option : [
+		    name: 'jpg_units', type: 'char',
+		    text: ['pixels/inch (dpi)', 'pixels/cm (dpc)'],
+		    onTrigger : 'return'
+		]
+	    ],
+	    Checkbox : [
+		name : 'jpg_high_quality', flushLeft : 1,
+		text : 'High Quality',
+		onTrigger : 'return',
+		bubbleHelp :
+		    'If on, set ribbon and focal blur quality\n'
+		    'to maximum for the picture creation.'
+	    ],
+	    Scale : [
+		title : 'Quality:', extendH: 1,
+		name : 'jpg_quality', len : 3,
+		range : [0, 100, 1],
+		bubbleHelp : [
+		    'Set the quality level of the picture from\n'
+		    '0 (worst) to 100 (best). Higher quality\n'
+		    'pictures require more disk space to store.'
+		]
+	    ],
+	    Label: [],
+	    Checkbox : [
+		name: 'jpg_pov', title : 'Options:',
+		text : 'Render with POV-Ray',
+		onTrigger : 'return',
+		bubbleHelp : [
+		    'If on, POV-Ray (Persistence of Vision Raytracer)\n'
+		    'will be used to render the molecular system.'
+		]
+	    ],
+	    Button : [
+		flushLeft : 1,
+		name : 'jpg_povsetup', text : 'POV-Ray Settings...',
+		font : 'mediumBold', onTrigger : 'return'
+	    ]
+	]
+    ]
+];
+
+const MDLMOL_ID = 'MOL';
+const MDLMOL_DESC = 'MDL SDfile or Molfile (.sdf, .mol)';
+const MDLMOL_EXT = ['sdf','mol'];
+const MDLMOL_DEFAULT = [
+    mdlmol_depict2D: 0, mdlmol_strip_h: 0, mdlct: 0,
+    mdlmol_molnames: 1, mdlmol_multifile: 0, mdlmol_nameroot: '',
+    mdlct_flatten: 0, mdlmol_version: 0
+];
+const MDLMOL_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save MDLMOL Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Hbox: [ extendH: 1, spacingH: 'medium',
+	    Checkbox : [
+		name : 'mdlmol_multifile',
+		text : 'One Molecule per File (.mol)',
+		onTrigger: 'return',
+		bubbleHelp:
+		    'If on, molecules will be saved one per file, with\n'
+		    'filenames generated from the File Prefix field\n'
+		    'and molecule chain names.  If off, molecules\n'
+		    'will be saved, one per record, to an SD file.'
+	    ],
+	    Text: [ extendH: 1,
+		name: 'mdlmol_nameroot',
+		title: 'File Prefix:',
+		emptyText: '<Auto>',
+		sensitive: 0,
+		bubbleHelp:
+		    'If One Molecule per File is on, molecules will\n'
+		    'be saved one per file, with filenames generated\n'
+		    'from the File Prefix field and molecule name.'
+	    ]
+	],
+	Checkbox : [
+	    text : 'Use Molecule Name in Title Field',
+	    name : 'mdlmol_molnames',
+	    bubbleHelp:
+		'If on, molecule chain names will be\n'
+		'written into the record title fields.'
+	],
+	Checkbox : [
+	    text : 'Omit H and LP Atoms', name : 'mdlmol_strip_h',
+	    bubbleHelp : 'Save only heavy atoms to file.'
+	],
+	Checkbox : [
+	    text : 'Depict as 2D', name : 'mdlmol_depict2D',
+	    bubbleHelp : 'Flatten structure to 2 dimensions.'
+	],
+	Checkbox : [
+	    text : 'V3000 format',
+	    name : 'mdlmol_version',
+	    bubbleHelp:
+		'If on, molecule will be written in the\n'
+		'newer V3000 MDL MOL file format.'
+	]
+    ]
+];
+
+const MAE_ID = 'MAE';
+const MAE_DESC = 'Schrodinger Maestro (.mae)';
+const MAE_EXT = 'mae';
+const MAE_DEFAULT = [maestro: 1];
+const MAE_PANEL = [
+    Vbox: [
+    ]
+];
+
+const MMOD_ID = 'MMD';
+const MMOD_DESC = 'Schrodinger Macromodel (.mmd)';
+const MMOD_EXT = 'mmd';
+const MMOD_DEFAULT = [];
+const MMOD_PANEL = [
+    Vbox: [
+	extendH : 1
+#if 0
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save MacroModel Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+#endif
+    ]
+];
+
+const MOE_ID = 'MOE';
+const MOE_DESC = 'MOE Molecule File (.moe)';
+const MOE_EXT = 'moe';
+const MOE_DEFAULT = [moe_graphics : 'All', moe_view : 0,
+			moe_no_atoms : 0, moe_box : 0, moe_wall : 0];
+const MOE_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save MOE Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Radio : [
+	    title: 'Graphics:', name: 'moe_graphics',
+	    bubbleHelp : [
+		'No graphics will be saved to MOE file',
+		'Only graphics seen in MOE window will\n'
+		'be saved to MOE file.',
+		'All graphics, including hidden ones,\n'
+		'will be saved to MOE file.'
+	    ],
+	    text: ['None','Visible Only','All']
+	],
+	Mbox : [
+	    title: 'Save:', columns: 2,
+
+	    Checkbox : [
+		name: 'moe_view', text: 'View Parameters',
+		bubbleHelp :
+		    'Saves current rotation, translation and zoom parameters.\n'
+		    'When the MOE file is opened again, it will appear\n'
+		    'exactly as it currently appears in the MOE window.'
+	    ],
+	    Checkbox : [
+		name: 'moe_no_atoms', text: 'Sequence Only',
+		bubbleHelp :
+		    'Only sequence information (no atoms)\n'
+		    'will be saved to the MOE file.'
+	    ],
+	    Checkbox : [
+		name: 'moe_box', text: 'Periodic Box',
+		bubbleHelp :
+		    'When periodic boundaries are enabled,\n'
+		    'the periodic system will be saved to\n'
+		    'the MOE file.'
+
+	    ],
+	    Checkbox : [
+		name: 'moe_wall', text: 'Wall Restraints',
+		bubbleHelp :
+		    'When wall restraints are enabled,\n'
+		    'they will be saved to the MOE file.'
+	    ]
+	]
+    ]
+];
+
+const MOL2_ID = 'MOL2';
+const MOL2_DESC = 'Tripos MOL2 (.mol2)';
+const MOL2_EXT = 'mol2';
+const MOL2_DEFAULT = [];
+const MOL2_PANEL = [
+    Vbox : [
+	extendH : 1
+#if 0
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save MOL2 Parameters' ],
+	    Separator : [ extendH : 1 ]
+	]
+#endif
+    ]
+];
+
+const MSF_ID = 'MSF';
+const MSF_DESC = 'GCG Multiple Sequence (.msf)';
+const MSF_EXT = 'msf';
+const MSF_DEFAULT = [MSF_reset_align : 0];
+const MSF_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save MSF Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Checkbox : [
+	    name : 'MSF_reset_align', text : 'Reset Alignment',
+	    bubbleHelp : BH_RESET_ALIGN
+	]
+    ]
+];
+
+const PDB_ID	= 'PDB';
+const PDB_DESC	= 'Protein Data Bank (.pdb)';
+const PDB_EXT	= ['pdb', 'ent'];
+
+const PDB_TFACTOR_PROP = tag [
+    [ 'Partial Charges', 'Hydrophobicity', 'Ideal VSA',
+      'Force', 'Atom Scalar', 'Accessible Surface Area' ],
+    [ 'charge', 'slogp', 'vsa', 'force', 'scalar', 'surface_area' ]
+];
+
+const PDB_DEFAULT = [
+    pdb_chain_id	: 1,
+    pdb_naming		: 0,
+    pdb_naming_option	: 'PDB',
+    pdb_tfactor_select	: 0,
+    pdb_tfactor_option	: first tags PDB_TFACTOR_PROP,
+    pdb_scale_tfactor	: 0,
+    pdb_cryst1		: 0,
+    pdb_multiplefiles	: 0,
+    pdb_multitype	: 'Tag',
+    pdb_nameroot	: ''
+];
+
+const PDB_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox:[
+	    extendH:1, flushLeft:1,
+	    Separator:[ extendH:1],
+	    Label:[text:'Save PDB Parameters'],
+	    Separator:[extendH:1]
+	],
+	Mbox : [
+	    columns:2, columnMajor:0, extendH:1,
+	    Checkbox:[
+		name:'pdb_chain_id', text:'Preserve Chain ID',
+		bubbleHelp :
+		    'If on, then try to preserve chain ID. The chain ID\n'
+		    'will be the last character of the chain name if it\n'
+		    'ends with a period followed by a single letter.'
+	    ],
+	    Checkbox:[
+		name:'pdb_cryst1', text:'Write Crystal Parameters',
+		bubbleHelp:
+		    'If on, a CRYST1 record will be written based on\n'
+		    'the current space group and unit cell dimensions.\n'
+		    'The option is available only if the Periodic System\n'
+		    'is enabled.'
+	    ],
+	    Checkbox:[
+		name:'pdb_naming', text:'Conform Naming to:',
+		onTrigger:'return',
+		bubbleHelp:
+		    'If on, names of hydrogens on amino acids will be\n'
+		    'translated to conform to the selected naming\n'
+		    'convention before being written to file.'
+	    ],
+	    Radio:[
+		name:'pdb_naming_option', type:'char',
+		text: ['PDB', 'PDB v3.0','IUPAC', 'AMBER'],
+		bubbleHelp:
+		    'PDB refers to the pre-remediation RCSB hydrogen naming\n'
+		    'convention. PDB v3.0 and IUPAC are identical except for\n'
+		    'the name of the peptide hydrogen: IUPAC recommends HN,\n'
+		    'whereas PDB v3.0 specifies H.\n\n'
+		    'If AMBER is chosen, neutral versions of the typically\n'
+		    'charged residues Asp, Glu, and Arg will be renamed.\n'
+		    'Histidine residues will be named according to their\n'
+		    'protonation state; half-cystines will be named CYX,\n'
+		    'as will de-protonated cysteines.'
+	    ],
+	    Checkbox : [
+		name:'pdb_tfactor_select', text:'Replace B-Factor with',
+		onTrigger:'return',
+		bubbleHelp:
+		    'If on, replace the B-factor column in the\n'
+		    'PDB output file with the specified value.'
+	    ],
+	    Option : [
+		name:'pdb_tfactor_option', type:'char',
+		text: tags PDB_TFACTOR_PROP,
+		bubbleHelp:
+		    'Select type of value to output in\n'
+		    'the B-factor column of the PDB file.'
+	    ],
+	    Checkbox:[
+		name:'pdb_scale_tfactor', text:'Scale B-Factor Values',
+		bubbleHelp:
+		    'Scale B-Factor values to the range [0,100].'
+	    ],
+	    Checkbox:[
+		name:'pdb_force_TER', text:'Write TER Records for All Chains',
+		bubbleHelp:
+		    'If on, chains will be written in the order that they\n'
+		    'appear in the Sequence Editor, and TER records will\n'
+		    'be written after each chain. If off, protein chains\n'
+		    'will be written before non-protein chains, and only\n'
+		    'protein chains will be followed by TER records.'
+	    ],
+	    Checkbox:[
+		name:'pdb_multiplefiles', text:'Separate into Files By:',
+		onTrigger: 'return',
+		bubbleHelp:
+		    'If on, molecules will be written one per\n'
+		    'file or separated into files by tag, with\n'
+		    'filenames generated from the Prefix\n'
+		    'field and chain tag.'
+	    ],
+	    Hbox: [ extendH: 1,
+		Radio: [
+		    name:'pdb_multitype', text:['Tag','Molecule'], sensitive: 0,
+		    bubbleHelp:
+			'Molecules will be written one per file\n'
+			'or separated into files by tag, with\n'
+			'filenames generated from the Prefix\n'
+			'field and chain tag.'
+		],
+		Text: [ extendH: 1,
+		    name: 'pdb_nameroot',
+		    title: 'Prefix:',
+		    emptyText: '<Auto>',
+		    sensitive: 0,
+		    bubbleHelp:
+			'If Separate into Files is on, molecules will be\n'
+			'saved one per file or separated into files by tag,\n'
+			'with filenames generated from the Prefix field\n'
+			'and chain tag.'
+		]
+	    ]
+	]
+    ]
+];
+
+const PHYLIP_ID = 'PHYLIP';
+const PHYLIP_DESC = 'Phylip (.phy)';
+const PHYLIP_EXT = 'phy';
+const PHYLIP_DEFAULT = [Phylip_reset_align : 0];
+const PHYLIP_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save Phylip Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Checkbox : [
+	    name : 'Phylip_reset_align', text : 'Reset Alignment',
+	    bubbleHelp : BH_RESET_ALIGN
+	]
+    ]
+];
+
+const PIR_ID = 'PIR';
+const PIR_DESC = 'Protein Id. Resource (.pir)';
+const PIR_EXT = 'pir';
+const PIR_DEFAULT = [PIR_reset_align : 0];
+const PIR_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save PIR Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Checkbox : [
+	    name : 'PIR_reset_align', text : 'Reset Alignment',
+	    bubbleHelp : BH_RESET_ALIGN
+	]
+    ]
+];
+
+const PNG_ID = 'PNG';
+const PNG_DESC = 'Portable Network Graphics (.png)';
+const PNG_EXT = 'png';
+const PNG_DEFAULT = [png_quality : 7, png_alpha : 0];
+const PNG_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save PNG Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Mbox : [
+	    columns : 2,
+	    Hbox : [
+		extendH : 1,
+		Text : [
+		    extendH : 1,
+		    title: 'Dimension:', name: 'png_dimension', len: 15,
+		    shortcut : PIXEL_DIMENSIONS,
+		    onTrigger : 'return'
+		],
+		Option : [
+		    name : 'png_dimension_unit',
+		    text : ['pixel', 'inch', 'cm', 'percent'],
+		    onTrigger : 'return'
+		]
+	    ],
+	    Checkbox: [
+		name : 'png_antialias', flushLeft : 1,
+		text : 'Anti-Alias Picture',
+		onTrigger : 'return'
+	    ],
+	    Hbox: [
+		extendH : 1,
+		Text : [
+		    title: 'Resolution:', name: 'png_resolution', len: 6,
+		    min : 1, max: INT_MAX, type: 'int', extendH: 1,
+		    shortcut: RESOLUTIONS,
+		    onTrigger : 'return'
+		],
+		Option : [
+		    name: 'png_units', type: 'char',
+		    text: ['pixels/inch (dpi)', 'pixels/cm (dpc)'],
+		    onTrigger : 'return'
+		]
+	    ],
+	    Checkbox : [
+		name : 'png_high_quality', flushLeft : 1,
+		text : 'High Quality',
+		onTrigger : 'return',
+		bubbleHelp :
+		    'If on, set ribbon and focal blur quality\n'
+		    'to maximum for the picture creation.'
+	    ],
+	    Scale : [
+		title : 'Compress:', name : 'png_quality',
+		extendH : 1, len : 3, range : [0, 9, 1],
+		bubbleHelp : [
+		    'Set the compression level of the picture\n'
+		    'from 0 (lowest) to 9 (highest). Higher\n'
+		    'compression produces smaller files but\n'
+		    'requires more time.'
+		]
+	    ],
+	    Option : [
+		title: ' Color Space:', name: 'png_colorspace',
+		type: 'char', minWidth: 3,
+		text: ['RGB', 'sRGB']
+	    ],
+	    Checkbox : [
+		name : 'png_alpha', title : 'Options:',
+		text : 'Transparent Background',
+		bubbleHelp : [
+		    'If on, then mark the background color\n'
+		    'of the picture as transparent.'
+		]
+	    ],
+	    Label : [],
+	    Checkbox : [
+		name: 'png_pov',
+		text : 'Render with POV-Ray',
+		onTrigger : 'return',
+		bubbleHelp : [
+		    'If on, POV-Ray (Persistence of Vision Raytracer)\n'
+		    'will be used to render the molecular system.'
+		]
+	    ],
+	    Button : [
+		flushLeft : 1,
+		name : 'png_povsetup', text : 'POV-Ray Settings...',
+		font : 'mediumBold', onTrigger : 'return'
+	    ]
+	]
+    ]
+];
+
+const POV_ID = 'POV';
+const POV_DESC = 'POV-Ray Scene File (.pov)';
+const POV_EXT = 'pov';
+const POV_DEFAULT = [];
+const POV_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save POV Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Radio : [
+	    title: 'Atom Theme:', name: 'pov_atom_theme',
+	    text: ['Default', 'Swirl', 'Metal', 'Glass', 'Marble'],
+	    bubbleHelp :
+		'Select the material used\n'
+		'to render the atoms.'
+	],
+	Radio : [
+	    title: 'Ribbon Theme:', name: 'pov_ribbon_theme',
+	    text: ['Default', 'Swirl', 'Metal', 'Glass', 'Marble'],
+	    bubbleHelp :
+		'Select the material used to\n'
+		'render the ribbons.'
+	]
+    ]
+];
+
+const SEQ_ID = 'SEQ';
+const SEQ_DESC = 'Formatted Sequence (.fsq)';
+const SEQ_EXT = 'fsq';
+const SEQ_DEFAULT = [Seq_reset_align : 0];
+const SEQ_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save Formatted Sequence Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Hbox : [
+	    extendH : 1,
+	    Checkbox : [
+		name : 'Seq_reset_align', text : 'Reset Alignment',
+		bubbleHelp : BH_RESET_ALIGN
+	    ],
+	    Text : [
+		title: 'Residues Per Line:', name: 'blocksize', len: 5,
+		type: 'int', shortcut : ['40', '60', '80', '100']
+	    ]
+	]
+    ]
+];
+
+const RAW_ID = 'RAW';
+const RAW_DESC = 'Raw Sequence (.seq)';
+const RAW_EXT = 'seq';
+const RAW_DEFAULT = [];		/* no alignment info */
+const RAW_PANEL = [
+    Vbox : [
+	extendH : 1
+#if 0
+	, Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save Raw Sequence Parameters' ],
+	    Separator : [ extendH : 1 ]
+	]
+#endif
+    ]
+];
+
+const TIF_ID = 'TIF';
+const TIF_DESC = 'Tagged Image File (.tif)';
+const TIF_EXT = 'tif';
+const TIF_DEFAULT = [tif_quality : 'Zip', tif_alpha : 0];
+const TIF_PANEL = [
+    Vbox : [
+	extendH : 1,
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save TIF Parameters' ],
+	    Separator : [ extendH : 1 ]
+	],
+	Mbox : [
+	    columns : 2,
+	    Hbox : [
+		extendH : 1,
+		Text : [
+		    extendH : 1,
+		    title: 'Dimension:', name: 'tif_dimension', len: 15,
+		    shortcut : PIXEL_DIMENSIONS,
+		    onTrigger : 'return'
+		],
+		Option : [
+		    name : 'tif_dimension_unit',
+		    text : ['pixel', 'inch', 'cm', 'percent'],
+		    onTrigger : 'return'
+		]
+	    ],
+	    Checkbox: [
+		name : 'tif_antialias', flushLeft : 1,
+		text : 'Anti-Alias Picture',
+		onTrigger : 'return'
+	    ],
+	    Hbox: [
+		extendH : 1,
+		Text : [
+		    title: 'Resolution:', name: 'tif_resolution', len: 6,
+		    min : 1, max: INT_MAX, type: 'int', extendH: 1,
+		    shortcut: RESOLUTIONS,
+		    onTrigger : 'return'
+		],
+		Option : [
+		    name: 'tif_units', type: 'char',
+		    text: ['pixels/inch (dpi)', 'pixels/cm (dpc)'],
+		    onTrigger : 'return'
+		]
+	    ],
+	    Checkbox : [
+		name : 'tif_high_quality', flushLeft : 1,
+		text : 'High Quality',
+		onTrigger : 'return',
+		bubbleHelp :
+		    'If on, set ribbon and focal blur quality\n'
+		    'to maximum for the picture creation.'
+	    ],
+	    Radio : [
+		title : 'Compress:', name : 'tif_quality',
+		type: 'char', text: ['None', 'RLE', 'Zip']
+	    ],
+	    Label : [],
+	    Checkbox : [
+		name : 'tif_alpha', title : 'Options:',
+		text : 'Transparent Background',
+		bubbleHelp : [
+		    'If on, then mark the background color\n'
+		    'of the picture as transparent.'
+		]
+	    ],
+	    Label : [],
+	    Checkbox : [
+		name: 'tif_pov',
+		text : 'Render with POV-Ray',
+		onTrigger : 'return',
+		bubbleHelp : [
+		    'If on, POV-Ray (Persistence of Vision Raytracer)\n'
+		    'will be used to render the molecular system.'
+		]
+	    ],
+	    Button : [
+		flushLeft : 1,
+		name : 'tif_povsetup', text : 'POV-Ray Settings...',
+		font : 'mediumBold', onTrigger : 'return'
+	    ]
+	]
+    ]
+];
+
+const XTL_ID = 'XTL';
+const XTL_DESC = 'MSI Crystal File (.xtl)';
+const XTL_EXT = 'xtl';
+const XTL_DEFAULT = [];
+const XTL_PANEL = [
+    Vbox: [
+	extendH : 1
+#if 0
+	Hbox : [
+	    extendH : 1, flushLeft : 1,
+	    Separator : [ extendH : 1 ],
+	    Label : [ text : 'Save XTL Parameters' ],
+	    Separator : [ extendH : 1 ]
+	]
+#endif
+    ]
+];
+
+// ---------- List of specially managed picture option widgets --------
+
+const PICTURE_OPTIONS = [
+    '*_dimension_unit', '*_dimension',	'*_resolution',
+    '*_units',		'*_antialias',	'*_high_quality'
+];
+
+// ------------------------ Format List -------------------------------
+
+const MOL_FORMAT = 1, SEQ_FORMAT = 2, PIC_FORMAT = 3;
+const FORMAT_ID = 1, FORMAT_DESC = 2, FORMAT_EXT = 3, FORMAT_PANEL = 4,
+	FORMAT_DEFAULT = 5;
+
+const MOL_X = 0;
+const MOLFORMAT_LIST = tr [
+    [MOE_ID,	MOE_DESC,	MOE_EXT,	MOE_PANEL,	MOE_DEFAULT],
+    [MDLMOL_ID,	MDLMOL_DESC,	MDLMOL_EXT,	MDLMOL_PANEL,	MDLMOL_DEFAULT],
+    [MOL2_ID,	MOL2_DESC,	MOL2_EXT,	MOL2_PANEL,	MOL2_DEFAULT],
+    [PDB_ID,	PDB_DESC,	PDB_EXT,	PDB_PANEL,	PDB_DEFAULT],
+    [MMOD_ID,	MMOD_DESC,	MMOD_EXT,	MMOD_PANEL,	MMOD_DEFAULT],
+    [MAE_ID,	MAE_DESC,	MAE_EXT,	MAE_PANEL,	MAE_DEFAULT],
+    [XTL_ID,	XTL_DESC,	XTL_EXT,	XTL_PANEL,	XTL_DEFAULT]
+];
+
+const SEQ_X = 7;
+const SEQFORMAT_LIST = tr [
+    [FASTA_ID,	FASTA_DESC,	FASTA_EXT,	FASTA_PANEL,	FASTA_DEFAULT],
+    [PIR_ID,	PIR_DESC,	PIR_EXT,	PIR_PANEL,	PIR_DEFAULT],
+    [CLUSTAL_ID,CLUSTAL_DESC,	CLUSTAL_EXT,	CLUSTAL_PANEL,CLUSTAL_DEFAULT],
+    [EMBL_ID,	EMBL_DESC,	EMBL_EXT,	EMBL_PANEL,	EMBL_DEFAULT],
+    [GB_ID,	GB_DESC,	GB_EXT,		GB_PANEL,	GB_DEFAULT],
+    [GCG_ID,	GCG_DESC,	GCG_EXT,	GCG_PANEL,	GCG_DEFAULT],
+    [IG_ID,	IG_DESC,	IG_EXT,		IG_PANEL,	IG_DEFAULT],
+    [MSF_ID,	MSF_DESC,	MSF_EXT,	MSF_PANEL,	MSF_DEFAULT],
+    [PHYLIP_ID,	PHYLIP_DESC,	PHYLIP_EXT,	PHYLIP_PANEL,	PHYLIP_DEFAULT],
+    [SEQ_ID,    SEQ_DESC,	SEQ_EXT,	SEQ_PANEL,	SEQ_DEFAULT],
+    [RAW_ID,	RAW_DESC,	RAW_EXT,	RAW_PANEL,	RAW_DEFAULT]
+];
+
+const PIC_X = 18;
+const PICFORMAT_LIST = tr [
+    [PNG_ID,	PNG_DESC,	PNG_EXT,	PNG_PANEL,	PNG_DEFAULT],
+    [JPG_ID,	JPG_DESC,	JPG_EXT,	JPG_PANEL,	JPG_DEFAULT],
+    [BMP_ID,	BMP_DESC,	BMP_EXT,	BMP_PANEL,	BMP_DEFAULT],
+    [TIF_ID,	TIF_DESC,	TIF_EXT,	TIF_PANEL,	TIF_DEFAULT],
+    [EPS_ID,	EPS_DESC,	EPS_EXT,	EPS_PANEL,	EPS_DEFAULT],
+    [POV_ID,	POV_DESC,	POV_EXT,	POV_PANEL,	POV_DEFAULT],
+    [EMF_ID,	EMF_DESC,	EMF_EXT,	EMF_PANEL,	EMF_DEFAULT]
+];
+
+const N_FORMAT_TYPE = 3;
+const FORMAT_LIST = [MOLFORMAT_LIST, SEQFORMAT_LIST, PICFORMAT_LIST];
+const PAGE_OFFSET = [MOL_X, SEQ_X, PIC_X];
+
+    // return the format type and index associated with an extension
+
+local function Ext2Format ext
+    local type_x, fmt_x;
+    for type_x = 1, N_FORMAT_TYPE loop
+	fmt_x = indexof [1, orE [apt indexof
+	    [ext, FORMAT_LIST(type_x)(FORMAT_EXT)], 0]];
+	if fmt_x then break; endif
+    endloop
+    return [type_x, fmt_x];
+endfunction
+
+local function Id2Format format_id
+    local type_x, fmt_x;
+    if allfalse format_id then return [0,0]; endif
+    for type_x = 1, N_FORMAT_TYPE loop
+	fmt_x = indexof [format_id, FORMAT_LIST(type_x)(FORMAT_ID)];
+	if fmt_x then break; endif
+    endloop
+    return [type_x, fmt_x];
+endfunction
+
+// ---------------------Manage Picture Options-------------------------------
+
+
+local function view_get_image opt
+    local data;
+    local vsetup = ViewSetup [];
+
+	// Set maximum ribbon quality if requested.
+
+    if istrue opt.max_ribbon_quality then
+	ViewSetup [ribbon_segments:16, ribbon_sections:12];
+    endif
+
+    data = ViewGetImage opt;
+
+	// Restore old ribbon settings.
+
+    if istrue opt.max_ribbon_quality then
+	ViewSetup [
+	    ribbon_segments: vsetup.ribbon_segments,
+	    ribbon_sections: vsetup.ribbon_sections
+	];
+    endif
+
+    return data;
+endfunction
+
+// Return ViewGetImage options + check how long it will take to
+// save the picture with the current settings.
+
+local function check_picture_size [val, fmt_tok]
+    local w_hq    = tok_cat [fmt_tok, '_high_quality'];
+    local w_aa    = tok_cat [fmt_tok, '_antialias'];
+    local w_alpha = tok_cat [fmt_tok, '_alpha'];
+    local w_wbg   = tok_cat [fmt_tok, '_white_bg'];
+
+	// Calculate number of antialias samples for snapshot.
+	// If a picture below 2 megapixels is created and/or the
+	// transparent background option is used, increase the
+	// amount of default antialias samples.
+
+    local vsetup = ViewSetup[];
+    local pixels = mul val.image_size[[1,2]];
+    local aa_def = 6 + 2 * (pixels < 2000000) + 4 * (anytrue val.(w_alpha));
+    local samples = max [vsetup.accum_samples, aa_def] * anytrue val.(w_aa);
+    local focal_blur_quality = vsetup.focal_blur_quality;
+
+    if (focal_blur_quality > 0) and alltrue val.(w_hq) then
+	focal_blur_quality = 3; /* highest blur quality */
+    endif
+
+    local vgi_opt = [
+	width : val.image_size(1),
+	height : val.image_size(2),
+	samples : samples,
+	focal_blur_quality : focal_blur_quality,
+	transparent_background : anytrue val.(w_alpha),
+	max_ribbon_quality : anytrue val.(w_hq)
+    ];
+
+    if anytrue val.(w_wbg) then
+	vgi_opt.force_background_color = icolor 'white';
+    endif
+
+    local mult = mul ceil (val.image_size[[1,2]] / ViewPixelDimensions []);
+    mult = max [1, max [samples, (vsetup.focal_blur>0) * 20]] * mult;
+
+    if mult > 30 then
+	local tm = view_get_image cat [[timing:1], vgi_opt];
+	if (tm > 15)  then
+	    local rc = YesNo twrite [
+		'Saving the picture with the specified\n'
+		'size and parameters will take about\n'
+		'{n:} minute(s). Do you want to continue?',
+		ceil (tm/60)
+	    ];
+	    if not rc then
+		return [];
+	    endif
+	endif
+    endif
+
+    return vgi_opt;
+endfunction
+
+local function manage_picture_options [wkey, val, trigger, fmt_tok]
+
+    local function parse_dim dim
+
+	    // Parse and Validate the image/print size.
+
+	dim = string dim;
+	dim = dim | not isspace dim;
+
+	local mask = indexof [dim, "0123456789.xX"];
+	if anyfalse mask then
+	    Warning 'Invalid dimension syntax.';
+	    return [];
+	endif
+
+	local dimc = btoc (isdigit dim or dim == ".");
+
+	    // We should have 3 distinct blocks, width, separator and height.
+
+	if length dimc <> 3 then
+	    Warning 'Invalid dimension syntax.';
+	    return [];
+	endif
+
+	    // Split the token in 3, width, separator and height.
+
+	local [width_tok, sep_tok, height_tok] = app token split [dim, dimc];
+
+	return [atof width_tok, atof height_tok];
+    endfunction
+
+    local function get_pdim [size, dunit, res, runit]
+
+	local [iwidth, iheight] = parse_dim size;
+
+	if isnull iwidth or isnull iheight then
+	    return [];					// bad dimension!!!
+	else
+	    local factor;
+	    if runit === 'pixels/cm (dpc)' then
+		res = res * 2.54;			// by default in dpi
+	    endif
+	    if dunit === 'pixel' then
+		factor = 1.0;
+	    elseif dunit === 'inch' then
+		factor = res;
+	    elseif dunit === 'cm' then
+		factor = res / 2.54;
+	    elseif dunit === 'percent' then
+		local [w, h] = ViewPixelDimensions [];
+		factor = [w, h] / 100;
+	    endif
+	    [iwidth, iheight] = round (factor * [iwidth,  iheight]);
+	endif
+
+	return [iwidth, iheight];
+    endfunction
+
+    local function set_pdim [wkey, iwidth, iheight, osize, dunit, res, runit]
+	local size, scut, w, wt;
+	local attr = [], data = [];
+	local rval = res;
+
+	if runit === 'pixels/cm (dpc)' then
+	    rval = rval * 2.54;				// by default in dpi
+	endif
+	if dunit === 'pixel' then
+	    size = twrite ['{n:} x {n:}', iwidth, iheight];
+	    scut = PIXEL_DIMENSIONS;
+	elseif dunit === 'inch' then
+	    size = twrite ['{n:.4} x {n:.4}', iwidth / rval, iheight / rval];
+	    scut = INCH_DIMENSIONS;
+	elseif dunit === 'cm' then
+	    rval = rval / 2.54;
+	    size = twrite ['{n:.4} x {n:.4}', iwidth / rval, iheight / rval];
+	    scut = CM_DIMENSIONS;
+	elseif dunit === 'percent' then
+	    local [ww, wh] = ViewPixelDimensions [] / 100;
+	    size = twrite ['{n:} x {n:}', round (iwidth/ww), round(iheight/wh)];
+	    scut = PERCENT_DIMENSIONS;
+	endif
+	if isnull iwidth or isnull iheight then size = osize; endif
+
+	wt = findmatch ['*_dimension', tags val];
+	data = tagput [[], wt, size];
+
+	for w in wt loop
+	    attr = tagpoke [attr, w, [shortcut: scut]];
+	endloop
+	WindowSetAttr [wkey, attr];
+
+	wt = findmatch ['*_dimension_unit', tags val];
+	data = tagput [data, wt, dunit];
+	wt = findmatch ['*_resolution', tags val];
+	data = tagput [data, wt, res];
+	wt = findmatch ['*_units', tags val];
+	data = tagput [data, wt, runit];
+
+	WindowSetData [wkey, data];
+	WindowSetData [wkey, [image_size : [iwidth, iheight, dunit]]];
+    endfunction
+
+    local function change_picture_dimension [wkey, val, fmt_tok, upd_only]
+
+	local [wname1, wname2, wname3, wname4] = apt tok_cat [
+	    fmt_tok, ['_dimension','_dimension_unit','_resolution','_units']
+	];
+	local iwidth, iheight;
+	local size =  val.(wname1);
+	local dunit = val.(wname2);
+	local res =   val.(wname3);
+	local runit = val.(wname4);
+	local id = first x_findmatch [size, (tr NAMED_DEFAULTS)(1)];
+
+	if upd_only then
+	    [iwidth, iheight] = get_pdim [size, val.image_size(3), res, runit];
+	elseif size == 'Current Window' then
+	    [iwidth, iheight] = ViewPixelDimensions [];
+	elseif length id then
+	    [[], [iwidth, iheight], res, runit] = NAMED_DEFAULTS(id);
+	else
+	    [iwidth, iheight] = get_pdim [size, dunit, res, runit];
+	endif
+
+	set_pdim [wkey, iwidth, iheight, size, dunit, res, runit];
+
+	if isnull iwidth or isnull iheight then
+	    return 0; // bad dimension!
+	else
+	    return 1;
+	endif
+    endfunction
+
+    local match_tok = tok_cat ['*', tok_drop [trigger, tok_length fmt_tok]];
+    local wtags = findmatch [match_tok, tags val];
+
+    if m_findmatch ['*_dimension_unit', trigger] then
+	return change_picture_dimension [wkey, val, fmt_tok, 1];
+
+    elseif m_findmatch ['*_dimension', trigger] then
+	return change_picture_dimension [wkey, val, fmt_tok, 0];
+
+    elseif m_findmatch [['*_resolution', '*_units'], trigger] then
+	return change_picture_dimension [wkey, val, fmt_tok, 0];
+
+    elseif m_findmatch [['*_antialias', '*_high_quality'], trigger] then
+	WindowSetData [wkey, tag [wtags, val.(trigger)]];
+
+    endif
+
+    return 1;
+endfunction
+
+// ---------------------------- Save Panel --------------------------------
+
+const SAVE_WNAME = 'MoeSaveWindow';
+
+const ICO_SIZE	= 15;
+const MODINT_1XCLICK = 1024;
+const MODINT_2XCLICK = 1032;
+const MODINT_RETURN = 8;
+
+const SAVE_PANEL = [
+    title: 'Save', name: 'save_panel', windowName: SAVE_WNAME,
+    options: ['Save', 'Cancel'], onTrigger: ['return', 'exit'],
+    bubbleHelp : [
+	'Create and save molecular data in desired format.\n'
+	'Panel will close once save operation is complete.',
+	'Close Save panel'
+    ],
+
+    Pager: [
+	name : 'path_pager', flushLeft : 1, extendH : 1, extendV : 1,
+	FSB : [
+	    name : 'fsb', extendH : 1, extendV : 1,
+	    onTrigger : 'validate', type: 'modint'
+	],
+	Label : [
+	    extendH : 1, extendV : 1, sensitive : 0,
+	    text : 'Copy to Clipboard'
+	]
+    ],
+    Separator: [extendH: 1, flushLeft: 1],
+    Vbox : [
+	Hbox : [
+	    extendH : 1,
+	    Option : [
+		title : 'Save:', name : 'format_type', type : 'int',
+		extendH : 1, text : ['Molecule', 'Sequence', 'Picture'],
+		columns : 1, onTrigger : 'return',
+		bubbleHelp :
+		    'Select the category of formats. The current\n'
+		    'molecular system can be saved using 3D\n'
+		    'coordinate data (Molecule), sequence only\n'
+		    'information (Sequence) or a snapshot (Picture).'
+	    ],
+	    Checkbox : [
+		name : 'save_selected', text : 'Only Selected',
+		onTrigger : 'return',
+		bubbleHelp :
+		    'If on, then only the selected atoms, residues\n'
+		    'or chains will be saved.'
+	    ],
+	    Option : [
+		name : 'subset', type : 'int',
+		extendH : 1, text : [
+		    'Atoms', 'Residues', 'Chains', 'Objects', 'Molecules'
+		],
+		bubbleHelp :
+		    'If on, then only the selected atoms, residues\n'
+		    'or chains will be saved.'
+	    ]
+	],
+	Hbox : [
+	    Pager : [
+		title : 'Format:', name : 'format_pager',
+		Option : [
+		    name : 'mol_option', extendH : 1, type : 'int',
+		    onTrigger : 'return',
+		    bubbleHelp :
+			'Select a molecular format.'
+		],
+		Option : [
+		    name : 'seq_option', extendH : 1, type : 'int',
+		    onTrigger : 'return',
+		    bubbleHelp :
+			'Select a sequence format.'
+		],
+		Option : [
+		    name : 'pic_option', extendH : 1, type : 'int',
+		    onTrigger : 'return',
+		    bubbleHelp :
+			'Select a graphics format.'
+		]
+	    ],
+	    Checkbox : [
+		name : 'auto_ext', text : 'Automatic Extension',
+		onTrigger : 'return',
+		bubbleHelp :
+		    'If on, ensures that filenames\n'
+		    'are terminated with the indicated\n'
+		    'extension for the selected format.'
+	    ]
+	]
+    ]
+];
+
+const COPY_PIC2CLIP_WNAME = 'MoeCopyPictureToClipboardWindow';
+const COPY_PIC2CLIP_PNAME = 'copy_pic2clip_panel';
+
+const COPY_PIC2CLIP_PANEL = [
+    title: 'Copy Picture to Clipboard',
+    name: COPY_PIC2CLIP_PNAME,
+    windowName: COPY_PIC2CLIP_WNAME,
+    options: ['OK', 'Cancel'],
+    onTrigger: ['return', 'return']
+];
+
+// ------------------------- Format Dispatcher ----------------------------
+
+local function get_subset [subset, moe_no_atoms, spc_obj]
+    local mol_object, c, r;
+    if allfalse subset or subset === ALL_MOLOBJ then	// save everything
+	if anytrue moe_no_atoms then
+	    mol_object = Residues [];
+	else
+	    mol_object = Chains [];		// whole system
+	endif
+    elseif length spc_obj and subset === SPC_OBJECTS then   // specified objects
+	mol_object = spc_obj;
+    elseif subset === SEL_ATOMS then		// save selected atoms
+	mol_object = SelectedAtoms[];
+	if anytrue moe_no_atoms then
+	    mol_object = uniq oParent mol_object;
+	endif
+    elseif subset === SEL_RES then		// save selected residues
+	mol_object = SelectedResidues[];
+    elseif subset === SEL_CHAINS then
+	mol_object = SelectedChains[];		// save selected chains
+	if anytrue moe_no_atoms then
+	    mol_object = cat cResidues mol_object;
+	endif
+
+	// NOTE(ms): resolving simultaneous res and chain selection in SE:
+	// all selected residues + selected chains with no sel.residues, i.e.
+	// - unselected chains with no selected residues are ignored
+	// - selected chains with no selected residues are taken as-is
+	// - in chains with some selected residues, unselected residues
+	//   are always ignored, regardless of chain selection
+	// We also make sure that the chain order is preserved.
+
+    elseif subset === SEL_RESCHAINS then	// sel.residues or chains
+	c = Chains[];
+	r = cResidues c;
+	c | not cSelected c = 0;		// unselected chains
+	c | app orE rSelected r = 0;		// chains with sel.residues
+	r | c = [[]];				// residues of as-is chains
+	c | not c = [[]];			// chains with explicit res
+	r = r || rSelected r;			// selected residues
+	mol_object = cat cat tr [c, r];
+
+    elseif subset === SEL_OBJECTS then		// save selected mol objects.
+	mol_object = uniq cat cat app oAtoms [
+	    SelectedChains[],
+	    SelectedResidues[],
+	    SelectedAtoms[]
+	];
+	if anytrue moe_no_atoms then
+	    mol_object = uniq oParent mol_object;
+	endif
+
+	// SEL_MOLECULES: Save connected components that contain any
+	//     selected chains/res/atoms;
+	//     but only save objects containing atoms.
+
+    elseif subset === SEL_MOLECULES then
+	mol_object = uniq cat cat app oAtoms [
+	    SelectedChains[],
+	    SelectedResidues[],
+	    SelectedAtoms[]
+	];
+	local idx = x_join[aMoleculeNumber Atoms[], aMoleculeNumber mol_object];
+	mol_object = (Atoms[])[idx];
+
+    elseif subset === LIGAND then
+	local a;
+	if length spc_obj then
+	    a = cat oAtoms spc_obj;
+	else
+	    a = Atoms [];
+	endif
+	mol_object = a | (andE [
+	    m_diff [rType oParent a, ['amino','dna','rna']],
+	    m_diff [aClassRLS a, ['sol','rec']]
+	]);
+	if anytrue moe_no_atoms then
+	    mol_object = uniq oParent mol_object;
+	endif
+    endif
+
+    return (mol_object | not cIsPrivate oChains mol_object);
+endfunction
+
+local function get_emf [image, options]
+    local [w, h] = [l_length image, length image];
+    local key = gr_create [size : [w, h], units: 'pix', opacity: -1];
+    gr_pixmap [key, [0, [0,h], [w,h], image]];
+    local s = 100.0 / options.resolution; // Powerpoint uses 100 dpi as base
+    local emf = gr_encode [key, 'image/x-emf', [0, 0, s, s]];
+    gr_destroy key;
+
+    if isnull emf then
+	Warning
+	    'Generation of Windows Enhanced\n'
+	    'Metafile was unsuccessful.'
+	;
+    else
+	return emf;
+    endif
+endfunction
+
+function DepictionCoordinates;
+
+// verify_overwrite: Returns:
+//	0: don't overwrite
+//	1: overwrite confirmed for this file
+//	2: overwrite confirmed for this file AND don't ask again
+//		for future files
+
+const DONT_CONFIRM = 2;
+
+local function verify_overwrite name
+    local wkey = WindowCreate [
+	name: 'overwrite_shell',
+	text: ['Yes','Cancel'],
+	onTrigger: ['return','return'],
+	Label: [
+	    font: 'mediumBold', centerH: 1,
+	    text: twrite ['File {} exists.', name]
+	],
+	Hbox: [ centerH: 1,
+	    Label: [
+		font: 'mediumBold',
+		text: 'Overwrite?'
+	    ],
+	    Checkbox: [
+		name: 'overwrite_all',
+		text: 'Overwrite All',
+		bubbleHelp:
+		    'If on, no further overwrite confirmations\n'
+		    'will be displayed.'
+	    ]
+	]
+    ];
+    WindowShow wkey;
+    local [val, trig] = WindowWait wkey;
+
+    if val.overwrite_shell == 'Yes' then
+	return 1 + val.overwrite_all;	// DONT_CONFIRM == 2
+    endif
+
+    return 0;	// Cancel
+endfunction
+
+// trim_ws: Trim leading and trailing spaces.
+
+local function trim_ws s
+    local m = not isspace s, p = pscan m;
+    return (s | m or ltE [0, p, last p]);
+endfunction
+
+// generate_filenames: Generates unique filenames for each
+//	molecule in MOE.
+
+local function generate_filenames [nameroot, dir, atoms]
+
+	// Generate unique filenames by generating unique serial
+	// numeric suffixes. Generate suffixes for duplicated names
+	// using igen second sac.
+
+    local chname = cName aChain app first atoms;	// all names
+    local ndup = second sac chname;
+    local [dup_i,dup_m] = sam chname;
+
+    local name_m = tok_length (chname[dup_i] | dup_m);	// has ch name
+
+	// If name is unique across all chains being saved, then
+	// do not generate a suffix.
+
+    local no_num_m = ndup == 1 and name_m;
+    ndup | no_num_m = 0;
+
+	// Suffix: append unique index prefixed by '_'.
+	// If there is no chain name, use unique index, with no '_'.
+
+    local suff = totok app igen ndup;
+    suff | no_num_m = '';		// turns nulls into ''
+
+    local m_underscore = ndup > 1 and name_m;
+    suff | m_underscore = tok_cat ['_', suff | m_underscore];
+
+	// Put suffixes back into their original order, append
+	// to user-specified name root; create complete filename.
+
+    chname = tok_cat [chname, totok perm [cat suff, x_sort chname]];
+    return fname tok_cat [dir, '/', nameroot, chname,'.mol'];
+endfunction
+
+// obj_gkeys: Returns the graphics objects associated with the object
+//	keys; objects can be nested (from dbv_edit.svl).
+
+local function obj_gkeys objects
+    local o_atm = app uniq app oAtoms objects;
+    local o_gkeys = rep [[], length objects];
+
+    local gkeys = GKeyList [];
+
+    local g_var = app GVar gkeys;
+    [gkeys, g_var] = [gkeys, g_var] || [app istagged g_var];
+    local ligxatm = app cat apt tagget [g_var,'_LIGX_System_oSerialNumber'];
+    g_var = [];
+
+    local g_acount = [];
+    local i;
+    for i=1, length o_atm loop
+	g_acount(i) = app length apt join [[o_atm(i)], ligxatm];
+    endloop;
+    local xg = apt x_max g_acount;	// idx of obj with max common ligxatm
+    [gkeys, xg] = [gkeys, xg] || [apt max g_acount];
+
+	// Associate gkeys to objects:
+
+    if length gkeys then
+	for i=1, length xg loop;
+	    o_gkeys(xg(i)) = cat [o_gkeys(xg(i)), gkeys(i)];
+	endloop
+    endif
+
+    return cat o_gkeys;
+endfunction
+// CallFormatWriter: Writes data to the given file in the specified format.
+
+local function CallFormatWriter [file_id, format, opt]
+    local [format_type, format_x] = Id2Format format;
+
+    if format_x == 0 then
+	Warning 'Invalid format specified.';
+	return 0;
+    endif
+
+    opt = tagcat [opt, FORMAT_LIST(format_type)(FORMAT_DEFAULT)(format_x)];
+
+    local vgi_opt = opt.vgi_options;
+
+    local subset = opt.subset;
+    if allfalse opt.save_selected then subset = ALL_MOLOBJ; endif
+
+	// Picture format ignore selection
+
+    if format_type <> PIC_FORMAT then
+	if subset == SEL_ATOMS and isnull SelectedAtoms[] then
+	    Warning 'No atoms are selected.';
+	    return 0;
+	endif
+
+	if subset == SEL_RES and isnull SelectedResidues[] then
+	    Warning 'No residues are selected.';
+	    return 0;
+	endif
+
+	if subset == SEL_RESCHAINS and allfalse [
+	    SelectedResidues[], SelectedChains[]
+	] then
+	    Warning 'No residues or chains are selected.';
+	    return 0;
+	endif
+
+	if subset == SEL_CHAINS and isnull SelectedChains[] then
+	    Warning 'No chains are selected.';
+	    return 0;
+	endif
+
+	if subset == SEL_OBJECTS and alltrue app isnull [
+	    SelectedChains[], SelectedResidues[], SelectedAtoms[]
+	] then
+	    Warning 'No molecular objects are selected.';
+	    return 0;
+	endif
+    endif
+	// mol_object is a flat vector of object keys;
+
+    local mol_object = get_subset [subset, opt.moe_no_atoms, opt.save_obj];
+    if allfalse mol_object and format_type <> PIC_FORMAT then
+
+	    // MOE format can be used to save things like graphics objects
+	    // or the view. All other format require molecular object
+
+	if format == MOE_ID and length GKeyList [] then	// graphics
+	    if NoYes 'No molecular data to save.\n\nContinue ?' == 0 then
+		return 0;
+	    endif
+	else
+	    Warning 'No molecular data to save.';
+	    return 0;
+	endif
+    endif
+
+	// Do not validate filename when using the clipboard,
+	// when no_fname_validate is on, when given a filenum
+	// or when writing multiple files
+
+    local use_filename = not anytrue [
+	format == 'BMP' and anytrue opt.bmp_clipboard,
+	anytrue opt.no_fname_validate,
+	type file_id == 'num',
+	format == 'MOL' and anytrue opt.mdlmol_multifile,
+	format == 'PDB' and anytrue opt.pdb_multiplefiles
+    ];
+
+    if use_filename then
+	local fname_validator = string file_id;
+	if allfalse fname_validator or
+	    alltrue isspace fname_validator or
+	    anytrue indexof ["*?@#^[]", fname_validator] then
+	    Warning 'Please enter a valid filename.';
+	    return 0;
+	endif
+    endif
+
+	// Tack on usual file extension for format if 1- we are given a
+	// filename, 2- auto-extension is on and 3- the given filename
+	// does not specify an extension (including if has terminal '.').
+
+    if type file_id <> 'num' and anytrue opt.auto_ext then
+	if allfalse fext ftail file_id and neL [tok_keep[file_id, -1], '.'] then
+	    file_id = tok_cat [file_id, '.',
+		first FORMAT_LIST(format_type)(FORMAT_EXT)(format_x)];
+	endif
+    endif
+
+    if use_filename then
+	if ftype file_id == 'file' then
+	    local fname_display = tok_cat ['"', file_id, '"\n\n'];
+	    local question = 'File already exists. Overwrite ?';
+	    if anyfalse YesNo tok_cat [fname_display, question] then
+		return 0;
+	    endif
+	endif
+    endif
+
+    local result, code = '';
+    local fork_options = [master : 'parent', errmsg : 'ignore'];
+    local fn;
+    local x, y, z;
+
+    local fh, i;
+    local dir, do_confirm = 1, atoms, idx, counts;
+    local nameroot, name_i = 1, newname;
+    static doOVERWRITE = 0;
+
+    if format == MOE_ID then
+	local moe_options = [
+	    box:	opt.moe_box,
+	    view:	opt.moe_view,
+	    wall:	opt.moe_wall,
+	    graphics:	'all',
+	    r_children:	not opt.moe_no_atoms
+	];
+
+	if opt.moe_graphics === 'None' then
+	    moe_options.graphics = 'none';
+	elseif opt.moe_graphics === 'Visible Only' then
+	    moe_options.graphics = 'visible';
+
+	    // In Copy As | MOE, if there are selected objects, only save
+	    // those graphics objects associated with the selection.
+
+	    // !!! In the future, graphics objects themselves will be
+	    // !!! selectable, so we won't be doing this calculation.
+
+	elseif opt.moe_graphics === 'Selected' or subset === SEL_OBJECTS then
+	    moe_options.graphics = 'sel';
+	    moe_options.gkeys = obj_gkeys [mol_object];
+	endif
+
+	[result,code] = task_call ['fwrite_MOE',
+	    [file_id, mol_object, moe_options], fork_options];
+
+    elseif format == MDLMOL_ID then
+	local mdlmol_options = [
+	    strip_h : opt.mdlmol_strip_h,
+	    depict : opt.mdlmol_depict2D or opt.mdlct_flatten,
+	    molnames: opt.mdlmol_molnames,
+	    multifile: opt.mdlmol_multifile,
+	    mdlct : opt.mdlct,
+	    version: select [3000, 2000, opt.mdlmol_version]
+	];
+
+	if anytrue opt.mdlmol_ligand then
+	    mol_object = get_subset [LIGAND, opt.moe_no_atoms, mol_object];
+	endif
+
+	    // Divide the system into individual molecules.
+	    // We can only write out components that have <= 999 atoms
+	    // (MDLMOL format limit).  If multifile format is off,
+	    // write an SDF file, otherwise write one .mol file per molecule.
+
+	atoms = cat oAtoms mol_object;
+	[idx, counts] = sac aMoleculeNumber atoms;
+	atoms = split [atoms[idx], counts];
+	local m_toobig = app length atoms > 999;
+	if orE m_toobig then
+	    mdlmol_options.version = 3000;
+//	    Warning
+//		'Molecule(s) exceeding atom limit (999)\n'
+//		'will not be written.'
+//	    ;
+	endif
+//	atoms = atoms | not m_toobig;	// only write out <999 ones
+	if allfalse atoms then return 0; endif
+
+	local mol_a;
+
+	if allfalse opt.mdlmol_multifile then
+	    mol_a = app mol_Extract atoms;
+	    fh = fopenw file_id;
+	else
+		// When writing one molecule per file, don't write out solvent.
+
+	    atoms = atoms || aClassRLS atoms <> 'sol';
+	    atoms = atoms | app length atoms;
+	    mol_a = app mol_Extract atoms;
+
+	    if allfalse mol_a then
+		Warning
+		    'Solvent atoms are not written out.\n'
+		    'There are no atoms to save.'
+		;
+		return 0;
+	    endif
+
+	    if allfalse (type fh == 'num') then
+		if ftype file_id == 'dir' then
+		    dir = file_id;
+		else
+		    dir = fpath file_id;
+		endif
+	    else
+		dir = cd [];
+	    endif
+
+	    nameroot = token opt.mdlmol_nameroot;
+	    if anytrue nameroot then
+		nameroot = tok_cat [nameroot, '_'];
+	    endif
+
+#if 0
+		// Generate unique filenames by generating unique serial
+		// numeric suffixes. Generate suffixes for duplicated names
+		// using igen second sac.
+
+	    local chname = cName aChain app first atoms;	// all names
+	    local ndup = second sac chname;
+	    local [dup_i,dup_m] = sam chname;
+
+	    local name_m = tok_length (chname[dup_i] | dup_m);	// has ch name
+
+		// If name is unique across all chains being saved, then
+		// do not generate a suffix.
+
+	    local no_num_m = ndup == 1 and name_m;
+	    ndup | no_num_m = 0;
+
+		// Suffix: append unique index prefixed by '_'.
+		// If there is no chain name, use unique index, with no '_'.
+
+	    local suff = totok app igen ndup;
+	    suff | no_num_m = '';		// turns nulls into ''
+
+	    local m_underscore = ndup > 1 and name_m;
+	    suff | m_underscore = tok_cat ['_', suff | m_underscore];
+
+		// Put suffixes back into their original order, append
+		// to user-specified name root; create complete filename.
+
+	    chname = tok_cat [chname, totok perm [cat suff, x_sort chname]];
+	    newname = fname tok_cat [dir, '/', nameroot, chname,'.mol'];
+#else
+	    newname = generate_filenames [nameroot, dir, atoms];
+#endif
+	endif
+
+	for i = 1, length mol_a loop
+
+		// If write separate MDLMOL files or if writing to
+		// clipboard, call fwrite_MDLMOL.
+		// !!! fwrite_MDLMOL and mdl_fwrite_MOL don't write in
+		// the same format; this latter uses explicit "\n" chars
+		// which are not recognized by e.g. SymyxDraw.
+
+	    if anytrue opt.mdlmol_multifile or anytrue opt.clipboard then
+#if 0
+		local chname = cName aChain first atoms(i);
+		if allfalse chname then		// use number if no chain name
+		    chname = totok name_i;
+		    name_i = inc name_i;	// sequential numbers
+		endif
+
+		newname = fname tok_cat [dir, '/', nameroot, chname,'.mol'];
+		if ftype newname == 'file' and do_confirm then
+#endif
+	        if allfalse opt.clipboard then	    // multifiles
+		    if ftype newname(i) == 'file' and do_confirm then
+			if 'child' == second task_wfork fork_options then
+			    doOVERWRITE = verify_overwrite newname(i);
+			    exit [];
+			endif
+			if not doOVERWRITE then return 0; endif
+			if doOVERWRITE == DONT_CONFIRM then do_confirm=0; endif
+		    endif
+
+			// If use "molecule" name, put chain name as
+		        // molecule name.  Do this by setting the mol_name
+		        // in the mdb mol.
+
+			// If Use Molecule Name is on, use chain name as chain
+			// tag, which is currently used for the title.
+
+		    if mdlmol_options.molnames then
+			mol_a(i)(2)(MOL_CHAIN_TAG) = mol_a(i)(2)(MOL_CHAIN_NAME);
+		    endif
+
+		    fh = fopenw newname(i);
+	        endif
+
+		local psys = SystemPush [];
+		    mol_object = mol_Create mol_a(i);
+		    [result,code] = task_call ['fwrite_MDLMOL',
+			[fh, mol_object, mdlmol_options], fork_options];
+		SystemPop psys;
+
+		if allfalse opt.clipboard then	    // multifiles
+		    fclose fh;
+	        else
+		    break;			// no multifiles on clipboard
+		endif
+
+	    else	// write single SDF file
+		if mdlmol_options.strip_h then
+		    mol_a(i) = mol_Heavy mol_a(i);
+		endif
+		if mdlmol_options.depict then
+		    mol_a(i) = mol_aSetPos [
+			mol_a(i), DepictionCoordinates [mol_a(i)]
+		    ];
+		endif
+
+		    // If Use Molecule Name is on, put chain name as molecule
+		    // name.  Do this by setting the mol_name in the mdb mol.
+
+	        if mdlmol_options.molnames then
+		    mol_a(i)(1)(MOL_NAME) = mol_a(i)(2)(MOL_CHAIN_NAME);
+		endif
+		local fnname = 'mdl_fwrite_MOL';
+		if mdlmol_options.version === 3000 then
+		    fnname = 'mdl_fwrite_MOL_v3000';
+		endif
+		[result,code] = task_call [fnname,
+		    [fh, mol_a(i)], fork_options];
+		fwrite [fh, '$$$$\n'];
+	    endif
+	endloop
+
+	if allfalse opt.mdlmol_multifile and allfalse opt.clipboard then
+	    fclose fh;
+	endif
+
+    elseif format == MOL2_ID then
+	[result,code] = task_call ['fwrite_TriposMOL2',
+	    [file_id, mol_object, []], fork_options];
+
+    elseif format == PDB_ID then
+	local pdb_options = [
+	    use_chain_id    : opt.pdb_chain_id,
+	    scale_atom_prop : opt.pdb_scale_tfactor,
+	    cryst1	    : opt.pdb_cryst1,
+	    force_TER	    : opt.pdb_force_TER,
+	    multiplefiles   : opt.pdb_multiplefiles,
+	    multitype	    : opt.pdb_multitype
+	];
+
+	if opt.pdb_tfactor_select then
+	    pdb_options.atom_prop = PDB_TFACTOR_PROP.(opt.pdb_tfactor_option);
+	endif
+	if opt.pdb_naming then
+	    if opt.pdb_naming_option === 'AMBER' then
+		pdb_options.amber = 1;
+		pdb_options.hnames = 'PDB v3.0';
+	    else
+		pdb_options.hnames = opt.pdb_naming_option;
+	    endif
+	endif
+
+	if anytrue pdb_options.multiplefiles then
+
+		// Don't save solvent.
+
+	    atoms = cat oAtoms mol_object;
+	    atoms = atoms || aClassRLS atoms <> 'sol';
+	    atoms = atoms | app length atoms;
+
+	    if pdb_options.multitype == 'Tag' then
+		[idx, counts] = sac cTag aChain atoms;
+	    else				// 'Molecule'
+		[idx, counts] = sac aMoleculeNumber atoms;
+	    endif
+	    atoms = split [atoms[idx], counts];
+
+	    if allfalse (type fh == 'num') then
+		if ftype file_id == 'dir' then
+		    dir = file_id;
+		else
+		    dir = fpath file_id;
+		endif
+	    else
+		dir = cd [];
+	    endif
+
+	    nameroot = opt.pdb_nameroot;
+	    if anytrue nameroot then
+		nameroot = tok_cat [nameroot, '_'];
+	    endif
+
+	    for i = 1, length atoms loop
+		local molname;
+		if pdb_options.multitype == 'Tag' then
+		    molname = cTag aChain first atoms(i);
+		else
+		    molname = cName aChain first atoms(i);
+		endif
+
+		if allfalse molname then	// use number if no name
+		    molname = totok name_i;
+		    name_i = inc name_i;	// sequential numbers
+		endif
+
+		newname = fname tok_cat [dir, '/', nameroot, molname, '.pdb'];
+		if ftype newname == 'file' and do_confirm then
+		    if 'child' == second task_wfork fork_options then
+			doOVERWRITE = verify_overwrite newname;
+			exit [];
+		    endif
+		    if not doOVERWRITE then return 0; endif
+		    if doOVERWRITE == DONT_CONFIRM then do_confirm = 0; endif
+		endif
+
+		fh = fopenw newname;
+		[result,code] = task_call ['fwrite_PDB',
+		    [fh, uniq aChain atoms(i), pdb_options], fork_options];
+		fclose fh;
+	    endloop
+	else
+	    [result, code] = task_call ['fwrite_PDB',
+		[file_id, mol_object, pdb_options], fork_options
+	    ];
+	endif
+
+    elseif format == MMOD_ID then
+	[result,code] = task_call ['fwrite_MacroModel',
+	    [file_id, mol_object, [maestro: 0]], fork_options];
+
+    elseif format == MAE_ID then
+	[result,code] = task_call ['fwrite_MacroModel',
+	    [file_id, mol_object, [maestro: 1]], fork_options];
+
+    elseif format == XTL_ID then
+	[result,code] = task_call ['fwrite_XTL',
+	    [file_id, mol_Extract mol_object, CellParameters[]], fork_options];
+
+    elseif format == FASTA_ID then
+	[result,code] = task_call ['fwrite_Fasta',
+	    [file_id, mol_object, [reset_alignment : opt.Fasta_reset_align]],
+	    fork_options];
+
+    elseif format == PIR_ID then
+	[result,code] = task_call ['fwrite_PIR',
+	    [file_id, mol_object,[reset_alignment : opt.PIR_reset_align]],
+	    fork_options];
+
+    elseif format == CLUSTAL_ID then
+	[result,code] = task_call ['fwrite_Clustal',
+	    [file_id, mol_object, [reset_alignment : opt.Clustal_reset_align]],
+	    fork_options];
+
+    elseif format == SEQ_ID then
+	[result,code] = task_call ['fwrite_FormattedSeq', [
+		file_id, mol_object,
+		[
+		    reset_alignment : opt.Seq_reset_align,
+		    blocksize: opt.blocksize,
+		    allow_duplicate_names: 1
+		]
+	    ], fork_options];
+
+    elseif format == RAW_ID then
+	[result,code] = task_call ['fwrite_RawSeq',
+	    [file_id, mol_object, []],
+	    fork_options];
+
+    elseif format == EMBL_ID then
+	[result,code] = task_call ['fwrite_EMBL',
+	    [file_id, mol_object, [reset_alignment : opt.EMBL_reset_align]],
+	    fork_options];
+
+    elseif format == GB_ID then
+	[result,code] = task_call ['fwrite_GB',
+	    [file_id, mol_object, [reset_alignment : opt.GB_reset_align]],
+	    fork_options];
+
+    elseif format == GCG_ID then
+	[result,code] = task_call ['fwrite_GCG',
+	    [file_id, mol_object,[reset_alignment : opt.GCG_reset_align]],
+	    fork_options];
+
+    elseif format == IG_ID then
+	[result,code] = task_call ['fwrite_IG',
+	    [file_id, mol_object, [reset_alignment : opt.IG_reset_align]],
+	    fork_options];
+
+    elseif format == MSF_ID then
+	[result,code] = task_call ['fwrite_MSF',
+	    [file_id, mol_object,[reset_alignment : opt.MSF_reset_align]],
+	    fork_options];
+
+    elseif format == PHYLIP_ID then
+	[result,code] = task_call ['fwrite_Phylip',
+	    [file_id, mol_object, [reset_alignment : opt.Phylip_reset_align]],
+	    fork_options];
+
+	// PIC_FORMATs
+
+    elseif format == PNG_ID then
+	local png_options = [
+	    quality :			opt.png_quality * 10 + 5,
+	    transparent_background :	opt.png_alpha,
+	    raytrace :			opt.png_pov,
+	    colorspace :		opt.png_colorspace,
+	    width :			(opt.image_size)(1),
+	    height :			(opt.image_size)(2)
+	];
+
+	local png_res_tok;
+	if opt.png_units == 'pixels/inch (dpi)' then
+	    png_res_tok = 'dpi';
+	elseif opt.png_units == 'pixels/cm (dpc)' then
+	    png_res_tok = 'dpc';
+	else
+	    exit 'Unimplemented.';
+	endif
+	local png_res_val = opt.png_resolution;
+
+	png_options = tagcat [png_options, tag [png_res_tok, png_res_val]];
+
+	    // Ignore ViewGetImage options when raytracing.
+
+	if png_options.raytrace then vgi_opt = []; endif
+
+	[result,code] = task_call ['fwrite_PNG',
+	    [file_id, view_get_image vgi_opt, png_options], fork_options];
+
+    elseif format == JPG_ID then
+
+	local jpg_options = [
+	    quality :			opt.jpg_quality,
+	    raytrace :			opt.jpg_pov,
+	    width :			(opt.image_size)(1),
+	    height :			(opt.image_size)(2)
+	];
+
+	local jpg_res_tok;
+	if opt.jpg_units == 'pixels/inch (dpi)' then
+	    jpg_res_tok = 'dpi';
+	elseif opt.jpg_units == 'pixels/cm (dpc)' then
+	    jpg_res_tok = 'dpc';
+	else
+	    exit 'Unimplemented.';
+	endif
+	local jpg_res_val = opt.jpg_resolution;
+
+	jpg_options = tagcat [jpg_options, tag [jpg_res_tok, jpg_res_val]];
+
+	    // Ignore ViewGetImage options when raytracing.
+
+	if jpg_options.raytrace then vgi_opt = []; endif
+
+	[result,code] = task_call ['fwrite_JPG',
+	    [file_id, view_get_image vgi_opt, jpg_options], fork_options];
+
+    elseif format == BMP_ID then
+
+	local version = tonum opt.bmp_version;
+	local bmp_options = [
+	    version	: version,
+	    transparent_background : opt.bmp_alpha and version > 3,
+	    raytrace	: opt.bmp_pov,
+	    width	: (opt.image_size)(1),
+	    height	: (opt.image_size)(2)
+	];
+
+	local bmp_res_tok;
+	if opt.bmp_units == 'pixels/inch (dpi)' then
+	    bmp_res_tok = 'dpi';
+	elseif opt.bmp_units == 'pixels/cm (dpc)' then
+	    bmp_res_tok = 'dpc';
+	else
+	    exit 'Unimplemented.';
+	endif
+	local bmp_res_val = opt.bmp_resolution;
+
+	bmp_options = tagcat [bmp_options, tag [bmp_res_tok, bmp_res_val]];
+
+	    // Ignore ViewGetImage options when raytracing.
+
+	if bmp_options.raytrace then vgi_opt = []; endif
+
+	if opt.bmp_clipboard then
+	    [result,code] = task_call ['fwrite_ClipboardBMP',
+		[file_id, view_get_image vgi_opt, bmp_options], fork_options];
+	else
+	    [result,code] = task_call ['fwrite_BMP',
+		[file_id, view_get_image vgi_opt, bmp_options], fork_options];
+	endif
+
+    elseif format == TIF_ID then
+
+	local tif_options = [
+	    transparent_background :	opt.tif_alpha,
+	    compression :		opt.tif_quality,
+	    raytrace :			opt.tif_pov,
+	    width :			(opt.image_size)(1),
+	    height :			(opt.image_size)(2)
+	];
+
+	local tif_res_tok;
+	if opt.tif_units == 'pixels/inch (dpi)' then
+	    tif_res_tok = 'dpi';
+	elseif opt.tif_units == 'pixels/cm (dpc)' then
+	    tif_res_tok = 'dpc';
+	else
+	    exit 'Unimplemented.';
+	endif
+	local tif_res_val = opt.tif_resolution;
+
+	tif_options = tagcat [tif_options, tag [tif_res_tok, tif_res_val]];
+
+	    // Ignore ViewGetImage options when raytracing.
+
+	if tif_options.raytrace then vgi_opt = []; endif
+
+	[result,code] = task_call ['fwrite_TIF',
+	    [file_id, view_get_image vgi_opt, tif_options], fork_options];
+
+    elseif format == EMF_ID then
+
+	    // NOTE: only EMF to Clipboard implemented!!!
+
+	local emf_res = opt.emf_resolution;
+	if opt.emf_units == 'pixels/cm (dpc)' then
+	    emf_res = emf_res * 2.54;
+	endif
+	local emf_options = [
+	    transparent_background : opt.emf_alpha,
+	    resolution : emf_res
+	];
+
+#if 0
+// Don't write directly to clipboard as we may want to write multiple tags.
+	[result,code] = task_call ['fwrite_ClipboardEMF',
+	    [file_id, view_get_image vgi_opt, emf_options], fork_options];
+#else
+	[result,code] = task_call ['fwriteb',
+	    [file_id, 'char', get_emf [view_get_image vgi_opt, emf_options]],
+	    fork_options
+	];
+#endif
+
+    elseif format == EPS_ID then
+
+	local do_grayscale = opt.eps_colormap == 'Grayscale';
+
+	[result,code] = task_call ['fwrite_ImageEPS',
+	    [file_id, view_get_image vgi_opt, do_grayscale], fork_options];
+
+    elseif format == POV_ID then
+	local pov_opt = [
+	    atom_theme: opt.pov_atom_theme,
+	    ribbon_theme: opt.pov_ribbon_theme
+	];
+	[result,code] = task_call ['fwrite_POV', [file_id,
+	    ViewPixelDimensions [], pov_opt],
+	    fork_options];
+
+    else
+	exit 'Format not implemented';
+    endif
+
+    if code == 'error' then
+	Warning result;
+	return 0;
+    endif
+
+    return 1;
+endfunction
+
+// ------------------------- Copy to Clipboard ----------------------------
+
+function _ClipboardEncodeBinData;
+function fread_MDLMOL;
+function copy_picture_to_clipboard;	// in this file
+
+// ClipboardSaveAs: Special ^C handling:
+//	In MOE Window: Windows: EMF, MDLCT, MOE
+//	In MOE Window: Non-Windows: MDLCT (MDL_MOL), MOE
+//	In SE: Raw Sequence Format
+
+// encode_data: Returns a tagged vector.  For picture formats, the
+//	tags are format-specific.  For many molecule formats, the
+//	the data is written to clipboard 'text'.  Molecular formats
+//	are generally saved in 'bin/moe' in a special encoding.
+//	Note that for saving in MOE format, the data is saved as
+//	both bin/moe and text: bin/moe contains a db mol, and the
+//	text contains the contents of a MOE file (which can include
+//	rendering and view info, etc.).  SMILES are specially encoded
+//	into bin/moe as well.  (Note: There is a special interception of
+//	SMILES and MOE formats in paste.svl.)
+// Note: On non-Windows, the clipboard is simulated by an internal
+// memory space.  This means that for copying between MOE's,
+// only the clipboard text is available for sharing data.
+
+local function encode_data [format, opt]
+    local [format_type, format_x] = Id2Format format;
+    local file_content;
+    local write_succeeded;
+    local out_fnum;
+
+	// Since picture formats are handled by an external application,
+	// ask the system for a temp file and write the picture in
+	// that file. !!! Problem with binary 0 in string
+
+    if format_type == PIC_FORMAT then
+	local clip_opt;
+	[format, clip_opt] = copy_picture_to_clipboard [format, opt];
+	if allfalse [format, clip_opt] then return []; endif
+
+	opt = tagcat [clip_opt, opt];
+
+	    /* Format might have changed in clipboard panel */
+
+	out_fnum = fopentemp [];
+	local out_fname = fname out_fnum;
+
+	    // CallFormatWriter writes the data to the clipboard.
+
+	write_succeeded = CallFormatWriter [
+	    out_fname, format, cat [opt, [no_fname_validate:1]]
+	];
+	if not write_succeeded then
+	    fclose out_fnum;
+	    return [];
+	endif
+
+	    // If BMP format,  nothing to do as fwrite_ClipboardBMP saves
+	    // the bmp on the clipboard for us.
+
+	if format == BMP_ID and anytrue opt.bmp_clipboard then
+	    fclose out_fnum;
+	    return [];
+	endif
+
+#if 0
+	    // If EMF format,  nothing to do as fwrite_ClipboardEMF
+	    // already puts the data onto the clipboard for us.
+
+	if format == EMF_ID and anytrue opt.emf_clipboard then
+	    fclose out_fnum;
+	    return [];
+	endif
+#endif
+
+#if 0
+	fseek [out_fnum, 0];		// !!!
+#endif
+	file_content = freadb [out_fname, 'char', INT_MAX];
+	fclose out_fnum;
+
+	    // Mac only supports writing PNG to clipboard (which then
+	    // gets converted to tiff by the system).
+	    // First clear the clipboard, as safety in case of error.
+
+	if format == BMP_ID and is_lnx[] then
+	    ClipboardSetData tag [['image/bmp','text'], [[]]];
+	    return tag [['image/bmp','text'], [file_content]];
+	elseif format == PNG_ID and (is_mac[] or is_lnx[]) then
+	    ClipboardSetData tag [['image/png','text'], [[]]];
+	    return tag [['image/png','text'], [file_content]];
+	elseif format == PNG_ID and is_win[] then
+	    ClipboardSetData tag [['image/png','text'], [[]]];
+	    return tag [['image/png'], [file_content]];
+	elseif format == JPG_ID and is_lnx[] then
+	    ClipboardSetData tag [['image/jpeg','text'], [[]]];
+	    return tag [['image/jpeg','text'], [file_content]];
+	elseif format == TIF_ID and is_lnx[] then
+	    ClipboardSetData tag [['image/tiff','text'], [[]]];
+	    return tag [['image/tiff','text'], [file_content]];
+	elseif format == EMF_ID and is_win[] then
+	    ClipboardSetData tag [['image/x-emf'], [[]]];
+	    return tag ['image/x-emf', [file_content]];
+	else
+	    return [text: file_content];
+	endif
+
+	return [];
+    endif
+
+	// Write the file as a string file.
+
+    out_fnum = fopen '';
+    write_succeeded = CallFormatWriter [out_fnum, format, opt];
+
+    if not write_succeeded then
+	fclose out_fnum;
+	return [];
+    endif
+
+	// Read back the file and put as text on the clipboard.
+
+    fseek [out_fnum, 0];
+    file_content = freadb [out_fnum, 'char', INT_MAX];
+    fclose out_fnum;
+
+    local mol, bintag, cbin;
+
+    if format == MDLMOL_ID then
+
+	    // For mdlmol format, we put the mol file on the clipboard
+	    // in raw text and mdlct format.
+
+	local ctformat_id;
+	if OS_MSWIN then
+	    ctformat_id = 'MDLCT';	// MSWindows clipboard format
+	else
+	    ctformat_id = 'MDL_MOL';		// Unix clipboard format
+	endif
+
+	local mdlct_fnum = fopen '';
+	opt.mdlct = 1;
+
+	write_succeeded = CallFormatWriter [mdlct_fnum, format, opt];
+	if not write_succeeded then
+	    fclose mdlct_fnum;
+	    return [];
+	endif
+
+	fseek [mdlct_fnum, 0];
+	local mdlct_content = freadb [mdlct_fnum, 'char', INT_MAX];
+
+	fseek [mdlct_fnum, 0];
+	mol = fread_MDLMOL [mdlct_fnum, opt];
+	fclose mdlct_fnum;
+
+	[bintag, cbin] = _ClipboardEncodeBinData [['','molecule',[[]]],[[mol]]];
+
+#if 0
+	    // On non-Window machines, molecular data must be shared between
+	    // different applications (including different MOE sessions)
+	    // through clipboard 'text'.
+
+	if OS_MSWIN then
+	    return tag [[ctformat_id, bintag], [mdlct_content, cbin]];
+	else
+	    return tag [
+		['text', ctformat_id, bintag],
+		[file_content, mdlct_content, cbin]
+	    ];
+	endif
+#else
+	    // Write molecular data to clipboard text as well.
+	    // This is needed e.g. for pasting to text editors.
+
+	return tag [
+	    ['text', ctformat_id, bintag],
+	    [file_content, mdlct_content, cbin]
+	];
+#endif
+    endif
+
+	// Always store molecule on clipboard in binary format.
+
+    local mol_object = get_subset [opt.subset, opt.moe_no_atoms, opt.save_obj];
+    if isnull mol_object then mol_object = Chains []; endif
+
+#if 1
+    mol = mol_Extract mol_object;
+#endif
+
+    local fd_env = ['', format, []];
+
+	// Keep only the desired objects.  If opt.moe_no_atoms, then
+	// do not auto-descend from residues to atoms; preserve
+	// only the atoms explicit in mol_object.
+	// Preserve all residues in mol_object (and perforce parent chains).
+	// If chains, auto-descend from chains to residues (automatically
+	// done by mol_Extract).
+
+	// Save molecular data in the form of a MOE (text) file in moe/bin
+	// to allow saving of alignment positions and view.
+
+#if 0
+#if 0
+    if anytrue opt.seq_only then	// mask out all atoms
+	mol(3)(MOL_RES_NATOMS) = 0;
+	mol(4) = app null mol(4);
+    elseif anytrue opt.moe_no_atoms then	// keep only explicit atoms
+	local a_keep = mol_object | oType mol_object == 'atom';
+	local amask = zero Atoms[] or indexof [a_keep, Atoms[]];
+	mol = mol_aMask [mol, amask];
+    endif
+
+    [bintag, cbin] = _ClipboardEncodeBinData [['','molecule',[fd_env]],[[mol]]];
+#else
+	// If already doing MOE_ID, then the MOE file has already been
+	// generated and is in file_content.
+
+    local moe_file_content;
+
+    if format == MOE_ID then
+	moe_file_content = file_content;
+    else
+	local moe_fnum = fopen '';
+	write_succeeded = CallFormatWriter [moe_fnum, MOE_ID, opt];
+
+	if write_succeeded then
+	    fseek [moe_fnum, 0];
+	    moe_file_content = freadb [moe_fnum, 'char', INT_MAX];
+	    fclose moe_fnum;
+
+	endif
+    endif
+    [bintag, cbin] = _ClipboardEncodeBinData [
+	['','molecule',[fd_env]], [[moe_file_content]]
+    ];
+#endif
+
+#else
+    local moe_file_content;
+
+    if format == MOE_ID then
+	moe_file_content = file_content;
+	[bintag, cbin] = _ClipboardEncodeBinData [
+	    ['', 'molecule', [fd_env]], [[moe_file_content]]
+	];
+    elseif anytrue opt.seq_only then	// mask out all atoms
+	mol(3)(MOL_RES_NATOMS) = 0;
+	mol(4) = app null mol(4);
+	[bintag, cbin] = _ClipboardEncodeBinData [
+	    ['', 'molecule', [fd_env]], [[mol]]
+	];
+    elseif anytrue opt.moe_no_atoms then	// keep only explicit atoms
+	local a_keep = mol_object | oType mol_object == 'atom';
+	local amask = zero Atoms[] or indexof [a_keep, Atoms[]];
+	mol = mol_aMask [mol, amask];
+	[bintag, cbin] = _ClipboardEncodeBinData [
+	    ['', 'molecule', [fd_env]], [[mol]]
+	];
+    else
+	local moe_fnum = fopen '';
+	write_succeeded = CallFormatWriter [moe_fnum, MOE_ID, opt];
+
+	if write_succeeded then
+	    fseek [moe_fnum, 0];
+	    moe_file_content = freadb [moe_fnum, 'char', INT_MAX];
+	    fclose moe_fnum;
+
+	endif
+	[bintag, cbin] = _ClipboardEncodeBinData [
+	    ['', 'molecule', [fd_env]], [[moe_file_content]]
+	];
+    endif
+
+#endif
+
+#if 0
+	// On non-Window machines, molecular data must be shared between
+	// different applications (including different MOE sessions)
+	// through clipboard 'text'.
+
+    if OS_MSWIN and not anytrue opt.seq_only then
+	return tag [bintag, [cbin]];
+    else
+	return tag [['text', bintag], [file_content, cbin]];
+    endif
+#else
+	// Write molecular data to clipboard text as well.
+	// This is needed e.g. for pasting to text editors.
+
+    return tag [['text', bintag], [file_content, cbin]];
+#endif
+endfunction
+
+// ClipboardSaveAs: Can take multiple formats.
+// !!! Note that the clipboard Text field will reflect the last format written.
+
+local function ClipboardSaveAs [formats, opt]
+    local f, data, cdata = [];
+
+    for f in formats loop
+	if isnull (data = encode_data [f, opt]) then
+	    return [];	// either failure or BMP in Windows
+	endif
+	cdata = tagcat [data, cdata];
+    endloop
+
+	// Clipboard data must all be set at once.
+
+    ClipboardSetData cdata;
+endfunction
+
+// CopyMainWindow: opt can be used to override default behaviour;
+//	e.g. when ^C from SE.
+//	format == []: ^C	special multi-format handling
+
+global function CopyMainWindow [format, opt]
+    if allfalse format then
+	format = COPYMOE;
+    endif
+
+    local idx, mask, clipboard_opt;
+    local n_asel = add aSelected Atoms [];
+
+    clipboard_opt.seq_only = m_join [format, SEQFORMAT_LIST(FORMAT_ID)];
+#if 0
+    clipboard_opt.moe_graphics	= 'All';
+#else
+    clipboard_opt.moe_graphics	= 'None';
+#endif
+
+    if n_asel then
+	clipboard_opt.save_selected = 1;
+	clipboard_opt.subset = SEL_ATOMS;
+    else
+	clipboard_opt.save_selected = 0;
+    endif
+
+    clipboard_opt = tagcat [opt, clipboard_opt];
+
+	// format SMILES will copy each molecule's smiles string to the
+	// clipboard
+
+    local atoms;
+    if format == 'SMILES' then
+	atoms = Atoms[];
+	mask = aSelected atoms;
+	if orE mask then atoms = atoms | mask; endif
+	[idx,mask] = sam aMoleculeNumber atoms;
+	local usmi = app sm_ExtractUnique split [atoms[idx], mtoc mask];
+	usmi = droplast cat apt swrite ['{}\n', usmi];
+	local [bintag, cbin] = _ClipboardEncodeBinData [
+	    ['', 'char', ['','SMILES',[['','SMILES',[]]]]],
+	    [[usmi]]
+	];
+	ClipboardSetData tag [['text',bintag], [usmi, cbin]];
+	return;
+    endif
+
+	// format MOL2D and MOL3D are special format used by the menus to
+	// differentiate between MDLMOL format with option mdlmol_depict2D
+	// on and off respectively.
+
+    if format == 'MOL2D' then
+	format = MDLMOL_ID;
+	clipboard_opt.mdlmol_depict2D = 1;
+    elseif format == 'MOL3D' then
+	format = MDLMOL_ID;
+	clipboard_opt.mdlmol_depict2D = 0;
+    endif
+
+    if format == MOE_ID then
+	if n_asel == 0 then
+	    clipboard_opt.moe_graphics = 'All';
+	else
+	    clipboard_opt.moe_graphics = 'Selected';
+	endif
+	clipboard_opt.moe_view = 1;
+	clipboard_opt.moe_box = 1;
+	clipboard_opt.moe_wall = 1;
+
+    elseif format == BMP_ID and OS_MSWIN then
+	clipboard_opt.bmp_clipboard = 1;
+	clipboard_opt.bmp_pov = 0;
+	clipboard_opt.bmp_units = 'pixels/inch (dpi)';
+	clipboard_opt.bmp_alpha = 0;
+
+	// ^C (default Copy action)
+
+    elseif format == COPYMOE then
+	const MAX_MDL_SIZE = 999;
+
+	format = [];
+
+	    // Determine if can include MDLCT.
+
+	if n_asel then
+	    atoms = SelectedAtoms[];
+	else
+	    atoms = Atoms[];
+	endif
+
+	    // Only put ligands into mdlct type.
+	    // Only have mdlct type for non protein/dna/rna,
+	    // non-receptor, non-solvent.
+
+	local a_mdl = atoms | m_diff [
+	    rType oParent atoms, ['amino','dna','rna']
+	];
+	a_mdl = a_mdl | m_diff [aClassRLS a_mdl, ['sol','rec']];
+	if anytrue a_mdl and length a_mdl <= MAX_MDL_SIZE then
+	    clipboard_opt.mdlct_flatten = 1;
+	    clipboard_opt.mdlmol_depict2D = 1;
+	    clipboard_opt.mdlmol_ligand = 1;
+	    format = MDLMOL_ID;	// mdlct
+	endif
+
+#if 0
+	if OS_MSWIN then
+	    format = cat [EMF_ID, format];
+	endif
+#endif
+
+	format = cat [format, MOE_ID];	// !!! MOE_ID last to fill text
+	clipboard_opt.ctrlc_moe	= 1;
+    endif
+
+    clipboard_opt.moe_view	= 1;
+    clipboard_opt.moe_box	= 1;
+    clipboard_opt.moe_wall	= 1;
+    clipboard_opt.clipboard	= 1;
+    ClipboardSaveAs [format, clipboard_opt];
+endfunction
+
+// CopySeqEdit:
+//	format == []: ^C	same as ^C in main window
+//				except honour selected res/chains
+
+global function CopySeqEdit [format, res]
+    if allfalse format then
+	format = COPYMOE;
+    endif
+
+    local clipboard_opt = [];
+    if indexof [format, SEQFORMAT_LIST(FORMAT_ID)] then // sequence-only
+	clipboard_opt = [ seq_only: 1, moe_no_atoms: 1 ];
+	if not (format === RAW_ID) then
+	    clipboard_opt = tagcat [ clipboard_opt, [
+		Clustal_reset_align: 0,
+		Fasta_reset_align: 0,
+		PIR_reset_align: 0,
+		GB_reset_align: 0,
+		EMBL_reset_align: 0,
+		GCG_reset_align: 0,
+		IG_reset_align: 0,
+		MSF_reset_align: 0,
+		Phylip_reset_align: 0,
+		Seq_reset_align: 0
+	    ]];
+	endif
+    endif
+
+    if length res then
+	clipboard_opt.save_selected = 1;
+	clipboard_opt.save_obj = res;
+	clipboard_opt.subset = SPC_OBJECTS;
+    elseif anytrue [SelectedResidues[], SelectedChains[]] then
+	clipboard_opt.save_selected = 1;
+	clipboard_opt.subset = SEL_RESCHAINS;
+    else
+	clipboard_opt.save_selected = 0;
+    endif
+
+    if format == COPYMOE then
+	CopyMainWindow [COPYMOE, clipboard_opt];
+	return;
+    endif
+
+    ClipboardSaveAs [format, clipboard_opt];
+endfunction
+
+// ----------------------------- GUI ----------------------------------------
+
+local function save_file filename
+
+	// prevent multiple instance of the panel
+
+    local wkey = WindowKey SAVE_WNAME;
+    if zero wkey then
+	WindowShow [wkey, 1];
+	return;
+    endif
+    local ttitle_org = task_title -1;
+    task_settitle [-1, 'File Save'];
+
+    wkey = WindowCreate cat [
+	SAVE_PANEL, [
+	    Pager : cat [
+		[ name:'param_pager', extendH:1, flushLeft:1 ],
+		app cat cat [
+		    MOLFORMAT_LIST(FORMAT_PANEL),
+		    SEQFORMAT_LIST(FORMAT_PANEL),
+		    PICFORMAT_LIST(FORMAT_PANEL)
+		]
+	    ],
+	    Data:[name:'image_size']
+	]
+    ];
+
+    local fsb_val;
+
+    if isnull filename then
+	WindowSetAttr [wkey, [fsb: [filter: '*.moe']]];
+	filename = '*.moe';
+    elseif m_findmatch ['*[*]*.*', filename] then	// has a * in filename
+	WindowSetAttr [wkey, [fsb: [filter: '*.moe']]];
+    else
+	fsb_val = (WindowGetData [wkey, 'fsb']).fsb;
+	fsb_val(2) = filename;
+	WindowSetData [wkey, [fsb: fsb_val]];
+    endif
+
+    static DO_REFRESH;
+#if 0
+    DO_REFRESH = CHANGE_DIR;
+#else
+    DO_REFRESH = 0;
+#endif
+
+    static dirpath;
+    dirpath = cd [];
+
+    static fmt_type, fmt_x;
+    [fmt_type, fmt_x] = Ext2Format fext filename;
+    if fmt_x == 0 then [fmt_type, fmt_x] = [1,1]; endif
+
+    // Initial settings of the panel
+
+    local dim = ViewPixelDimensions [];
+    local tdim = twrite ['{} x {}', dim(1), dim(2)];
+
+    local default_data = [
+	auto_ext	    : 1,
+	format_type	    : fmt_type,
+	format_pager	    : fmt_type,
+	mdlmol_depict2D	    : MDLMOL_DEFAULT.mdlmol_depict2D,
+	mdlmol_molnames	    : MDLMOL_DEFAULT.mdlmol_molnames,
+	mdlmol_multifile    : MDLMOL_DEFAULT.mdlmol_multifile,
+	mdlmol_nameroot	    : MDLMOL_DEFAULT.mdlmol_nameroot,
+	mdlmol_strip_h	    : MDLMOL_DEFAULT.mdlmol_strip_h,
+	mdlmol_version	    : MDLMOL_DEFAULT.mdlmol_version,
+	pdb_nameroot	    : PDB_DEFAULT.pdb_nameroot,
+	png_quality	    : 7,
+	png_resolution	    : RESOLUTION_DEFAULT,
+	png_dimension	    : tdim,
+	png_antialias	    : 1,
+	png_high_quality    : 1,
+	jpg_quality	    : 75,
+	jpg_resolution	    : RESOLUTION_DEFAULT,
+	jpg_dimension	    : tdim,
+	jpg_antialias	    : 1,
+	jpg_high_quality    : 1,
+	bmp_resolution	    : RESOLUTION_DEFAULT,
+	bmp_dimension	    : tdim,
+	bmp_antialias	    : 1,
+	bmp_high_quality    : 1,
+	bmp_winspecific	    : inc OS_MSWIN,
+	bmp_version	    : BMP_DEFAULT.bmp_version,
+	tif_resolution	    : RESOLUTION_DEFAULT,
+	tif_dimension	    : tdim,
+	tif_antialias	    : 1,
+	tif_high_quality    : 1,
+	eps_resolution	    : RESOLUTION_DEFAULT,
+	eps_dimension	    : tdim,
+	eps_antialias	    : 1,
+	eps_high_quality    : 1,
+	moe_view	    : 1,
+#if 1
+	moe_graphics	    : 'All',
+#else
+	moe_graphics	    : 'None',
+#endif
+	pdb_naming	    : PDB_DEFAULT.pdb_naming,
+	pdb_naming_option   : PDB_DEFAULT.pdb_naming_option,
+	pdb_chain_id	    : PDB_DEFAULT.pdb_chain_id,
+	pdb_tfactor_option  : PDB_DEFAULT.pdb_tfactor_option,
+	pdb_multiplefiles   : PDB_DEFAULT.pdb_multiplefiles,
+	pdb_multitype	    : PDB_DEFAULT.pdb_multitype,
+	param_pager	    : PAGE_OFFSET(fmt_type) + fmt_x,
+	image_size	    : cat [ViewPixelDimensions[], 'pixel'],
+	pov_atom_theme	    : GetRC ['povray.atom_theme', 'Default'],
+	pov_ribbon_theme    : GetRC ['povray.ribbon_theme', 'Default']
+    ];
+
+#if 0
+    if fmt_type == MOL_FORMAT then
+	default_data.mol_option = fmt_x;
+    elseif fmt_type == SEQ_FORMAT then
+	default_data.seq_option = fmt_x;
+    elseif fmt_type == PIC_FORMAT then
+	default_data.pic_option = fmt_x;
+    endif
+#endif
+
+    WindowSetData [wkey, default_data];
+
+	// Remove EMF from option, it is only available through the clipboard.
+
+    local not_emf = PICFORMAT_LIST(FORMAT_DESC) <> EMF_DESC;
+
+    local default_attr = [
+	mol_option	    : [ text : MOLFORMAT_LIST(FORMAT_DESC)],
+	seq_option	    : [ text : SEQFORMAT_LIST(FORMAT_DESC)],
+	pic_option	    : [ text : PICFORMAT_LIST(FORMAT_DESC) | not_emf],
+	save_selected	    : [ sensitive : fmt_type <> PIC_FORMAT],
+	subset		    : [ sensitive: 0 ],
+	pdb_tfactor_option  : [ sensitive: 0 ],
+	pdb_naming_option   : [ sensitive: 0 ],
+	pdb_cryst1	    : [ sensitive: CellEnable[] ],
+	mdlmol_nameroot	    : [ shortcut: get_rcnameroot'save.mdlmol_nameroot'],
+	pdb_nameroot	    : [ shortcut: get_rcnameroot'save.pdb_nameroot']
+    ];
+
+    WindowSetAttr [wkey, default_attr];
+
+    local pov_opt = pov_DefaultSetup [];
+    pov_sensitize [wkey, pov_opt];
+
+    local function change_format [fmt_type, fmt_id, trigger]
+	local fsb_val = (WindowGetData [wkey, 'fsb']).fsb;
+	local auto_ext = (WindowGetData [wkey, 'auto_ext']).auto_ext;
+	local multifile =
+	    (WindowGetData [wkey, 'mdlmol_multifile']).mdlmol_multifile
+	;
+	local fmt_ext;
+
+	    // Special for .mol/.sdf: depends on multifile option.
+
+	if (FORMAT_LIST(fmt_type)(MOL_FORMAT)(fmt_id) === MDLMOL_ID) then
+	    if anytrue multifile then
+		fmt_ext = 'mol';
+	    else
+		fmt_ext = 'sdf';
+	    endif
+	else
+	    fmt_ext = FORMAT_LIST(fmt_type)(FORMAT_EXT)(fmt_id);
+	endif
+
+	    // Only change filter when change format page.
+	    // !!! named filters
+
+	const CHG_FILTER=['format_type','mol_option','seq_option','pic_option'];
+	if m_join [trigger, CHG_FILTER] then
+
+	        // Special case: Format 'MDL SDfile or Molfile' selected.
+
+	    if (FORMAT_LIST(fmt_type)(MOL_FORMAT)(fmt_id) === MDLMOL_ID) then
+		WindowSetAttr [wkey, [fsb: [filter: ['*.sdf','*.mol']]]];
+	    else
+		WindowSetAttr [wkey, [fsb: [filter: tok_cat ['*.', fmt_ext]]]];
+	    endif
+	endif
+
+	WindowSetData [wkey, [format_type : fmt_type]];
+	WindowSetData [wkey, [format_pager : fmt_type]];
+
+	if fmt_type == MOL_FORMAT then
+	    WindowSetData [wkey, [mol_option : fmt_id]];
+	elseif fmt_type == SEQ_FORMAT then
+	    WindowSetData [wkey, [seq_option : fmt_id]];
+	elseif fmt_type == PIC_FORMAT then
+	    WindowSetData [wkey, [pic_option : fmt_id]];
+	endif
+
+	WindowSetAttr [wkey, [ save_selected :
+		[ sensitive : fmt_type <> PIC_FORMAT]]];
+	WindowSetData [wkey, ['param_pager' : PAGE_OFFSET(fmt_type) + fmt_id]];
+
+	if fmt_type == PIC_FORMAT and
+	    FORMAT_LIST(fmt_type)(FORMAT_ID)(fmt_id) == 'BMP' then
+	    local clip_on =
+		(WindowGetData [wkey, 'bmp_clipboard']).bmp_clipboard;
+	    WindowSetData [wkey, [path_pager : inc clip_on]];
+	else
+	    WindowSetData [wkey, [path_pager : 1]];
+	endif
+
+#if 0
+	local fsb_path, fsb_tail;
+
+	    // If no selection/empty textfield, set filter.
+
+	if last fsb_val === 0 and allfalse second fsb_val then
+	    fsb_path = first fsb_val;
+	    fsb_tail = '*';
+	else		// user selected/entered a filename
+	    fsb_path = first fsb_val;
+	    fsb_tail = second fsb_val;
+	endif
+
+	if allfalse fsb_tail then fsb_tail = '*'; endif
+
+	local fsb_base = fbase fsb_tail;
+	local fsb_ext = fext fsb_tail;
+
+	local new_fsb_val;
+	if auto_ext and neL [tok_keep [fsb_tail, -1], '.'] then
+	    new_fsb_val = tok_cat [fsb_base, '.', first fmt_ext];
+	else
+	    new_fsb_val = fsb_tail;
+	endif
+#else
+	local new_fsb_val = [];
+
+	    // The filter is set only when the format type changes.
+	    // If no selection/empty textfield, set filter.
+
+	if last fsb_val === 0 and allfalse second fsb_val then
+	    new_fsb_val = '*';
+	else		// user selected/entered a filename
+	    new_fsb_val = second fsb_val;
+	endif
+	if allfalse new_fsb_val then new_fsb_val = '*'; endif
+
+	if auto_ext and neL [tok_keep [new_fsb_val, -1], '.'] then
+	    new_fsb_val = tok_cat [fbase new_fsb_val, '.', first fmt_ext];
+	endif
+#endif
+
+	    // MOL (multi MDLMOL) mode: don't change FSB textfield.
+	    // Change the filter only when toggling multifile checkbox.
+
+	if trigger === 'mdlmol_multifile' then
+	    WindowSetAttr [wkey, [
+		fsb: [filter: tok_cat ['*.', fext new_fsb_val]]]
+	    ];
+	endif
+
+	    // If there is something in the textfield (but it isn't
+	    // a directory that's been selected), change the extension.
+	    // (Don't automatically add extension to directory, otherwise
+	    // can't descend into it!  !!! check for double-click action...)
+
+#if ABSFNAME
+	local isdir = 'dir' == ftype token second fsb_val;
+#else
+	local isdir = 'dir' == ftype tok_cat [
+	    first fsb_val, '/', token second fsb_val
+	];
+#endif
+
+	const CHG_FORMAT=cat ['auto_ext', CHG_FILTER];
+
+	if m_join [trigger, CHG_FORMAT] or anytrue last fsb_val then
+	    local file_specified = not isdir and anytrue second fsb_val;
+	    if file_specified and auto_ext then
+		new_fsb_val = [first fsb_val, new_fsb_val];
+		WindowSetData [wkey, [fsb : new_fsb_val]];
+	    endif
+	endif
+    endfunction
+
+    local function toggle_pov [wkey, val, trigger]
+	local attr = [], data = [];
+	local w, wtok, fmts;
+	local tgs = tags val;
+
+	    // Enable/Disable all affected widgets in panel pagers.
+
+	fmts = findmatch ['*_pov', tgs];    // find formats with *_pov widget
+	fmts = tok_cat [apt tok_drop [fmts, -4], '_*'];
+	wtok = ['*high_quality', '*antialias'];
+	wtok = findmatch [wtok, findmatch [fmts, tgs]];
+	for w in wtok loop
+	    attr = tagpoke [attr, w, [sensitive:not val.(trigger)]];
+	endloop
+	WindowSetAttr [wkey, attr];
+
+	    // Set/unset all pov checkboxes.
+
+	attr = [];
+	wtok = findmatch ['*_pov', tgs];
+	data = tagput[[], wtok, val.(trigger)];
+	WindowSetData [wkey, data];
+    endfunction
+
+	// This task is responsible for refreshing the panel data and
+	// monitoring the extension of any filename typed in the FSB
+	// in order to automatically switch to the appropriate format.
+	// The task also monitors directory changes and maintains the
+	// filename by resetting the FSB value. 
+
+    local val;
+    static trigger;
+    const TOPT = [master: 'parent', errmsg: 'ignore', statics:'share'];
+
+    static liveFNAME = '';	// name that the user typed in the fsb textfield
+
+    if 'child' == second task_fork TOPT then
+	local action;
+	local old_prio;
+	local old_ext = FORMAT_LIST(fmt_type)(FORMAT_EXT)(fmt_x);
+	local old_cell_enable = []; // CellEnable[];
+	local new_ext;
+	local curr_dir = cd [];    // starts in the local current dir
+	local curr_filename = '';
+
+	task_idle 1;
+	loop
+	    old_prio = task_prio 0;
+
+	    action = DO_REFRESH;
+	    DO_REFRESH = 0;
+	    local cell_enable = CellEnable[];
+	    if not (old_cell_enable === cell_enable) then
+		old_cell_enable = cell_enable;
+		WindowSetAttr [wkey, [pdb_cryst1:[sensitive:cell_enable]]];
+	    endif
+
+	    task_prio old_prio;
+
+		// widget triggered refresh
+
+	    local new_fsbval = (WindowGetData [wkey, 'fsb']).fsb;
+
+	    if anytrue second new_fsbval then
+#if 1
+		    // If entered or clicked on a file...
+
+		if ftype token second new_fsbval <> 'dir' then
+		    if action == SINGLE_CLICK then
+			curr_filename = ftail second new_fsbval;
+		        liveFNAME = curr_filename;
+		    else	// entered
+			liveFNAME = ftail second new_fsbval;
+		    endif
+
+		else
+		    liveFNAME = curr_filename;
+	        endif
+#else
+		if
+		    ftype token second new_fsbval <> 'dir' and
+		    allfalse third new_fsbval	// not click in list
+	        then
+		    liveFNAME = ftail second new_fsbval;
+		else
+		    liveFNAME = curr_filename;
+		endif
+#endif
+	    endif
+	    
+	    if m_join [action, [CHANGE_DIR, CHANGE_FORMAT]] then
+		if action == CHANGE_FORMAT then
+		    change_format [fmt_type, fmt_x, trigger];
+		endif
+		old_ext = FORMAT_LIST(fmt_type)(FORMAT_EXT)(fmt_x);
+
+		// Process single or double-click in FSB, of
+	        // FSB text field change.
+
+	    else
+		new_ext = fext token second new_fsbval;
+
+		    // If changed dir, then preserve filename.
+
+		local new_dir = first new_fsbval;
+	        if neL fabsname [curr_dir, new_dir] then
+		    curr_dir = new_dir;
+		    curr_filename = liveFNAME;
+		    WindowSetData [wkey, [fsb: [new_dir, curr_filename]]];
+
+		    // curr_filename is used to preserve the last typed/
+		    // selected filename across directory changes made
+		    // using favourites (star), navigation tabs, or
+		    // double-click in list (fsb clears file textfield in
+		    // all these cases).
+		    // If second fsbval is [], then either dir was changed:
+		    // don't update curr_filename; or, if no click in
+		    // list, then either the filename was manually set by
+		    // the user to '' or the user switched to same directory
+		    // as the current.
+		    // !!! Unfortunately, we currently can't tell
+		    // the difference between these latter, so don't know
+		    // when to clear curr_filename. Err on side of keeping name.
+		    // Otherwise, if second fsbval is non-null, a file
+		    // was specified (we know it's a file since we already did
+		    // the diff directory check above); update curr_filename.
+
+#if 0
+	        elseif anytrue second new_fsbval and anytrue third new_fsbval
+		then
+		    curr_filename = ftail second new_fsbval;
+#endif
+	        endif
+#if 0
+// used to be #else
+		new_ext = fext (WindowGetData [wkey, 'fsb']).fsb;
+#endif
+
+		    // If changed ext, then change format.
+
+		if indexof [new_ext, old_ext] == 0 then
+		    local [new_type, new_x] = Ext2Format new_ext;
+
+		    if (WindowGetData [wkey, 'auto_ext']).auto_ext then
+			if new_x then
+			    change_format [new_type, new_x, trigger];
+			endif
+		    endif
+		    old_ext = new_ext;
+		endif
+	    endif
+
+	    sleep 0.1;
+	endloop
+	exit [];
+    endif
+
+    if fmt_type == 1 then
+	WindowTrigger [wkey, [format_type: fmt_type, mol_option: fmt_x]];
+    elseif fmt_type == 2 then
+	WindowTrigger [wkey, [format_type: fmt_type, seq_option: fmt_x]];
+    elseif fmt_type == 3 then
+	WindowTrigger [wkey, [format_type: fmt_type, pic_option: fmt_x]];
+    endif
+
+    WindowShow wkey;
+
+	// main event loop
+
+    local write_succeeded = 0;
+    static MKDIR_wkey = 0;
+    loop
+	[val, trigger] = WindowWait wkey;
+
+	fmt_type = val.format_type;
+	fmt_x = (val.format_pager)(fmt_type);
+	local format = FORMAT_LIST(fmt_type)(FORMAT_ID)(fmt_x);
+	local fmt_tok = tolower FORMAT_LIST(fmt_type)(FORMAT_ID)(fmt_x);
+
+	fsb_val = val.fsb;
+
+	    // format pulldown
+
+	if anytrue indexof [FORMAT_TYPE_WIDGET, trigger] then
+	    DO_REFRESH = CHANGE_FORMAT;
+	    continue;
+
+	elseif (trigger == 'fsb') then
+
+		// Do save if double-click on filename, otherwise
+		// let monitor process.
+
+	    if not bitand [last fsb_val, WMOD_DBL] then
+		if bitshr [last fsb_val, WMOD_NBITS] == 1 then
+		    DO_REFRESH = SINGLE_CLICK;
+	        endif
+		continue;
+	    endif
+
+	    DO_REFRESH = DOUBLE_CLICK;
+
+	    // Only selected checkbox
+
+	elseif trigger == 'save_selected' then
+	    WindowSetAttr [wkey, [subset : [ sensitive : val.(trigger)]]];
+	    continue;
+
+	elseif trigger == 'auto_ext' then
+	    local ext = fext token second (WindowGetData [wkey, 'fsb']).fsb;
+	    local [_type, _x] = Ext2Format ext;
+
+	    if _x then
+		change_format [_type, _x, trigger];
+	    endif
+	    continue;
+
+	    // user clicked in the list
+
+	    // PDB format specific triggers
+
+	elseif trigger == 'pdb_tfactor_select' then
+	    WindowSetAttr [wkey, [
+		pdb_tfactor_option : [sensitive : val.(trigger)]
+	    ]];
+	    continue;
+
+	elseif trigger == 'pdb_naming' then
+	    WindowSetAttr [wkey, [
+		pdb_naming_option : [sensitive : val.(trigger)]
+	    ]];
+	    continue;
+
+	elseif trigger == 'pdb_multiplefiles' then
+	    WindowSetAttr [wkey, [
+		pdb_multitype	: [sensitive : val.(trigger)],
+		pdb_nameroot	: [sensitive : val.(trigger)]
+	    ]];
+	    continue;
+
+	    // MDLMOL specific triggers
+
+	elseif trigger == 'mdlmol_multifile' then
+	    WindowSetAttr[wkey,[mdlmol_nameroot:[sensitive: val.(trigger)]]];
+	    DO_REFRESH = CHANGE_FORMAT;
+	    continue;
+
+	    // bmp format specific trigger
+
+	elseif trigger == 'bmp_clipboard' then
+	    local clip_on = val.bmp_clipboard;
+	    WindowSetData [wkey, [path_pager : inc clip_on]];
+	    continue;
+
+	    // POV-ray option triggered
+
+	elseif m_findmatch ['???_pov', trigger] then
+	    toggle_pov [wkey, val, trigger];
+	    continue;
+
+	    // POV-ray setup panel
+
+	elseif m_findmatch ['???_povsetup', trigger] then
+	    pov_SetupPanel [#pov_sensitize, wkey];
+	    continue;
+
+	    // BMP color channel option controls transparent bg checkbox.
+
+	elseif trigger == 'bmp_version' then
+	    WindowSetAttr [wkey,
+		[bmp_alpha : [sensitive : tonum val.bmp_version > 3]]
+	    ];
+	    continue;
+
+	    // Picture format specific triggers.
+
+	elseif m_findmatch [PICTURE_OPTIONS, trigger] then
+	    manage_picture_options [wkey, val, trigger, fmt_tok];
+	    continue;
+
+	endif
+
+	    // ------------ Saving starts here ---------------
+
+	    // Do last checks on dimensions and settings, before saving picture.
+
+	if fmt_type == PIC_FORMAT then
+
+		// Check only if the current picture format has a
+		// dimension widget.
+
+	    if	    length val.(tok_cat [fmt_tok, '_dimension'])
+		and allfalse val.(tok_cat [fmt_tok, '_pov'])
+	    then
+		    // Pretend to have triggered the dimension widget to check
+		    // the current content of it.
+
+		local rc = manage_picture_options [
+		    wkey, val, tok_cat [fmt_tok, '_dimension'], fmt_tok
+		];
+		if not rc then continue; endif	// bad dimension
+		val = WindowValues wkey;
+
+		val.vgi_options = check_picture_size [val, fmt_tok];
+		if isnull val.vgi_options then continue; endif;
+	    endif
+
+		// Set a dummy fsb file name for bmp clipboard option.
+
+	    if fmt_tok === 'bmp' and anytrue val.bmp_clipboard then
+		fsb_val(2) = '_clipboard.bmp';
+	    endif
+	endif
+
+	if allfalse second fsb_val
+	    and not (fmt_tok == 'mol' and anytrue val.mdlmol_multifile)
+	    and not (fmt_tok == 'pdb' and anytrue val.pdb_multiplefiles)
+	then
+	    Warning 'Please specify a file.';
+	    continue;
+	endif	// protect if no file
+
+	WindowSetAttr [wkey, [save_panel : [sensitive : [0, 1]]]];
+
+#if ABSFNAME
+	local name = token second fsb_val;
+#else
+	local name = tok_cat [first fsb_val, '/', token second fsb_val];
+#endif
+
+	local ori_name = name;
+
+	    // !!! todo: put into a shortcut.
+	    // Also serves as a hacky way to communicate prefix
+	    // to CallFormatWriter...
+
+	if format == MDLMOL_ID and anytrue val.mdlmol_multifile then
+	    name = tok_cat [first fsb_val, '/', token val.mdlmol_nameroot];
+	    set_rcnameroot ['save.mdlmol_nameroot', token val.mdlmol_nameroot];
+	elseif format == PDB_ID and anytrue val.pdb_multiplefiles then
+	    name = tok_cat [first fsb_val, '/', token val.pdb_nameroot];
+	    set_rcnameroot ['save.pdb_nameroot', token val.pdb_nameroot];
+	endif
+
+	write_succeeded = CallFormatWriter [name, format, val];
+	WindowSetAttr [wkey, [save_panel : [sensitive : [1, 1]]]];
+
+	if write_succeeded then
+	    if anytrue indexof [[MOL_FORMAT, SEQ_FORMAT], fmt_type] then
+		if name === ori_name then
+		    DataFilename name;
+		endif
+		DataModified 0;
+	    endif
+
+		// Record saved filename to recentFiles.
+
+	    _SetRecentPath name;
+	    break;
+	endif
+    endloop
+
+    WindowDestroy wkey;
+    task_settitle [-1, ttitle_org];
+endfunction
+
+
+// Copy Picture to Clipboard GUI
+
+local function clipboard_panel formats = [
+    Hbox : [
+	extendH : 1,
+	Option : [
+	    name : 'clipboard_format', title: 'Format:', type: 'int',
+	    text : formats,
+	    onTrigger : 'return'
+	]
+    ],
+    Hbox : [
+	extendH : 1,
+	Text : [
+	    extendH : 1,
+	    title: 'Dimension:', name: 'clipboard_dimension', len: 15,
+	    shortcut : PIXEL_DIMENSIONS,
+	    onTrigger : 'return'
+	],
+	Option : [
+	    name : 'clipboard_dimension_unit',
+	    text : ['pixel', 'inch', 'cm', 'percent'],
+	    onTrigger : 'return'
+	]
+    ],
+    Hbox: [
+	extendH : 1,
+	Text : [
+	    title: 'Resolution:', name: 'clipboard_resolution', len: 6,
+	    min : 1, max: INT_MAX, type: 'int', extendH: 1,
+	    shortcut: RESOLUTIONS,
+	    onTrigger : 'return'
+	],
+	Option : [
+	    name: 'clipboard_units', type: 'char',
+	    text: ['pixels/inch (dpi)', 'pixels/cm (dpc)'],
+	    onTrigger : 'return'
+	]
+    ],
+    Checkbox: [
+	name : 'clipboard_antialias', title : 'Options:',
+	text : 'Anti-Alias Picture'
+    ],
+    Checkbox: [
+	name : 'clipboard_high_quality', text : 'High Quality',
+	bubbleHelp :
+	    'If on, set ribbon and focal blur quality\n'
+	    'to maximum for the picture creation.'
+    ],
+    Pager: [
+	name: 'clipboard_bg_pager',
+	Checkbox : [
+	    name : 'clipboard_alpha', text: 'Transparent Background',
+	    bubbleHelp :
+		'If on, then mark the background color of\n'
+		'the picture as transparent.'
+	],
+	Checkbox : [
+	    name : 'clipboard_white_bg', text: 'White Background',
+	    bubbleHelp :
+		'If on, then use white as background color for the picture.'
+	]
+    ]
+];
+
+local function copy_picture_to_clipboard [target_format, opt]
+
+    local mask =	    [0,0,0,0,0,1];
+    if is_win[] then mask = [1,1,1,0,0,1]; endif
+    if is_mac[] then mask = [0,1,0,0,0,1]; endif
+    if is_lnx[] then mask = [0,1,1,1,1,1]; endif
+
+    local clipboard_format =
+	[EMF_ID, PNG_ID, BMP_ID, JPG_ID, TIF_ID, EPS_ID] | mask
+    ;
+    local clipboard_option =
+	[EMF_DESC, PNG_DESC, BMP_DESC, JPG_DESC, TIF_DESC, EPS_DESC] | mask
+    ;
+	// Initial settings of the panel
+
+    local dim = ViewPixelDimensions [];
+    local default_data = [
+	clipboard_dimension	: twrite ['{} x {}', dim(1), dim(2)],
+	clipboard_resolution	: RESOLUTION_DEFAULT,
+	clipboard_antialias	: 1,
+	clipboard_high_quality	: 1,
+	clipboard_alpha		: 0,
+	clipboard_bg_pager	:
+	    inc m_join [clipboard_format(1),[BMP_ID,JPG_ID,EPS_ID]],
+	image_size		: cat [dim, 'pixel']
+    ];
+
+	// Prevent multiple instances of the panel.
+
+    local wkey, page;
+
+    if allfalse opt.(COPYMOE) then
+	wkey = WindowShow [COPY_PIC2CLIP_WNAME, 1];
+
+	    // If panel already exists, put it to requested page.
+
+	if wkey then
+	    page = indexof [target_format, clipboard_format];
+	    if page then
+		WindowSetData [wkey, [clipboard_format: page]];
+		WindowSetData [wkey, [clipboard_bg_pager :
+		    inc m_join [target_format, [BMP_ID,JPG_ID,EPS_ID]]
+		]];
+	    endif
+	    return [];
+	endif
+    endif
+
+    wkey = WindowCreate cat [
+	COPY_PIC2CLIP_PANEL,
+	clipboard_panel clipboard_option,
+	[Data:[name:'image_size']]
+    ];
+
+    WindowSetData [wkey, default_data];
+
+	// Go to page of requested format.
+
+    page = indexof [target_format, clipboard_format];
+    if page then
+	WindowSetData [wkey, [clipboard_format: page]];
+	WindowSetData [wkey, [clipboard_bg_pager :
+	    inc m_join [target_format, [BMP_ID,JPG_ID,EPS_ID]]
+	]];
+    endif
+
+    if anytrue opt.(COPYMOE) then
+	WindowTrigger [wkey, tag [COPY_PIC2CLIP_PNAME, 'OK']];
+    else
+	WindowShow wkey;
+    endif
+
+	// main event loop
+
+    local val, trigger;
+    local write_succeeded = 0;
+    loop
+	[val, trigger] = WindowWait wkey;
+
+	local fmt_tok = 'clipboard';
+
+	    // Picture format specific triggers.
+
+	if m_findmatch [PICTURE_OPTIONS, trigger] then
+
+	    manage_picture_options [wkey, val, trigger, fmt_tok];
+	    continue;
+
+	elseif trigger == 'clipboard_format' then
+
+	    local id = clipboard_format(val.clipboard_format);
+	    WindowSetData [wkey, [clipboard_bg_pager :
+		inc m_join [id, [BMP_ID,JPG_ID,EPS_ID]]
+	    ]];
+
+	elseif trigger == COPY_PIC2CLIP_PNAME then
+	    if val.(trigger) == 'Cancel' then
+		return;
+
+	    elseif val.(trigger) == 'OK' then
+		target_format = clipboard_format(val.clipboard_format);
+
+		    // Do last checks, before saving picture.
+
+		    // Pretend to have triggered the dimension widget to check
+		    // the current content of it.
+
+		local rc = manage_picture_options [
+		    wkey, val, tok_cat [fmt_tok, '_dimension'], fmt_tok
+		];
+		if not rc then continue; endif	// bad dimension
+		val = WindowValues wkey;
+
+		    // Check picture size and get options for ViewGetImage.
+
+		val.vgi_options = check_picture_size [val, fmt_tok];
+		if isnull val.vgi_options then continue; endif;
+
+		    // Copy/Set picture options.
+
+		local ttok = tolower target_format;
+
+		val.(tok_cat [ttok, '_resolution']) = val.clipboard_resolution;
+		val.(tok_cat [ttok, '_units'])	    = val.clipboard_units;
+		val.(tok_cat [ttok, '_pov'])	    = 0;
+		val.(tok_cat [ttok, '_high_quality']) =
+		    val.clipboard_high_quality
+		;
+		val.(tok_cat [ttok, '_clipboard'])  = 1;
+
+		if target_format == BMP_ID and not OS_MSWIN then
+		    val.bmp_clipboard = 0;
+		endif
+
+		    // Set alpha channel for formats that support
+		    // transparency, otherwise use white background.
+
+		if target_format == EMF_ID then
+		    val.emf_alpha = val.clipboard_alpha;
+		    val.emf_white_bg = 0;
+		elseif target_format == PNG_ID then
+		    val.png_alpha = val.clipboard_alpha;
+		    val.png_white_bg = 0;
+		elseif target_format == JPG_ID then
+		    val.jpg_apha = 0;
+		    val.jpg_white_bg = val.clipboard_white_bg;
+		elseif target_format == BMP_ID then
+		    val.bmp_apha = 0;	// !!! available if use version > 3
+		    val.bmp_white_bg = val.clipboard_white_bg;
+		elseif target_format == TIF_ID then
+		    val.tif_alpha = val.clipboard_alpha;
+		    val.tif_white_bg = 0;
+		elseif target_format == EPS_ID then
+		    val.eps_apha = 0;
+		    val.eps_white_bg = val.clipboard_white_bg;
+		endif
+
+		WindowDestroy wkey;
+
+		return [target_format, val];	// return save-picture-options
+	    endif
+
+	endif
+
+    endloop
+
+    WindowDestroy wkey;
+
+endfunction
