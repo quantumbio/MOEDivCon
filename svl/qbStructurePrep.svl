@@ -397,7 +397,8 @@ global function qbPrepareSystem [opt]
         local tmpResidueNames;
         tmpResidueNames.residues = cat Residues [];
         tmpResidueNames.names = rName tmpResidueNames.residues;
-        StructurePreparation[disableTypes : ['Alternates','Break'],batch_protonate3d:0];
+//        StructurePreparation[disableTypes : ['Alternates','Break'],batch_protonate3d:0];
+        StructurePreparation[batch_protonate3d:0];
         // StructurePreparation 'Library' problem type not only builds missing atoms but also renames residues.
         local m_valid = oValid tmpResidueNames.residues;
         rSetName [tmpResidueNames.residues | m_valid, tmpResidueNames.names | m_valid];
