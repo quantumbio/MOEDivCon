@@ -6962,7 +6962,7 @@ function BondGraph;
 // RETURN:	problems
 
 local function proprep_diagnose_cb res
-
+write ['NOTE: IN QB proprep_diagnose_cb\n'];
     local prob = [];
 
 	// Get protein residues
