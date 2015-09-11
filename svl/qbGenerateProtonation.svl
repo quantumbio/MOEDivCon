@@ -55,6 +55,10 @@ const DEFAULT_OPT = [
     protDist    : 4.0       // Only reprotonate non-selected atoms within this distance from selected atoms
 ];
 
+const DEFAULT_NAMES = ['Chain','Residue ID','Sequence','Atom Name'];
+
+const DEFAULT_TYPES = ['char','char','int','char'];
+
 local function PrintError [errortext]
     write ['ERROR: {}\n\tContact support@quantumbioinc.com for more information.\n',errortext];
 endfunction
@@ -70,8 +74,8 @@ global function qbSendAtomsToCSV [ascii_file,runAtoms]
     local db_file = twrite['{}-DELETE.mdb',fbase ascii_file];
     local names, types;
 
-    names = ['Chain','Residue ID','Sequence','Atom Name'];
-    types = ['char','char','int','char'];
+    names = DEFAULT_NAMES;
+    types = DEFAULT_TYPES;
 
     local mdbKey = db_Open [db_file,'create'];
     apt db_CreateField [mdbKey, names, types];
@@ -124,6 +128,7 @@ local function qbCSVtoMDB opt
     db_Close db_Open [opt.db_file,'create'];
     opt = __db_ImportASCII_DetectOptions opt;
     opt = __db_ImportASCII_ReadFile opt;
+    opt.types = DEFAULT_TYPES;      // NOTE: this line is to clean up a problem in the importer which mistypes certain cases.
     db_ImportASCII opt;
     // read in MDB file and return the corresponding atoms in the MOE window
     local mdbKey = db_Open [opt.db_file,'read'];
