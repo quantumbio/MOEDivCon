@@ -235,5 +235,28 @@ global function qbOutputMeasurePotential [ligand, receptor]
 
 endfunction
 
+// selChain = token corresponding to the chain code.
+// selSequence = number corresponding to the sequence integer.
 
-// ted_SaveAndLoad
+// example: qbmoebatch -licwait -exec "eval [qbCalculateInteractionFromFile ['1FK7.pdb', ['L',1]]]" -exit
+
+function cLetter;
+function dock_score_GBVIWSA_dG;
+global function qbCalculateInteractionFromFile [fname_complex,[selChain, selSequence]]
+    local pdata = SystemPush [];
+
+    ReadAuto fname_complex;
+        
+    local interestResidue = Residues [] | totok cLetter rChain Residues [] == selChain and rUID Residues[] == selSequence;
+    
+    if isnull interestResidue then
+        write ['ERROR: [{},{}] not found!\n', selChain, selSequence];
+        return;
+    endif
+
+    local interactions = qbMeasurePotential[interestResidue,diff [Residues[], interestResidue]];
+    local score = dock_score_GBVIWSA_dG ['scoreLigX', [cat rAtoms diff [Residues[], interestResidue],cat rAtoms interestResidue]];
+    write ['interactions: {} | {}\n', add second untag third interactions, score];
+    SystemPop pdata;
+
+endfunction
