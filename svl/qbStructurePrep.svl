@@ -65,6 +65,8 @@
  *  qbmoebatch -exec "run ['qbStructurePrep.svl',['pre_1X8X.pdb',[],[enableOpt:0,enableCutWat:1,wat_radius:5.0,outfiletype:'pdb',enableAmberName:1,renameLigand:'LIG',printRes:['LIG',5.0]]]]" -exit
  *          Same as above, but enables the AMBER atom/residue name option in the PDB writer.
  *
+ *  qbmoebatch -exec "eval [qbPrepFile ['1LRI.pdb', [enableOpt:0,enableLigFix:1,outfiletype:'pdb',enableProtonate:1,protPH:7.4,ligSelect:'/L/CLR/99//'] ]]" -exit
+ *
  *      NOTE: -licwait is used to wait for a license to free. It will wait forever.
  *
  ****************************************************************************/
@@ -124,8 +126,9 @@ const DEFAULTS = cat [CORE_DEFAULTS, [
     outfiletype:'mol2',     // output file type supported by script (can be either mol2 or PDB).
     enableAmberName:0,         // output amber names in PDB files.
     wasPDB:0,               // option set to 1 when pdb file is read in.
-    prtElementList:[]       // [['H','C'],'L'] elements to print to atom list file (such as for NMR or belly)
+    prtElementList:[],       // [['H','C'],'L'] elements to print to atom list file (such as for NMR or belly)
     					// L = ligand, T = target/receptor, [] or other = all
+    ligSelect:''        // uses the standard, QuantumBio selection format: '/A/CLR/99//'
 ]];
 
 const HYDRATE_DEFAULTS = [
@@ -380,6 +383,30 @@ global function qbPrepareSystem [opt]
     local function filterInert atoms
         return diff [atoms,Atoms [] | aInert Atoms[]];
     endfunction
+    
+    if opt.ligSelect <> '' then
+        local interestResidue = [];
+        local [none1,chainName,resName,resUID,atmName,none2] = fieldsplit [string opt.ligSelect,"/"];
+        chainName = token chainName;
+        resName = token resName;
+        resUID = toint token resUID;
+        if chainName <> '' and not isnull resUID then
+            write [' infirst: {} {} {}\n', chainName, resName, resUID];
+            interestResidue = Residues [] | totok cLetter rChain Residues [] == chainName and rUID Residues[] == resUID;
+        elseif chainName <> '' and resName <> '' then
+            write [' insecond\n'];
+            interestResidue = Residues [] | totok cLetter rChain Residues [] == chainName and rName Residues[] == resName;
+        elseif resName <> '' then
+            write [' inthird\n'];
+            interestResidue = Residues [] | rName Residues[] == resName;
+        endif
+        if isnull interestResidue then
+            write ['ERROR: {} not found!\n', opt.ligSelect];
+            return [];
+        endif
+        write ['{} | {}\n', interestResidue, type interestResidue];
+        oSetCollection ['Ligand', cat rAtoms interestResidue];
+    endif
         
     local atomsToProtonate = [];
     if not isnull opt.protAtomList then     // needs to be set here because atom numbers can change!
@@ -470,7 +497,7 @@ global function qbPrepareSystem [opt]
 
         // remove protons from list as it makes no sense to include them and this heads off a possible Protonate3D bug
         atomsToProtonate = diff [atomsToProtonate,(Atoms[] | aElement Atoms[] == 'H')];
-//        fixedAtoms = diff [fixedAtoms,(Atoms[] | aElement Atoms[] == 'H')];
+        fixedAtoms = diff [fixedAtoms,(Atoms[] | aElement Atoms[] == 'H')];
                 
         if opt.pmode == 'Add_H' then
             Add_H diff [filterInert atomsToProtonate,fixedAtoms];

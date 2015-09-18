@@ -260,3 +260,6 @@ global function qbCalculateInteractionFromFile [fname_complex,[selChain, selSequ
     SystemPop pdata;
 
 endfunction
+
+#eof
+
