@@ -120,6 +120,18 @@ local function filterInert atoms
     return diff [atoms,Atoms [] | aInert Atoms[]];
 endfunction
 
+// As of Phenix 1.10, they moved the chem_data path to an interior directory.
+local function getChemDataPath []
+
+    local version = atoi token second wordsplit [string first wordsplit [string getenv 'PHENIX_VERSION',"-"],"."];
+    if version < 10 then
+        return tok_cat [getenv 'PHENIX', '/chem_data'];
+    else
+        return tok_cat [getenv 'PHENIX', '/modules/chem_data'];
+    endif
+
+endfunction
+
 // Process one of the various CIF file types and return a MOE MOL structure.
 global function qbCIF2MOL[ cif_file, root ]
     root = tolower root;
@@ -417,9 +429,9 @@ local function getCIFlist [directory]
     if isnull directory then
         if not isnull getenv 'PHENIX' then
         // 9/2014: According to Nat Echols, these are the three directories to consider (in order).
-            directory = tok_cat [getenv 'PHENIX', '/chem_data/chemical_components'];
-            directory = append [directory, tok_cat [getenv 'PHENIX', '/chem_data/geostd']];
-            directory = append [directory, tok_cat [getenv 'PHENIX', '/chem_data/mon_lib']];
+            directory = tok_cat [getChemDataPath[], '/chemical_components'];
+            directory = append [directory, tok_cat [getChemDataPath[], '/geostd']];
+            directory = append [directory, tok_cat [getChemDataPath[], '/mon_lib']];
         else
             return [];
         endif
@@ -488,7 +500,7 @@ local function RenameBasedOnCIF [residueList,ciffiles,procPhenixCIFLib]
     endif
 
     if not isnull getenv 'PHENIX' then
-        WriteLog[twrite ['NOTE: Using Phenix cif database found at {}', tok_cat [getenv 'PHENIX', '/chem_data/']]];
+        WriteLog[twrite ['NOTE: Using Phenix cif database found at {}', getChemDataPath[]]];
     else
                      //            1         2         3         4         5         6         7         8
                      //   12345678901234567890123456789012345678901234567890123456789012345678901234567890
@@ -1054,7 +1066,7 @@ local function cif_Window [wparent,residueList]
     local phenixdb;
     local cifFiles;
     if not isnull getenv 'PHENIX' then
-        phenixdb = tok_cat [getenv 'PHENIX', '/chem_data/'];
+        phenixdb = getChemDataPath[];
         local filelist = getCIFlist[];
         local tmpResidue;
         write ['residueList: {} | {} \n', length residueList, rName residueList];
