@@ -34,7 +34,7 @@ function pro_PeptideFlags;
 function CIF_fread_cif_all;
 function cif_ExtractInfo;
 function mtz_Read;
-function StructurePreparationGUI;
+// function StructurePreparationGUI;    // DELME 
 
 function harmonize_H;
 
@@ -50,6 +50,8 @@ function qbCalcMemoryRequirementsInGB;
 static transFileName;
 static residueNamesTaken;
 static errorCifFiles;
+
+global PHENIXHOME;
 
 const CORE_DEFAULTS = [
     enableAutoPrep:0,       // Run the MOE structure preparation tool.
@@ -125,9 +127,9 @@ local function getChemDataPath []
 
     local version = atoi token second wordsplit [string first wordsplit [string getenv 'PHENIX_VERSION',"-"],"."];
     if version < 10 then
-        return tok_cat [getenv 'PHENIX', '/chem_data'];
+        return tok_cat [PHENIXHOME, '/chem_data'];
     else
-        return tok_cat [getenv 'PHENIX', '/modules/chem_data'];
+        return tok_cat [PHENIXHOME, '/modules/chem_data'];
     endif
 
 endfunction
@@ -253,7 +255,7 @@ local function CompareBondDBs [leftBondDB, rightBondDB, opt]
     return content;
 endfunction
 
-// Source code between  // ===================== lines based on code provided by CCG 1/2013
+// Source code between  // ===================== lines based on code based on some code by CCG 1/2013
 // ===================== 
 
 // JT: takes atom keys from a template (dictionary), modify the ionization
@@ -427,7 +429,7 @@ endfunction
 
 local function getCIFlist [directory]
     if isnull directory then
-        if not isnull getenv 'PHENIX' then
+        if not isnull PHENIXHOME then
         // 9/2014: According to Nat Echols, these are the three directories to consider (in order).
             directory = tok_cat [getChemDataPath[], '/chemical_components'];
             directory = append [directory, tok_cat [getChemDataPath[], '/geostd']];
@@ -499,7 +501,7 @@ local function RenameBasedOnCIF [residueList,ciffiles,procPhenixCIFLib]
         procPhenixCIFLib = 1;
     endif
 
-    if not isnull getenv 'PHENIX' then
+    if not isnull PHENIXHOME then
         WriteLog[twrite ['NOTE: Using Phenix cif database found at {}', getChemDataPath[]]];
     else
                      //            1         2         3         4         5         6         7         8
@@ -631,7 +633,7 @@ local function FindPeptideBreaks[inChains]
 endfunction
 
 function Seq_NameToLetter;
-local function ResiduePreparation []
+global function qbResiduePreparation []
     local testResidues = uniq (rName Residues [] | Seq_NameToLetter rName Residues [] <> 'X');
     testResidues = uniq cat [pro_StandardRes[], testResidues,
         'HOH','ASH','CYX','SO4','DA','DT','DG','DC','A','U','G','C',toupper el_Elements[]];
@@ -657,15 +659,14 @@ local function ReadInputFiles[inpdbfile,opt]
             for altCollection in findmatch ['PDB_ALTLOC_[A-Z,a-z,0-9]', oCollections[]] loop
                 oSetCollection [altCollection, [] ];    // alt designator cleared from output
             endloop
-//            aSetOccupancy [Atoms[],1.00];     // we should not be cleaning these out
         endif
     endif
     return length inchains;
 endfunction
 
-local function WriteInputFiles[residueList,ciffiles,filebase,opt]
+global function qbWriteInputFiles[residueList,ciffiles,filebase,opt]
     opt = tagcat[opt, PREPDEFAULTS];    // this function is called from various locations (both GUI and non-GUI which have different opts)
-    // address a MOE-ism that renames HIS residues based on protonation
+    // address a MOE-ism that renames HIS residues based on protonation as per the AMBER standard. Phenix doesnt like that.
     rSetName [cat [Residues [] | rName Residues [] == 'HIP'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HID'],'HIS'];
     rSetName [cat [Residues [] | rName Residues [] == 'HIE'],'HIS'];
@@ -700,14 +701,22 @@ local function WriteInputFiles[residueList,ciffiles,filebase,opt]
     return [mainPDBfilename,resPDBfilenames];
 endfunction
 
-global function qbPhenixPrep [filebase,opt,ciffiles]
+global function qbPhenixPrep [filebase,opt,ciffiles,inphenixhome]
     // WARNING: removal/circumvention of license check code is a direct violation of license agreement!
     if not qbCheckLicense[] then
         return;
     endif
     opt = tagcat[opt, PREPDEFAULTS];
     WriteLog[ [], twrite ['{}-phenix',filebase], 'init'];
-    local residueList = ResiduePreparation[];
+    local residueList = qbResiduePreparation[];
+    
+    if not isnull inphenixhome then
+        PHENIXHOME = inphenixhome;
+    elseif not isnull getenv 'PHENIX' then
+        PHENIXHOME = getenv 'PHENIX';
+    else
+        PHENIXHOME = [];
+    endif
     
     if opt.enableCIFprotons then
 //        opt.notProtAtomList = aNumber ProtonateBasedOnCif[residueList,ciffiles];
@@ -715,7 +724,7 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     endif
     aSetSelected [opt.notProtAtomList,1];
     qbPrepareSystem [opt];
-    residueList = ResiduePreparation[]; // lmw (11/14) - CCG StructurePreparation will rename items sometimes so the list needs rebuilt after run.
+    residueList = qbResiduePreparation[]; // lmw (11/14) - CCG StructurePreparation will rename items sometimes so the list needs rebuilt after run.
     aSetOccupancy [oGetCollection ['STRUCTPREP_NEWATOMS'],0];
     // set the occupancy based upon the occupancy of the heavy atom to which the proton is bound. Do the same for OXT
     local keyAtoms = Atoms[];
@@ -734,16 +743,16 @@ global function qbPhenixPrep [filebase,opt,ciffiles]
     else
         WriteLog ['WARNING: problem in OXT Occupancy. Check for odd atoms named OXT.\n'];
     endif
-    return WriteInputFiles[residueList,ciffiles,filebase,opt];
+    return qbWriteInputFiles[residueList,ciffiles,filebase,opt];
 endfunction
 
-global function qbPhenixPrepFile[inpdbfile,opt,ciffiles]
+global function qbPhenixPrepFile[inpdbfile,opt,ciffiles,inphenixhome]
     opt = tagcat[opt, PREPDEFAULTS];
     if not ReadInputFiles[inpdbfile,opt] then
         return;
     endif
 
-    qbPhenixPrep[fbase inpdbfile,opt,ciffiles];
+    qbPhenixPrep[fbase inpdbfile,opt,ciffiles,inphenixhome];
 endfunction
 
 global function qbPostPhenix [inpdbfile,trFile]
@@ -787,8 +796,8 @@ local function GenerateBatchScript [opt,batchfilename,inMainPDB,inLigPDBs,moeLog
     fwrite [shscr, 'QBPHENIX={}/bin/qbphenix\n',getenv 'QBHOME'];
     fwrite [shscr, 'QBMOEBATCH={}/bin/qbmoebatch\n',getenv 'QBHOME'];
     
-    if not isnull getenv 'PHENIX' then
-        fwrite [shscr, 'QBPHENIX_ENV={}/phenix_env.sh\n',getenv 'PHENIX'];
+    if not isnull PHENIXHOME then
+        fwrite [shscr, 'QBPHENIX_ENV={}/phenix_env.sh\n',PHENIXHOME];
     else
         fwrite [shscr, 'QBPHENIX_ENV=\n'];
     endif
@@ -1034,8 +1043,17 @@ local function BatchPanel finame
     endif
 endfunction
 
-local function cif_Window [wparent,residueList]
+global function qbCifWindow [wparent,residueList,inphenixhome]
     static ciffiles;
+    
+    if not isnull inphenixhome then
+        PHENIXHOME = inphenixhome;
+    elseif not isnull getenv 'PHENIX' then
+        PHENIXHOME = getenv 'PHENIX';
+    else
+        PHENIXHOME = [];
+    endif
+
     local wkey = WindowCreate
     [
         title: 'CIF Preparation',
@@ -1065,7 +1083,7 @@ local function cif_Window [wparent,residueList]
     ];
     local phenixdb;
     local cifFiles;
-    if not isnull getenv 'PHENIX' then
+    if not isnull PHENIXHOME then
         phenixdb = getChemDataPath[];
         local filelist = getCIFlist[];
         local tmpResidue;
@@ -1080,7 +1098,7 @@ local function cif_Window [wparent,residueList]
     if isnull phenixdb then
         WindowSetAttr[wkey, [   phenixStatus: [text:'WARNING: Phenix NOT installed'] ] ];
     else
-        WindowSetAttr[wkey, [   phenixStatus: [text:twrite ['Using Phenix installed at\n   {}',getenv 'PHENIX'] ] ] ];
+        WindowSetAttr[wkey, [   phenixStatus: [text:twrite ['Using Phenix installed at\n   {}',PHENIXHOME] ] ] ];
     endif
     
     WindowSetAttr[wkey, [   ciffilesBox:    [text : cifFiles]   ]];   
@@ -1217,8 +1235,8 @@ local function phenix_Window [wparent]
     ];
     local phenixdb;
     local cifFiles;
-    if not isnull getenv 'PHENIX' then
-        phenixdb = tok_cat [getenv 'PHENIX'];
+    if not isnull PHENIXHOME then
+        phenixdb = tok_cat [PHENIXHOME];
     endif
     
     if isnull phenixdb then
@@ -1412,7 +1430,7 @@ local function qbCoreResiduesBoxLogic [values, trigger, wkey]       // could bec
     return returnvalue;
 endfunction
 
-global function qbPhenixPrepPanel[]
+global function qbPhenixPrepPanel[inphenixhome]
 
 	if WindowShow ['PhenixDivConPanel', 1] then
 	    return;
@@ -1422,6 +1440,14 @@ global function qbPhenixPrepPanel[]
     if isnull Atoms[] then
         Warning 'Error:\nUse File->Open to open a molecule of interest\nprior to attempting refinement.';
         return;
+    endif
+
+    if not isnull inphenixhome then
+        PHENIXHOME = inphenixhome;
+    elseif not isnull getenv 'PHENIX' then
+        PHENIXHOME = getenv 'PHENIX';
+    else
+        PHENIXHOME = [];
     endif
 
     local pdbfile = cTag first Chains[];
@@ -1446,7 +1472,7 @@ global function qbPhenixPrepPanel[]
     const hCutOff = 0.49;
     strprep_info = twrite['Not performed and {f.1}% of atoms are protons',100*hPercent];
 
-    local residueList = ResiduePreparation[];
+    local residueList = qbResiduePreparation[];
     
     local coreResiduesBoxPanel = qbCoreResiduesBoxPanel['Core Residues:'];
 
@@ -1531,8 +1557,7 @@ global function qbPhenixPrepPanel[]
                 ]
             ],
         Separator : [flushLeft:1],
-            Mbox:
-            [
+            Mbox:   [
                 name: 'structurePrepSection',
                 columns: 2,
                 Button:
@@ -1934,7 +1959,7 @@ global function qbPhenixPrepPanel[]
 //  write ['DEBUG: {} | {}\n', values, trigger];
         if trigger === 'button_CIFsetup' then
             local tmpcif_success;
-            [ciffiles,tmpcif_success] = cif_Window[wkey,residueList];
+            [ciffiles,tmpcif_success] = qbCifWindow[wkey,residueList];
             status.cif_success = tmpcif_success;
             if isnull status.cif_success then
                 WindowSetAttr[wkey,[cif_info: [text:cif_info]]];
@@ -1951,7 +1976,8 @@ global function qbPhenixPrepPanel[]
         elseif trigger === 'button_MOEPreparation' then
             local before_run = cat Atoms[];
             brick_panel[wkey,0];
-            StructurePreparationGUI[cmd:'interactive'];
+//            StructurePreparationGUI[cmd:'interactive'];       // DELME
+            run ['structprep_ui.svl', [cmd:'interactive']];
             status.ran_structprep = 1;
             sleep 2.0;      // needs a couple of seconds to init StructurePrep function
             while WindowKey 'Structure Preparation' loop
@@ -2020,7 +2046,7 @@ global function qbPhenixPrepPanel[]
 
                 if not isnull batchname then
                     WriteLog[twrite ['Creating {}',batchname],twrite ['{}-phenix',values.baseName]];
-                    local [mainPDBfilename,resPDBfilenames] = WriteInputFiles[residueList,ciffiles,values.baseName,values];
+                    local [mainPDBfilename,resPDBfilenames] = qbWriteInputFiles[residueList,ciffiles,values.baseName,values];
                     if fext values.mtzFile == 'mtz' then
                         values.labelList = twrite['{},{}',mtzFColumns[values.column_F],mtzQColumns[values.column_Q]];
                     else
