@@ -33,7 +33,6 @@ function _StructurePreparation;
 function ctab_EnumerateProtomers;
 function WashMoleculeMOE;
 
-function qb_cLetter;
 function qbTetherMMMin;
 
 // MDB/CSV file data information
@@ -82,7 +81,7 @@ global function qbSendAtomsToCSV [ascii_file,runAtoms]
     local tmpAtom;
     for tmpAtom in runAtoms loop
        db_Write [mdbKey,0, tag [names,[
-           string qb_cLetter aChain tmpAtom,string rName aResidue tmpAtom,
+           cLetter aChain tmpAtom,string rName aResidue tmpAtom,
            rUID aResidue tmpAtom,string aName tmpAtom   ]]];
     endloop
     db_Close mdbKey;
@@ -92,7 +91,7 @@ global function qbSendAtomsToCSV [ascii_file,runAtoms]
 endfunction
 
 local function FindAtoms values
-    local interestResidue = Residues [] | qb_cLetter rChain Residues [] == token values.'Chain' and rUID Residues[] == values.'Sequence';
+    local interestResidue = Residues [] | app token cLetter rChain Residues [] == token values.'Chain' and rUID Residues[] == values.'Sequence';
     if isnull interestResidue then
         write ['warning (residue not found): {} {} {}\n', values.'Chain', values.'Residue ID', values.'Sequence'];
         return [];
@@ -174,11 +173,11 @@ global function qbGenerateProtonation [pdbfile,opt]
         ligAtoms = Atoms[];
 
         if not isnull opt.chain then
-            if isnull (ligAtoms | qb_cLetter aChain ligAtoms == opt.chain) then
+            if isnull (ligAtoms | app token aChain ligAtoms == opt.chain) then
                 PrintError [twrite ['Chain {} not found!', opt.chain]];
                 return;
             endif
-            ligAtoms = ligAtoms | qb_cLetter aChain ligAtoms == opt.chain;
+            ligAtoms = ligAtoms | app token aChain ligAtoms == opt.chain;
         endif
         
         if not isnull opt.resid then
@@ -276,7 +275,7 @@ global function qbGenerateProtonation [pdbfile,opt]
                 outpdbname,
                 length (ligAtoms | aElement ligAtoms == 'H'),
                 aIon ligHeavyAtoms, aName ligHeavyAtoms, rName aResidue ligHeavyAtoms, 
-                qb_cLetter rChain aResidue ligHeavyAtoms, rUID aResidue ligHeavyAtoms];
+                app token cLetter rChain aResidue ligHeavyAtoms, rUID aResidue ligHeavyAtoms];
             fclose fileHandle;
             WritePDB[outpdbname,[cryst1:1]];
         endloop
@@ -346,7 +345,7 @@ global function qbGenerateProtonationPanel []
     ];
     
     local function updateCoreResidueList [coreList]
-	    return apt twrite ['{}\t{}\t{}\t{}',qb_cLetter aChain coreList, rName aResidue coreList, rUID aResidue coreList, aName coreList];
+	    return apt twrite ['{}\t{}\t{}\t{}',app token cLetter aChain coreList, rName aResidue coreList, rUID aResidue coreList, aName coreList];
 	endfunction
 
     WindowShow wkey;

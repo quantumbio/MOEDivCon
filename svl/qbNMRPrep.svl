@@ -33,7 +33,6 @@ function qbPrepareSystem;
 function qbCorrectAtomNames;
 function qbCheckLicense;
 function qbGetResidueOnRadius;
-function qb_cLetter;
 
 // statics
 static transFileName;
@@ -59,7 +58,7 @@ local function GenerateBatchScript [opt,batchfilename]
     fwrite [shscr, 'setMem={}\n',opt.setMem];
     if not isnull opt.siteatoms then
         local tmpSiteResidue = uniq aResidue opt.siteatoms;
-        fwrite [shscr, 'selection="{}"\n',twrite ['/{}/{}/{}//', qb_cLetter rChain tmpSiteResidue, rName tmpSiteResidue, rUID tmpSiteResidue]];
+        fwrite [shscr, 'selection="{}"\n',twrite ['/{}/{}/{}//', app token cLetter rChain tmpSiteResidue, rName tmpSiteResidue, rUID tmpSiteResidue]];
     endif
     fwrite [shscr, '    \n'];
     
@@ -617,7 +616,7 @@ global function qbNMRPrepPanel[]
 	];
 	
 	local function updateCoreResidueList [coreList]
-	    return apt twrite ['{}\t{}\t{}\t{}',qb_cLetter aChain coreList, rName aResidue coreList, rUID aResidue coreList, aName coreList];
+	    return apt twrite ['{}\t{}\t{}\t{}',app token cLetter aChain coreList, rName aResidue coreList, rUID aResidue coreList, aName coreList];
 	endfunction
     
     local function ShowWarnings [wkey,trigger,values,status,siteatoms,ligatoms,is_file]
