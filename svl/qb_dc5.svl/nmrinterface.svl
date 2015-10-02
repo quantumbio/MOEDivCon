@@ -330,22 +330,13 @@ function db_ImportASCII;
 function db_Open;
 function db_Close;
 
-global function qb_cLetter chainid
-    // when the cName and the cTag are the same this means that there is no (or empty) chain ID.
-    if cName chainid === cTag chainid then
-        return ' ';
-    else
-        return fext cName chainid;
-    endif
-endfunction
-
 // Functions necessary to find the corresponding Atoms from a QB-standard NMR CSV file
 // The QB-standard NMR CSV file stores the following information:
 //  "Chain","Residue ID","Sequence","Atom Name","Unbound ppm","Bound ppm"
 //  "A","VAL",380,"CG1",0,-0.27
 // these items point to atoms in the MOE window
 local function FindAtoms values
-    local interestResidue = Residues [] | qb_cLetter rChain Residues [] == token values.'Chain' and rUID Residues[] == values.'Sequence';
+    local interestResidue = Residues [] | app token cLetter rChain Residues [] == token values.'Chain' and rUID Residues[] == values.'Sequence';
     local expBound;
     local expUnBound;
     if isnull interestResidue then
@@ -427,13 +418,13 @@ global function qbSendAtomsToNMRCSV [ascii_file,runAtoms,boundData,unboundData]
     if anytrue app isnull second untag cat [boundData, unboundData] then
         for tmpAtom in runAtoms loop
            db_Write [mdbKey,0, tag [names,[
-               string qb_cLetter aChain tmpAtom,string rName aResidue tmpAtom,
+               cLetter aChain tmpAtom,string rName aResidue tmpAtom,
                rUID aResidue tmpAtom,string aName tmpAtom   ]]];
         endloop
     else
         for tmpAtom in runAtoms loop
            db_Write [mdbKey,0, tag [names,[
-               string qb_cLetter aChain tmpAtom,string rName aResidue tmpAtom,
+               cLetter aChain tmpAtom,string rName aResidue tmpAtom,
                rUID aResidue tmpAtom,string aName tmpAtom,
                unboundData.(totok tmpAtom),boundData.(totok tmpAtom)    ]]];
         endloop
