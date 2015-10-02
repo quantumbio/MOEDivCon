@@ -37,7 +37,6 @@ addpath "$MOEHOME/java/svljava.jar" CLASSPATH
 addpath "$QBHOME/${PLTFM_VER}/MOEDivcon.jar" CLASSPATH
 addpath ${CLASSPATH} SVL_CLASSPATH
 
-exec "$MOEBIN" "$@"
+exec "$MOEBIN" "$@" -custom ${QBHOME}/svl/patch
 
 exit $?
-
