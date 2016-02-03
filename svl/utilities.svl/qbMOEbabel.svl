@@ -1,0 +1,84 @@
+#svl
+#if 0
+ // BEGIN COPYRIGHT
+ /***********************************************************************
+    Copyright (c) 1998-2010 QuantumBio Inc. and/or its affiliates.
+    
+ This source code is the property of QuantumBio Inc. and/or its affiliates
+ and is considered secret.
+
+ This source code contains proprietary and Confidential Information, 
+ including trade secrets, belonging to QuantumBio Inc. and/or its 
+ affiliates.
+
+ Use, duplication, or disclosure of this source code is strictly 
+ prohibited without prior written authorization by the management of 
+ QuantumBio Inc. At no time are you authorized to repurpose the source
+ code for use with software other then that which it was intended.
+
+ Please see http://www.quantumbioinc.com/ for more information.
+
+ ***********************************************************************/
+ // END COPYRIGHT
+#endif   
+
+/****************************************************************************
+ *                                qbMOEbabel.svl
+ *
+ *  Read in a PDB, MOL2, or any other file MOE supports and output a file in a 
+ *      different format chosen by the user which MOE supports.
+ *
+ *  Main function:
+ *
+ *    qbMOEbabel [input-pattern, output-pattern, optional-srcpath]
+ *
+ *  Arguments:
+ *    
+ *    optional-srcpath : token : path to the source directory where the files of interest
+ *                          live.
+ *
+ *    input-pattern : token : can be a name or search pattern (e.g. *.pdb for
+ *                                  all PDB files in srcpath.
+ *
+ *    output-pattern : token : can be a name or a format pattern supported by MOE. Including:
+ *                              'mol2', 'pdb', etc
+ *
+ *  Example moebatch call:
+ *
+ *    qbmoebatch -exec "run ['qbMOEbabel.svl',['*.mol2', 'pdb', '.']]" -exit
+ *          This wil run the script on all mol2 files within the CWD and write pdb versions.
+ *
+ ****************************************************************************/
+
+#set main 'qbMOEbabel'
+
+const MOEBABEL_DEFAULTS =   [
+        res_selection:[]
+    ];
+
+function qbMOEbabel [inpatt, outformat, opt, src]     // x is the function argument
+    opt = tagcat[opt, MOEBABEL_DEFAULTS];
+    if isnull src then
+        src = '.';
+    endif
+    local srcfilelist = flist [src, inpatt];
+    local filename, chains;
+    local outpat;
+
+    for filename in srcfilelist loop
+        write ['\nTranslating {} to {}\n', filename, twrite ['{}.{}', fbase filename, fext outformat]];
+        oDestroy Chains[];
+        ReadAuto filename;
+        local selection;
+        if isnull opt.res_selection then
+            selection = Atoms[];
+        else
+            selection = Residues [] | rName Residues [] == opt.res_selection;
+        endif
+        local pdata = SystemPush selection;
+        pot_SetCharges [];
+        WriteAuto [twrite ['{}.{}', fbase filename, fext outformat]];
+        SystemPop pdata;
+    endloop
+endfunction 
+
