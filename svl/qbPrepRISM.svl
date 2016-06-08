@@ -266,7 +266,7 @@ global function qbPrepRISM[infname]
 
     local receptor = [];
     local ligand = [];
-    local atoms = cat rAtoms uniq aResidue qbNearby[cat cAtoms cat [asymmetricChains,crystalChains], cat cAtoms asymmetricChains, vals.neardist];
+    local atoms = cat rAtoms uniq aResidue first qbNearby[cat cAtoms cat [asymmetricChains,crystalChains], cat cAtoms asymmetricChains, vals.neardist];
     atoms = atoms | (not aInert atoms);
 
     local wkey = [];
