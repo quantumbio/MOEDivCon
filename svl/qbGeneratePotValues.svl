@@ -261,5 +261,73 @@ global function qbCalculateInteractionFromFile [fname_complex,[selChain, selSequ
 
 endfunction
 
+global function qbPotentialEnergyTimer [infile]
+
+    local startTime;
+    
+    write ['Beginning with file {}\n', infile];
+    startTime = clock[];
+    ReadAuto infile;
+    write ['Time to open {} (incl. parsing and typing): {} seconds\n', infile, (clock[] - startTime)];
+
+    startTime = clock[];
+    
+    local fffile = 'Amber10EHT.ff';
+    write ['Loading {} Forcefield\n', fffile];
+    pot_Load twrite ['$MOE/lib/{}',fffile];
+    pot_Setup [
+        solEnable:0,    // Disable solvation
+        eleDist:0,      // Coulomb electrostatics
+        cutoffEnable:0,  // Disable cutoff
+        threadCount:1   // Thread count
+    ];
+    pot_SetCharges [];
+    write ['  Forcefield settings:\n'];
+    apt write ['    {}\n', pot_Setup[]];
+    write ['Time to load/setup {} Forcefield: {} seconds\n',fffile, (clock[] - startTime)];
+
+    local tmpEnergy;
+    local middleTime;
+    
+    write ['Beginning {} Calculation:\n', fffile];
+    startTime = clock[];
+    
+    middleTime = clock[];
+    tmpEnergy = first pot_angEnergy Atoms[];
+    write ['    Time to calculate angle bend energy ({} kcal/mol): {} seconds\n', tmpEnergy, (clock[] - middleTime)];
+
+    middleTime = clock[];
+    tmpEnergy = first pot_oopEnergy Atoms[];
+    write ['    Time to calculate out-of-plane energy ({} kcal/mol): {} seconds\n', tmpEnergy, (clock[] - middleTime)];
+
+    middleTime = clock[];
+    tmpEnergy = first pot_resEnergy Atoms[];
+    write ['    Time to calculate restraints energy ({} kcal/mol): {} seconds\n', tmpEnergy, (clock[] - middleTime)];
+
+    middleTime = clock[];
+    tmpEnergy = first pot_stbEnergy Atoms[];
+    write ['    Time to calculate stretch-bend energy ({} kcal/mol): {} seconds\n', tmpEnergy, (clock[] - middleTime)];
+
+    middleTime = clock[];
+    tmpEnergy = first pot_strEnergy Atoms[];
+    write ['    Time to calculate bond stretch energy ({} kcal/mol): {} seconds\n', tmpEnergy, (clock[] - middleTime)];
+
+    middleTime = clock[];
+    tmpEnergy = first pot_torEnergy Atoms[];
+    write ['    Time to calculate torsion energy ({} kcal/mol): {} seconds\n', tmpEnergy, (clock[] - middleTime)];
+
+    middleTime = clock[];
+    tmpEnergy = first pot_eleEnergy Atoms[];
+    write ['    Time to calculate electrostatic energy ({} kcal/mol): {} seconds\n', tmpEnergy, (clock[] - middleTime)];
+
+    middleTime = clock[];
+    tmpEnergy = first pot_vdwEnergy Atoms[];
+    write ['    Time to calculate van der Waals energy ({} kcal/mol): {} seconds\n', tmpEnergy, (clock[] - middleTime)];
+
+    write ['Time to calculate everything: {} seconds\n', (clock[] - startTime)];
+
+endfunction
+
+
 #eof
 
