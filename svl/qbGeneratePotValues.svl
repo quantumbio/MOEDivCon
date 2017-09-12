@@ -261,6 +261,8 @@ global function qbCalculateInteractionFromFile [fname_complex,[selChain, selSequ
 
 endfunction
 
+// Example: qbmoebatch -licwait -exec "qbPotentialEnergyTimer ['1.pdb']" -exit
+
 global function qbPotentialEnergyTimer [infile]
 
     local startTime;
