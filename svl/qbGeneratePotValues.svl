@@ -348,6 +348,33 @@ global function qbPotentialEnergyTimer [infile]
 
 endfunction
 
+function pro_StandardRes;
+function WritePDB;
+global function qbSanderPrep [infile]
+
+    ReadAuto infile;
+    local basename = fbase infile;
+    
+    local residueList = Residues[] | m_join [rName Residues [], pro_StandardRes[] ] == 0;
+    oDestroy residueList;
+    oDestroy (Atoms [] | aElement Atoms [] == 'H');
+    
+    local newfilename = twrite ['{}-moe.pdb', basename];
+    write ['Writing..... {}\n', newfilename];
+    WritePDB [newfilename, [amber:1]];
+
+endfunction
+
+global function qbLeap2PDB [infile]
+
+    ReadPDB infile;
+    local basename = fbase infile;
+    local newfilename = twrite ['{}-trx.pdb', basename];
+    write ['Writing..... {}\n', newfilename];
+    WritePDB [newfilename, [amber:0]];
+
+endfunction
+
 
 #eof
 
