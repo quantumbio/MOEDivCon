@@ -1,0 +1,477 @@
+#svl
+
+#set title	'JSON File I/O'
+#set class	'MOE:file-io'
+
+#set main qbReadJSONStream
+
+// TODO: this function should be moved somewhere else.
+global function catch_errors []
+    local t = task_fork [creator:'detach', master:'none'];
+    if t(2) === 'child' then
+	while task_key t(1) loop
+	    print [t:t];
+	    sleep 1;
+	endloop 
+	where [];
+	exit [];
+    endif
+
+endfunction
+
+// This file is organized by overall functional groups:
+//      * General JSON utilities (stream parsing). Function could be used anywhere.
+//      * Molecule JSON file input
+//      * Molecule JSON file output
+
+//  ==================================== General JSON utilities for stream processing ========================================
+
+// STATIC/LOCAL variables
+static braceCount;      // the braces are counted throughout the JSON file in order to determine when an object is completed.
+
+// LOCAL FUNCTIONS
+
+// Local utility functions required to break apart and process the JSON document.
+
+local function convertType [inCell]
+    local tmpCell = string totok inCell;
+    if alltrue (isdigit tmpCell or tmpCell == "-" or tmpCell == "+" or tmpCell == ".") then
+        return tonum inCell;
+    else
+        return swrite ['\"{}\"',inCell];
+    endif        
+endfunction
+
+// function used to process a string
+local function getString [position,inString]
+    local tmpCurrent;
+    while position <= length inString loop
+        if inString(position) == "\"" and inString(position-1) <> "\\" then     //"
+            return [position, tmpCurrent];
+        else
+            tmpCurrent = cat [tmpCurrent,inString(position)];
+        endif
+        position = position + 1;
+    endloop
+    return [position,[]];    
+endfunction
+
+// function used to process an individual array element or cell
+local function getArrayCell [position, inString]
+    local tmpCurrent, current;
+    local done = 0;
+    while position <= length inString loop
+        if (inString(position) == "]" and inString(position-1) <> "\\") then
+            done = 1;
+            return [position, cat first sread[tmpCurrent, '{G w=`, \t\n\f`}{t:}'], done];
+        elseif inString(position) == "," then
+            return [position, cat first sread[tmpCurrent, '{G w=`, \t\n\f`}{t:}'], done];
+        elseif inString(position) == "\"" then              // "
+            [position, tmpCurrent] = getString [position+1, inString];
+            return [position, token tmpCurrent, done];
+        else
+            tmpCurrent = cat [tmpCurrent, inString(position)];
+        endif
+        position = position + 1;
+    endloop
+    return [position,[], done];
+endfunction
+
+// function used to process an array of values/strings
+local function getArray [position, inString]
+    local tmpCurrent, current, done;
+    while position <= length inString loop
+        [position, tmpCurrent, done] = getArrayCell [position, inString];
+        current = cat [current, tmpCurrent];
+        if done then
+            return [position, current];
+        else
+            position = position + 1;
+        endif
+    endloop
+    return [position,[]];
+endfunction
+
+// function used to process either the key or value within the object.
+//      (note: this function will call back to getObject if new { is found in value);
+function getObject;
+local function getObjectCell [position, inString, isValue]
+    local tmpCurrent, current;
+    local done = 0;
+    while position <= length inString loop
+        if (inString(position) == "}" and inString(position-1) <> "\\") 
+            or (inString(position) == ",") or (inString(position) == ":") then
+            done = 1;
+            return [position, cat first sread[tmpCurrent, '{G w=`, \t\n\f`}{t:}'], done];
+        elseif inString(position) == "\"" then              // "
+            [position, tmpCurrent] = getString [position+1, inString];
+            return [position, token tmpCurrent, done];
+        elseif inString(position) == "[" then
+            [position, tmpCurrent] = getArray [position+1, inString];
+            return [position, tmpCurrent, done];
+        elseif inString(position) == "{" and isValue then
+            [position, tmpCurrent] = getObject [position+1, inString];
+            return [position, tmpCurrent, done];
+        else
+            tmpCurrent = cat [tmpCurrent, inString(position)];
+        endif
+        position = position + 1;
+    endloop
+    return [position,[], done];
+endfunction
+
+// function used to get an entire object at whatever level within the document.
+local function getObject [position, inString]
+    local object = [];
+    local myBraceCount;
+    braceCount = braceCount + 1;
+    myBraceCount = braceCount;
+    local tmpLeft, tmpRight, tmpCurrent;
+    local done = 0;
+    while position <= length inString loop
+        if (inString(position) == ":") and not isnull tmpLeft then
+            [position, tmpRight] = getObjectCell [position+1, inString, 1];
+            object.(tmpLeft) = tmpRight;
+        elseif isnull tmpLeft then
+            [position, tmpLeft] = getObjectCell [position, inString, 0];
+        endif
+        
+        if (inString(position) == "}" or inString(position) == ",")
+            and not isnull tmpLeft and not isnull tmpRight then
+            object.(tmpLeft) = tmpRight;
+            if inString(position) == "}" then
+                braceCount = braceCount - 1;
+            endif
+            //write ['IN THE IF: {}|{}|{}|{}|{}|{}\n',position,inString(position),(myBraceCount-1),braceCount,tmpLeft,tmpRight];
+            if (myBraceCount-1) == braceCount then
+                return [(position+1), object];              // move on to the next character and return otherwise it gets stuck
+            else
+                tmpLeft = [];
+                tmpRight = [];
+            endif
+        endif
+        position = position + 1;
+    endloop
+    return [position,[]];
+endfunction
+
+local function removecomma tmpString
+    if last tmpString == "," then
+        return droplast tmpString;
+    else
+        return tmpString;
+    endif
+endfunction
+
+local function sendObject [taggedVector]
+
+    local tmpTag;
+    local tmpString;
+            
+    tmpString = "{";
+    for tmpTag in tags taggedVector loop
+        if isflat taggedVector.(tmpTag) then
+            if isscalar taggedVector.(tmpTag) then
+                tmpString = cat [tmpString, swrite ['\"{}\": {},', tmpTag, convertType taggedVector.(tmpTag)]];
+            else
+                tmpString = cat [tmpString, swrite ['\"{}\" : [ {} ],', tmpTag, removecomma cat apt swrite ['{},', app convertType taggedVector.(tmpTag)] ]];
+            endif
+        else
+            tmpString = cat [tmpString, swrite ['\"{}\" : ', tmpTag]];
+            tmpString = cat [tmpString, sendObject [taggedVector.(tmpTag)]];
+        endif
+    endloop
+    return cat [removecomma tmpString,"},"];
+endfunction
+
+local function getBondConnections atoms
+    local atmA, atmB;
+    local atmListLen = length atoms;
+    local bondList = [];
+    atmA = 1;
+    atmB = 1;
+    while atmA <= atmListLen loop
+        atmB = atmA;
+        while atmB <= atmListLen loop
+            if bInteraction [ atoms(atmA), atoms(atmB) ] == 2 then
+                bondList = append [bondList, [atoms(atmA), atoms(atmB)]];
+            endif
+            atmB = atmB + 1;
+        endloop
+        atmA = atmA + 1;
+    endloop
+    return bondList;
+endfunction
+
+// GLOBAL FUNCTIONS
+
+// the qbParseJSON function takes the JSON string as input. Presumably the calling 
+//  function would have read in the file, generated it in some way. 
+//
+// the return value for the function is a tagged vector for the entire document.
+//      TODO : we are using tagged vectors but it is unknown how deep SVL supports. 
+global function qbReadJSONStream inOUTPUT
+    local inString = string inOUTPUT;
+
+    //  HACK WARNING!
+    // remove all carriage returns.
+    //  they are considered whitespace in JSON spec and they seem to confuse SVL/MOE
+    //  may as well just remove them and simplify the process.
+    local m_returns = apt strpos ["\n", inString];
+    inString = inString | not m_returns;
+
+    local position, tmpObject, object;
+    position = 1;
+    while position <= length inString loop
+        braceCount = 0;
+        if inString(position) == "{" or inString(position) == "," then
+            [position, tmpObject] = getObject [position+1, inString];
+            object = cat [object, tmpObject];
+        endif
+        position = position + 1;
+    endloop
+    
+    return object;
+endfunction
+
+global function qbWriteJSONStream taggedVector
+    local tmpString = removecomma sendObject [taggedVector];
+    fwrite ['test.txt', '{}\n', tmpString];
+    return tmpString;
+endfunction
+
+// returns a JSON-formated version of a vector of molecule object keys (atoms, residues, etc)
+global function json_Extract moeObjectKeys
+
+    local moe_mol = mol_Extract moeObjectKeys;
+    local psys = SystemPush [];
+    mol_Create moe_mol;
+    getBondConnections Atoms[];
+    local object;
+    
+    object.name = moe_mol (MOL_NAME);
+    object.chains.names = cName Chains[];
+    object.chains.nresidues = cResidueCount Chains[];
+    object.residues.names.('3letter') = rName Residues [];
+    object.residues.sequence = rUID Residues [];
+    object.residues.natoms = app length rAtoms Residues [];
+    object.atoms.ids = cat aName Atoms[];
+    object.atoms.elements.type = cat aElement Atoms[];
+    object.atoms.elements.number = cat aAtomicNumber Atoms[] ;
+    object.atoms.coords.('3d') = cat app aPos Atoms[];
+    object.atoms.('temperature factor') = cat aTempFactor Atoms[];
+    object.atoms.hybridization = cat aGeometry Atoms[];
+    object.atoms.('formal charge') = cat aFCharge Atoms[];
+    local allBonds = getBondConnections Atoms[];
+    object.bonds.connections.ids = cat aName allBonds;
+    object.bonds.connections.index = cat aNumber allBonds;
+    object.bonds.order = app bOrder allBonds;
+    object.properties.('total charge') = add aFCharge Atoms [];
+    SystemPop psys;
+    
+    return object;
+endfunction
+
+// returns a MOE object keys version of a JSON stream
+global function json_Create json
+
+    local mol;
+    local object = qbReadJSONStream json;
+    
+    if not isnull object.name then
+        mol(1)(MOL_NAME) = object.name;
+    else
+        mol(1)(MOL_NAME) = 'UNKNOWN';
+    endif
+    if not isnull object.chains.names then
+        mol(2)(MOL_CHAIN_NAME) = object.chains.names;
+    endif
+    if not isnull object.chains.nresidues then
+        mol(2)(MOL_CHAIN_NRES) = object.chains.nresidues;
+    endif
+    if not isnull object.residues.names.('3letter') then
+        mol(3)(MOL_RES_NAME) = object.residues.names.('3letter');
+    endif
+    if not isnull object.residues.sequence then
+        mol(3)(MOL_RES_UID) = object.residues.sequence;
+    endif
+    if not isnull object.residues.natoms then
+        mol(3)(MOL_RES_NATOMS) = object.residues.natoms;
+    endif
+    if not isnull object.atoms.elements.type then
+        mol(4)(MOL_ATOM_EL) = object.atoms.elements.type;
+    endif
+    if not isnull object.atoms.hybridization then
+        mol(4)(MOL_ATOM_GEOM) = object.atoms.hybridization;
+    endif
+    
+    return mol;
+endfunction
+
+// TEST code
+const inOUTPUT1 = 
+#token
+{
+  "chemical json": 0,
+  "name": "ethane",
+  "inchi": "1/C2H6/c1-2/h1-2H3",
+  "formula": "C 2 H 6",
+  "atoms": {
+    "elements": {
+      "number": [  1,   6,   1,   1,   6,   1,   1,   1 ]
+    },
+    "coords": {
+      "3d": [  1.185080, -0.003838,  0.987524,
+               0.751621, -0.022441, -0.020839,
+               1.166929,  0.833015, -0.569312,
+               1.115519, -0.932892, -0.514525,
+              -0.751587,  0.022496,  0.020891,
+              -1.166882, -0.833372,  0.568699,
+              -1.115691,  0.932608,  0.515082,
+              -1.184988,  0.004424, -0.987522 ]
+    }   
+  },
+  "bonds": {
+    "connections": {
+      "index": [ 0, 1,
+                 1, 2,
+                 1, 3,
+                 1, 4,
+                 4, 5,
+                 4, 6,
+                 4, 7 ]
+    },
+    "order": [ 1, 1, 1, 1, 1, 1, 1 ]
+  },
+  "properties": {
+    "molecular mass": 30.0690,
+    "melting point": -172,
+    "boiling point": -88
+  }
+}
+#;
+
+const inOUTPUT2 = 
+#token
+{"total-charge" : "0"}, {"formal-charge" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+0, 0, 0]}, {"hybridization" : ["sp3", "sp3", "sp3",
+"sp3", "sp3", "sp2", "sp2", "sp3", "sp3", "sp3", "sp3", "sp3", "sp3", "sp3",
+"sp3"]}
+#;
+
+global function JSONreadtest_WebService []
+    catch_errors[];
+    local object = qbReadJSONStream [inOUTPUT2];
+
+    write ['object: {} | {}\n', length object, object];
+    write ['untaged: {} | {}\n', first untag object];
+    write ['============\n'];
+    write ['total-charge: {} | {}\n', length object.('total-charge'), object.('total-charge')];
+    write ['formal-charge: {} | {}\n', length object.('formal-charge'),object.('formal-charge')];
+    write ['hybridization: {} | {}\n', length object.('hybridization'),object.('hybridization')];
+
+    local tmpString = qbWriteJSONStream object;
+    object = qbReadJSONStream[tmpString];
+
+    write ['object: {} | {}\n', length object, object];
+    write ['untaged: {} | {}\n', first untag object];
+    write ['============\n'];
+    write ['total-charge: {} | {}\n', length object.('total-charge'), object.('total-charge')];
+    write ['formal-charge: {} | {}\n', length object.('formal-charge'),object.('formal-charge')];
+    write ['hybridization: {} | {}\n', length object.('hybridization'),object.('hybridization')];
+
+endfunction
+
+global function JSONreadtest_ChemJSON []
+    catch_errors[];
+    local object = qbReadJSONStream [inOUTPUT1];
+    
+    write ['object: {} | {}\n', length object, object];
+    write ['untaged: {} | {}\n', first untag object];
+    write ['============\n'];
+    write ['chemical json: {} | {}\n', length object.('chemical json'), object.('chemical json')];
+    write ['name: {} | {}\n', length object.('name'),object.('name')];
+    write ['inchi: {} | {}\n', length object.('inchi'),object.('inchi')];
+    write ['formula: {} | {}\n', length object.('formula'), object.('formula')];
+    write ['atoms: {} | {}\n', length object.('atoms'),object.('atoms')];
+    write ['atoms.elements: {} | {}\n', length object.('atoms').('elements'), object.('atoms').('elements')];
+    write ['atoms.elements.number: {} | {}\n', length object.('atoms').('elements').('number'),object.('atoms').('elements').('number')];
+    write ['atoms.coords: {} | {}\n', length object.('atoms').('coords'), object.('atoms').('coords')];
+    write ['atoms.coords.3d: {} | {}\n', length object.('atoms').('coords').('3d'),object.('atoms').('coords').('3d')];
+    write ['bonds: {} | {}\n', length object.('bonds'),object.('bonds')];
+    write ['bonds.connections: {} | {}\n', length object.('bonds').('connections'),object.('bonds').('connections')];
+    write ['bonds.connections.index: {} | {}\n', length object.('bonds').('connections').('index'),object.('bonds').('connections').('index')];
+    write ['bonds.order: {} | {}\n', length object.('bonds').('order'),object.('bonds').('order')];
+    write ['properties: {} | {}\n', length object.('properties'),object.('properties')];
+    write ['properties.molecular mass: {} | {}\n', length object.('properties').('molecular mass'),object.('properties').('molecular mass')];
+    write ['properties.melting point: {} | {}\n', length object.('properties').('melting point'),object.('properties').('melting point')];
+    write ['properties.boiling point: {} | {}\n', length object.('properties').('boiling point'),object.('properties').('boiling point')];
+
+    local tmpString = qbWriteJSONStream object;
+    object = qbReadJSONStream[tmpString];
+
+    write ['object: {} | {}\n', length object, object];
+    write ['untaged: {} | {}\n', first untag object];
+    write ['============\n'];
+    write ['chemical json: {} | {}\n', length object.('chemical json'), object.('chemical json')];
+    write ['name: {} | {}\n', length object.('name'),object.('name')];
+    write ['inchi: {} | {}\n', length object.('inchi'),object.('inchi')];
+    write ['formula: {} | {}\n', length object.('formula'), object.('formula')];
+    write ['atoms: {} | {}\n', length object.('atoms'),object.('atoms')];
+    write ['atoms.elements: {} | {}\n', length object.('atoms').('elements'), object.('atoms').('elements')];
+    write ['atoms.elements.number: {} | {}\n', length object.('atoms').('elements').('number'),object.('atoms').('elements').('number')];
+    write ['atoms.coords: {} | {}\n', length object.('atoms').('coords'), object.('atoms').('coords')];
+    write ['atoms.coords.3d: {} | {}\n', length object.('atoms').('coords').('3d'),object.('atoms').('coords').('3d')];
+    write ['bonds: {} | {}\n', length object.('bonds'),object.('bonds')];
+    write ['bonds.connections: {} | {}\n', length object.('bonds').('connections'),object.('bonds').('connections')];
+    write ['bonds.connections.index: {} | {}\n', length object.('bonds').('connections').('index'),object.('bonds').('connections').('index')];
+    write ['bonds.order: {} | {}\n', length object.('bonds').('order'),object.('bonds').('order')];
+    write ['properties: {} | {}\n', length object.('properties'),object.('properties')];
+    write ['properties.molecular mass: {} | {}\n', length object.('properties').('molecular mass'),object.('properties').('molecular mass')];
+    write ['properties.melting point: {} | {}\n', length object.('properties').('melting point'),object.('properties').('melting point')];
+    write ['properties.boiling point: {} | {}\n', length object.('properties').('boiling point'),object.('properties').('boiling point')];
+    
+endfunction
+
+//  ==================================== Molecule JSON reading ========================================
+const FREAD_JSON_DEFAULTS = [];
+
+local function _json_open file
+    local fnum = [], exe_key = [];
+    if type file == 'num' then
+	fnum = file;
+    elseif orE (tolower fext file == ['gz','z','zip']) then
+	exe_key = exe_open_hidden tok_cat [
+	    MOE, '/bin-', MOE_ARCH, '/gzip.exe -dc ',
+	    '"', fabsname file, '"'
+	];
+	fnum = exe_stdout exe_key;
+    else
+	fnum = fopenr file;
+    endif
+    return [fnum, exe_key];
+endfunction
+
+local function _json_close [file, fnum, exe_key]
+    if anytrue exe_key then
+	if exe_status exe_key then
+	    freadb [fnum, 'line', INT_MAX];
+	endif
+	loop sleep 0.05; until not exe_status exe_key endloop
+	exe_close exe_key;
+    endif
+    if type file <> 'num' then
+	fclose fnum;
+    endif
+endfunction
+
+global function fread_JSON [file, opt]
+    opt = tagcat [opt, FREAD_JSON_DEFAULTS];
+
+    local [fnum, exe_key] = _json_open file;   // OPEN
+
+    _json_close [file, fnum, exe_key];	// CLOSE
+
+endfunction
+//  ==================================== Molecule JSON writing ========================================
+
