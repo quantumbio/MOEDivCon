@@ -163,7 +163,7 @@ local function removecomma tmpString
     endif
 endfunction
 
-local function sendObject [taggedVector]
+local function _Object2JSON [taggedVector]
 
     local tmpTag;
     local tmpString;
@@ -178,10 +178,14 @@ local function sendObject [taggedVector]
             endif
         else
             tmpString = cat [tmpString, swrite ['\"{}\" : ', tmpTag]];
-            tmpString = cat [tmpString, sendObject [taggedVector.(tmpTag)]];
+            tmpString = cat [tmpString, _Object2JSON [taggedVector.(tmpTag)]];
         endif
     endloop
     return cat [removecomma tmpString,"},"];
+endfunction
+
+local function Object2JSON [taggedVector]
+    return removecomma _Object2JSON [taggedVector];
 endfunction
 
 local function getBondConnections atoms
@@ -235,7 +239,7 @@ global function qbReadJSONStream inOUTPUT
 endfunction
 
 global function qbWriteJSONStream taggedVector
-    local tmpString = removecomma sendObject [taggedVector];
+    local tmpString = Object2JSON [taggedVector];
     fwrite ['test.txt', '{}\n', tmpString];
     return tmpString;
 endfunction
