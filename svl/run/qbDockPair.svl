@@ -1,0 +1,194 @@
+#svl
+
+//  USAGE:
+//      moebatch -run qbDockPair.svl -rec receptor.pdb -lig ligand.mol2 -conf conformers.sdf
+
+global argv;
+function ArgvPull;
+
+local function DockOptNew []
+
+    local opt = [
+        outrmsd: 1,
+        sel_ent_only_rec: 0,
+        sel_ent_only: 0,
+        wall: [ '', 0, [ 0, 0, 0 ], [ 1000000, 1000000, 1000000 ], 0 ],
+        csearch: 0,
+        confGenMethod: 'None',
+        ignoreMseq: 0,
+        retainData: [ 1, 0, 1, 1, 1, 1 ],
+        placement: 'Triangle Matcher',
+        placement_opt: [ timeout : 300,	nretpose : 10000 ],
+        scoring: 'London dG',
+        scoring_opt: [  ],
+        dup_placement: 1,
+        maxpose: 300,
+        refine: 'None',
+//        refine_opt: [ ed_map : 'Fo',	ed_f : 'Simulated',	ed_phi : 'Simulated',	ed_f2 : 'Simulated',	ed_path : '',	ed_res : 2.5,	ed_sfdata : [ [  ], [  ], [  ], 'Simulated', 'Simulated', 'Fo' ],	ed_surflevelD : 3,	inducedOptionBox : [ 1, 6, 'Tether', 10 ],	wholeres : 1,	cutoff : 6,	fixrec : 'Tether',	tether : 10,	packsidechains : 1,	OverrideSetup : 1,	mmgbvi : 1,	rigidlig : 1,	rigidPlanar : 0,	gtest : 0.01,	maxit : 500,	k_potl : 100,	roffset : 0.4 ],
+        refine_opt: [ fixrec : '', rigidlig : 1,	rigidPlanar : 0 ],
+
+        rescoring: 'GBVI/WSA dG',
+        rescoring_opt: [  ],
+        dup_refine: 1,
+        remaxpose: 5,
+        descexpr: '',
+        receptor_mfield: '',
+        ligand_mfield: 'mol',
+        rxnFile: '',
+        rxsite: [  ],
+        edsupport: 1,
+        ed_data: [ ed_dockpath : '' ],
+        check_pose_geom: [  ],
+        multiLigand: 0,
+        need_dmat: 1,
+        gen_plif: 1,
+        tempDB: '',
+//        ph4: ph4file,
+//        ligmdbname: ligmdbname,
+//        recmdbname: recmdbname,
+        BatchFile: 'dock_batch.svl'
+    ];
+
+    return opt;
+
+endfunction
+
+local function DockOpt []
+
+    local opt = [
+        outrmsd: 1,
+        sel_ent_only_rec: 0,
+        sel_ent_only: 0,
+        wall: [ '', 0, [ 0, 0, 0 ], [ 1000000, 1000000, 1000000 ], 0 ],
+        csearch: 1,
+        confGenMethod: 'None',
+        placement: 'Triangle Matcher',
+        placement_opt: [ timeout : 300,	nretpose : 1000 ],
+        scoring: 'London dG',
+        scoring_opt: [ train : 0 ],
+        dup_placement: 1,
+        maxpose: 100,
+        refine: 'None',
+        refine_opt: [ ed_map : 'Fo',	ed_f : 'Simulated',	ed_phi : 'Simulated',	ed_f2 : 'Simulated',	ed_path : '',	ed_res : 2.5,	ed_sfdata : [ [  ], [  ], [  ], 'Simulated', 'Simulated', 'Fo' ],	ed_surflevelD : 3,	cutoff : 6,	wholeres : 1,	mmgbvi : 1,	fixrec : 'Fix',	tether : 10,	gtest : 0.01,	maxit : 500,	OverrideSetup : 1,	k_potl : 100,	roffset : 0.4 ],
+        rescoring: 'GBVI/WSA dG',
+        rescoring_opt: [  ],
+        dup_refine: 1,
+        remaxpose: 30,
+        descexpr: '',
+        receptor_mfield: '',
+        ligand_mfield: '',
+        rxnFile: '',
+        rxsite: [  ],
+        edsupport: 1,
+        ed_data: [ ed_dockpath : '' ],
+        tempDB: '',
+//        ph4: ph4file,
+//        ligmdbname: ligmdbname,
+//        recmdbname: recmdbname,
+        BatchFile: 'dock_batch.svl'
+    ];
+
+    return opt;
+
+endfunction
+
+function db_ImportSD;
+function db_Sort;
+function db_Delete;
+function db_ExportSD;
+function DockAtoms;
+function DockFile;
+
+local function main []
+    ArgvReset ArgvExpand argv;
+    local [recfilename, ligfilename, conffilename, outf] = ArgvPull [ ['-rec', '-lig','-conf','-o'], 1 ];
+
+    if not isnull recfilename then
+        local rec = ReadAuto recfilename;
+        if isnull rec then
+            exit twrite ['Cannot read receptor file {}', recfilename];
+        endif
+    else
+        exit twrite ['Use -rec command line argument to provide an input file for RECEPTOR'];
+    endif
+    
+    if not isnull ligfilename then
+        local lig = ReadAuto ligfilename;
+        if isnull lig then
+            exit twrite ['Cannot read receptor file {}', ligfilename];
+        endif
+    else
+        exit twrite ['Use -lig command line argument to provide an input file for LIGAND'];
+    endif
+    
+    if not isnull conffilename then
+        local confmdbname = twrite ['{}.mdb',fbase conffilename];
+        db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
+        db_Sort [confmdbname,'Rank',1];
+        db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-5)]];
+        db_Sort [confmdbname,'Rank',0];
+    endif
+        
+    if isnull outf then
+        outf = 'dock.mdb';
+    else
+        outf = twrite ['{}.mdb',fbase outf];
+    endif;
+    
+    local opt = DockOptNew[];
+    
+    pot_Load '$MOE/lib/Amber10EHT.ff';
+
+	// Note that the following is the general potential set up only.
+	// Individual stages like refinement may use a modified set up.
+
+    pot_Setup [
+        strEnable: 1,
+        angEnable: 1,
+        stbEnable: 1,
+        oopEnable: 1,
+        torEnable: 1,
+        vdwEnable: 1,
+        eleEnable: 1,
+        solEnable: 0,
+        resEnable: 1,
+        strWeight: 1,
+        angWeight: 1,
+        stbWeight: 1,
+        oopWeight: 1,
+        torWeight: 1,
+        vdwWeight: 1,
+        eleWeight: 1,
+        solWeight: 1,
+        resWeight: 1,
+        cutoffEnable: 1,
+        cutoffOn: 8,
+        cutoffOff: 10,
+        eleDist: 2,
+        vdwScale14: 0.5,
+        vdwBuffer1: 0,
+        vdwBuffer2: 0,
+        eleScale14: 0.833333,
+        eleDielectric: 1,
+        eleBuffer: 0,
+        solDielectric: 80,
+        solDielectricOffset: 0,
+        state0: 1,
+        state1: 0,
+        state2: 1,
+        threadCount: 0
+    ];
+
+    local site = lig;
+
+    if not isnull confmdbname then
+        opt = tagcat [opt, [ligmdbname: confmdbname] ];
+        DockFile [cat oAtoms rec, cat oAtoms site, confmdbname, outf, opt];
+        db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];
+    else
+        DockAtoms [cat oAtoms rec, cat oAtoms site, cat oAtoms lig, outf, opt];
+    endif
+        
+    write ['Docking finished at {}.\n', asctime []];
+
+endfunction
