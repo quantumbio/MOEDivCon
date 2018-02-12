@@ -15,15 +15,15 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Vector;
 import javax.swing.tree.DefaultMutableTreeNode;
-import ncsa.hdf.object.Attribute;
-import ncsa.hdf.object.Datatype;
-import ncsa.hdf.object.FileFormat;
-import ncsa.hdf.object.HObject;
-import ncsa.hdf.object.h5.H5CompoundDS;
-import ncsa.hdf.object.h5.H5Datatype;
-import ncsa.hdf.object.h5.H5Group;
-import ncsa.hdf.object.h5.H5ScalarDS;
-import ncsa.hdf.object.h5.H5File;
+import hdf.object.Attribute;
+import hdf.object.Datatype;
+import hdf.object.FileFormat;
+import hdf.object.HObject;
+import hdf.object.h5.H5CompoundDS;
+import hdf.object.h5.H5Datatype;
+import hdf.object.h5.H5Group;
+import hdf.object.h5.H5ScalarDS;
+import hdf.object.h5.H5File;
 import svljava.SVLJava;
 import svljava.SVLJavaException;
 import svljava.SVLVar;
@@ -57,8 +57,8 @@ import javax.xml.bind.JAXBElement;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.transform.stream.StreamSource;
-import ncsa.hdf.hdf5lib.exceptions.HDF5Exception;
-import ncsa.hdf.object.Group;
+import hdf.hdf5lib.exceptions.HDF5Exception;
+import hdf.object.Group;
 
         
 /**
@@ -389,10 +389,10 @@ public class HDF5Correspondent extends Correspondent implements SVLJavaDriver {
         while(li.hasNext())
         {
             Object obj=li.next();
-            if(obj instanceof ncsa.hdf.object.h5.H5ScalarDS && ((ncsa.hdf.object.h5.H5ScalarDS)obj).getName().compareTo(target+".xml")==0)
+            if(obj instanceof hdf.object.h5.H5ScalarDS && ((hdf.object.h5.H5ScalarDS)obj).getName().compareTo(target+".xml")==0)
             {
                 documentExists=true;
-                ((ncsa.hdf.object.h5.H5ScalarDS)obj).write(new String[]{baos.toString()});
+                ((hdf.object.h5.H5ScalarDS)obj).write(new String[]{baos.toString()});
                 break;
             }
         }
@@ -1052,7 +1052,7 @@ private SVLVar retrieveScalars(SVLVar var) throws SVLJavaException, IOException,
         tags=new String[scalarRow.size()];
         for(int memberIndex=0;memberIndex<scalarRow.size();memberIndex++)
         {
-            ncsa.hdf.object.Attribute member=(ncsa.hdf.object.Attribute)scalarRow.get(memberIndex);
+            hdf.object.Attribute member=(hdf.object.Attribute)scalarRow.get(memberIndex);
             tags[memberIndex]=member.getName();
             System.out.println(member.getName()+" value class "+member.getValue().getClass().getName());
             scalars[memberIndex]=new SVLVar(((double[])member.getValue())[0]);
@@ -1310,12 +1310,12 @@ private SVLVar retrieveAtomByAtomPWD(SVLVar var) throws SVLJavaException, IOExce
                     while(li.hasNext())
                     {
                         Object obj=li.next();
-                        if(obj instanceof ncsa.hdf.object.Attribute && ((ncsa.hdf.object.Attribute)obj).getName().compareTo("Total Charge")==0)
+                        if(obj instanceof hdf.object.Attribute && ((hdf.object.Attribute)obj).getName().compareTo("Total Charge")==0)
                         {
 //                            ChargesType chargeType=new ChargesType();
 //                            TotalChargeType totalChargeType=new TotalChargeType();
 //                            chargeType.setTotalCharge(totalChargeType);
-//                            int[] tc=(int[])((ncsa.hdf.object.Attribute)obj).getValue();
+//                            int[] tc=(int[])((hdf.object.Attribute)obj).getValue();
                         }
                     }
     if(ligand.length()>0)
@@ -1652,12 +1652,12 @@ private SVLVar retrieveAtomByAtomDecomposition(SVLVar var) throws SVLJavaExcepti
 //                    while(li.hasNext())
 //                    {
 //                        Object obj=li.next();
-//                        if(obj instanceof ncsa.hdf.object.Attribute && ((ncsa.hdf.object.Attribute)obj).getName().compareTo("Total Charge")==0)
+//                        if(obj instanceof hdf.object.Attribute && ((hdf.object.Attribute)obj).getName().compareTo("Total Charge")==0)
 //                        {
 ////                            ChargesType chargeType=new ChargesType();
 ////                            TotalChargeType totalChargeType=new TotalChargeType();
 ////                            chargeType.setTotalCharge(totalChargeType);
-////                            int[] tc=(int[])((ncsa.hdf.object.Attribute)obj).getValue();
+////                            int[] tc=(int[])((hdf.object.Attribute)obj).getValue();
 //                        }
 //                    }
             List<HObject> ligandList=pwdGroup.getMemberList();
@@ -1997,12 +1997,12 @@ private SVLVar retrieveAtomByAtomMRM(SVLVar var) throws SVLJavaException, IOExce
                     while(li.hasNext())
                     {
                         Object obj=li.next();
-                        if(obj instanceof ncsa.hdf.object.Attribute && ((ncsa.hdf.object.Attribute)obj).getName().compareTo("Total Charge")==0)
+                        if(obj instanceof hdf.object.Attribute && ((hdf.object.Attribute)obj).getName().compareTo("Total Charge")==0)
                         {
 //                            ChargesType chargeType=new ChargesType();
 //                            TotalChargeType totalChargeType=new TotalChargeType();
 //                            chargeType.setTotalCharge(totalChargeType);
-//                            int[] tc=(int[])((ncsa.hdf.object.Attribute)obj).getValue();
+//                            int[] tc=(int[])((hdf.object.Attribute)obj).getValue();
                         }
                     }
     if(ligand.length()>0)
