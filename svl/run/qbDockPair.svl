@@ -99,9 +99,20 @@ function db_ExportSD;
 function DockAtoms;
 function DockFile;
 
+const DEFAULT_OPT = [
+    delwat : 0,
+    flexdock : 0
+];
+
 local function main []
     ArgvReset ArgvExpand argv;
-    local [recfilename, ligfilename, conffilename, outf] = ArgvPull [ ['-rec', '-lig','-conf','-o'], 1 ];
+    local [recfilename, ligfilename, conffilename, outf, delwat] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat'], [1,1,1,1,0] ];
+    write ['delwat: {}\n', delwat];
+    local inopt;
+    inopt.delwat = delwat;
+    inopt = tagcat [inopt, DEFAULT_OPT];
+    
+    write ['inopt: {}\n',inopt];
 
     if not isnull recfilename then
         local rec = ReadAuto recfilename;
@@ -125,7 +136,9 @@ local function main []
         local confmdbname = twrite ['{}.mdb',fbase conffilename];
         db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
         db_Sort [confmdbname,'Rank',1];
-        db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-5)]];
+        if (db_nEntries confmdbname) > 5 then
+            db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-5)]];
+        endif
         db_Sort [confmdbname,'Rank',0];
     endif
         
@@ -135,13 +148,19 @@ local function main []
         outf = twrite ['{}.mdb',fbase outf];
     endif;
     
+    if inopt.delwat then
+        write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING\n'];
+        oDestroy uniq cat aResidue _Atoms '$$solvent';
+    else
+        write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
+    endif
+    
     local opt = DockOptNew[];
     
     pot_Load '$MOE/lib/Amber10EHT.ff';
 
 	// Note that the following is the general potential set up only.
 	// Individual stages like refinement may use a modified set up.
-
     pot_Setup [
         strEnable: 1,
         angEnable: 1,
