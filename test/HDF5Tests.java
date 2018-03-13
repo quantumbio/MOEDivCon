@@ -19,7 +19,7 @@ import svljava.SVLVar;
 public class HDF5Tests {
     
          static {
-         System.loadLibrary("jhdf5");
+         System.loadLibrary("hdf5");
          }
     public HDF5Tests() {
     }

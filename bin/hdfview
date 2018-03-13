@@ -27,4 +27,4 @@ fi
 
 CLASSPATH=$QBHOME/$PLTFM_VER/lib/netcdf.jar:$QBHOME/$PLTFM_VER/lib/fits.jar:${CLASSPATH} ; export CLASSPATH
 
-java -Xmx${QBJVMXmx} -Djava.library.path=$LD_LIBRARY_PATH -classpath $CLASSPATH ncsa.hdf.view.HDFView -root $QBHOME $*
+java -Xmx${QBJVMXmx} -Djava.library.path=$LD_LIBRARY_PATH -classpath $CLASSPATH hdf.view.HDFView -root $QBHOME $*
