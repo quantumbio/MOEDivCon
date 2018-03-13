@@ -13,7 +13,7 @@ function Add_H;
 
 // between  ========= closely copy/paste from $MOE/lib/run/rism_run_ui.svl
 //   =========
-const SOLVENT_FILES_DIR = "$MOE/lib/rism/";
+const SOLVENT_FILES_DIR = "$MOE/opt/rism/";
 
 const RISM_CONVERGE = ['Loose','Medium','Tight'];
 const RISM_CONVERGE_MAP = [1e-5,1e-7,1e-9];
@@ -239,6 +239,8 @@ endfunction
 const WATER_RESIDUES = ['HOH','WAT','TIP','SOL','OH2','DOD','D20'];
 local function is_water_res v = indexof [v, WATER_RESIDUES];
 
+function _PrepareRISMOptions;
+
 global function qbPrepRISM[infname]
     local globalSystem = SystemPush [];
     oDestroy Chains[];
@@ -272,6 +274,18 @@ global function qbPrepRISM[infname]
     local wkey = [];
     local unused_atoms_nowat = diff [Atoms[],atoms];
     unused_atoms_nowat = unused_atoms_nowat | (not aInert unused_atoms_nowat);
+    // lmw - TODO: PrepareRISMOptions has become _PrepareRISMOptions on more modern MOE versions and so our old copy can be replaced.
+//    local [ fwrite_options, charging_method ] = PrepareRISMOptions 
+//    [
+//		wkey,
+//		vals,
+//		atoms,
+//		receptor,
+//		ligand,
+//		unused_atoms_nowat,
+//		RISM_OPTIONS_DEFAULT,
+//		SOLVENT_DEFAULTS
+//    ];
     local [ fwrite_options, charging_method ] = PrepareRISMOptions 
     [
 		wkey,
