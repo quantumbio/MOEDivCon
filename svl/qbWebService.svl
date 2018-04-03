@@ -4,9 +4,11 @@
 
 function qbParseJSON;
 
-const RCSB_URL = 'http://127.0.0.1:8080';
+// const QB_URL = 'http://localhost:8080';
+ const QB_URL = 'http://shadowfax.quantumbioinc.com:8080';
+// const QB_URL = 'http://shadowfax.quantumbioinc.com:8888';
 
-local function RCSB_post [rcsb_url, query]
+local function OLDRCSB_post [QB_URL, query]
 //    const POST_CONTENT = 'dodododod';
 //    query = tok_cat ["--dodododod
     local myproperties = [
@@ -276,10 +278,10 @@ END
 
 
 //    local url = url_open tok_cat [
-//	first cat [rcsb_url, RCSB_URL], '/qmechanic/perception'
+//	first cat [QB_URL, QB_URL], '/qmechanic/perception'
 //    ]; 
     local url = url_open [
-        url: tok_cat [first cat [rcsb_url, RCSB_URL], '/qmechanic/perception'],
+        url: tok_cat [first cat [QB_URL, QB_URL], '/qmechanic/perception'],
         properties : myproperties
     ]; 
     url_write  [url, string tok_cat [POST_CONTENT]];
@@ -289,53 +291,64 @@ END
 //    qbParseJSON[tmpJSON];
 endfunction
 
+function json_Create;
+function json_Extract;
+function qbWriteJSONStream;
 
-global function qbPostData mol
+global function qbTestPost []
 
-//    const POST_CONTENT = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    local query = 'lalalal';
+    const boundary_chars = "-_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    local boundary = sample [shuffle boundary_chars, 40];
+    local ctype = cat ["multipart/form-data; boundary=", boundary];
+    boundary = cat ["--", boundary]; // add two dashes by the standards
+    const CRLF = "\r\n";
     
-    RCSB_post[RCSB_URL,query];
+    local Instructions = cat [
+        boundary, CRLF,
+        "Content-Disposition: form-data; name=\"instructions\"", CRLF,
+        "Content-Type: text/plain", CRLF,
+        CRLF,
+        "{ \"options\": {\"scoretype\": \"endpoint\"}}", CRLF
+    ];
     
-//    local url = 'http://ec2-54-69-153-147.us-west-2.compute.amazonaws.com:8080/qmechanic/perception';
-//    local myurl = 'http://127.0.0.1:8080/qmechanic/perception';
-//    local myurl = 'http://127.0.0.1:8080/qmechanic/perception';
+    local TargetContent = cat [
+        boundary, CRLF,
+        "Content-Disposition: form-data; name=\"Target\"", CRLF,
+        "Content-Type: text/plain", CRLF,
+        CRLF,
+        string twrite ['{}',qbWriteJSONStream json_Extract diff [Atoms[], _Atoms '$$ligand']], CRLF
+    ];
     
-//    local startproperty = [
-        
- 
-//    local myproperties = [
-//            'Content-Disposition': "form-data; name=\"Instructions\"",
-//            'Content-Type': "text/plain"
-//        ];
-// write ['URL:        {}\n', myurl];
-// write ['properties: {}\n', myproperties];
-//    local sk = url_open 
-//        [
-//            url:    myurl
-//         ,   properties: myproperties
-//        ];
-//    url_write [sk, swrite ['{}', url_encode 'lalalla']];
-//    write ['POST: {}\n', string tok_cat [POST_CONTENT, query]];
-//    url_write [sk, string tok_cat [POST_CONTENT, query]];
-//    url_write [sk, 
+    local LigandContent = cat [
+        boundary, CRLF,
+        "Content-Disposition: form-data; name=\"Ligand\"", CRLF,
+        "Content-Type: text/plain", CRLF,
+        CRLF,
+        string twrite ['{}',qbWriteJSONStream json_Extract _Atoms '$$ligand'], CRLF    
+    ];
 
-//    url_write [sk, swrite ['{}', url_encode irequest]];
-//    local dat = url_read sk;
-//    url_close sk;
-//    if not length dat then return ''; endif
+    local POST_CONTENT = cat [
+        Instructions,
+        TargetContent,
+        LigandContent,
+        boundary, "--", CRLF
+    ];
 
-        // Check, if results are in HTML format like Error Pages.
-        // We will discrard them.
-
-//    if not indexof ["\n", dat] or strpos ["<html", tolower dat] then
-//        return '';
-//    endif
-
-//    return dat = app token fieldsplit [dat, "\n"];
-
-
+    local postlen = length string POST_CONTENT;
+    write ['size: {}\n', postlen];
+    
+    fwrite ['del-debug-POST.txt', '{}\n', POST_CONTENT];
+    local url = curl_open [
+        url: tok_cat [QB_URL, '/qmechanic/movabletype'],
+        infilesize: postlen,
+        httpheader: [ 'Transfer-Encoding: Chunked', 
+                 'TargetName: target.json',
+                 'LigandName: ligand.json']
+    ]; 
+    curl_write  [url, POST_CONTENT];
+    local tmpJSON = curl_read url;
+    write ['RETURN JSON: {}\n', tmpJSON];
 
 endfunction
 
-
+#eof

@@ -240,7 +240,7 @@ endfunction
 
 global function qbWriteJSONStream taggedVector
     local tmpString = Object2JSON [taggedVector];
-    fwrite ['test.txt', '{}\n', tmpString];
+    fwrite ['test.json', '{}\n', tmpString];
     return tmpString;
 endfunction
 
@@ -439,6 +439,7 @@ endfunction
 
 //  ==================================== Molecule JSON reading ========================================
 const FREAD_JSON_DEFAULTS = [];
+const FWRITE_JSON_DEFAULTS = [];
 
 local function _json_open file
     local fnum = [], exe_key = [];
@@ -478,4 +479,11 @@ global function fread_JSON [file, opt]
 
 endfunction
 //  ==================================== Molecule JSON writing ========================================
+
+global function fwrite_JSON [file,mol,opt]
+    opt = tagcat [opt, FWRITE_JSON_DEFAULTS];
+    local taggedVector = json_Extract mol;
+    local tmpString = Object2JSON [taggedVector];
+    fwrite [file, '{}\n', tmpString];
+endfunction
 
