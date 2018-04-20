@@ -47,7 +47,7 @@ global function dock_score_qbMTScore [cmd, arg, opt]
         ]
     ];
     if cmd === 'ID' then
-        return 'MTScore dG [QuantumBio]';
+        return 'MTScoreES dG [QuantumBio]';
     elseif cmd === 'configpanelwidgets' then
         write ['cmd: {}\n', cmd];
         return PANEL;
