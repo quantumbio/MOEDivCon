@@ -239,9 +239,7 @@ global function qbReadJSONStream inOUTPUT
 endfunction
 
 global function qbWriteJSONStream taggedVector
-    local tmpString = Object2JSON [taggedVector];
-    fwrite ['test.json', '{}\n', tmpString];
-    return tmpString;
+    return Object2JSON [taggedVector];
 endfunction
 
 // returns a JSON-formated version of a vector of molecule object keys (atoms, residues, etc)
