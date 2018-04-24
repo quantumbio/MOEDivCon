@@ -16,8 +16,8 @@ function qbWS_MTScore;
 local function ScoreMTScore_dG [recatoms, ligatoms, ff, rec]
     // This function is effectively a "wrapper" for the call to the MTScore webservice
     local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
-write ['tmpJSON: {} \n', tmpJSON];
-    return atof tmpJSON.('MTScore');
+// write ['tmpJSON: {} \n', tmpJSON];
+    return atof tmpJSON.('MTScoreES');
 endfunction
 
 global function dock_score_qbMTScore [cmd, arg, opt]
