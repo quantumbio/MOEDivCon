@@ -135,11 +135,11 @@ local function main []
     if not isnull conffilename then
         local confmdbname = twrite ['{}.mdb',fbase conffilename];
         db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
-        db_Sort [confmdbname,'Rank',1];
+        db_Sort [confmdbname,'BFIRank',1];
         if (db_nEntries confmdbname) > 5 then
             db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-5)]];
         endif
-        db_Sort [confmdbname,'Rank',0];
+        db_Sort [confmdbname,'BFIRank',0];
     endif
         
     if isnull outf then
