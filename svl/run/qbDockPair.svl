@@ -141,6 +141,8 @@ local function main []
         endif
         db_Sort [confmdbname,'BFIRank',0];
     endif
+    
+    db_RenameField [confmdbname,'BFIRank','mseq'];
         
     if isnull outf then
         outf = 'dock.mdb';
@@ -202,12 +204,19 @@ local function main []
 
     if not isnull confmdbname then
         opt = tagcat [opt, [ligmdbname: confmdbname] ];
+        write ['opt: {}\n',opt];
         DockFile [cat oAtoms rec, cat oAtoms site, confmdbname, outf, opt];
+        
+        // Copy the data from the old to the new
+//        if not anytrue (first db_Fields outf == 'BFIRank') then
+            db_RenameField [outf,'mseq','BFIRank'];
+//        endif
+
         db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];
     else
         DockAtoms [cat oAtoms rec, cat oAtoms site, cat oAtoms lig, outf, opt];
-    endif
-        
+    endif        
+
     write ['Docking finished at {}.\n', asctime []];
 
 endfunction
