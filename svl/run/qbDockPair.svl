@@ -141,8 +141,11 @@ local function main []
         endif
         db_Sort [confmdbname,'BFIRank',0];
     endif
-    
-    db_RenameField [confmdbname,'BFIRank','mseq'];
+
+    // For older versions of MOE - need to rename BFIRank to mseq so it can be used in MTCS calculation    
+    if MOE_VERSION < 2018 then
+        db_RenameField [confmdbname,'BFIRank','mseq'];
+    endif
         
     if isnull outf then
         outf = 'dock.mdb';
@@ -207,10 +210,10 @@ local function main []
         write ['opt: {}\n',opt];
         DockFile [cat oAtoms rec, cat oAtoms site, confmdbname, outf, opt];
         
-        // Copy the data from the old to the new
-//        if not anytrue (first db_Fields outf == 'BFIRank') then
+        // For older versions of MOE - need to rename mseq to BFIRank so it can be used in MTCS calculation
+        if MOE_VERSION < 2018 then
             db_RenameField [outf,'mseq','BFIRank'];
-//        endif
+        endif
 
         db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];
     else
