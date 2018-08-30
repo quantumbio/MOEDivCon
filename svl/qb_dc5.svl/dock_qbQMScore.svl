@@ -24,7 +24,7 @@
 
 #set class   'QuantumBio'
 #set version '2011.03'
-#set main    'dock_score_qbQMScore'
+#set main    'OLDdock_score_qbQMScore'
 
 function qb_TagCoreVals;
 function qb_TagQMSVals;
@@ -36,7 +36,7 @@ function qb_GetRecFields;
 function qb_GetPoseFields;
 function qb_SaveDivConStatus;
 
-global function dock_score_qbQMScore [cmd, arg, opt]
+global function OLDdock_score_qbQMScore [cmd, arg, opt]
 
     static wascalled, dbkey, posecount;
 
@@ -182,14 +182,14 @@ global function dock_score_qbQMScore [cmd, arg, opt]
 
 	// Should also address the following cmd's currently skipped because we don't need anything
     elseif cmd === 'openReceptor' then		// arg = rec
-	    dock_score_qbQMScore ['closeReceptor', arg, opt];
+	    OLDdock_score_qbQMScore ['closeReceptor', arg, opt];
 	return;
 
     elseif cmd === 'closeReceptor' then		// arg = rec
 	return;
 
     elseif cmd === 'openLigand' then		// arg = lig
-	    dock_score_qbQMScore ['closeLigand', arg, opt];
+	    OLDdock_score_qbQMScore ['closeLigand', arg, opt];
 	return;
 
     elseif cmd === 'closeLigand' then		// arg = lig

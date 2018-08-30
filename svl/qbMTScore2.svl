@@ -1,0 +1,98 @@
+#svl
+
+// ScoreMTScore_dG takes receptor atoms and ligand atoms and returns an 
+// estimate of the binding affinity using the MTScore dG. This is a one-shot 
+// calculation
+// FUNCTION : 	Calculate the MTScore score between recatoms and ligatoms
+// INPUT: 	recatoms = receptor atoms
+//		ligatoms = ligand atoms
+//		ff = options (1 = [fast]endpoint parameters,2 = [slower]endemble parameters)
+//		rec = if docking cached receptor energy terms.
+// RETURN:	MTScore score.
+// NOTE:	This function must be used within a private system.
+
+function qbWS_MTScore;
+
+local function ScoreMTScore_dG [recatoms, ligatoms, ff, rec]
+    // This function is effectively a "wrapper" for the call to the MTScore webservice
+    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
+// write ['tmpJSON: {} \n', tmpJSON];
+    return atof tmpJSON.('MTScoreES');
+endfunction
+
+global function dock_score_qbMTScore [cmd, arg, opt]
+    local ligpos = [], lig = [], rec=[], score;
+
+    const MTSCORE_OPT_DEFAULTS = [
+        ['mttyperdio',      'Endstate'         ]
+    ];
+    
+    const MTTYPES = [
+        'Endstate',
+        'Ensemble'
+    ];
+    const PANEL =   [
+        Vbox:   [
+            HBox:   [
+                name: 'mtbox', extendH: 1,
+                Mbox:   [
+                    columns: 2, columnMajor:1, name: 'calcbox', extendH: 1,
+                    Option: [
+                        name: 'mttyperdio', title: 'Type:', text: MTTYPES,
+                        type: 'char', minWidth: 8, bubbleHelp:
+                        ''
+                    ]
+                ]
+            ]
+        ]
+    ];
+    if cmd === 'ID' then
+        return 'MTScoreES dG [QuantumBio]';
+    elseif cmd === 'configpanelwidgets' then
+        write ['cmd: {}\n', cmd];
+        return PANEL;
+    elseif cmd === 'configpanelevent' then   // arg = [val, trig]
+        write ['cmd: {}\n', cmd];
+        local [val, trig, wkey] = arg;
+        return 0;
+    elseif cmd === 'configvals' then        // qrg = val
+        write ['cmd: {}\n', cmd];
+        arg = tagcat [arg, tag tr MTSCORE_OPT_DEFAULTS ];
+        return arg;
+    elseif cmd === 'openReceptor' then      // arg = rec
+        write ['cmd: {}\n', cmd];
+        return;
+    elseif cmd === 'closeReceptor' then     // arg = rec
+        write ['cmd: {}\n', cmd];
+        return;
+    elseif cmd === 'openLigand' then        // arg = lig
+        write ['cmd: {}\n', cmd];
+        return;
+    elseif cmd === 'closeLigand' then       // arg = lig
+        write ['cmd: {}\n', cmd];
+        return;
+    elseif not (cmd === 'score') then       // arg = [ligpos, lig, rec]
+        write ['cmd: {}\n', cmd];
+        return;
+    endif
+    
+    [ligpos, lig, rec] = arg;
+    
+    local [osys, nsys] = SystemPush [];
+    oDestroy Chains [];
+    
+    local recatoms = cat oAtoms mol_Create *rec.mol;
+    local ligatoms = cat oAtoms mol_Create *lig.mol;
+    aSetPos [ligatoms, ligpos];
+
+    score = ScoreMTScore_dG [recatoms, ligatoms];
+write ['score: {}\n', score];
+        
+    oDestroy Chains [];
+    SystemPop [osys, nsys];
+    
+    return score;
+endfunction
+
+
+#eof
