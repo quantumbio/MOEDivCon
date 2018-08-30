@@ -19,7 +19,7 @@ local function DockOptNew []
         csearch: 0,
         confGenMethod: 'None',
         ignoreMseq: 0,
-        retainData: [ 1, 0, 1, 1, 1, 1 ],
+	    retainData: [ 1, 0, 1, 1 ],
         placement: 'Triangle Matcher',
         scoring: 'London dG',
         scoring_opt: [  ],
