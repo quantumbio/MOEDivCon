@@ -5,8 +5,8 @@
 //  becomes unweildy, we could move these functions.
 
 // WS Server (to be set through dialog box)
-// const QB_URL = 'http://localhost:8080';
- const QB_URL = 'http://shadowfax.quantumbioinc.com:8080';
+ const QB_URL = 'http://localhost:8080';
+// const QB_URL = 'http://shadowfax.quantumbioinc.com:8080';
 // const QB_URL = 'http://shadowfax.quantumbioinc.com:8888';
 
 // WS spec
@@ -51,14 +51,14 @@ global function qbWS_MTScore [target_mol, ligand_mol, opt]
     local boundary = boundaryGen[];
     local ctype = cat ["multipart/form-data; boundary=", boundary];
     boundary = cat ["--", boundary]; // add two dashes by the standards
-    
+
     local Instructions = cat [
         "Content-Disposition: form-data; name=\"Instructions\"", CRLF,
         "Content-Type: text/plain", CRLF,
         CRLF,
         "{ \"options\": {\"scoretype\": \"endstate\"}}", CRLF
     ];
-    
+
     local POST_CONTENT = cat [
         boundary, CRLF,
         Instructions,
@@ -75,8 +75,11 @@ global function qbWS_MTScore [target_mol, ligand_mol, opt]
                  'TargetName: target.json',
                  'LigandName: ligand.json']
     ]; 
+
     curl_write  [url, POST_CONTENT];
+
     local tmpJSON = curl_read url;
+
 #if 0
     fwrite ['debug-WSPOST.txt', '{}\n', POST_CONTENT];
     fwrite ['debug-WSRETURN.txt','{}',tmpJSON];

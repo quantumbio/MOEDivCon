@@ -33,13 +33,13 @@ local function DockOptNew []
     // Limited OPT
         placement_opt: [ timeout : 300,	nretpose : 5000 ],
         maxpose: 100,
+        remaxpose: 5,
         refine: 'Rigid Receptor',
         refine_opt: [ fixrec : 'Fix',	ed_map : 'Fo',	ed_f : 'Simulated',	ed_phi : 'Simulated',	ed_f2 : 'Simulated',	ed_path : '',	ed_res : 2.5,	ed_sfdata : [ [  ], [  ], [  ], 'Simulated', 'Simulated', 'Fo' ],	ed_surflevelD : 3,	cutoff : 6,	wholeres : 1,	mmgbvi : 1,	packsidechains : 1,	rigidlig : 0,	rigidPlanar : 0,	tether : 10,	gtest : 0.01,	maxit : 500,	OverrideSetup : 1,	k_potl : 100,	roffset : 0.4 ],
 
         rescoring: 'GBVI/WSA dG',
         rescoring_opt: [  ],
         dup_refine: 1,
-        remaxpose: 5,
         descexpr: '',
         receptor_mfield: '',
         ligand_mfield: 'mol',
@@ -124,7 +124,7 @@ local function main []
     write ['inopt: {}\n',inopt];
 
     if not isnull recfilename then
-        local rec = ReadAuto recfilename;
+        local rec = cat cat cAtoms ReadAuto recfilename;
         if isnull rec then
             exit twrite ['Cannot read receptor file {}', recfilename];
         endif
@@ -133,14 +133,16 @@ local function main []
     endif
     
     if not isnull ligfilename then
-        local lig = ReadAuto ligfilename;
+        local lig = cat cat cAtoms ReadAuto ligfilename;
+        oReparent [diff [lig, first lig], aResidue first lig];  // MOE appears to need all lignad atoms in a single residue
         if isnull lig then
             exit twrite ['Cannot read receptor file {}', ligfilename];
         endif
     else
         exit twrite ['Use -lig command line argument to provide an input file for LIGAND'];
     endif
-    
+    write ['lig length {}\n', length lig];
+    write ['rec length {}\n', length rec];
     if not isnull conffilename then
         local confmdbname = twrite ['{}.mdb',fbase conffilename];
         db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
@@ -157,7 +159,8 @@ local function main []
     endif
         
     if isnull outf then
-        outf = 'dock.mdb';
+//        outf = 'dock.mdb';
+        outf = twrite ['{}_dock.mdb',fbase ligfilename];
     else
         outf = twrite ['{}.mdb',fbase outf];
     endif;
@@ -211,27 +214,33 @@ local function main []
         state2: 1,
         threadCount: 0
     ];
-
+    lig = lig | oValid lig;
+    rec = rec | oValid rec;
+    write ['lig length {}\n', length lig];
+    write ['rec length {}\n', length rec];
     local site = lig;
 
     if not isnull confmdbname then
-        opt = tagcat [opt, [ligmdbname: confmdbname] ];
+        opt = tagcat [ [ligmdbname: confmdbname], opt ];
         write ['opt: {}\n',opt];
-        DockFile [cat oAtoms rec, cat oAtoms site, confmdbname, outf, opt];
+        DockFile [rec, site, confmdbname, outf, opt];
         
         // For older versions of MOE - need to rename mseq to BFIRank so it can be used in MTCS calculation
         if MOE_VERSION < 2018 then
             db_RenameField [outf,'mseq','BFIRank'];
         endif
 
-        db_Sort [outf,'S',0];
-        db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];
-        
-        local mdbdata = db_Read [outf,first db_Entries outf];    
-        fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol]; 
     else
-        DockAtoms [cat oAtoms rec, cat oAtoms site, cat oAtoms lig, outf, opt];
+        opt = tagcat [ [remaxpose: 25], opt ];
+        write ['opt: {}\n',opt];
+        DockAtoms [ rec,  site,  lig, outf, opt];
     endif        
+
+    db_Sort [outf,'S',0];
+    db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];
+    
+    local mdbdata = db_Read [outf,first db_Entries outf];    
+    fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol]; 
 
     write ['Docking finished at {}.\n', asctime []];
 
