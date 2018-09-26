@@ -85,12 +85,12 @@ global function dock_score_qbMTScore [cmd, arg, opt]
     local ligatoms = cat oAtoms mol_Create *lig.mol;
     aSetPos [ligatoms, ligpos];
 
+local starttime = clock[];
     score = ScoreMTScore_dG [recatoms, ligatoms];
-write ['score: {}\n', score];
+write ['MTScoreES (dG): {} kcal/mol in {} secs\n', score, (clock[] - starttime)];
         
     oDestroy Chains [];
     SystemPop [osys, nsys];
-    
     return score;
 endfunction
 
