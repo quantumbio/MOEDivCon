@@ -9,7 +9,7 @@ function fwrite_TriposMOL2;
 function mol_Create;
 
 
-local function DockOptNew []
+local function DockOpt []
 
     local opt = [
         outrmsd: 1,
@@ -32,11 +32,32 @@ local function DockOptNew []
 //        refine_opt: [ fixrec : '', rigidlig : 1,	rigidPlanar : 0 ],
     // Limited OPT
         placement_opt: [ timeout : 300,	nretpose : 5000 ],
-        maxpose: 100,
+        maxpose: 50,
         remaxpose: 5,
         refine: 'Rigid Receptor',
-        refine_opt: [ fixrec : 'Fix',	ed_map : 'Fo',	ed_f : 'Simulated',	ed_phi : 'Simulated',	ed_f2 : 'Simulated',	ed_path : '',	ed_res : 2.5,	ed_sfdata : [ [  ], [  ], [  ], 'Simulated', 'Simulated', 'Fo' ],	ed_surflevelD : 3,	cutoff : 6,	wholeres : 1,	mmgbvi : 1,	packsidechains : 1,	rigidlig : 0,	rigidPlanar : 0,	tether : 10,	gtest : 0.01,	maxit : 500,	OverrideSetup : 1,	k_potl : 100,	roffset : 0.4 ],
-
+        refine_opt: [ 
+            fixrec : 'Fix',	
+            ed_map : 'Fo',	
+            ed_f : 'Simulated',	
+            ed_phi : 'Simulated',	
+            ed_f2 : 'Simulated',	
+            ed_path : '',	
+            ed_res : 2.5,	
+            ed_sfdata : [ [  ], [  ], [  ], 'Simulated', 'Simulated', 'Fo' ],	
+            ed_surflevelD : 3,	
+            cutoff : 6,	
+            wholeres : 1,	
+            mmgbvi : 1,	
+            packsidechains : 1,	
+            rigidlig : 0,	
+            rigidPlanar : 0,	
+            tether : 10,	
+            gtest : 0.01,	
+            maxit : 500,	
+            OverrideSetup : 1,	
+            k_potl : 100,	
+            roffset : 0.4 
+        ],
         rescoring: 'GBVI/WSA dG',
         rescoring_opt: [  ],
         dup_refine: 1,
@@ -62,45 +83,6 @@ local function DockOptNew []
 
 endfunction
 
-local function DockOpt []
-
-    local opt = [
-        outrmsd: 1,
-        sel_ent_only_rec: 0,
-        sel_ent_only: 0,
-        wall: [ '', 0, [ 0, 0, 0 ], [ 1000000, 1000000, 1000000 ], 0 ],
-        csearch: 1,
-        confGenMethod: 'None',
-        placement: 'Triangle Matcher',
-        placement_opt: [ timeout : 300,	nretpose : 1000 ],
-        scoring: 'London dG',
-        scoring_opt: [ train : 0 ],
-        dup_placement: 1,
-        maxpose: 100,
-        refine: 'None',
-        refine_opt: [ ed_map : 'Fo',	ed_f : 'Simulated',	ed_phi : 'Simulated',	ed_f2 : 'Simulated',	ed_path : '',	ed_res : 2.5,	ed_sfdata : [ [  ], [  ], [  ], 'Simulated', 'Simulated', 'Fo' ],	ed_surflevelD : 3,	cutoff : 6,	wholeres : 1,	mmgbvi : 1,	fixrec : 'Fix',	tether : 10,	gtest : 0.01,	maxit : 500,	OverrideSetup : 1,	k_potl : 100,	roffset : 0.4 ],
-        rescoring: 'GBVI/WSA dG',
-        rescoring_opt: [  ],
-        dup_refine: 1,
-        remaxpose: 30,
-        descexpr: '',
-        receptor_mfield: '',
-        ligand_mfield: '',
-        rxnFile: '',
-        rxsite: [  ],
-        edsupport: 1,
-        ed_data: [ ed_dockpath : '' ],
-        tempDB: '',
-//        ph4: ph4file,
-//        ligmdbname: ligmdbname,
-//        recmdbname: recmdbname,
-        BatchFile: 'dock_batch.svl'
-    ];
-
-    return opt;
-
-endfunction
-
 function db_ImportSD;
 function db_Sort;
 function db_Delete;
@@ -109,16 +91,18 @@ function DockAtoms;
 function DockFile;
 
 const DEFAULT_OPT = [
-    delwat : 0,
-    flexdock : 0
+    delwat      : 0,
+    mtscorees   : 0,
+    optpos      : 50,
+    flexdock    : 0
 ];
 
 local function main []
     ArgvReset ArgvExpand argv;
-    local [recfilename, ligfilename, conffilename, outf, delwat] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat'], [1,1,1,1,0] ];
-    write ['delwat: {}\n', delwat];
+    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-optpos'], [1,1,1,1,0,0,1] ];
     local inopt;
     inopt.delwat = delwat;
+    inopt.mtscorees = mtscorees;
     inopt = tagcat [inopt, DEFAULT_OPT];
     
     write ['inopt: {}\n',inopt];
@@ -141,8 +125,7 @@ local function main []
     else
         exit twrite ['Use -lig command line argument to provide an input file for LIGAND'];
     endif
-    write ['lig length {}\n', length lig];
-    write ['rec length {}\n', length rec];
+
     if not isnull conffilename then
         local confmdbname = twrite ['{}.mdb',fbase conffilename];
         db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
@@ -159,7 +142,6 @@ local function main []
     endif
         
     if isnull outf then
-//        outf = 'dock.mdb';
         outf = twrite ['{}_dock.mdb',fbase ligfilename];
     else
         outf = twrite ['{}.mdb',fbase outf];
@@ -172,7 +154,12 @@ local function main []
         write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
     endif
     
-    local opt = DockOptNew[];
+    local opt = DockOpt[];
+
+    if mtscorees then
+        opt = tagcat [ [rescoring: 'MTScoreES dG [QuantumBio]'], opt ];
+    endif
+    write ['NOTE: RUNNING {} as MOE/Dock Final Scoring Function\n', opt.rescoring];
     
     pot_Load '$MOE/lib/Amber10EHT.ff';
 
@@ -216,8 +203,6 @@ local function main []
     ];
     lig = lig | oValid lig;
     rec = rec | oValid rec;
-    write ['lig length {}\n', length lig];
-    write ['rec length {}\n', length rec];
     local site = lig;
 
     if not isnull confmdbname then
