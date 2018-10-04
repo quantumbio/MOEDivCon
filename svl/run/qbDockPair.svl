@@ -91,18 +91,22 @@ function DockAtoms;
 function DockFile;
 
 const DEFAULT_OPT = [
-    delwat      : 0,
-    mtscorees   : 0,
-    optpos      : 50,
-    flexdock    : 0
+    delwat      : 0,    // Delete waters prior to performing docking/placement
+    mtscorees   : 0,    // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
+    mtcsconf    : 5,    // Number of MTCS conformers to use (these are the best X conformers according to BFintensity).
+    optpos      : 50,   // Number of poses to optimize (per posed conformer) prior to final score
+    remaxpose   : 5     // Max number of poses to return per conformer
 ];
 
 local function main []
-    ArgvReset ArgvExpand argv;
-    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-optpos'], [1,1,1,1,0,0,1] ];
     local inopt;
+    ArgvReset ArgvExpand argv;
+    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, optpos, mtcsconf,remaxpose] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-optpos','-mtcsconf', '-remaxpose'], [1,1,1,1,0,0,1,1,1] ];
     inopt.delwat = delwat;
     inopt.mtscorees = mtscorees;
+    inopt.optpos = atoi optpos;
+    inopt.mtcsconf = atoi mtcsconf;
+    inopt.remaxpose = atoi remaxpose;
     inopt = tagcat [inopt, DEFAULT_OPT];
     
     write ['inopt: {}\n',inopt];
@@ -130,7 +134,7 @@ local function main []
         local confmdbname = twrite ['{}.mdb',fbase conffilename];
         db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
         db_Sort [confmdbname,'BFIRank',1];
-        if (db_nEntries confmdbname) > 5 then
+        if (db_nEntries confmdbname) > inopt.mtcsconf then
             db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-5)]];
         endif
         db_Sort [confmdbname,'BFIRank',0];
@@ -160,6 +164,7 @@ local function main []
         opt = tagcat [ [rescoring: 'MTScoreES dG [QuantumBio]'], opt ];
     endif
     write ['NOTE: RUNNING {} as MOE/Dock Final Scoring Function\n', opt.rescoring];
+    opt = tagcat [ [maxpose: inopt.optpos], opt ];
     
     pot_Load '$MOE/lib/Amber10EHT.ff';
 
@@ -219,7 +224,7 @@ local function main []
         opt = tagcat [ [remaxpose: 25], opt ];
         write ['opt: {}\n',opt];
         DockAtoms [ rec,  site,  lig, outf, opt];
-    endif        
+    endif
 
     db_Sort [outf,'S',0];
     db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];
