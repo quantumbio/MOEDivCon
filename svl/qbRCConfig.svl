@@ -1,0 +1,63 @@
+/*
+Add to $MOE/menu/menu_Template
+
+MENU APPEND "Main:Options"
+    "Template" exec "OptionsWindow 'Template'"
+ENDMENU
+
+
+
+*/
+const DEFAULT = [
+
+	field1:'1',
+	field2:2,
+	field3:'3'
+
+];
+//------------------------------------------------------------------------------
+// function RCConfig_info_Template
+//    - Configuration panel for the Template
+//------------------------------------------------------------------------------
+    
+global function RCConfig_info_Template [] = [
+    'Template',
+    [
+    ['field1',        'char',        DEFAULT.field1],
+    ['field2',            'num',        DEFAULT.field2],
+    ['field3',            'char',        DEFAULT.field3]
+    ],
+    [
+    Vbox: [
+        extendH: 1,
+        Text:[
+        name: 'field1', title: 'Field 1:',
+        type: 'char', len: 30,
+        bubbleHelp:
+            'This is the first field'
+        ],
+        Text:[
+        name: 'field2', title: 'Field 2:',
+        type: 'real', len: 5,
+        bubbleHelp:
+            'This is the second field'
+        ],
+        Text:[
+        name: 'field3', title: 'Field 3:',
+        type: 'char', len: 30,
+        bubbleHelp:
+            'This is the third field'
+        ]
+    ]
+    ]
+];
+
+
+//------------------------------------------------------------------------------
+// function RCConfig_trigger_Tempalte
+//    - needs to be there to write to moe-rc
+//------------------------------------------------------------------------------
+
+global function RCConfig_trigger_Template [wkey, trigger, value]
+
+endfunction
