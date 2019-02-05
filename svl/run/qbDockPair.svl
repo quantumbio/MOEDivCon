@@ -18,7 +18,7 @@ local function DockOpt []
         csearch: 0,
         confGenMethod: 'None',
         ignoreMseq: 0,
-	    retainData: [ 1, 0, 1, 1 ],
+//	    retainData: [ 1, 0, 1, 1],
         placement: 'Triangle Matcher',
         scoring: 'London dG',
         scoring_opt: [  ],
@@ -131,6 +131,8 @@ local function main []
         exit twrite ['Use -lig command line argument to provide an input file for LIGAND'];
     endif
 
+    local opt = DockOpt[];
+
     if not isnull conffilename then
         local confmdbname = twrite ['{}.mdb',fbase conffilename];
         db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
@@ -139,6 +141,7 @@ local function main []
             db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-5)]];
         endif
         db_Sort [confmdbname,'BFIRank',0];
+        opt.retainData = not (first db_Fields confmdbname == 'mol');
     endif
 
     // For older versions of MOE - need to rename BFIRank to mseq so it can be used in MTCS calculation    
@@ -159,8 +162,6 @@ local function main []
         write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
     endif
     
-    local opt = DockOpt[];
-
     if mtscorees then
         opt = tagcat [ [rescoring: 'MTScoreES dG [QuantumBio]'], opt ];
     endif
@@ -213,7 +214,6 @@ local function main []
 
     if not isnull confmdbname then
         opt = tagcat [ [ligmdbname: confmdbname], opt ];
-        write ['opt: {}\n',opt];
         DockFile [rec, site, confmdbname, outf, opt];
         
         // For older versions of MOE - need to rename mseq to BFIRank so it can be used in MTCS calculation
