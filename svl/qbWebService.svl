@@ -5,8 +5,8 @@
 //  becomes unweildy, we could move these functions.
 
 // WS Server (to be set through dialog box)
-// const QB_URL = 'http://localhost:8080';
-const QB_URL = 'http://shadowfax.quantumbioinc.com:8080';
+const QB_URL = 'http://localhost:8080';
+// const QB_URL = 'http://shadowfax.quantumbioinc.com:8080';
 // const QB_URL = 'http://shadowfax.quantumbioinc.com:8888';
 
 // WS spec
@@ -80,7 +80,7 @@ global function qbWS_MTScore [target_mol, ligand_mol, opt]
 
     local tmpJSON = curl_read url;
     curl_close url;
-#if 0
+#if 1
     fwrite ['debug-WSPOST.txt', '{}\n', POST_CONTENT];
     fwrite ['debug-WSRETURN.txt','{}',tmpJSON];
 #endif
@@ -103,7 +103,7 @@ global function qbMTScoreFile [targetfile,ligandfile]
     
 //    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
     local tmpJSON = qbWS_MTScore [targetobj,ligandobj];
-    write ['{} {} {}  | {} sec\n', tmpJSON.('MTScore'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
+    write ['{} {} {}  | {} sec\n', tmpJSON.('MTScoreES'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
 //    write ['MTScore: {} : {} | {} {} {}  | {} sec\n', fbase ftail targetfile, fbase ftail ligandfile, tmpJSON.('MTScore'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
 
     SystemPop pdata;
