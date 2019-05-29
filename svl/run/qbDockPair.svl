@@ -135,7 +135,12 @@ local function main []
 
     if not isnull conffilename then
         local confmdbname = twrite ['{}.mdb',fbase conffilename];
-        db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
+//        db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
+        db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol',
+            ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
+            ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
+            ['double','int','double','double','double','double']        
+        ];
         db_Sort [confmdbname,'BFIRank',1];
         if (db_nEntries confmdbname) > inopt.mtcsconf then
             db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-5)]];
