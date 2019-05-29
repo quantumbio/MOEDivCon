@@ -8,7 +8,6 @@ function ArgvPull;
 function fwrite_TriposMOL2;
 function mol_Create;
 
-
 local function DockOpt []
 
     local opt = [
@@ -19,7 +18,7 @@ local function DockOpt []
         csearch: 0,
         confGenMethod: 'None',
         ignoreMseq: 0,
-	    retainData: [ 1, 0, 1, 1 ],
+//	    retainData: [ 1, 0, 1, 1],
         placement: 'Triangle Matcher',
         scoring: 'London dG',
         scoring_opt: [  ],
@@ -94,17 +93,19 @@ const DEFAULT_OPT = [
     delwat      : 0,    // Delete waters prior to performing docking/placement
     mtscorees   : 0,    // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
     mtcsconf    : 5,    // Number of MTCS conformers to use (these are the best X conformers according to BFintensity).
-    optpos      : 50,   // Number of poses to optimize (per posed conformer) prior to final score
-    remaxpose   : 5     // Max number of poses to return per conformer
+    maxpose     : 50,   // Number of poses to optimize (per posed conformer) prior to final score
+    remaxpose   : 5     // Max number of poses to return per conformer (after optimization)
 ];
 
 local function main []
+    local startcputime = cpuclock[];
+    local starttime = clock[];
     local inopt;
     ArgvReset ArgvExpand argv;
-    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, optpos, mtcsconf,remaxpose] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-optpos','-mtcsconf', '-remaxpose'], [1,1,1,1,0,0,1,1,1] ];
+    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose'], [1,1,1,1,0,0,1,1,1] ];
     inopt.delwat = delwat;
     inopt.mtscorees = mtscorees;
-    inopt.optpos = atoi optpos;
+    inopt.maxpose = atoi maxpose;
     inopt.mtcsconf = atoi mtcsconf;
     inopt.remaxpose = atoi remaxpose;
     inopt = tagcat [inopt, DEFAULT_OPT];
@@ -130,14 +131,22 @@ local function main []
         exit twrite ['Use -lig command line argument to provide an input file for LIGAND'];
     endif
 
+    local opt = DockOpt[];
+
     if not isnull conffilename then
         local confmdbname = twrite ['{}.mdb',fbase conffilename];
-        db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
+//        db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
+        db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol',
+            ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
+            ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
+            ['double','int','double','double','double','double']        
+        ];
         db_Sort [confmdbname,'BFIRank',1];
         if (db_nEntries confmdbname) > inopt.mtcsconf then
             db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-5)]];
         endif
         db_Sort [confmdbname,'BFIRank',0];
+        opt.retainData = not (first db_Fields confmdbname == 'mol');
     endif
 
     // For older versions of MOE - need to rename BFIRank to mseq so it can be used in MTCS calculation    
@@ -158,13 +167,11 @@ local function main []
         write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
     endif
     
-    local opt = DockOpt[];
-
     if mtscorees then
         opt = tagcat [ [rescoring: 'MTScoreES dG [QuantumBio]'], opt ];
     endif
     write ['NOTE: RUNNING {} as MOE/Dock Final Scoring Function\n', opt.rescoring];
-    opt = tagcat [ [maxpose: inopt.optpos], opt ];
+    opt = tagcat [ [maxpose: inopt.maxpose], opt ];
     
     pot_Load '$MOE/lib/Amber10EHT.ff';
 
@@ -212,7 +219,6 @@ local function main []
 
     if not isnull confmdbname then
         opt = tagcat [ [ligmdbname: confmdbname], opt ];
-        write ['opt: {}\n',opt];
         DockFile [rec, site, confmdbname, outf, opt];
         
         // For older versions of MOE - need to rename mseq to BFIRank so it can be used in MTCS calculation
@@ -232,7 +238,7 @@ local function main []
     local mdbdata = db_Read [outf,first db_Entries outf];    
     fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol]; 
 
-    write ['Docking finished at {}.\n', asctime []];
+    write ['Docking finished in {} seconds & {} CPUseconds.\n', starttime-clock[], startcputime-cpuclock[] ];
 
 endfunction
 
