@@ -5,7 +5,7 @@
 //  becomes unweildy, we could move these functions.
 
 // WS Server (to be set through dialog box)
-const QB_URL = 'http://localhost:8080';
+// const QB_URL = 'http://localhost:8080';
 // const QB_URL = 'http://shadowfax.quantumbioinc.com:8080';
 // const QB_URL = 'http://shadowfax.quantumbioinc.com:8888';
 
@@ -68,7 +68,12 @@ global function qbWS_MTScore [target_mol, ligand_mol, opt]
         getLigandChunk ligand_mol,
         boundary, "--", CRLF    
     ];
-
+    
+    local QB_URL=twrite ['https://{}:{}',
+        GetRC ['qbWSHostname','localhost'],
+        GetRCNumber ['qbWSPort',8080]
+    ];
+    
     local url = curl_open [
         url: tok_cat [QB_URL, '/qmechanic/movabletype'],
         httpheader: [ 'Transfer-Encoding: Chunked', 
