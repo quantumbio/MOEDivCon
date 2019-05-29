@@ -31,53 +31,56 @@ global function dock_score_qbMTScore [cmd, arg, opt]
         'Endstate',
         'Ensemble'
     ];
-    const PANEL =   [
-        Vbox:   [
-            HBox:   [
-                name: 'mtbox', extendH: 1,
-                Mbox:   [
-                    columns: 2, columnMajor:1, name: 'calcbox', extendH: 1,
-                    Option: [
-                        name: 'mttyperdio', title: 'Type:', text: MTTYPES,
-                        type: 'char', minWidth: 8, bubbleHelp:
-                        ''
-                    ]
-                ]
+
+    local DEFAULTS = [
+        qbWSHostname: GetRC ['qbWSHostname','localhost'],
+        qbWSPort:     GetRCNumber ['qbWSPort',8080]
+    ];
+    
+    const PANEL = [
+        Mbox : [
+            Text : [
+                title: 'Hostname:', name: 'qbWSHostname', type: 'char',
+                shortcut: ['localhost'],
+                bubbleHelp: 'Enter hostname (default: localhost).'
+            ],
+                Text : [
+                title: 'Port:', name: 'qbWSPort', type: 'int',
+                shortcut: ['8080','8081','8082'],
+                bubbleHelp: 'Enter the port number (default: 8080).'
             ]
         ]
     ];
+    
+    write ['DEBUG: cmd: {} | arg: {}\n', cmd, arg];
+
     if cmd === 'ID' then
         return 'MTScoreES dG [QuantumBio]';
     elseif cmd === 'configpanelwidgets' then
-        write ['cmd: {}\n', cmd];
         return PANEL;
     elseif cmd === 'configpanelevent' then   // arg = [val, trig]
-        write ['cmd: {}\n', cmd];
         local [val, trig, wkey] = arg;
         return 0;
-    elseif cmd === 'configvals' then        // qrg = val
-        write ['cmd: {}\n', cmd];
-        arg = tagcat [arg, tag tr MTSCORE_OPT_DEFAULTS ];
-        return arg;
+    elseif cmd === 'configvalues' then        // qrg = val
+        return tagcat [arg, DEFAULTS];
     elseif cmd === 'openReceptor' then      // arg = rec
-        write ['cmd: {}\n', cmd];
         return;
     elseif cmd === 'closeReceptor' then     // arg = rec
-        write ['cmd: {}\n', cmd];
         return;
     elseif cmd === 'openLigand' then        // arg = lig
-        write ['cmd: {}\n', cmd];
         return;
     elseif cmd === 'closeLigand' then       // arg = lig
-        write ['cmd: {}\n', cmd];
         return;
     elseif not (cmd === 'score') then       // arg = [ligpos, lig, rec]
-        write ['cmd: {}\n', cmd];
         return;
     endif
     
     [ligpos, lig, rec] = arg;
     
+    opt = tagcat [opt, DEFAULTS];
+    SetRC ['qbWSHostname',opt.qbWSHostname];
+    SetRCNumber ['qbWSPort',opt.qbWSPort];
+
     local [osys, nsys] = SystemPush [];
     oDestroy Chains [];
     
