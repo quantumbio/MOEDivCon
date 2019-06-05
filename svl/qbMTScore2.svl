@@ -15,7 +15,8 @@ function qbWS_MTScore;
 
 local function ScoreMTScore_dG [recatoms, ligatoms, ff, rec]
     // This function is effectively a "wrapper" for the call to the MTScore webservice
-    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
+//    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
+    local tmpJSON = qbWS_MTScore [recatoms,ligatoms];
 // write ['tmpJSON: {} \n', tmpJSON];
     return atof tmpJSON.('MTScoreES');
 endfunction
@@ -52,7 +53,7 @@ global function dock_score_qbMTScore [cmd, arg, opt]
         ]
     ];
     
-    write ['DEBUG: cmd: {} | arg: {}\n', cmd, arg];
+//    write ['DEBUG: cmd: {} | arg: {}\n', cmd, arg];
 
     if cmd === 'ID' then
         return 'MTScoreES dG [QuantumBio]';
@@ -61,8 +62,13 @@ global function dock_score_qbMTScore [cmd, arg, opt]
     elseif cmd === 'configpanelevent' then   // arg = [val, trig]
         local [val, trig, wkey] = arg;
         return 0;
-    elseif cmd === 'configvalues' then        // qrg = val
+    elseif cmd === 'configvalues' then        // arg = val
         return tagcat [arg, DEFAULTS];
+    elseif cmd === 'validateOptions' then        // arg = val
+        SetRC ['qbWSHostname',arg.qbWSHostname];
+        SetRCNumber ['qbWSPort',arg.qbWSPort];
+//        write ['RC: {} | {}\n', arg.qbWSHostname, arg.qbWSPort];
+        return;
     elseif cmd === 'openReceptor' then      // arg = rec
         return;
     elseif cmd === 'closeReceptor' then     // arg = rec
@@ -76,10 +82,9 @@ global function dock_score_qbMTScore [cmd, arg, opt]
     endif
     
     [ligpos, lig, rec] = arg;
-    
-    opt = tagcat [opt, DEFAULTS];
     SetRC ['qbWSHostname',opt.qbWSHostname];
     SetRCNumber ['qbWSPort',opt.qbWSPort];
+    opt = tagcat [opt, DEFAULTS];
 
     local [osys, nsys] = SystemPush [];
     oDestroy Chains [];
@@ -88,13 +93,47 @@ global function dock_score_qbMTScore [cmd, arg, opt]
     local ligatoms = cat oAtoms mol_Create *lig.mol;
     aSetPos [ligatoms, ligpos];
 
-local starttime = clock[];
+    local starttime = clock[];
     score = ScoreMTScore_dG [recatoms, ligatoms];
-write ['MTScoreES (dG): {} kcal/mol in {} secs\n', score, (clock[] - starttime)];
+    write ['MTScoreES (dG): {} kcal/mol in {} secs\n', score, (clock[] - starttime)];
         
     oDestroy Chains [];
     SystemPop [osys, nsys];
     return score;
+endfunction
+
+function MM; // forward declaration
+global function qbInteractiveMTScoreUpdate []
+    const RUNNINGMT = 'Running MTScore to update current binding affinity....';
+    const RUNNINGMM = 'Running MM opt of ligand+pocket to update current binding affinity....';
+    local currentState = 0;
+    local currentPos = aPos Atoms[];
+    if second task_fork[] == 'child' then
+        task_settitle [-1, 'qbInteractiveMTScoreUpdate'];
+        local msgkey = Message [ 0, '' ];
+        loop
+            if length uniq aResidue _Atoms '$$ligand' <> 1 then
+                write ['Please select one and only one residue as a ligand\n'];
+            elseif currentState <> SystemTopologyState [] or not (currentPos === aPos Atoms[]) then
+                Message [ msgkey, RUNNINGMM ];
+                local originalFixed = Atoms[] | aFixed Atoms[];
+                aSetFixed [diff [Atoms[], _Atoms '$$ligand'], 1];
+                MM [ gtest:0.01, maxit:200 ];
+                aSetFixed [Atoms[], 0];
+                aSetFixed [originalFixed, 1];
+                currentState = SystemTopologyState [];
+                currentPos = aPos Atoms[];
+                local pdata = SystemPush Atoms[];
+                Message [ msgkey, RUNNINGMT ];
+                Message [msgkey, twrite ['MTScoreES (dG): {} kcal/mol\n', ScoreMTScore_dG [
+                    cat diff [Atoms[], _Atoms '$$ligand'],
+                    cat _Atoms '$$ligand'
+                ]]];
+                SystemPop pdata;
+            endif
+            sleep 0.5;
+        endloop
+    endif
 endfunction
 
 
