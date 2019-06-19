@@ -40,8 +40,8 @@ endfunction
 
 local function getWSHostNPort []
     return twrite ['http://{}:{}',
-        GetRC ['qbWSHostname','localhost'],
-        GetRCNumber ['qbWSPort',8080]
+        GetRC ['QuantumBio.qbWSHostname','localhost'],
+        GetRCNumber ['QuantumBio.qbWSPort',8080]
     ];
 endfunction
 
@@ -161,6 +161,55 @@ global function qbRunMTPairList listfile
             exit[];
         endif
     endloop
+endfunction
+
+global function qbWSConfig wparent
+
+    local DEFAULTS = [
+        qbWSHostname: GetRC ['QuantumBio.qbWSHostname','localhost'],
+        qbWSPort:     GetRCNumber ['QuantumBio.qbWSPort',8080]
+    ];
+
+    local wkey = WindowCreate
+    [
+        title: 'qbWebService Setup',
+        name: 'panel',
+        text:   ['Save','Cancel'],
+        onTrigger: ['validate','return'],
+        bubbleHelp: [
+            'Configure qbWebService (hostname and port).'
+        ], 
+        Mbox : [
+            Text : [
+                title: 'Hostname:', name: 'qbWSHostname', type: 'char',allowBlank:0,len:20,
+                value: GetRC ['QuantumBio.qbWSHostname','localhost'],
+                shortcut: ['localhost'],
+                bubbleHelp: 'Enter hostname (default: localhost).'
+            ],
+            Text : [
+                title: 'Port:', name: 'qbWSPort', type: 'int',allowBlank:0,len:5,
+                value: GetRCNumber ['QuantumBio.qbWSPort',8080],
+                shortcut: ['8080','8081','8082'],
+                bubbleHelp: 'Enter the port number (default: 8080).'
+            ]
+        ]
+    ];
+    
+//    WindowSetAttr [wkey, DEFAULTS];
+    WindowShow wkey;
+    loop
+        local [values, trigger] = WindowWait wkey;
+        if trigger === 'panel' then
+            if values.panel == 'Cancel' then break; endif
+            if values.panel == 'Save' then
+                SetRC ['QuantumBio.qbWSHostname',values.qbWSHostname];
+                SetRCNumber ['QuantumBio.qbWSPort',values.qbWSPort];
+                break;
+            endif        
+        endif
+    endloop
+    WindowDestroy wkey;
+    
 endfunction
 
 #eof
