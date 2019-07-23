@@ -15,7 +15,8 @@ function qbWS_MTScore;
 
 local function ScoreMTScore_dG [recatoms, ligatoms, ff, rec]
     // This function is effectively a "wrapper" for the call to the MTScore webservice
-    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
+//    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
+    local tmpJSON = qbWS_MTScore [recatoms,ligatoms];
 // write ['tmpJSON: {} \n', tmpJSON];
     return atof tmpJSON.('MTScoreES');
 endfunction
@@ -33,8 +34,8 @@ global function dock_score_qbMTScore [cmd, arg, opt]
     ];
 
     local DEFAULTS = [
-        qbWSHostname: GetRC ['qbWSHostname','localhost'],
-        qbWSPort:     GetRCNumber ['qbWSPort',8080]
+        qbWSHostname: GetRC ['QuantumBio.qbWSHostname','localhost'],
+        qbWSPort:     GetRCNumber ['QuantumBio.qbWSPort',8080]
     ];
     
     const PANEL = [
@@ -44,7 +45,7 @@ global function dock_score_qbMTScore [cmd, arg, opt]
                 shortcut: ['localhost'],
                 bubbleHelp: 'Enter hostname (default: localhost).'
             ],
-                Text : [
+            Text : [
                 title: 'Port:', name: 'qbWSPort', type: 'int',
                 shortcut: ['8080','8081','8082'],
                 bubbleHelp: 'Enter the port number (default: 8080).'
@@ -52,7 +53,7 @@ global function dock_score_qbMTScore [cmd, arg, opt]
         ]
     ];
     
-    write ['DEBUG: cmd: {} | arg: {}\n', cmd, arg];
+//    write ['DEBUG: cmd: {} | arg: {}\n', cmd, arg];
 
     if cmd === 'ID' then
         return 'MTScoreES dG [QuantumBio]';
@@ -61,8 +62,13 @@ global function dock_score_qbMTScore [cmd, arg, opt]
     elseif cmd === 'configpanelevent' then   // arg = [val, trig]
         local [val, trig, wkey] = arg;
         return 0;
-    elseif cmd === 'configvalues' then        // qrg = val
+    elseif cmd === 'configvalues' then        // arg = val
         return tagcat [arg, DEFAULTS];
+    elseif cmd === 'validateOptions' then        // arg = val
+        SetRC ['QuantumBio.qbWSHostname',arg.qbWSHostname];
+        SetRCNumber ['QuantumBio.qbWSPort',arg.qbWSPort];
+//        write ['RC: {} | {}\n', arg.qbWSHostname, arg.qbWSPort];
+        return;
     elseif cmd === 'openReceptor' then      // arg = rec
         return;
     elseif cmd === 'closeReceptor' then     // arg = rec
@@ -76,10 +82,9 @@ global function dock_score_qbMTScore [cmd, arg, opt]
     endif
     
     [ligpos, lig, rec] = arg;
-    
+    SetRC ['QuantumBio.qbWSHostname',opt.qbWSHostname];
+    SetRCNumber ['QuantumBio.qbWSPort',opt.qbWSPort];
     opt = tagcat [opt, DEFAULTS];
-    SetRC ['qbWSHostname',opt.qbWSHostname];
-    SetRCNumber ['qbWSPort',opt.qbWSPort];
 
     local [osys, nsys] = SystemPush [];
     oDestroy Chains [];
@@ -88,13 +93,220 @@ global function dock_score_qbMTScore [cmd, arg, opt]
     local ligatoms = cat oAtoms mol_Create *lig.mol;
     aSetPos [ligatoms, ligpos];
 
-local starttime = clock[];
+    local starttime = clock[];
     score = ScoreMTScore_dG [recatoms, ligatoms];
-write ['MTScoreES (dG): {} kcal/mol in {} secs\n', score, (clock[] - starttime)];
+    write ['MTScoreES (dG): {} kcal/mol in {} secs\n', score, (clock[] - starttime)];
         
     oDestroy Chains [];
     SystemPop [osys, nsys];
     return score;
+endfunction
+
+function MM; // forward declaration
+global function qbInteractiveMTScoreUpdate []
+    const RUNNINGMT = 'Running MTScore to update current binding affinity....';
+    const RUNNINGMM = 'Running MM opt of ligand+pocket to update current binding affinity....';
+    local currentState = 0;
+    local currentPos = aPos Atoms[];
+    if second task_fork[] == 'child' then
+        task_settitle [-1, 'qbInteractiveMTScoreUpdate'];
+        local msgkey = Message [ 0, '' ];
+        loop
+            if length uniq aResidue _Atoms '$$ligand' <> 1 then
+                write ['Please select one and only one residue as a ligand\n'];
+            elseif currentState <> SystemTopologyState [] or not (currentPos === aPos Atoms[]) then
+                Message [ msgkey, RUNNINGMM ];
+                local originalFixed = Atoms[] | aFixed Atoms[];
+                aSetFixed [diff [Atoms[], _Atoms '$$ligand'], 1];
+                MM [ gtest:0.01, maxit:200 ];
+                aSetFixed [Atoms[], 0];
+                aSetFixed [originalFixed, 1];
+                currentState = SystemTopologyState [];
+                currentPos = aPos Atoms[];
+                local pdata = SystemPush Atoms[];
+                Message [ msgkey, RUNNINGMT ];
+                Message [msgkey, twrite ['MTScoreES (dG): {} kcal/mol\n', ScoreMTScore_dG [
+                    cat diff [Atoms[], _Atoms '$$ligand'],
+                    cat _Atoms '$$ligand'
+                ]]];
+                SystemPop pdata;
+            endif
+            sleep 0.5;
+        endloop
+    endif
+endfunction
+
+// functions necessary for the qbInteractiveMTScoreUpdate panel
+
+const WINDOW_NAME = 'QuantumBio/MTScore';		// window title
+
+// MakePanel only takes care of what the panel looks like but not the contents or processing any triggers.
+local function MakePanel opt
+    local opt_enableSidepanel = GetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', 0];
+
+    local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
+
+    local window = [
+        title: WINDOW_NAME,
+        name: 'shell', 
+        text: [select ['Detach', 'Attach', opt_enableSidepanel], 'Close'],
+        onTrigger: ['return', 'exit'],
+        Vbox: [
+            Hbox:   [
+                Label: [
+                    text: 'qbWebService: ',
+                    font: 'mediumFixedBold'
+                ],
+                Label: [
+//                    title: 'qbWebService:',
+                    name: 'qbwebservice_info',
+                    text: twrite ['{}:{}',GetRC ['QuantumBio.qbWSHostname','localhost'],GetRCNumber ['QuantumBio.qbWSPort',8080]]
+                ],
+                Button: [
+                    title: '', name: 'button_WSsetup', graphics: config,
+                    bubbleHelp: 'Configure QuantumBio WebSerice (host and port).'
+                ]
+            ],
+            Button: [
+                text: 'Structure Preparation', name: 'button_MOEPreparation', extendH: 1,
+                bubbleHelp: 
+                    'Configure and run the MOE-based structure preparation.\n'
+                    '   Warning, if less then 49% the atoms are protons. FIX: Run Protonate3D.\n'
+                    '   Noted, if there was no change to the structure before and after structure preparation.\n'
+                    '   Noted, if not performed.'
+            ],
+            Hbox:   [
+                Checkbox:   [
+                    name: 'optyesno',text: 'Optimize',value:1,
+                    bubbleHelp: 'Optimize ligand w/in receptor prior to score.'
+                ],
+//                Button: [
+//                        name: 'showSelection', text: 'Show',
+//                        bubbleHelp: 'Show selected ligand in the MOE window.'
+//                ],
+                Button: [
+                        name: 'addCurrent', text: 'Add',
+                        bubbleHelp: 'Add the selected ligand within the MOE window to the list and calculate MTScoreES.'
+                ],
+                Button: [
+                        name: 'deleteSelection', text: 'X', font: 'mediumBold',flushLeft: 0,
+                        bubbleHelp: 'Delete selected ligand from the list.'
+                ]
+            ],
+            Listbox : [
+                name: 'slist',
+                onTrigger: 'return',
+                multiSelect: 0,
+                type: 'int',
+                sortEnable: 1,
+                header: 'MTScoreES (kcal/mol){.20n}',
+                resizeV:1,
+//                len:10,
+//                width:5,
+                resizeH:1
+            ]
+        ]
+    ];
+    
+    if opt_enableSidepanel then
+	    window.location = 'MOE_Right';
+    else
+	    window.windowName = WINDOW_NAME;
+    endif
+
+    return window;
+endfunction
+
+// forward declarations
+function qbWSConfig;
+
+global function qbInteractiveMTScoreUI opt
+
+    local wkey = WindowCreate MakePanel opt;
+    WindowShow wkey;
+
+    local currentState = 0;
+    local currentPos = aPos Atoms[];
+    local currentOptYesNo = 0;
+    local currentMTScoreES = 0;
+
+    const RUNNINGMT = 'Running MTScore to update current binding affinity....';
+    const RUNNINGMM = 'Running MM opt of ligand+pocket to update current binding affinity....';
+    local msgkey = Message [ 0, '' ];
+    
+    local scoresList = [];
+    local molList = [];
+    local prevSelected = 0;
+    
+    local status;
+
+    loop
+        local [values, trigger] = WindowWait wkey;
+        write ['values: {}\ntrigger: {}\n', values, trigger];
+        
+        if trigger === 'button_WSsetup' then
+            qbWSConfig wkey;
+            WindowSetAttr [wkey, [
+                qbwebservice_info: [text: twrite ['{}:{}',
+                    GetRC ['QuantumBio.qbWSHostname','localhost'],
+                    GetRCNumber ['QuantumBio.qbWSPort',8080]]]
+            ]];
+        elseif trigger === 'showSelection' or trigger === 'slist' then
+            if first values.slist and first values.slist <> prevSelected then
+                prevSelected = first values.slist;
+                local parentResidue = uniq aResidue _Atoms '$$ligand';
+                oDestroy _Atoms '$$ligand';
+                Message [msgkey, twrite ['MTScoreES (dG): {} kcal/mol\n', scoresList(first values.slist)]];
+                local tmpNewChains = mol_Create molList(first values.slist);
+                oReparent [cat cAtoms tmpNewChains,parentResidue];
+                oDestroy tmpNewChains;
+            endif
+        elseif trigger === 'addCurrent' then
+            if length uniq aResidue _Atoms '$$ligand' <> 1 then
+                Message [ msgkey, 'Please select one and only one residue as a ligand\n'];
+            elseif currentState <> SystemTopologyState [] 
+                        or not (currentPos === aPos Atoms[]) 
+                        or values.optyesno <> currentOptYesNo then
+                if values.optyesno then
+                    Message [ msgkey, RUNNINGMM ];
+                    local originalFixed = Atoms[] | aFixed Atoms[];
+                    aSetFixed [_Atoms '$$receptor', 1];
+                    MM [ gtest:0.01, maxit:200 ];
+                    aSetFixed [Atoms[], 0];
+                    aSetFixed [originalFixed, 1];
+                endif
+                currentState = SystemTopologyState [];
+                currentPos = aPos Atoms[];
+                currentOptYesNo = values.optyesno;
+                local pdata = SystemPush Atoms[];
+                Message [ msgkey, RUNNINGMT ];
+                currentMTScoreES = ScoreMTScore_dG [cat _Atoms '$$receptor', cat _Atoms '$$ligand'];
+                Message [msgkey, twrite ['MTScoreES (dG): {} kcal/mol\n', currentMTScoreES]];
+                molList = append [molList, mol_Extract _Atoms '$$ligand'];
+                scoresList = append [scoresList, currentMTScoreES];
+                WindowSetAttr[wkey, [   slist:    [text : apt twrite ['{}',scoresList]]   ]];   
+                SystemPop pdata;
+            endif
+        elseif trigger === 'button_MOEPreparation' then
+            run ['structprep_ui.svl', [cmd:'interactive']];
+            status.ran_structprep = 1;
+            sleep 2.0;      // needs a couple of seconds to init StructurePrep function
+            while WindowKey 'Structure Preparation' loop
+                sleep 0.15;
+                if WindowKey 'Protonate3D' then
+                    status.ran_protonate = 1;
+                endif
+            endloop
+        elseif trigger === 'shell' then
+            WindowDestroy WindowKey wkey;
+            if values.shell === 'Attach' or values.shell === 'Detach' then
+                SetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', values.shell==='Attach'];
+                task_call [ 'qbInteractiveMTScoreUI', [], [master:'none', creator:'detach', statics: 'new'] ];
+            endif
+            break;
+        endif
+    endloop
+
 endfunction
 
 

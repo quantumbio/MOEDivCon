@@ -4,11 +4,6 @@
 //  changes in protocol and the like can be fixed and maintained in a single file. Over time, if this
 //  becomes unweildy, we could move these functions.
 
-// WS Server (to be set through dialog box)
-// const QB_URL = 'http://localhost:8080';
-// const QB_URL = 'http://shadowfax.quantumbioinc.com:8080';
-// const QB_URL = 'http://shadowfax.quantumbioinc.com:8888';
-
 // WS spec
 const CRLF = "\r\n";
 
@@ -43,7 +38,52 @@ local function getLigandChunk ligand_mol
     ];
 endfunction
 
+local function getWSHostNPort []
+    return twrite ['http://{}:{}',
+        GetRC ['QuantumBio.qbWSHostname','localhost'],
+        GetRCNumber ['QuantumBio.qbWSPort',8080]
+    ];
+endfunction
+
 // Global Functions
+
+global function qbWS_TestEndpoint endpoint
+    local boundary = boundaryGen[];
+    local ctype = cat ["multipart/form-data; boundary=", boundary];
+    boundary = cat ["--", boundary]; // add two dashes by the standards
+
+    local Instructions = cat [
+        "Content-Disposition: form-data; name=\"Instructions\"", CRLF,
+        "Content-Type: text/plain", CRLF,
+        CRLF,
+        "{ \"options\": {\"scoretype\": \"info\"}}", CRLF
+    ];
+
+    local POST_CONTENT = cat [
+        boundary, CRLF,
+        Instructions,
+        boundary, "--", CRLF    
+    ];
+            
+    local url = curl_open [
+        url: tok_cat [getWSHostNPort [], '/qmechanic/movabletype'],
+        httpheader: [ 'Transfer-Encoding: Chunked', 
+                 'TargetName: target.json',
+                 'LigandName: ligand.json']
+    ]; 
+
+    curl_write  [url, POST_CONTENT];
+
+    local tmpJSON = curl_read url;
+    curl_close url;
+#if 0
+    fwrite ['debug-WSPOST.txt', '{}\n', POST_CONTENT];
+    fwrite ['debug-WSRETURN.txt','{}',tmpJSON];
+#endif
+    // Return the JSON tagged vector to be used by other functions
+    return qbReadJSONStream tmpJSON;
+
+endfunction
 
 // Function to call the MTScore webservice
 global function qbWS_MTScore [target_mol, ligand_mol, opt]
@@ -68,14 +108,9 @@ global function qbWS_MTScore [target_mol, ligand_mol, opt]
         getLigandChunk ligand_mol,
         boundary, "--", CRLF    
     ];
-    
-    local QB_URL=twrite ['https://{}:{}',
-        GetRC ['qbWSHostname','localhost'],
-        GetRCNumber ['qbWSPort',8080]
-    ];
-    
+        
     local url = curl_open [
-        url: tok_cat [QB_URL, '/qmechanic/movabletype'],
+        url: tok_cat [getWSHostNPort[], '/qmechanic/movabletype'],
         httpheader: [ 'Transfer-Encoding: Chunked', 
                  'TargetName: target.json',
                  'LigandName: ligand.json']
@@ -85,7 +120,7 @@ global function qbWS_MTScore [target_mol, ligand_mol, opt]
 
     local tmpJSON = curl_read url;
     curl_close url;
-#if 1
+#if 0
     fwrite ['debug-WSPOST.txt', '{}\n', POST_CONTENT];
     fwrite ['debug-WSRETURN.txt','{}',tmpJSON];
 #endif
@@ -126,6 +161,55 @@ global function qbRunMTPairList listfile
             exit[];
         endif
     endloop
+endfunction
+
+global function qbWSConfig wparent
+
+    local DEFAULTS = [
+        qbWSHostname: GetRC ['QuantumBio.qbWSHostname','localhost'],
+        qbWSPort:     GetRCNumber ['QuantumBio.qbWSPort',8080]
+    ];
+
+    local wkey = WindowCreate
+    [
+        title: 'qbWebService Setup',
+        name: 'panel',
+        text:   ['Save','Cancel'],
+        onTrigger: ['validate','return'],
+        bubbleHelp: [
+            'Configure qbWebService (hostname and port).'
+        ], 
+        Mbox : [
+            Text : [
+                title: 'Hostname:', name: 'qbWSHostname', type: 'char',allowBlank:0,len:20,
+                value: GetRC ['QuantumBio.qbWSHostname','localhost'],
+                shortcut: ['localhost'],
+                bubbleHelp: 'Enter hostname (default: localhost).'
+            ],
+            Text : [
+                title: 'Port:', name: 'qbWSPort', type: 'int',allowBlank:0,len:5,
+                value: GetRCNumber ['QuantumBio.qbWSPort',8080],
+                shortcut: ['8080','8081','8082'],
+                bubbleHelp: 'Enter the port number (default: 8080).'
+            ]
+        ]
+    ];
+    
+//    WindowSetAttr [wkey, DEFAULTS];
+    WindowShow wkey;
+    loop
+        local [values, trigger] = WindowWait wkey;
+        if trigger === 'panel' then
+            if values.panel == 'Cancel' then break; endif
+            if values.panel == 'Save' then
+                SetRC ['QuantumBio.qbWSHostname',values.qbWSHostname];
+                SetRCNumber ['QuantumBio.qbWSPort',values.qbWSPort];
+                break;
+            endif        
+        endif
+    endloop
+    WindowDestroy wkey;
+    
 endfunction
 
 #eof
