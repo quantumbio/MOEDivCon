@@ -139,7 +139,7 @@ local function main []
         db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol',
             ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
             ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
-            ['double','int','double','double','double','double']        
+            ['double','int','double','char','double','double']        
         ];
         db_Sort [confmdbname,'BFIRank',1];
         if (db_nEntries confmdbname) > inopt.mtcsconf then
