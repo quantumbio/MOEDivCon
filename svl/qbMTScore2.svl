@@ -156,6 +156,7 @@ local function MakePanel opt
     local opt_enableSidepanel = GetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', 0];
 
     local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
+    local openicon = gr_icon ['$MOE/lib/icon/open.ico', 12, 'foreground'];
         
     local window = [
         title: WINDOW_NAME,
@@ -178,9 +179,14 @@ local function MakePanel opt
                     bubbleHelp: 'Configure QuantumBio WebSerice (host and port).'
                 ]
             ],
-            Label: [
-                name: 'sysok',
-                text: ''
+            Hbox:   [
+                Label:  [
+                    text: 'Status: '
+                ],
+                Label: [
+                    name: 'sysok',
+                    text: ''
+                ]
             ],
             Button: [
                 text: 'Structure Preparation', name: 'button_MOEPreparation', extendH: 1,
@@ -190,15 +196,42 @@ local function MakePanel opt
                     '   Noted, if there was no change to the structure before and after structure preparation.\n'
                     '   Noted, if not performed.'
             ],
-            Hbox:   [
-                Checkbox:   [
-                    name: 'optyesno',text: 'Optimize',value:1,
-                    bubbleHelp: 'Optimize ligand w/in receptor prior to score.'
-                ],
-//                Button: [
-//                        name: 'showSelection', text: 'Show',
-//                        bubbleHelp: 'Show selected ligand in the MOE window.'
+//            Mbox: [
+//                columns: 3, extendH: 1,
+//                Label: [
+//                    text: 'MDB: '
 //                ],
+//
+//                FSBText: [
+//                name: 'outdb', len: 25, extendH: 1, mode: 'saveAs',
+//                bubbleHelp:
+//                    'The database to which the generated structures\n'
+//                    'will be written.'
+//                ],
+//
+//                Button: [
+//                    title: '', name: 'browse_outdb', graphics: openicon,
+//                    bubbleHelp: 'Select / Create MDB to store ligands of interest.\nNew DB will be created while existing DB will be read and added to list below.'
+//                ]
+//            ],
+//
+//            Checkbox: [
+//                name: 'open_outdb', onTrigger: 'ignore',
+//                text: 'Open Database Viewer', bubbleHelp:
+//                'If on, a Database Viewer will be opened\n'
+//                'showing the created database.'
+//            ],
+            Hbox:   [
+                Label:  [
+                    text: 'Optimize: ',
+                    bubbleHelp: 'Optimize ligand or receptor pocket prior to score.'
+                ],
+                Radio:  [
+                    name: 'optlevel',
+                    text: ['None','Ligand','Pocket'],
+                    onTrigger: 'return',
+                    bubbleHelp: 'Optimize ligand or receptor pocket prior to score.'                
+                ],
                 Button: [
                         name: 'addCurrent', text: 'Add',
                         bubbleHelp: 'Add the selected ligand within the MOE window to the list and calculate MTScoreES.'
@@ -254,85 +287,125 @@ function qbWSConfig;
 
 function PartialCharge;
 
+// Monitor loop for addressing changing items in the UI
 local function ReadyMonitor wkey
     local systemNonviewState = -1;
+    
+//    local dataFile = second cat WindowGetData [wkey, 'outdb'];
+    local mdb_key;
 
     loop
-        if systemNonviewState == SystemNonviewState[] then
-            sleep 0.25;
-            continue;
-        endif
-        systemNonviewState = SystemNonviewState [];
+        if systemNonviewState <> SystemNonviewState[] then
+            systemNonviewState = SystemNonviewState [];
         
-        local syskeys = SystemPush Atoms[];    // limit the chances of concurrent molecule object editing errors
-        static sys_serial, q_save, pot_serial;
-        local atoms = Atoms[];
+            local syskeys = SystemPush Atoms[];    // limit the chances of concurrent molecule object editing errors
+            static sys_serial, q_save, pot_serial;
+            local atoms = Atoms[];
 
-        local q = aCharge atoms;
+            local q = aCharge atoms;
 
-        local check = not isnull wkey and not (
-            SystemTopologyState[] === sys_serial
-        and (q === q_save)
-        and (pot_Info[]).serial === pot_serial
-        );
+            local check = not isnull wkey and not (
+                SystemTopologyState[] === sys_serial
+            and (q === q_save)
+            and (pot_Info[]).serial === pot_serial
+            );
 
-        local fixH = 0, fixQ = 0;
+            local fixH = 0, fixQ = 0;
 
-        local xh = aExplicitHCount atoms;			// check H
-        local hc = select [0, aHCount atoms, pot_Parm_uh atoms];
-        fixH = fixH or orE (xh <> hc);
+            local xh = aExplicitHCount atoms;			// check H
+            local hc = select [0, aHCount atoms, pot_Parm_uh atoms];
+            fixH = fixH or orE (xh <> hc);
 
-        local xlp = app add not aAtomicNumber aBonds atoms;	// check LP
-        local lpc = pot_Parm_lp atoms;
+            local xlp = app add not aAtomicNumber aBonds atoms;	// check LP
+            local lpc = pot_Parm_lp atoms;
 
-        if orE lpc then
-            local idx = x_pack lpc;
-            lpc[idx | sm_Match ['[Lp1]', atoms[idx]]] = 1;
-            lpc[idx | sm_Match ['[Lp2]', atoms[idx]]] = 2;
-            lpc[idx | sm_Match ['[Lp3]', atoms[idx]]] = 3;
-            lpc[idx | sm_Match ['[Lp4]', atoms[idx]]] = 4;
-        endif
+            if orE lpc then
+                local idx = x_pack lpc;
+                lpc[idx | sm_Match ['[Lp1]', atoms[idx]]] = 1;
+                lpc[idx | sm_Match ['[Lp2]', atoms[idx]]] = 2;
+                lpc[idx | sm_Match ['[Lp3]', atoms[idx]]] = 3;
+                lpc[idx | sm_Match ['[Lp4]', atoms[idx]]] = 4;
+            endif
 
-        fixH = fixH or orE (xlp <> lpc);
+            fixH = fixH or orE (xlp <> lpc);
 
-        local fq = first PartialCharge [atoms, 'FF'];
-        local chargesEQ = max abs (q - fq) < 1e-5;
+            local fq = first PartialCharge [atoms, 'FF'];
+            local chargesEQ = max abs (q - fq) < 1e-5;
 
-        fixQ = fixQ or not chargesEQ;
+            fixQ = fixQ or not chargesEQ;
         
-//        if fixQ then
-//            pot_SetCharges[];
-//            fq = first PartialCharge [atoms, 'FF'];
-//            chargesEQ = max abs (q - fq) < 1e-5;
-//            fixQ = fixQ or not chargesEQ;
-//        endif
+    //        if fixQ then
+    //            pot_SetCharges[];
+    //            fq = first PartialCharge [atoms, 'FF'];
+    //            chargesEQ = max abs (q - fq) < 1e-5;
+    //            fixQ = fixQ or not chargesEQ;
+    //        endif
         
-        local systext = 'Molecular system parameterized.';
-        local sysbool = 1;
-        local syscolors = ['red','blue'];
+            local systext = 'Molecular system parameterized.';
+            local sysbool = 1;
+            local syscolors = ['red','blue'];
     
-        if orE (aMMType atoms == '??') then
-            systext = 'Unparameterized atoms in the system.';
-            sysbool = 0;
-        elseif chargesEQ and abs (add q - add aIon atoms) > 1e-3 then
-            systext = 'Missing atoms in the system.';
-            sysbool = 0;
-        elseif fixH then
-            systext = 'Error in Hydrogens or partial charges.';
-            sysbool = 0;
-        elseif length uniq aResidue _Atoms '$$ligand' <> 1 then
-            systext = 'Designate one residue as a ligand';
-            sysbool = 0;
+            if isnull Atoms[] then
+                systext = 'Open molecular system.';
+                sysbool = 0;
+            elseif orE (aMMType atoms == '??') then
+                systext = 'Unparameterized atoms in the system.';
+                sysbool = 0;
+            elseif chargesEQ and abs (add q - add aIon atoms) > 1e-3 then
+                systext = 'Missing atoms in the system.';
+                sysbool = 0;
+            elseif fixH then
+                systext = 'Error in Hydrogens or partial charges.';
+                sysbool = 0;
+            elseif length uniq aResidue _Atoms '$$ligand' <> 1 then
+                systext = 'Designate one residue as a ligand';
+                sysbool = 0;
+            elseif length uniq aResidue _Atoms '$$pocket' < 1 then
+                systext = 'Designate residues as pocket';
+                sysbool = 0;
+            endif
+
+            WindowSetAttr [wkey, [sysok:  [text: systext, foreground: syscolors [sysbool+1] ]]];
+            WindowSetAttr [wkey, [addCurrent:  [sensitive: sysbool]]];
+
+            q_save = q;
+            sys_serial = SystemTopologyState[];
+            pot_serial = (pot_Info[]).serial;
+            SystemPop syskeys;
+//        elseif neL [dataFile, second cat WindowGetData [wkey, 'outdb']] then
+//            dataFile = second cat WindowGetData [wkey, 'outdb'];
+//// If the DB exists, open it and check contents
+//            if ftype dataFile == '' then
+//                mdb_key = db_Open [dataFile, 'create'];
+//                db_CreateField [ mdb_key, 'Target', 'molecule' ];
+//                db_CreateField [ mdb_key, 'Ligand', 'molecule' ];
+//                db_CreateField [ mdb_key, 'MTScoreES', 'float' ];
+//            else
+//                mdb_key = db_Open [dataFile, 'read-write'];
+//                local [mdbFields,mdbTypes] = db_Fields mdb_key;
+//                if indexof [(mdbFields | (mdbTypes == 'molecule')), 'Target'] and
+//                    indexof [(mdbFields | (mdbTypes == 'molecule')), 'Ligand'] and
+//                    indexof [(mdbFields | (mdbTypes == 'molecule')), 'MTScoreES'] then
+//                        write ['all in!\n'];
+//                else
+//                    write ['missing!\n'];
+//                endif
+//            endif
+//    // if the contents are MT contents, then read them in and add them to the viewer list
+//        
+//    // if the contents are not MT contents, then throw an error
+//
+//
+//// if the DB doesn't exist, create it and add columns for target structure, ligand structure, and score information
+//
+////            db_Close  mdb_key;
+//// finally, if the "view database" is checked, then open the db in a db_viewer
+//            if second cat WindowGetData [wkey, 'open_outdb'] then
+//                dbv_Open [dataFile];
+//            endif
+        else
+            sleep 0.25;
         endif
-
-        WindowSetAttr [wkey, [sysok:  [text: systext, foreground: syscolors [sysbool+1] ]]];
-        WindowSetAttr [wkey, [addCurrent:  [sensitive: sysbool]]];
-
-        q_save = q;
-        sys_serial = SystemTopologyState[];
-        pot_serial = (pot_Info[]).serial;
-        SystemPop syskeys;
-//        sleep 0.5;
     endloop
 endfunction
 
@@ -343,7 +416,7 @@ global function qbInteractiveMTScoreUI opt
 
     local currentState = 0;
     local currentPos = aPos Atoms[];
-    local currentOptYesNo = 0;
+    local currentOptLevel = 0;
     local currentMTScoreES = 0;
 
     const RUNNINGMT = 'Running MTScore to update current binding affinity....';
@@ -354,6 +427,9 @@ global function qbInteractiveMTScoreUI opt
     local namesList = [];
     local molList = [];
     local prevSelected = 0;
+    
+    local dataFile;
+    local prevDataFile;
     
     local status;
 
@@ -366,7 +442,7 @@ global function qbInteractiveMTScoreUI opt
             else                return twrite ['{}',inVal];
             endif
         endfunction
-        return twrite ['{}',twrite ['{}{}{}', formNum timevec(7), formNum timevec(8), formNum timevec(9)]];
+        return twrite ['{}',twrite ['{}:{}:{}', formNum timevec(7), formNum timevec(8), formNum timevec(9)]];
     endfunction
     
     if second task_fork [master:'mutual', idle:1, prio:0] === 'child' then
@@ -377,8 +453,7 @@ global function qbInteractiveMTScoreUI opt
 // main loop
     loop
         local [values, trigger] = WindowWait wkey;
-//        write ['values: {}\ntrigger: {}\n', values, trigger];
-        
+//        write ['values: {}\ntrigger: {}\n', values, trigger];        
         if trigger === 'button_WSsetup' then
             qbWSConfig wkey;
             WindowSetAttr [wkey, [
@@ -395,39 +470,37 @@ global function qbInteractiveMTScoreUI opt
                 prevSelected = first values.slist;
                 local parentResidue = uniq aResidue _Atoms '$$ligand';
                 local tmpBondLook = first aBondLook cat _Atoms '$$ligand';
-                oDestroy _Atoms '$$ligand';
+                oDestroy Chains[];
                 Message [msgkey, twrite ['MTScoreES (dG): {} kcal/mol\n', scoresList(first values.slist)]];
-                local tmpNewChains = mol_Create molList(first values.slist);
-                aSetBondLook [cat cAtoms tmpNewChains, tmpBondLook];
-                aSetHidden [cat cAtoms tmpNewChains | aElement cat cAtoms tmpNewChains == 'H', 1];
-                oReparent [cat cAtoms tmpNewChains,parentResidue];
-                oDestroy tmpNewChains;
+                _moe_Create [molList(first values.slist),[view:0]];
                 currentState = SystemTopologyState [];
                 currentPos = aPos Atoms[];
                 WindowSetAttr[wkey, [   tLigName:    [value : namesList(first values.slist) ]]];  
             endif
         elseif trigger === 'addCurrent' then
-            if length uniq aResidue _Atoms '$$ligand' <> 1 then
-                Message [ msgkey, 'Please select one and only one residue as a ligand\n'];
-            elseif currentState <> SystemTopologyState [] 
+            if currentState <> SystemTopologyState [] 
                         or not (currentPos === aPos Atoms[]) 
-                        or values.optyesno <> currentOptYesNo then
-                if values.optyesno then
+                        or values.optlevel <> currentOptLevel then
+                if values.optlevel <> 'None' then
                     Message [ msgkey, RUNNINGMM ];
                     local originalFixed = Atoms[] | aFixed Atoms[];
-                    aSetFixed [_Atoms '$$receptor', 1];
+                    aSetFixed [Atoms[], 1];
+                    aSetFixed [_Atoms '$$ligand', 0];
+                    if values.optlevel == 'Pocket' then
+                        aSetFixed [_Atoms '$$pocket', 0];
+                    endif
                     MM [ gtest:0.01, maxit:200 ];
                     aSetFixed [Atoms[], 0];
                     aSetFixed [originalFixed, 1];
                 endif
                 currentState = SystemTopologyState [];
                 currentPos = aPos Atoms[];
-                currentOptYesNo = values.optyesno;
+                currentOptLevel = values.optlevel;
                 local pdata = SystemPush Atoms[];
                 Message [ msgkey, RUNNINGMT ];
                 currentMTScoreES = ScoreMTScore_dG [cat _Atoms '$$receptor', cat _Atoms '$$ligand'];
                 Message [msgkey, twrite ['MTScoreES (dG): {} kcal/mol\n', currentMTScoreES]];
-                molList = append [molList, mol_Extract _Atoms '$$ligand'];
+                molList = append [molList, _moe_Extract [Chains[]]];
                 scoresList = append [scoresList, currentMTScoreES];
                 namesList = append [namesList, StartName[]];
                 WindowSetAttr[wkey, [   slist:    [text : apt twrite ['{}\t{}',namesList,scoresList]]   ]];   
@@ -464,6 +537,24 @@ global function qbInteractiveMTScoreUI opt
                     status.ran_protonate = 1;
                 endif
             endloop
+        elseif trigger === 'optlevel' then
+            local prevSelection = Atoms[] | aSelected Atoms[];
+            aSetSelected [Atoms[], 0];
+            if values.optlevel == 'Ligand' then
+                aSetSelected [_Atoms '$$ligand', 1];
+            elseif values.optlevel == 'Pocket' then
+                aSetSelected [cat [_Atoms '$$pocket',_Atoms '$$ligand'], 1];
+            endif
+            sleep 1.0;
+            aSetSelected [Atoms[], 0];
+            aSetSelected [prevSelection, 1];
+//        elseif trigger === 'browse_outdb' then
+//            run ['fbrowse.svl', [wkey, trigger, [outdb: [
+//                title: 'Output Database',
+//                mode: 'file',
+//                filter: '*.mdb',
+//                autoExtension: 'mdb'
+//            ]]]];
         elseif trigger === 'bRename' or trigger === 'tLigName' then
             namesList(first values.slist) = first values.tLigName;
 //            WindowSetAttr[wkey, [   slist:    [text : apt twrite ['{}\t{}',scoresList,namesList]]   ]];  
