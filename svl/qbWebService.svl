@@ -47,41 +47,18 @@ endfunction
 
 // Global Functions
 
-global function qbWS_TestEndpoint endpoint
-    local boundary = boundaryGen[];
-    local ctype = cat ["multipart/form-data; boundary=", boundary];
-    boundary = cat ["--", boundary]; // add two dashes by the standards
+global function qbWSTestEndpoint endpoint
+    
+    local curlkey = curl_open [url: tok_cat [getWSHostNPort[], twrite ['/qmechanic/{}',endpoint]]];
+    local [curl_out, err] = task_call [ 'curl_read',  curlkey, [errmsg:'ignore'] ];
+    curl_close curlkey;
 
-    local Instructions = cat [
-        "Content-Disposition: form-data; name=\"Instructions\"", CRLF,
-        "Content-Type: text/plain", CRLF,
-        CRLF,
-        "{ \"options\": {\"scoretype\": \"info\"}}", CRLF
-    ];
+    if err === '' then
+    else
+        curl_out = '';
+    endif
 
-    local POST_CONTENT = cat [
-        boundary, CRLF,
-        Instructions,
-        boundary, "--", CRLF    
-    ];
-            
-    local url = curl_open [
-        url: tok_cat [getWSHostNPort [], '/qmechanic/movabletype'],
-        httpheader: [ 'Transfer-Encoding: Chunked', 
-                 'TargetName: target.json',
-                 'LigandName: ligand.json']
-    ]; 
-
-    curl_write  [url, POST_CONTENT];
-
-    local tmpJSON = curl_read url;
-    curl_close url;
-#if 0
-    fwrite ['debug-WSPOST.txt', '{}\n', POST_CONTENT];
-    fwrite ['debug-WSRETURN.txt','{}',tmpJSON];
-#endif
-    // Return the JSON tagged vector to be used by other functions
-    return qbReadJSONStream tmpJSON;
+    return qbReadJSONStream curl_out;
 
 endfunction
 
@@ -126,6 +103,7 @@ global function qbWS_MTScore [target_mol, ligand_mol, opt]
 
     local tmpJSON = curl_read url;
     curl_close url;
+
 #if 1
     fwrite ['debug-WSRETURN.txt','{}',tmpJSON];
 #endif

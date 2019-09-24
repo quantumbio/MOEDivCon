@@ -12,6 +12,7 @@
 // NOTE:	This function must be used within a private system.
 
 function qbWS_MTScore;
+function qbWSTestEndpoint;
 
 local function ScoreMTScore_dG [recatoms, ligatoms, ff, rec]
     // This function is effectively a "wrapper" for the call to the MTScore webservice
@@ -322,6 +323,8 @@ local function ReadyMonitor wkey
     local systemNonviewState = -1;
     local dbState = -1;
     
+    local sysbool = 1;
+    
     local dataFile;
     local prevDataFile = '';
     
@@ -335,7 +338,7 @@ local function ReadyMonitor wkey
             endif
         endif
         
-        if systemNonviewState <> SystemNonviewState[] or dataFile <> prevDataFile then
+        if systemNonviewState <> SystemNonviewState[] or dataFile <> prevDataFile or sysbool == 0 then
             systemNonviewState = SystemNonviewState [];
             prevDataFile = dataFile;
             
@@ -389,7 +392,7 @@ local function ReadyMonitor wkey
     //        endif
         
             local systext = 'Molecular system parameterized.';
-            local sysbool = 1;
+            sysbool = 1;
             local syscolors = ['red','blue'];
     
             if isnull Atoms[] then
@@ -413,6 +416,9 @@ local function ReadyMonitor wkey
             elseif length uniq aResidue _Atoms '$$pocket' < 1 then
                 systext = 'Designate residues as pocket';
                 sysbool = 0;
+            elseif length qbWSTestEndpoint [] < 1 then
+                systext = 'Can not connect to qbWebService';
+                sysbool = 0;
             endif
 
             WindowSetAttr [wkey, [sysok:  [text: systext, foreground: syscolors [sysbool+1] ]]];
@@ -424,7 +430,11 @@ local function ReadyMonitor wkey
             SystemPop syskeys;
         endif
         
-        sleep 0.25;
+        if sysbool == 0 then
+            sleep 1.0;
+        else
+            sleep 0.25;
+        endif
     endloop
 endfunction
 
