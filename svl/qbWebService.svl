@@ -38,11 +38,15 @@ local function getLigandChunk ligand_mol
     ];
 endfunction
 
-local function getWSHostNPort []
-    return twrite ['http://{}:{}',
-        GetRC ['QuantumBio.qbWSHostname','localhost'],
-        GetRCNumber ['QuantumBio.qbWSPort',8080]
-    ];
+local function getWSHostNPort [hostname, portnum]
+    if isnull hostname then
+        hostname = GetRC ['QuantumBio.qbWSHostname','localhost'];
+    endif
+    if isnull portnum then
+        portnum = GetRCNumber ['QuantumBio.qbWSPort',8080];
+    endif
+    
+    return twrite ['http://{}:{}', hostname, portnum ];
 endfunction
 
 // Global Functions
@@ -67,8 +71,7 @@ global function qbWSTestEndpoint url
 endfunction
 
 // Function to call the MTScore webservice
-global function qbWS_MTScore [target_mol, ligand_mol, opt]
-
+global function qbWS_MTScore [target_mol, ligand_mol, hostname, portnum]
     local boundary = boundaryGen[];
     local ctype = cat ["multipart/form-data; boundary=", boundary];
     boundary = cat ["--", boundary]; // add two dashes by the standards
@@ -96,7 +99,7 @@ global function qbWS_MTScore [target_mol, ligand_mol, opt]
 #endif
         
     local url = curl_open [
-        url: tok_cat [getWSHostNPort[], '/qmechanic/movabletype'],
+        url: tok_cat [getWSHostNPort[hostname, portnum], '/qmechanic/movabletype'],
         httpheader: [ 'Transfer-Encoding: Chunked', 
                  'TargetName: target.json',
                  'LigandName: ligand.json']
