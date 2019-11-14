@@ -89,8 +89,57 @@ function db_ExportSD;
 function DockAtoms;
 function DockFile;
 
+local function dockmdb2mol2 [db_file,mol2_file]
+    local mdb = db_Open db_file;
+    local fnum, mfield = '';
+
+	// make sure that our database contains the right exportable field
+	// and then open the output file
+    local [fldnames, fldtypes] = db_Fields mdb;
+
+    mfield = fldnames | fldtypes == 'molecule';
+
+	// run through the database and write the data to the file
+
+    local psys = SystemPush [];
+
+    local ent = 0;
+    local count = 0;
+    local mol = [];
+    local targ_chains = [];
+    local lig_chains = [];
+    local chains = [];
+    local inopt;
+    local pdata;
+    while (ent = db_NextEntry [mdb, ent]) loop
+        count = count + 1;
+
+        pdata = tag [fldnames, db_ReadFields [mdb, ent, fldnames]];
+    
+        inopt.pdata = pdata | m_diff [tags pdata, mfield];
+
+        mol =  pdata.(second mfield);       // receptor in dock.mdb
+        targ_chains = mol_Create mol;
+        cSetName [targ_chains | cName targ_chains == '', mol(1)(MOL_NAME)];
+
+        mol =  pdata.(first mfield);        // ligand in dock.mdb
+        lig_chains = mol_Create mol;
+        cSetName [lig_chains | cName lig_chains == '', mol(1)(MOL_NAME)];
+
+        chains = cat [targ_chains,lig_chains];
+
+        fwrite_TriposMOL2 [twrite ['{}_{}.mol2', fbase mol2_file, count],chains,inopt];
+        oDestroy chains;
+    
+    endloop
+
+    SystemPop psys;
+
+endfunction
+
 const DEFAULT_OPT = [
     delwat      : 0,    // Delete waters prior to performing docking/placement
+    inducedfit  : 0,    // Run induced fit (optimized protein) on dock
     mtscorees   : 0,    // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
     mtcsconf    : 5,    // Number of MTCS conformers to use (these are the best X conformers according to BFintensity).
     maxpose     : 50,   // Number of poses to optimize (per posed conformer) prior to final score
@@ -102,8 +151,14 @@ local function main []
     local starttime = clock[];
     local inopt;
     ArgvReset ArgvExpand argv;
-    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose'], [1,1,1,1,0,0,1,1,1] ];
+    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit'], [1,1,1,1,0,0,1,1,1,0] ];
+    local remaining = ArgvAll [];
+    if not isnull remaining then
+        exit twrite ['ERROR: Unknown command line options: {}\n',remaining];
+    endif
+    write ['remaining: {}\n', remaining];
     inopt.delwat = delwat;
+    inopt.inducedfit = inducedfit;
     inopt.mtscorees = mtscorees;
     inopt.maxpose = atoi maxpose;
     inopt.mtcsconf = atoi mtcsconf;
@@ -132,6 +187,8 @@ local function main []
     endif
 
     local opt = DockOpt[];
+    opt = tagcat [ [maxpose: inopt.maxpose], opt ];
+    opt = tagcat [ [remaxpose: inopt.remaxpose], opt ];
 
     if not isnull conffilename then
         local confmdbname = twrite ['{}.mdb',fbase conffilename];
@@ -143,7 +200,7 @@ local function main []
         ];
         db_Sort [confmdbname,'BFIRank',1];
         if (db_nEntries confmdbname) > inopt.mtcsconf then
-            db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-5)]];
+            db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-inopt.mtcsconf)]];
         endif
         db_Sort [confmdbname,'BFIRank',0];
         opt.retainData = not (first db_Fields confmdbname == 'mol');
@@ -167,11 +224,16 @@ local function main []
         write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
     endif
     
+    if inopt.inducedfit then
+        opt.refine='Induced Fit';
+        opt.refine_opt.fixrec='Tether';   
+    endif
+    
     if mtscorees then
         opt = tagcat [ [rescoring: 'MTScoreES dG [QuantumBio]'], opt ];
     endif
-    write ['NOTE: RUNNING {} as MOE/Dock Final Scoring Function\n', opt.rescoring];
-    opt = tagcat [ [maxpose: inopt.maxpose], opt ];
+    
+    write ['NOTE: RUNNING {} Docking with {} as MOE/Dock Final Scoring Function\n', opt.refine, opt.rescoring];
     
     pot_Load '$MOE/lib/Amber10EHT.ff';
 
@@ -227,16 +289,18 @@ local function main []
         endif
 
     else
-        opt = tagcat [ [remaxpose: 25], opt ];
-        write ['opt: {}\n',opt];
         DockAtoms [ rec,  site,  lig, outf, opt];
     endif
 
     db_Sort [outf,'S',0];
-    db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];
-    
-    local mdbdata = db_Read [outf,first db_Entries outf];    
-    fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol]; 
+
+    if inopt.inducedfit then
+        dockmdb2mol2 [outf,twrite ['{}.mol2',fbase outf]];
+    else
+        db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];    
+        local mdbdata = db_Read [outf,first db_Entries outf];    
+        fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol]; 
+    endif
 
     write ['Docking finished in {} seconds & {} CPUseconds.\n', starttime-clock[], startcputime-cpuclock[] ];
 
