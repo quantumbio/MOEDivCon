@@ -89,7 +89,7 @@ function db_ExportSD;
 function DockAtoms;
 function DockFile;
 
-local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb]
+local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
     local mdb = db_Open db_file;
     local mfield = '';
 
@@ -101,8 +101,6 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb]
 
 	// run through the database and write the data to the file
 
-    local psys = SystemPush [];
-
     local ent = 0;
     local count = 0;
     local mol = [];
@@ -112,6 +110,8 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb]
     local inopt;
     local pdata;
     while (ent = db_NextEntry [mdb, ent]) loop
+        local psys = SystemPush [];
+        
         count = count + 1;
         local outmol2 = twrite ['{}_{}.mol2', fbase mol2_file, count];
         write['Translating .... {}\n',outmol2];
@@ -124,7 +124,14 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb]
             targ_chains = mol_Create mol;
             cSetName [targ_chains | cName targ_chains == '', mol(1)(MOL_NAME)];
         else
-            targ_chains = ReadAuto targ_pdb;
+            ReadAuto targ_pdb;
+            if mainopt.delwat then
+                write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING\n'];
+                oDestroy uniq cat aResidue _Atoms '$$solvent';
+            else
+                write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
+            endif
+            targ_chains = Chains[];
         endif
         
         mol =  pdata.(first mfield);        // ligand in dock.mdb
@@ -187,9 +194,10 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb]
         fclose foutnum;
         freplace [tmpMol2, outmol2];    // replace the old file with the new file (no need to keep both around)
         // END: (TEMPORARY KLUDGE ALERT) clean up '****' SUBSTRUCTURE "problem"
+        
+        SystemPop psys;
     endloop
 
-    SystemPop psys;
 
 endfunction
 
@@ -372,7 +380,7 @@ local function main []
     db_Sort [outf,'S',0];
 
     if inopt.inducedfit then
-        dockmdb2mol2 [outf,twrite ['{}.mol2',fbase outf],ligID,recfilename];
+        dockmdb2mol2 [outf,twrite ['{}.mol2',fbase outf],ligID,recfilename,inopt];
     else
         db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];    
         local mdbdata = db_Read [outf,first db_Entries outf];    
