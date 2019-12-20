@@ -89,8 +89,121 @@ function db_ExportSD;
 function DockAtoms;
 function DockFile;
 
+local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
+    local mdb = db_Open db_file;
+    local mfield = '';
+
+	// make sure that our database contains the right exportable field
+	// and then open the output file
+    local [fldnames, fldtypes] = db_Fields mdb;
+
+    mfield = fldnames | fldtypes == 'molecule';
+
+	// run through the database and write the data to the file
+
+    local ent = 0;
+    local count = 0;
+    local mol = [];
+    local targ_chains = [];
+    local lig_chains = [];
+    local chains = [];
+    local inopt;
+    local pdata;
+    while (ent = db_NextEntry [mdb, ent]) loop
+        local psys = SystemPush [];
+        
+        count = count + 1;
+        local outmol2 = twrite ['{}_{}.mol2', fbase mol2_file, count];
+        write['Translating .... {}\n',outmol2];
+        pdata = tag [fldnames, db_ReadFields [mdb, ent, fldnames]];
+    
+        inopt.pdata = pdata | m_diff [tags pdata, mfield];
+        
+        if length mfield == 2 then
+            mol =  pdata.(second mfield);       // receptor in dock.mdb
+            targ_chains = mol_Create mol;
+            cSetName [targ_chains | cName targ_chains == '', mol(1)(MOL_NAME)];
+        else
+            ReadAuto targ_pdb;
+            if mainopt.delwat then
+                write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING\n'];
+                oDestroy uniq cat aResidue _Atoms '$$solvent';
+            else
+                write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
+            endif
+            targ_chains = Chains[];
+        endif
+        
+        mol =  pdata.(first mfield);        // ligand in dock.mdb
+        lig_chains = mol_Create mol;
+        cSetName [lig_chains | cName lig_chains == '', mol(1)(MOL_NAME)];
+        
+        local ligResidue = first cat cResidues lig_chains;
+        local ligChain = rChain ligResidue;
+        
+        rSetINS [ligResidue, ligID.rINS];
+        rSetName [ligResidue, ligID.rName];
+        rSetType [ligResidue, ligID.rType];
+        rSetUID [ligResidue, ligID.rUID];
+
+        cSetName [ligChain, ligID.cName];
+        cSetGroup [ligChain, ligID.cGroup];
+        cSetNumber [ligChain, ligID.cNumber];
+        cSetTag [ligChain, ligID.cTag];
+
+        chains = cat [targ_chains,lig_chains];
+
+        fwrite_TriposMOL2 [outmol2,chains,inopt];
+        oDestroy chains;
+        
+        // START: (TEMPORARY KLUDGE ALERT) clean up '****' SUBSTRUCTURE "problem"
+        local tmpMol2 = twrite ['{}-tmp.mol2', fbase outmol2];
+        local fnum = fopenrz outmol2;
+        local foutnum = fopenw tmpMol2;
+        
+        local ldata;
+        local field_array;
+        local bSubStructure = 0;
+        while length (ldata = freadb [fnum, 'line', 1]) loop
+            ldata = swrite ['{}',ldata];
+            if strpos ["@<TRIPOS>SUBSTRUCTURE", ldata] == 1 then
+                bSubStructure = 1;
+            elseif strpos ["@<TRIPOS>", ldata] == 1 then
+                bSubStructure = 0;
+            endif
+            if bSubStructure then
+                field_array = wordsplit [ldata, " "];
+                if length field_array == 8 then
+                    if field_array(7) === "****" then       // For now we need to translate this to the residue code
+                        if field_array(2)(1) == "Q" and isscalarnum atoi twrite ['{}',field_array(2)(2)] then       // translate this MOE/Sybil-ism back to the original code
+                            field_array(2) = dropfirst field_array(2);
+                        endif
+                        while length field_array(2) < 4 loop
+                            field_array(2) = cat [field_array(2), " "];
+                        endloop
+                        // just want the last set of "****" (which corresponds to the residue)
+                        ldata = reverse ldata;
+                        ldata = splice [ldata, strpos ["****",ldata], 4, reverse field_array(2)];
+                        ldata = reverse ldata;
+                    endif
+                endif
+            endif
+            fwriteb [foutnum, 'line', ldata];        
+        endloop
+        fclose fnum;
+        fclose foutnum;
+        freplace [tmpMol2, outmol2];    // replace the old file with the new file (no need to keep both around)
+        // END: (TEMPORARY KLUDGE ALERT) clean up '****' SUBSTRUCTURE "problem"
+        
+        SystemPop psys;
+    endloop
+
+
+endfunction
+
 const DEFAULT_OPT = [
     delwat      : 0,    // Delete waters prior to performing docking/placement
+    inducedfit  : 0,    // Run induced fit (optimized protein) on dock
     mtscorees   : 0,    // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
     mtcsconf    : 5,    // Number of MTCS conformers to use (these are the best X conformers according to BFintensity).
     maxpose     : 50,   // Number of poses to optimize (per posed conformer) prior to final score
@@ -102,8 +215,14 @@ local function main []
     local starttime = clock[];
     local inopt;
     ArgvReset ArgvExpand argv;
-    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose'], [1,1,1,1,0,0,1,1,1] ];
+    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, dockmdb] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-dockmdb'], [1,1,1,1,0,0,1,1,1,0,1] ];
+    local remaining = ArgvAll [];
+    if not isnull remaining then
+        exit twrite ['ERROR: Unknown command line options: {}\n',remaining];
+    endif
+    write ['remaining: {}\n', remaining];
     inopt.delwat = delwat;
+    inopt.inducedfit = inducedfit;
     inopt.mtscorees = mtscorees;
     inopt.maxpose = atoi maxpose;
     inopt.mtcsconf = atoi mtcsconf;
@@ -123,120 +242,150 @@ local function main []
     
     if not isnull ligfilename then
         local lig = cat cat cAtoms ReadAuto ligfilename;
-        oReparent [diff [lig, first lig], aResidue first lig];  // MOE appears to need all lignad atoms in a single residue
+        local ligResidue = aResidue first lig;
+        oReparent [diff [lig, first lig], ligResidue];  // MOE appears to need all lignad atoms in a single residue
         if isnull lig then
             exit twrite ['Cannot read receptor file {}', ligfilename];
         endif
     else
         exit twrite ['Use -lig command line argument to provide an input file for LIGAND'];
     endif
+        
+    // Need the UID, etc of the ligand read in so the write process can rename back (this circumvents the SDF problem which effectively "washes" out these terms).
+    local ligChain = rChain ligResidue;
+    local ligID;
+    ligID.rINS = rINS ligResidue;
+    ligID.rName = rName ligResidue;
+    ligID.rNumber = rNumber ligResidue;
+    ligID.rType = rType ligResidue;
+    ligID.rUID = rUID ligResidue;
+    
+    ligID.cName = fext cName ligChain;
+    ligID.cGroup = cGroup ligChain;   
+    ligID.cNumber = cNumber ligChain;   
+    ligID.cTag = cTag ligChain;
+    
+    // if the user provides a dockmdb then we assume they wish to perform the final translation to qmechanic-readabe output (SDF or MOL2 depending)
+    if isnull dockmdb then
 
-    local opt = DockOpt[];
+        local opt = DockOpt[];
+        opt = tagcat [ [maxpose: inopt.maxpose], opt ];
+        opt = tagcat [ [remaxpose: inopt.remaxpose], opt ];
 
-    if not isnull conffilename then
-        local confmdbname = twrite ['{}.mdb',fbase conffilename];
-//        db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
-        db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol',
-            ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
-            ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
-            ['double','int','double','char','double','double']        
-        ];
-        db_Sort [confmdbname,'BFIRank',1];
-        if (db_nEntries confmdbname) > inopt.mtcsconf then
-            db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-5)]];
+        if not isnull conffilename then
+            local confmdbname = twrite ['{}.mdb',fbase conffilename];
+    //        db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
+            db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol',
+                ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
+                ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
+                ['double','int','double','char','double','double']        
+            ];
+            db_Sort [confmdbname,'BFIRank',1];
+            if (db_nEntries confmdbname) > inopt.mtcsconf then
+                db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-inopt.mtcsconf)]];
+            endif
+            db_Sort [confmdbname,'BFIRank',0];
+            opt.retainData = not (first db_Fields confmdbname == 'mol');
         endif
-        db_Sort [confmdbname,'BFIRank',0];
-        opt.retainData = not (first db_Fields confmdbname == 'mol');
-    endif
 
-    // For older versions of MOE - need to rename BFIRank to mseq so it can be used in MTCS calculation    
-    if MOE_VERSION < 2018 then
-        db_RenameField [confmdbname,'BFIRank','mseq'];
-    endif
-        
-    if isnull outf then
-        outf = twrite ['{}_dock.mdb',fbase ligfilename];
-    else
-        outf = twrite ['{}.mdb',fbase outf];
-    endif;
-    
-    if inopt.delwat then
-        write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING\n'];
-        oDestroy uniq cat aResidue _Atoms '$$solvent';
-    else
-        write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
-    endif
-    
-    if mtscorees then
-        opt = tagcat [ [rescoring: 'MTScoreES dG [QuantumBio]'], opt ];
-    endif
-    write ['NOTE: RUNNING {} as MOE/Dock Final Scoring Function\n', opt.rescoring];
-    opt = tagcat [ [maxpose: inopt.maxpose], opt ];
-    
-    pot_Load '$MOE/lib/Amber10EHT.ff';
-
-	// Note that the following is the general potential set up only.
-	// Individual stages like refinement may use a modified set up.
-    pot_Setup [
-        strEnable: 1,
-        angEnable: 1,
-        stbEnable: 1,
-        oopEnable: 1,
-        torEnable: 1,
-        vdwEnable: 1,
-        eleEnable: 1,
-        solEnable: 0,
-        resEnable: 1,
-        strWeight: 1,
-        angWeight: 1,
-        stbWeight: 1,
-        oopWeight: 1,
-        torWeight: 1,
-        vdwWeight: 1,
-        eleWeight: 1,
-        solWeight: 1,
-        resWeight: 1,
-        cutoffEnable: 1,
-        cutoffOn: 8,
-        cutoffOff: 10,
-        eleDist: 2,
-        vdwScale14: 0.5,
-        vdwBuffer1: 0,
-        vdwBuffer2: 0,
-        eleScale14: 0.833333,
-        eleDielectric: 1,
-        eleBuffer: 0,
-        solDielectric: 80,
-        solDielectricOffset: 0,
-        state0: 1,
-        state1: 0,
-        state2: 1,
-        threadCount: 0
-    ];
-    lig = lig | oValid lig;
-    rec = rec | oValid rec;
-    local site = lig;
-
-    if not isnull confmdbname then
-        opt = tagcat [ [ligmdbname: confmdbname], opt ];
-        DockFile [rec, site, confmdbname, outf, opt];
-        
-        // For older versions of MOE - need to rename mseq to BFIRank so it can be used in MTCS calculation
+        // For older versions of MOE - need to rename BFIRank to mseq so it can be used in MTCS calculation    
         if MOE_VERSION < 2018 then
-            db_RenameField [outf,'mseq','BFIRank'];
+            db_RenameField [confmdbname,'BFIRank','mseq'];
         endif
-
-    else
-        opt = tagcat [ [remaxpose: 25], opt ];
-        write ['opt: {}\n',opt];
-        DockAtoms [ rec,  site,  lig, outf, opt];
-    endif
-
-    db_Sort [outf,'S',0];
-    db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];
+        
+        if isnull outf then
+            outf = twrite ['{}_dock.mdb',fbase ligfilename];
+        else
+            outf = twrite ['{}.mdb',fbase outf];
+        endif;
     
-    local mdbdata = db_Read [outf,first db_Entries outf];    
-    fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol]; 
+        if inopt.delwat then
+            write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING\n'];
+            oDestroy uniq cat aResidue _Atoms '$$solvent';
+        else
+            write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
+        endif
+    
+        if inopt.inducedfit then
+            opt.refine='Induced Fit';
+            opt.refine_opt.fixrec='Tether';   
+        endif
+    
+        if mtscorees then
+            opt = tagcat [ [rescoring: 'MTScoreES dG [QuantumBio]'], opt ];
+        endif
+    
+        write ['NOTE: RUNNING {} Docking with {} as MOE/Dock Final Scoring Function\n', opt.refine, opt.rescoring];
+    
+        pot_Load '$MOE/lib/Amber10EHT.ff';
+
+        // Note that the following is the general potential set up only.
+        // Individual stages like refinement may use a modified set up.
+        pot_Setup [
+            strEnable: 1,
+            angEnable: 1,
+            stbEnable: 1,
+            oopEnable: 1,
+            torEnable: 1,
+            vdwEnable: 1,
+            eleEnable: 1,
+            solEnable: 0,
+            resEnable: 1,
+            strWeight: 1,
+            angWeight: 1,
+            stbWeight: 1,
+            oopWeight: 1,
+            torWeight: 1,
+            vdwWeight: 1,
+            eleWeight: 1,
+            solWeight: 1,
+            resWeight: 1,
+            cutoffEnable: 1,
+            cutoffOn: 8,
+            cutoffOff: 10,
+            eleDist: 2,
+            vdwScale14: 0.5,
+            vdwBuffer1: 0,
+            vdwBuffer2: 0,
+            eleScale14: 0.833333,
+            eleDielectric: 1,
+            eleBuffer: 0,
+            solDielectric: 80,
+            solDielectricOffset: 0,
+            state0: 1,
+            state1: 0,
+            state2: 1,
+            threadCount: 0
+        ];
+        lig = lig | oValid lig;
+        rec = rec | oValid rec;
+        local site = lig;
+
+        if not isnull confmdbname then
+            opt = tagcat [ [ligmdbname: confmdbname], opt ];
+            DockFile [rec, site, confmdbname, outf, opt];
+        
+            // For older versions of MOE - need to rename mseq to BFIRank so it can be used in MTCS calculation
+            if MOE_VERSION < 2018 then
+                db_RenameField [outf,'mseq','BFIRank'];
+            endif
+
+        else
+            DockAtoms [ rec,  site,  lig, outf, opt];
+        endif
+    else
+        outf = dockmdb;
+    endif
+    
+    db_Sort [outf,'S',0];
+
+    if inopt.inducedfit then
+        dockmdb2mol2 [outf,twrite ['{}.mol2',fbase outf],ligID,recfilename,inopt];
+    else
+        db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];    
+        local mdbdata = db_Read [outf,first db_Entries outf];    
+        fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol]; 
+    endif
 
     write ['Docking finished in {} seconds & {} CPUseconds.\n', starttime-clock[], startcputime-cpuclock[] ];
 

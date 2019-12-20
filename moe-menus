@@ -27,11 +27,11 @@
 #         ENDMENU
 # ENDMENU
 
-MENU APPEND "Main"
+MENU APPEND "Main:Extra"
     "QuantumBio"
         MENU  "QuantumBio"
-    "Standard Preparation..."       exec "qbPrepareSystemPanel[]"
-    "Fix Charged Atoms..."      exec "qbFixChargedAtomsPanel[]"
+#    "Standard Preparation..."       exec "qbPrepareSystemPanel[]"
+#    "Fix Charged Atoms..."      exec "qbFixChargedAtomsPanel[]"
     "Refinement Preparation..."     exec "qbPhenixPrepPanel[]"
     
 #    SEPARATOR
@@ -44,10 +44,9 @@ MENU APPEND "Main"
 #            "NMR Perturbation..." exec "run'perturbpanel.svl'"
 #            "PWD Visualization..."           exec "run'pwdpanel.svl'"
 #            "Toolbox"               submenu "QuantumBio:Toolbox"
-	    SEPARATOR
 	"MTScoreES - Interactive (beta)"    exec "qbInteractiveMTScoreUI[]"
 	    SEPARATOR
-            "Help ..."  exec "LaunchDocument'$QBHOME/doc/help.html'"	    
+            "Help ..."  exec "LaunchDocument'http://www.quantumbioinc.com/support/'"	    
         ENDMENU
 ENDMENU
 
