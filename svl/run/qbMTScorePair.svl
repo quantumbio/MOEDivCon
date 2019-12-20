@@ -1,0 +1,33 @@
+#svl
+
+//  USAGE:
+//      moebatch -run qbMTScorePair.svl -rec receptor.pdb -lig ligand.mol2 [-host URL -port ####]
+
+global argv;
+function ArgvPull;
+
+function qbWS_MTScore;
+
+local function main []
+    ArgvReset ArgvExpand argv;
+    local [targetfile, ligandfile, hostname, portnum] = ArgvPull [ ['-rec', '-lig','-host','-port'], [1,1,1,1] ];
+
+    write ['Processing: {} {} {} {}\n',targetfile, ligandfile, hostname, portnum];
+
+    local pdata = SystemPush [];
+    local starttime = clock [];
+    local targetobj, ligandobj;
+    targetobj = ReadAuto targetfile;
+    ligandobj = ReadAuto ligandfile;
+    // ligandobj = _Atoms '$$ligand';
+    
+//    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
+    local tmpJSON = qbWS_MTScore [targetobj,ligandobj, hostname, portnum];
+//    write ['{} {} {}  | {} sec\n', tmpJSON.('MTScoreES'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
+    write ['MTScoreES: {} kcal/mol  | {} sec\n', tmpJSON.('MTScoreES'), (clock [] - starttime) ];
+//    write ['MTScore: {} : {} | {} {} {}  | {} sec\n', fbase ftail targetfile, fbase ftail ligandfile, tmpJSON.('MTScore'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
+
+    SystemPop pdata;
+
+
+endfunction
