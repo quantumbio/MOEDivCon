@@ -199,7 +199,8 @@ const DEFAULT_OPT = [
     mtscorees   : 0,    // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
     mtcsconf    : 5,    // Number of MTCS conformers to use (these are the best X conformers according to BFintensity).
     maxpose     : 50,   // Number of poses to optimize (per posed conformer) prior to final score
-    remaxpose   : 5     // Max number of poses to return per conformer (after optimization)
+    remaxpose   : 5,    // Max number of poses to return per conformer (after optimization)
+    rigidlig    : 0     // Run with the ligand/conformation treated rigidly
 ];
 
 local function main []
@@ -207,7 +208,7 @@ local function main []
     local starttime = clock[];
     local inopt;
     ArgvReset ArgvExpand argv;
-    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, dockmdb] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-dockmdb'], [1,1,1,1,0,0,1,1,1,0,1] ];
+    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb'], [1,1,1,1,0,0,1,1,1,0,0,1] ];
     local remaining = ArgvAll [];
     if not isnull remaining then
         exit twrite ['ERROR: Unknown command line options: {}\n',remaining];
@@ -219,6 +220,7 @@ local function main []
     inopt.maxpose = atoi maxpose;
     inopt.mtcsconf = atoi mtcsconf;
     inopt.remaxpose = atoi remaxpose;
+    inopt.rigidlig = rigidlig;
     inopt = tagcat [inopt, DEFAULT_OPT];
     
     write ['inopt: {}\n',inopt];
@@ -302,6 +304,12 @@ local function main []
             opt.refine='Induced Fit';
             opt.refine_opt.fixrec='Tether';   
         endif
+        
+        if inopt.rigidlig then
+    write ['in rigidlig\n'];
+            opt.refine_opt.rigidlig=1;   
+            opt.refine_opt.rigidPlanar=1;   
+        endif            
     
         if mtscorees then
             opt = tagcat [ [rescoring: 'MTScoreES dG [QuantumBio]'], opt ];
@@ -372,7 +380,7 @@ local function main []
     db_Sort [outf,'S',0];
 
     if inopt.inducedfit then
-        dockmdb2mol2 [outf,twrite ['{}.mol2',fbase outf],ligID,recfilename];
+        dockmdb2mol2 [outf,twrite ['{}.mol2',fbase outf],ligID,recfilename,inopt];
     else
         db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];    
         local mdbdata = db_Read [outf,first db_Entries outf];    
