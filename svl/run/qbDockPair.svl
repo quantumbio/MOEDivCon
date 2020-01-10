@@ -227,7 +227,16 @@ local function main []
     inopt.maxpose = atoi maxpose;
     inopt.mtcsconf = atoi mtcsconf;
     inopt.remaxpose = atoi remaxpose;
-    inopt = tagcat [inopt, DEFAULT_OPT];
+    
+    // In the event that no conformers are provided we will use the standard docking function.
+    //  With that in mind, we should bump up the defaults.
+    local defaults = DEFAULT_OPT;
+    if isnull conffilename then
+        defaults.maxpose = ceil (DEFAULT_OPT.maxpose * (DEFAULT_OPT.maxpose/DEFAULT_OPT.remaxpose/2));
+        defaults.remaxpose = ceil (DEFAULT_OPT.remaxpose * (DEFAULT_OPT.maxpose/DEFAULT_OPT.remaxpose/2));
+    endif
+    
+    inopt = tagcat [inopt, defaults];
     
     write ['inopt: {}\n',inopt];
 
