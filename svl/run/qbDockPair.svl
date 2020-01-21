@@ -113,7 +113,7 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
         local psys = SystemPush [];
         
         count = count + 1;
-        local outmol2 = twrite ['{}_{}.mol2', fbase mol2_file, count];
+        local outmol2 = twrite ['{}_{}.{}', fbase mol2_file, count, fext mol2_file];
         write['Translating .... {}\n',outmol2];
         pdata = tag [fldnames, db_ReadFields [mdb, ent, fldnames]];
     
@@ -153,47 +153,52 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
 
         chains = cat [targ_chains,lig_chains];
 
-        fwrite_TriposMOL2 [outmol2,chains,inopt];
-        oDestroy chains;
+        if fext mol2_file == 'pdb' then
+            fwrite_PDB [outmol2,chains,inopt];
+        else
+            fwrite_TriposMOL2 [outmol2,chains,inopt];
+#if 0
+            // START: (TEMPORARY KLUDGE ALERT) clean up '****' SUBSTRUCTURE "problem"
+            local tmpMol2 = twrite ['{}-tmp.mol2', fbase outmol2];
+            local fnum = fopenrz outmol2;
+            local foutnum = fopenw tmpMol2;
         
-        // START: (TEMPORARY KLUDGE ALERT) clean up '****' SUBSTRUCTURE "problem"
-        local tmpMol2 = twrite ['{}-tmp.mol2', fbase outmol2];
-        local fnum = fopenrz outmol2;
-        local foutnum = fopenw tmpMol2;
-        
-        local ldata;
-        local field_array;
-        local bSubStructure = 0;
-        while length (ldata = freadb [fnum, 'line', 1]) loop
-            ldata = swrite ['{}',ldata];
-            if strpos ["@<TRIPOS>SUBSTRUCTURE", ldata] == 1 then
-                bSubStructure = 1;
-            elseif strpos ["@<TRIPOS>", ldata] == 1 then
-                bSubStructure = 0;
-            endif
-            if bSubStructure then
-                field_array = wordsplit [ldata, " "];
-                if length field_array == 8 then
-                    if field_array(7) === "****" then       // For now we need to translate this to the residue code
-                        if field_array(2)(1) == "Q" and isscalarnum atoi twrite ['{}',field_array(2)(2)] then       // translate this MOE/Sybil-ism back to the original code
-                            field_array(2) = dropfirst field_array(2);
+            local ldata;
+            local field_array;
+            local bSubStructure = 0;
+            while length (ldata = freadb [fnum, 'line', 1]) loop
+                ldata = swrite ['{}',ldata];
+                if strpos ["@<TRIPOS>SUBSTRUCTURE", ldata] == 1 then
+                    bSubStructure = 1;
+                elseif strpos ["@<TRIPOS>", ldata] == 1 then
+                    bSubStructure = 0;
+                endif
+                if bSubStructure then
+                    field_array = wordsplit [ldata, " "];
+                    if length field_array == 8 then
+                        if field_array(7) === "****" then       // For now we need to translate this to the residue code
+                            if field_array(2)(1) == "Q" and isscalarnum atoi twrite ['{}',field_array(2)(2)] then       // translate this MOE/Sybil-ism back to the original code
+                                field_array(2) = dropfirst field_array(2);
+                            endif
+                            while length field_array(2) < 4 loop
+                                field_array(2) = cat [field_array(2), " "];
+                            endloop
+                            // just want the last set of "****" (which corresponds to the residue)
+                            ldata = reverse ldata;
+                            ldata = splice [ldata, strpos ["****",ldata], 4, reverse field_array(2)];
+                            ldata = reverse ldata;
                         endif
-                        while length field_array(2) < 4 loop
-                            field_array(2) = cat [field_array(2), " "];
-                        endloop
-                        // just want the last set of "****" (which corresponds to the residue)
-                        ldata = reverse ldata;
-                        ldata = splice [ldata, strpos ["****",ldata], 4, reverse field_array(2)];
-                        ldata = reverse ldata;
                     endif
                 endif
-            endif
-            fwriteb [foutnum, 'line', ldata];        
-        endloop
-        fclose fnum;
-        fclose foutnum;
-        freplace [tmpMol2, outmol2];    // replace the old file with the new file (no need to keep both around)
-        // END: (TEMPORARY KLUDGE ALERT) clean up '****' SUBSTRUCTURE "problem"
+                fwriteb [foutnum, 'line', ldata];        
+            endloop
+            fclose fnum;
+            fclose foutnum;
+            freplace [tmpMol2, outmol2];    // replace the old file with the new file (no need to keep both around)
+            // END: (TEMPORARY KLUDGE ALERT) clean up '****' SUBSTRUCTURE "problem"
+#endif
+        endif
+        oDestroy chains;
         
         SystemPop psys;
     endloop
@@ -204,6 +209,7 @@ endfunction
 const DEFAULT_OPT = [
     delwat      : 0,    // Delete waters prior to performing docking/placement
     inducedfit  : 0,    // Run induced fit (optimized protein) on dock
+    ifformat    : 'pdb',    // output this version of output for induced fit (can be either 'pdb' or 'mol2')
     mtscorees   : 0,    // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
     mtcsconf    : 5,    // Number of MTCS conformers to use (these are the best X conformers according to BFintensity).
     maxpose     : 50,   // Number of poses to optimize (per posed conformer) prior to final score
@@ -216,7 +222,7 @@ local function main []
     local starttime = clock[];
     local inopt;
     ArgvReset ArgvExpand argv;
-    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb'], [1,1,1,1,0,0,1,1,1,0,0,1] ];
+    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, ifformat] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-ifformat'], [1,1,1,1,0,0,1,1,1,0,0,1,1] ];
     local remaining = ArgvAll [];
     if not isnull remaining then
         exit twrite ['ERROR: Unknown command line options: {}\n',remaining];
@@ -229,6 +235,7 @@ local function main []
     inopt.mtcsconf = atoi mtcsconf;
     inopt.remaxpose = atoi remaxpose;
     inopt.rigidlig = rigidlig;
+    inopt.ifformat = ifformat;
 
     // In the event that no conformers are provided we will use the standard docking function.
     //  With that in mind, we should bump up the defaults.
@@ -397,7 +404,7 @@ local function main []
     db_Sort [outf,'S',0];
 
     if inopt.inducedfit then
-        dockmdb2mol2 [outf,twrite ['{}.mol2',fbase outf],ligID,recfilename,inopt];
+        dockmdb2mol2 [outf,twrite ['{}.{}',fbase outf,inopt.ifformat],ligID,recfilename,inopt];
     else
         db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];    
         local mdbdata = db_Read [outf,first db_Entries outf];    
