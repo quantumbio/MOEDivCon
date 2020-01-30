@@ -268,6 +268,12 @@ local function main []
     else
         exit twrite ['Use -lig command line argument to provide an input file for LIGAND'];
     endif
+
+    if isnull outf then
+        outf = twrite ['{}_dock.mdb',fbase ftail ligfilename];
+    else
+        outf = twrite ['{}.mdb',fbase outf];
+    endif;
         
     // Need the UID, etc of the ligand read in so the write process can rename back (this circumvents the SDF problem which effectively "washes" out these terms).
     local ligChain = rChain ligResidue;
@@ -291,8 +297,7 @@ local function main []
         opt = tagcat [ [remaxpose: inopt.remaxpose], opt ];
 
         if not isnull conffilename then
-            local confmdbname = twrite ['{}.mdb',fbase conffilename];
-    //        db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol'];
+            local confmdbname = twrite ['{}.mdb',fbase ftail conffilename];
             db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol',
                 ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
                 ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
@@ -310,27 +315,20 @@ local function main []
         if MOE_VERSION < 2018 then
             db_RenameField [confmdbname,'BFIRank','mseq'];
         endif
-        
-        if isnull outf then
-            outf = twrite ['{}_dock.mdb',fbase ligfilename];
-        else
-            outf = twrite ['{}.mdb',fbase outf];
-        endif;
-    
+
         if inopt.delwat then
             write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING\n'];
             oDestroy uniq cat aResidue _Atoms '$$solvent';
         else
             write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
         endif
-    
+
         if inopt.inducedfit then
             opt.refine='Induced Fit';
             opt.refine_opt.fixrec='Tether';   
         endif
         
         if inopt.rigidlig then
-    write ['in rigidlig\n'];
             opt.refine_opt.rigidlig=1;   
             opt.refine_opt.rigidPlanar=1;   
         endif            
@@ -397,18 +395,16 @@ local function main []
         else
             DockAtoms [ rec,  site,  lig, outf, opt];
         endif
-    else
-        outf = dockmdb;
+        dockmdb = outf;
     endif
     
-    db_Sort [outf,'S',0];
-
+    db_Sort [dockmdb,'S',0];
     if inopt.inducedfit then
-        dockmdb2mol2 [outf,twrite ['{}.{}',fbase outf,inopt.ifformat],ligID,recfilename,inopt];
+        dockmdb2mol2 [dockmdb,twrite ['{}.{}',fbase ftail outf,inopt.ifformat],ligID,recfilename,inopt];
     else
-        db_ExportSD [ outf, twrite ['{}.sdf',fbase outf] ];    
-        local mdbdata = db_Read [outf,first db_Entries outf];    
-        fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol]; 
+        db_ExportSD [ dockmdb, twrite ['{}.sdf',fbase outf] ];
+        local mdbdata = db_Read [dockmdb,first db_Entries dockmdb];
+        fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol];
     endif
 
     write ['Docking finished in {} seconds & {} CPUseconds.\n', starttime-clock[], startcputime-cpuclock[] ];
