@@ -153,73 +153,121 @@ global function qbRunMTPairList listfile
     endloop
 endfunction
 
-global function qbWSConfig wparent
+global function qbWSConfig [cmd, wkey, trigger, values]
 
     local DEFAULTS = [
         qbWSHostname: GetRC ['QuantumBio.qbWSHostname','localhost'],
         qbWSPort:     GetRCNumber ['QuantumBio.qbWSPort',8080]
     ];
-
-    local wkey = WindowCreate
-    [
-        title: 'qbWebService Setup',
-        name: 'panel',
-        text:   ['Save','Cancel'],
-        onTrigger: ['validate','return'],
-        bubbleHelp: [
-            'Configure qbWebService (hostname and port).'
-        ], 
-        Mbox : [
-            Text : [
-                title: 'Hostname:', name: 'qbWSHostname', type: 'char',allowBlank:0,len:20,
-                value: GetRC ['QuantumBio.qbWSHostname','localhost'],
-                shortcut: ['localhost'],
-                onTrigger: 'return',
-                bubbleHelp: 'Enter hostname (default: localhost).'
-            ],
-            Hbox : [            
-                Text : [
-                    title: 'Port:', name: 'qbWSPort', type: 'int',allowBlank:0,len:5,
-                    value: GetRCNumber ['QuantumBio.qbWSPort',8080],
-                    shortcut: ['8080','8081','8082'],
-                    onTrigger: 'return',
-                    bubbleHelp: 'Enter the port number (default: 8080).'
-                ],
-                Label : [
-                    text: '', name: 'wsStatus', centerH: 1, extendH: 1
-                ]
-            ]
-        ]
-    ];
-
-    function UpdateStatus wkey
-        local values = WindowValues wkey;
-        local tmpURL = twrite ['http://{}:{}', values.qbWSHostname, values.qbWSPort];
-        local tmpConnect = qbWSTestEndpoint tmpURL;
-        if length tmpConnect == 0 then
-            WindowSetAttr [wkey, [wsStatus: [text: 'No Connection', foreground: 'red']]];
-        else
-            WindowSetAttr [wkey, [wsStatus: [text: 'Connection OK', foreground: 'blue']]];
-        endif                        
-    endfunction
     
-    WindowShow wkey;
-    UpdateStatus wkey;
-    loop
-        local [values, trigger] = WindowWait wkey;
-        if trigger === 'qbWSHostname' or trigger === 'qbWSPort' then
-            UpdateStatus wkey;
-        elseif trigger === 'panel' then
-            if values.panel == 'Cancel' then break; endif
-            if values.panel == 'Save' then
-                SetRC ['QuantumBio.qbWSHostname',values.qbWSHostname];
-                SetRCNumber ['QuantumBio.qbWSPort',values.qbWSPort];
-                break;
-            endif
+    local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
+    
+    function apprHost inName
+        const hostlen = 10;
+        inName = string inName;
+        if length inName > hostlen then
+            inName = twrite ['{}...',resize [inName,hostlen]];
         endif
-    endloop
-    WindowDestroy wkey;
+        return twrite ['{}',inName];
+    endfunction
+
+    if cmd == 'getWidget' then
+        return [
+//            Hbox:   [
+                extendH: 1,
+                Label: [
+                    text: 'qbWebService:',
+                    font: 'mediumFixedBold'
+                ],
+                Label: [
+                    name: 'qbwebservice_info',
+                    text: twrite ['{}:{}', apprHost GetRC ['QuantumBio.qbWSHostname','localhost'],GetRCNumber ['QuantumBio.qbWSPort',8080]],
+                    bubbleHelp:twrite ['{}:{}',GetRC ['QuantumBio.qbWSHostname','localhost'],GetRCNumber ['QuantumBio.qbWSPort',8080]]
+                ],
+                Button: [
+                    title: '', name: 'button_WSsetup', graphics: config,
+                    bubbleHelp: 'Configure QuantumBio WebSerice (host and port).'
+                ]
+//            ]
+        ];
+    elseif cmd == 'processWidget' then
     
+        if trigger === 'button_WSsetup' then
+    
+            local wConfKey = WindowCreate
+            [
+                title: 'qbWebService Setup',
+                name: 'panel',
+                text:   ['Save','Cancel'],
+                onTrigger: ['validate','return'],
+                bubbleHelp: [
+                    'Configure qbWebService (hostname and port).'
+                ], 
+                Mbox : [
+                    Text : [
+                        title: 'Hostname:', name: 'qbWSHostname', type: 'char',allowBlank:0,len:20,
+                        value: GetRC ['QuantumBio.qbWSHostname','localhost'],
+                        shortcut: ['localhost'],
+                        onTrigger: 'return',
+                        bubbleHelp: 'Enter hostname (default: localhost).'
+                    ],
+                    Hbox : [            
+                        Text : [
+                            title: 'Port:', name: 'qbWSPort', type: 'int',allowBlank:0,len:5,
+                            value: GetRCNumber ['QuantumBio.qbWSPort',8080],
+                            shortcut: ['8080','8081','8082'],
+                            onTrigger: 'return',
+                            bubbleHelp: 'Enter the port number (default: 8080).'
+                        ],
+                        Label : [
+                            text: '', name: 'wsStatus', centerH: 1, extendH: 1
+                        ]
+                    ]
+                ]
+            ];
+
+            function UpdateStatus wConfKey
+                local vals = WindowValues wConfKey;
+                local tmpURL = twrite ['http://{}:{}', vals.qbWSHostname, vals.qbWSPort];
+                local tmpConnect = qbWSTestEndpoint tmpURL;
+                if length tmpConnect == 0 then
+                    WindowSetAttr [wConfKey, [wsStatus: [text: 'No Connection', foreground: 'red']]];
+                else
+                    WindowSetAttr [wConfKey, [wsStatus: [text: 'Connection OK', foreground: 'blue']]];
+                endif                        
+            endfunction
+    
+            WindowShow wConfKey;
+            UpdateStatus wConfKey;
+            loop
+                local [vals, trig] = WindowWait wConfKey;
+                if trig === 'qbWSHostname' or trig === 'qbWSPort' then
+                    UpdateStatus wConfKey;
+                elseif trig === 'panel' then
+                    if vals.panel == 'Cancel' then break; endif
+                    if vals.panel == 'Save' then
+                        SetRC ['QuantumBio.qbWSHostname',vals.qbWSHostname];
+                        SetRCNumber ['QuantumBio.qbWSPort',vals.qbWSPort];
+                        break;
+                    endif
+                endif
+            endloop
+            WindowDestroy wConfKey;
+    
+            WindowSetAttr [wkey, [
+            qbwebservice_info: [text:twrite ['{}:{}',
+                apprHost GetRC ['QuantumBio.qbWSHostname','localhost'],
+                GetRCNumber ['QuantumBio.qbWSPort',8080]],
+                bubbleHelp:twrite ['{}:{}',
+                GetRC ['QuantumBio.qbWSHostname','localhost'],
+                GetRCNumber ['QuantumBio.qbWSPort',8080]]
+                ]
+            ]];
+            return 1;
+        endif
+        return 0;
+    endif
+        
 endfunction
 
 #eof
