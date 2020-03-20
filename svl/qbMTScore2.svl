@@ -13,6 +13,7 @@
 
 function qbWS_MTScore;
 function qbWSTestEndpoint;
+function qbWSConfig;
 
 local function ScoreMTScore_dG [recatoms, ligatoms, ff, rec]
     // This function is effectively a "wrapper" for the call to the MTScore webservice
@@ -139,16 +140,6 @@ endfunction
 
 // functions necessary for the qbInteractiveMTScoreUpdate panel
 
-function apprHost inName
-    const hostlen = 10;
-    inName = string inName;
-    if length inName > hostlen then
-        inName = twrite ['{}...',resize [inName,hostlen]];
-    endif
-    return twrite ['{}',inName];
-endfunction
-
-
 const WINDOW_NAME = 'QuantumBio/MTScore BETA';		// window title
 
 // MakePanel only takes care of what the panel looks like but not the contents or processing any triggers.
@@ -156,30 +147,17 @@ local function MakePanel opt
 
     local opt_enableSidepanel = GetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', 0];
 
-    local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
     local openicon = gr_icon ['$MOE/lib/icon/open.ico', 12, 'foreground'];
-        
+    
+    write ['{}\n',qbWSConfig ['getWidget']];       // lmw - standard WS config widget
+            
     local window = [
         title: WINDOW_NAME,
         name: 'shell', 
         text: [select ['Detach', 'Attach', opt_enableSidepanel], 'Close'],
         onTrigger: ['return', 'exit'],
         Vbox: [
-            Hbox:   [
-                Label: [
-                    text: 'qbWebService:',
-                    font: 'mediumFixedBold'
-                ],
-                Label: [
-                    name: 'qbwebservice_info',
-                    text: twrite ['{}:{}', apprHost GetRC ['QuantumBio.qbWSHostname','localhost'],GetRCNumber ['QuantumBio.qbWSPort',8080]],
-                    bubbleHelp:twrite ['{}:{}',GetRC ['QuantumBio.qbWSHostname','localhost'],GetRCNumber ['QuantumBio.qbWSPort',8080]]
-                ],
-                Button: [
-                    title: '', name: 'button_WSsetup', graphics: config,
-                    bubbleHelp: 'Configure QuantumBio WebSerice (host and port).'
-                ]
-            ],
+            Hbox:   qbWSConfig ['getWidget'],       // lmw - standard WS config widget
             Hbox:   [
                 Label:  [
                     text: 'Status: '
@@ -282,12 +260,14 @@ local function MakePanel opt
 endfunction
 
 // forward declarations
-function qbWSConfig;
 function PartialCharge;
 
 local function SyncMDB wkey
     // If the DB exists, open it and check contents
     local dataFile = second cat WindowGetData [wkey, 'outdb'];
+    if dataFile == '' then
+        return;
+    endif
     if ftype dataFile == '' then
         db_Open [dataFile, 'create'];
     endif
@@ -438,6 +418,20 @@ local function ReadyMonitor wkey
     endloop
 endfunction
 
+// qbAmberTIPanel is a function which is to take care of all of the AMBERTI processing (so the changes to CCG code is minimal)
+global function qbAmberTIPanel [cmd, wkey, trigger, values]
+    if cmd == 'getWidget' then
+        return [
+            margin: 5,
+            columns: 1, extendH: 0,
+            Hbox: qbWSConfig ['getWidget'],       // standard call to build/get qbWebService status (consistent between QB widgets)
+            Label : [text: 'this is a test']
+        ];
+    elseif cmd == 'processWidget' then
+        return qbWSConfig ['processWidget', wkey, trigger, values];
+    endif
+endfunction
+
 global function qbInteractiveMTScoreUI opt
 
     local wkey = WindowCreate MakePanel opt;
@@ -491,18 +485,7 @@ global function qbInteractiveMTScoreUI opt
         scoresList = values.scoresList;
         namesList = values.namesList;
 //        write ['values: {}\ntrigger: {}\n', values, trigger];        
-        if trigger === 'button_WSsetup' then
-            qbWSConfig wkey;
-            WindowSetAttr [wkey, [
-                qbwebservice_info: [text:twrite ['{}:{}',
-                    apprHost GetRC ['QuantumBio.qbWSHostname','localhost'],
-                    GetRCNumber ['QuantumBio.qbWSPort',8080]],
-                    bubbleHelp:twrite ['{}:{}',
-                    GetRC ['QuantumBio.qbWSHostname','localhost'],
-                    GetRCNumber ['QuantumBio.qbWSPort',8080]]
-                    ]
-            ]];
-        elseif trigger === 'showSelection' or trigger === 'slist' then
+        if trigger === 'showSelection' or trigger === 'slist' then
             if first values.slist and first values.slist <> prevSelected then
                 prevSelected = first values.slist;
                 local parentResidue = uniq aResidue _Atoms '$$ligand';
@@ -617,6 +600,8 @@ global function qbInteractiveMTScoreUI opt
                 task_call [ 'qbInteractiveMTScoreUI', [], [master:'none', creator:'detach', statics: 'new'] ];
             endif
             break;
+        elseif qbWSConfig ['processWidget', wkey, trigger, values] then
+            values = WindowValues wkey;
         endif
     endloop
 
