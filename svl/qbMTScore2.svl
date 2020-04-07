@@ -19,8 +19,8 @@ local function ScoreMTScore_dG [recatoms, ligatoms, ff, rec]
     // This function is effectively a "wrapper" for the call to the MTScore webservice
 //    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
     local tmpJSON = qbWS_MTScore [recatoms,ligatoms];
-// write ['tmpJSON: {} \n', tmpJSON];
-    return atof tmpJSON.('MTScoreES');
+ write ['JSON Returned: {} \n', tmpJSON];
+    return atof tmpJSON.('MTScoreES(s)');
 endfunction
 
 global function dock_score_qbMTScore [cmd, arg, opt]
@@ -149,7 +149,7 @@ local function MakePanel opt
 
     local openicon = gr_icon ['$MOE/lib/icon/open.ico', 12, 'foreground'];
     
-    write ['{}\n',qbWSConfig ['getWidget']];       // lmw - standard WS config widget
+//    write ['{}\n',qbWSConfig ['getWidget']];       // lmw - standard WS config widget
             
     local window = [
         title: WINDOW_NAME,
