@@ -270,4 +270,58 @@ global function qbWSConfig [cmd, wkey, trigger, values]
         
 endfunction
 
+// For running on the command line ()
+//
+//  EXAMPLE: % moebatch -run $QBHOME/svl/qbWebService.svl -rec thrombin_030215.pdb -lig thrombin_030215_Lig3b.mol2 -host localhost -port 8080
+//
+global argv;
+
+function ArgvPull;
+
+local function main []
+
+    local startcputime = cpuclock[];
+    local starttime = clock[];
+    local inopt;
+    ArgvReset ArgvExpand argv;
+    local [recfilename, ligfilename, hostname, port] = ArgvPull [ ['-rec', '-lig','-host','-port'], [1,1,1,1] ];
+    local remaining = ArgvAll [];
+    if not isnull remaining then
+        exit twrite ['ERROR: Unknown command line options: {}\n',remaining];
+    endif
+
+    if not isnull recfilename then
+        local rec = cat cat cAtoms ReadAuto recfilename;
+        if isnull rec then
+            exit twrite ['Cannot read receptor file {}', recfilename];
+        endif
+    else
+        exit twrite ['Use -rec command line argument to provide an input file for RECEPTOR'];
+    endif
+    
+    if not isnull ligfilename then
+        local lig = cat cat cAtoms ReadAuto ligfilename;
+        local ligResidue = aResidue first lig;
+        oReparent [diff [lig, first lig], ligResidue];  // MOE appears to need all lignad atoms in a single residue
+        if isnull lig then
+            exit twrite ['Cannot read receptor file {}', ligfilename];
+        endif
+    else
+        exit twrite ['Use -lig command line argument to provide an input file for LIGAND'];
+    endif
+
+    if isnull hostname then
+        hostname = GetRC ['QuantumBio.qbWSHostname','localhost'];
+    endif
+    
+    if isnull port then
+        port = GetRCNumber ['QuantumBio.qbWSPort',8080];
+    endif
+    
+    write ['Scoring {} target atoms & {} ligand atoms on qbWebService: {}\n', length rec, length lig, getWSHostNPort[hostname, port]];
+    local scoreData = qbWS_MTScore [rec, lig, hostname, port];
+    write ['scoreData: {}\n', qbWriteJSONStream scoreData];
+    
+endfunction
+
 #eof
