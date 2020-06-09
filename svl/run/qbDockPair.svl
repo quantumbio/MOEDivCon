@@ -4,9 +4,15 @@
 //      moebatch -run qbDockPair.svl -rec receptor.pdb -lig ligand.mol2 -conf conformers.sdf
 
 global argv;
+
+// forward declarations
+function PartialCharge;
 function ArgvPull;
 function fwrite_TriposMOL2;
 function mol_Create;
+function MM;
+function StructurePreparation;
+function Protonate3D;
 
 local function DockOpt []
 
@@ -80,6 +86,30 @@ local function DockOpt []
 
     return opt;
 
+endfunction
+
+local function checkMolecule[]
+
+    local sysbool = 1;
+
+    local prepTypes = StructurePreparation [cmd:'_types'];
+    prepTypes = diff [prepTypes, ['HCount','Charge','FF']];
+    local SPREP_prob = StructurePreparation [disableTypes:prepTypes,batch_protonate3d:0, cmd:'_items'];
+    
+    if length SPREP_prob(4) > 0 then
+        write ['ERROR: MOE reports the following structural/chemical problems are found in this structure.\n'];
+        write ['\t/Chain/ResName/ResUID/AtmName/\tProblem\n'];
+        local i = 1;
+        while i <= length SPREP_prob(4) loop
+            local errorText = SPREP_prob(3)(i);
+            apt write ['\t\t/{}/{}/{}/{}/\t\t{}\n',  fext cName aChain SPREP_prob(4)(i), rName aResidue SPREP_prob(4)(i), rUID aResidue SPREP_prob(4)(i), aName SPREP_prob(4)(i),errorText]; //, SPREP_prob(3)];
+        i = i+1;
+        endloop
+        sysbool = 0;
+    endif
+     
+    return sysbool;
+    
 endfunction
 
 function db_ImportSD;
@@ -203,18 +233,20 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
         SystemPop psys;
     endloop
 
-
 endfunction
 
 const DEFAULT_OPT = [
-    delwat      : 0,    // Delete waters prior to performing docking/placement
-    inducedfit  : 0,    // Run induced fit (optimized protein) on dock
+    delwat      : 0,        // Delete waters prior to performing docking/placement but AFTER any optimization if -preopt chosen
+    inducedfit  : 0,        // Run induced fit (optimized protein) on dock
     ifformat    : 'pdb',    // output this version of output for induced fit (can be either 'pdb' or 'mol2')
-    mtscorees   : 0,    // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
-    mtcsconf    : 5,    // Number of MTCS conformers to use (these are the best X conformers according to BFintensity).
-    maxpose     : 50,   // Number of poses to optimize (per posed conformer) prior to final score
-    remaxpose   : 5,    // Max number of poses to return per conformer (after optimization)
-    rigidlig    : 0     // Run with the ligand/conformation treated rigidly
+    mtscorees   : 0,        // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
+    mtcsconf    : 5,        // Number of MTCS conformers to use (these are the best X conformers according to BFintensity).
+    maxpose     : 50,       // Number of poses to optimize (per posed conformer) prior to final score
+    remaxpose   : 5,        // Max number of poses to return per conformer (after optimization)
+    rigidlig    : 0,        // Run with the ligand/conformation treated rigidly
+    preopt      : 0,        // Run an optimization of the protein:ligand complex prior to docking
+    protonate   : 0,        // Run Protonate3D prior to docking/scoring
+    forceexe    : 0         // Force the calculation to proceed even if there are structural defects
 ];
 
 local function main []
@@ -222,12 +254,11 @@ local function main []
     local starttime = clock[];
     local inopt;
     ArgvReset ArgvExpand argv;
-    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, ifformat] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-ifformat'], [1,1,1,1,0,0,1,1,1,0,0,1,1] ];
+    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, ifformat, preopt, protonate, forceexe] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-ifformat','-preopt','-protonate','-forceexe'], [1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0] ];
     local remaining = ArgvAll [];
     if not isnull remaining then
         exit twrite ['ERROR: Unknown command line options: {}\n',remaining];
     endif
-    write ['remaining: {}\n', remaining];
     inopt.delwat = delwat;
     inopt.inducedfit = inducedfit;
     inopt.mtscorees = mtscorees;
@@ -236,6 +267,9 @@ local function main []
     inopt.remaxpose = atoi remaxpose;
     inopt.rigidlig = rigidlig;
     inopt.ifformat = ifformat;
+    inopt.preopt = preopt;
+    inopt.protonate = protonate;
+    inopt.forceexe = forceexe;
 
     // In the event that no conformers are provided we will use the standard docking function.
     //  With that in mind, we should bump up the defaults.
@@ -295,6 +329,10 @@ local function main []
         local opt = DockOpt[];
         opt = tagcat [ [maxpose: inopt.maxpose], opt ];
         opt = tagcat [ [remaxpose: inopt.remaxpose], opt ];
+        
+        if inopt.protonate then
+            Protonate3D [Atoms[],rec,rec,lig,[],[]];    // Only manipulate protonation of the target (the ligand is left as is)
+        endif
 
         if not isnull conffilename then
             local confmdbname = twrite ['{}.mdb',fbase ftail conffilename];
@@ -316,13 +354,6 @@ local function main []
             db_RenameField [confmdbname,'BFIRank','mseq'];
         endif
 
-        if inopt.delwat then
-            write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING\n'];
-            oDestroy uniq cat aResidue _Atoms '$$solvent';
-        else
-            write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
-        endif
-
         if inopt.inducedfit then
             opt.refine='Induced Fit';
             opt.refine_opt.fixrec='Tether';   
@@ -336,9 +367,7 @@ local function main []
         if mtscorees then
             opt = tagcat [ [rescoring: 'MTScoreES dG [QuantumBio]'], opt ];
         endif
-    
-        write ['NOTE: RUNNING {} Docking with {} as MOE/Dock Final Scoring Function\n', opt.refine, opt.rescoring];
-    
+        
         pot_Load '$MOE/lib/Amber10EHT.ff';
 
         // Note that the following is the general potential set up only.
@@ -379,10 +408,59 @@ local function main []
             state2: 1,
             threadCount: 0
         ];
+        pot_SetCharges [];
+
+        // Check system to make sure it is ready to roll - and throw error with suggested ways around it
+        local sysbool = checkMolecule[];
+
+        if not sysbool then
+            write ['\tDouble check molecular input in GUI and run Structure Prep as required.\n'];  
+            if not inopt.forceexe then
+                write ['\tYou may choose to force the calculation to proceed using -forceexe command line.\n'];
+                return[];
+            else
+                write ['WARNING: You have chosen to -forceexe the calculation to proceed without fixing the problems noted.\n'];
+            endif
+        else
+            write ['Molecular system parameterized.'];
+        endif
+        
+        if inopt.preopt then
+            write ['NOTE: RUNNING MM OPT with {}\n', 'Amber10EHT.ff'];
+            local tetherWeight = rep [opt.refine_opt.tether, length Atoms[]];
+            local moveMask = aAtomicNumber Atoms[] <= 1;
+            (tetherWeight | moveMask) = 0;
+            MM[gtest:opt.refine_opt.gtest,maxit:opt.refine_opt.maxit, tetherWeight:tetherWeight ];
+        else
+            write ['NOTE: Skipping MM complex minimization prior to docking (use -preopt to turn ON optimization)\n'];
+        endif
+
+        if inopt.delwat then
+            write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING\n'];
+            oDestroy uniq cat aResidue _Atoms '$$solvent';
+        else
+            write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
+        endif
         lig = lig | oValid lig;
         rec = rec | oValid rec;
+        write ['STARTING SIZE:   {} | {}\n', length rec, length lig];
+        lig = cat cat cAtoms (uniq aChain lig);     // address any changes which may have been made to the ligand (protons, etc)
+        rec = cat cat cAtoms (uniq aChain rec);     // address any changes which may have been made to receptor (protons, etc)
+        write ['ENDING SIZE:     {} | {}\n', length rec, length lig];
         local site = lig;
+        
+        // Write the _predock versions of any input PDB & mol2 files so that these can be used in qmechanic
+        local syskeys = SystemPush rec;
+        write ['pro_{}_predock.{}\n', fbase ligfilename, fext recfilename];
+        WriteAuto [twrite ['pro_{}_predock.{}', fbase ligfilename, fext recfilename]];
+        SystemPop syskeys;
 
+        write ['lig_{}_predock.{}\n', fbase ligfilename, fext ligfilename];
+        syskeys = SystemPush lig;
+        WriteAuto [twrite ['lig_{}_predock.{}', fbase ligfilename, fext ligfilename]];
+        SystemPop syskeys;
+
+        write ['NOTE: RUNNING {} Docking with {} as MOE/Dock Final Scoring Function\n', opt.refine, opt.rescoring];
         if not isnull confmdbname then
             opt = tagcat [ [ligmdbname: confmdbname], opt ];
             DockFile [rec, site, confmdbname, outf, opt];
