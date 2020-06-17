@@ -589,6 +589,7 @@ global function qbInteractiveMTScoreUI opt
                 sleep 0.50;
             endloop
             [dataFile,molList,scoresList,namesList] = SyncMDB wkey;
+            dbv_OpenFile dataFile;
         elseif trigger === 'bRename' or trigger === 'tLigName' then
             namesList(first values.slist) = first values.tLigName;
             db_Write [ dataFile, molList(first values.slist), [Label : string namesList(first values.slist) ] ];
