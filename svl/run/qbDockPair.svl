@@ -292,15 +292,32 @@ local function main []
         exit twrite ['Use -rec command line argument to provide an input file for RECEPTOR'];
     endif
     
+    // perform some house cleaning
+//     oDestroy (Residues [] | rName Residues[] == 'EOH');
+//     oDestroy (Residues [] | rName Residues[] == 'GOL');
+//     oDestroy (Residues [] | rName Residues[] == 'DMS');
+//     oDestroy (Residues [] | rName Residues[] == 'SO4');
+    rec = rec | oValid rec;
+    
+    local lig, ligResidue, ligfext;
     if not isnull ligfilename then
-        local lig = cat cat cAtoms ReadAuto ligfilename;
-        local ligResidue = aResidue first lig;
+        lig = cat cat cAtoms ReadAuto ligfilename;
+        ligResidue = aResidue first lig;
+        ligfext = fext ligfilename;
         oReparent [diff [lig, first lig], ligResidue];  // MOE appears to need all lignad atoms in a single residue
         if isnull lig then
             exit twrite ['Cannot read receptor file {}', ligfilename];
         endif
+    elseif length uniq aResidue _Atoms '$$ligand' == 1 then
+        lig = _Atoms '$$ligand';
+        ligResidue = aResidue first lig;
+        ligfilename = rName ligResidue;
+        ligfext = 'mol2';       // when no file is provided for the ligand we will default to writing out a mol2
+        write ['WARNING: Using Ligand {} found in {}. Use -lig command line argument to provide an input file for LIGAND\n', rName ligResidue, recfilename];
+    elseif length uniq aResidue _Atoms '$$ligand' > 1 then
+        exit twrite ['{} Ligands found in {}. Use -lig command line argument to provide an input file for LIGAND\n', length uniq aResidue _Atoms '$$ligand', recfilename];
     else
-        exit twrite ['Use -lig command line argument to provide an input file for LIGAND'];
+        exit twrite ['No Ligand found in {}. Use -lig command line argument to provide an input file for LIGAND\n', recfilename];
     endif
 
     if isnull outf then
@@ -331,7 +348,8 @@ local function main []
         opt = tagcat [ [remaxpose: inopt.remaxpose], opt ];
         
         if inopt.protonate then
-            Protonate3D [Atoms[],rec,rec,lig,[],[]];    // Only manipulate protonation of the target (the ligand is left as is)
+//            Protonate3D [Atoms[],rec,rec,lig,[],[]];    // Only manipulate protonation of the target (the ligand is left as is)
+            Protonate3D [Atoms[],rec,rec,[],[],[]];    // protonate both the protein and the ligand
         endif
 
         if not isnull conffilename then
@@ -455,9 +473,9 @@ local function main []
         WriteAuto [twrite ['pro_{}_predock.{}', fbase ligfilename, fext recfilename]];
         SystemPop syskeys;
 
-        write ['lig_{}_predock.{}\n', fbase ligfilename, fext ligfilename];
+        write ['lig_{}_predock.{}\n', fbase ligfilename, ligfext];
         syskeys = SystemPush lig;
-        WriteAuto [twrite ['lig_{}_predock.{}', fbase ligfilename, fext ligfilename]];
+        WriteAuto [twrite ['lig_{}_predock.{}', fbase ligfilename, ligfext]];
         SystemPop syskeys;
 
         write ['NOTE: RUNNING {} Docking with {} as MOE/Dock Final Scoring Function\n', opt.refine, opt.rescoring];
