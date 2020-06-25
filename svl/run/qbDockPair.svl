@@ -293,10 +293,10 @@ local function main []
     endif
     
     // perform some house cleaning
-//     oDestroy (Residues [] | rName Residues[] == 'EOH');
-//     oDestroy (Residues [] | rName Residues[] == 'GOL');
-//     oDestroy (Residues [] | rName Residues[] == 'DMS');
-//     oDestroy (Residues [] | rName Residues[] == 'SO4');
+//      oDestroy (Residues [] | rName Residues[] == 'EOH');
+//      oDestroy (Residues [] | rName Residues[] == 'GOL');
+//      oDestroy (Residues [] | rName Residues[] == 'DMS');
+//      oDestroy (Residues [] | rName Residues[] == 'SO4');
     rec = rec | oValid rec;
     
     local lig, ligResidue, ligfext;
@@ -319,6 +319,8 @@ local function main []
     else
         exit twrite ['No Ligand found in {}. Use -lig command line argument to provide an input file for LIGAND\n', recfilename];
     endif
+    
+    rec = diff [rec,lig];   // make sure the receptor does not include the ligand.
 
     if isnull outf then
         outf = twrite ['{}_dock.mdb',fbase ftail ligfilename];
@@ -462,8 +464,8 @@ local function main []
         lig = lig | oValid lig;
         rec = rec | oValid rec;
         write ['STARTING SIZE:   {} | {}\n', length rec, length lig];
-        lig = cat cat cAtoms (uniq aChain lig);     // address any changes which may have been made to the ligand (protons, etc)
-        rec = cat cat cAtoms (uniq aChain rec);     // address any changes which may have been made to receptor (protons, etc)
+        lig = cat cat rAtoms (uniq aResidue lig);     // address any changes which may have been made to the ligand (protons, etc)
+        rec = cat cat rAtoms (uniq aResidue rec);     // address any changes which may have been made to receptor (protons, etc)
         write ['ENDING SIZE:     {} | {}\n', length rec, length lig];
         local site = lig;
         
