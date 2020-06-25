@@ -20,7 +20,11 @@ local function ScoreMTScore_dG [recatoms, ligatoms, ff, rec]
 //    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
     local tmpJSON = qbWS_MTScore [recatoms,ligatoms];
  write ['JSON Returned: {} \n', tmpJSON];
-    return atof tmpJSON.('MTScoreES(s)');
+    if tmpJSON.success then
+        return atof tmpJSON.('MTScoreES(s)');
+    else
+        return 0.00;
+    endif
 endfunction
 
 global function dock_score_qbMTScore [cmd, arg, opt]
