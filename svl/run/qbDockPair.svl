@@ -14,6 +14,20 @@ function MM;
 function StructurePreparation;
 function Protonate3D;
 
+const DEFAULT_OPT = [
+    delwat      : 0,        // Delete waters prior to performing docking/placement but AFTER any optimization if -preopt chosen
+    inducedfit  : 0,        // Run induced fit (optimized protein) on dock
+    ifformat    : 'pdb',    // output this version of output for induced fit (can be either 'pdb' or 'mol2')
+    mtscorees   : 0,        // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
+    mtcsconf    : 0,        // Number of MTCS conformers to use (these are the best X conformers according to BFintensity). If zero (default) use ALL conformers (WARNING: this can be expensive.)
+    maxpose     : 50,       // Number of poses to optimize (per posed conformer) prior to final score
+    remaxpose   : 5,        // Max number of poses to return per conformer (after optimization)
+    rigidlig    : 0,        // Run with the ligand/conformation treated rigidly
+    preopt      : 0,        // Run an optimization of the protein:ligand complex prior to docking
+    protonate   : 0,        // Run Protonate3D prior to docking/scoring
+    forceexe    : 0         // Force the calculation to proceed even if there are structural defects
+];
+
 local function DockOpt []
 
     local opt = [
@@ -235,29 +249,120 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
 
 endfunction
 
-const DEFAULT_OPT = [
-    delwat      : 0,        // Delete waters prior to performing docking/placement but AFTER any optimization if -preopt chosen
-    inducedfit  : 0,        // Run induced fit (optimized protein) on dock
-    ifformat    : 'pdb',    // output this version of output for induced fit (can be either 'pdb' or 'mol2')
-    mtscorees   : 0,        // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
-    mtcsconf    : 5,        // Number of MTCS conformers to use (these are the best X conformers according to BFintensity).
-    maxpose     : 50,       // Number of poses to optimize (per posed conformer) prior to final score
-    remaxpose   : 5,        // Max number of poses to return per conformer (after optimization)
-    rigidlig    : 0,        // Run with the ligand/conformation treated rigidly
-    preopt      : 0,        // Run an optimization of the protein:ligand complex prior to docking
-    protonate   : 0,        // Run Protonate3D prior to docking/scoring
-    forceexe    : 0         // Force the calculation to proceed even if there are structural defects
-];
+local function usage []
+
+    local defaults = DEFAULT_OPT;
+    local opt = DockOpt[];
+    
+    pot_Load '$MOE/lib/Amber10EHT.ff.gz';
+    
+    local function yesno inVar
+        if inVar then
+            return 'YES';
+        else
+            return 'NO';
+        endif
+    endfunction
+write [
+#token
+
+USAGE:
+    $ moebatch -run ./DivConSuite/svl/run/qbDockPair.svl -rec receptor.pdb -lig placed_ligand.mol2
+
+AVAILABLE OPTIONS
+
+    -rec <file>         (Required) Receptor or Target:ligand in PDB or MOL2 format (DEFAULT: none)
+    
+    -lig <file>         (Optional) Placed Ligand in PDB or MOL2 format 
+                            (DEFAULT: Ligand if -rec includes target:ligand)
+    -conf <file>        (Optional) [MTCS] Conformers in SDF format. 
+                            (DEFAULT: built-in MOE conformers)
+    -o <filename>       Output base filename (DEFAULT: <ligand_filename>_dock.mdb)
+    -delwat (bool)      Delete waters prior to docking (DEFAULT: {})
+    -mtscorees (bool)   Use MTScoreES instead of MOE {} score (DEFAULT: {})
+    -maxpose <num>      Number of poses to refine (per comformer) prior to final score (DEFAULT: {})
+    -remaxpose <num>    Number of poses to return (per conformer) after refinement prior 
+                            to final score (DEFAULT: {})
+    -inducedfit (bool)  Use induced-fit (refined) target docking and return the associated PDB 
+                            (DEFAULT: {})
+    -rigidlig (bool)    Dock the ligand/conformer rigidly with no in-site optimization (DEFAULT: {})
+    -preopt (bool)      Optimize the target:placed_ligand PRIOR to performing docking (DEFAULT: {})
+    -protonate (bool)   Run Protonate3D on the target:placed_ligand PRIOR to docking (DEFAULT: {})
+    -forceexe (bool)    Force execution even when Check Molecule process fails (DEFAULT: {})
+    -help               Print this help screen and quit without running any further steps.
+
+FILES RETURNED/GENERATED (to be used in MTScoreE)
+
+    pro_<ligand>_predock.pdb    A fully prepared PDB file of the receptor 
+                                    (e.g. AFTER -preopt or -protonate if these options are selected)
+    lig_<ligand>_predock.mol2   A fully prepared mol2 file of the placed ligand 
+                                    (e.g. AFTER -preopt or -protonate if these options are selected)
+    <ligand>_dock.sdf           The docked ligand poses generated using the MOE docker if 
+                                    -inducedfit is NOT selected
+    <ligand>_dock_<num>.pdb     The docked target:ligand poses generated using the MOE docker if 
+                                    -inducedfit IS selected
+    
+SUBSEQUENT USAGE (in MTScoreE [Ensemble] Score)
+
+    Once the above noted files are generated
+
+    * FOR RIGID RECEPTOR SCORING:
+        $ /path/to/DivConSuite/bin/qmechanic pro_<ligand>_predock.pdb       \\
+            --ligand lig_<ligand>_predock.mol2 --mtdock <ligand>_dock.sdf   \\
+            --mtscore ensembe -v 2 --np 2
+
+    * FOR INDICED FIT RECEPTOR SCORING:
+        $ /path/to/DivConSuite/bin/qmechanic pro_<ligand>_predock.pdb       \\
+            --ligand lig_<ligand>_predock.mol2 --mtdock <ligand>_dock_*.pdb \\
+            --mtscore ensembe -v 2 --np 2
+
+DOCUMENTATION
+    The qbDockPair.svl script is used to encapsulate the steps required to use MOE to dock a
+    ligand in preparation for MTScoreE (Ensemble) and MTScoreES (EndState). You may generate an
+    SDF in another way or with an alternative docking function, but it is suggested that a
+    similar workflow is used. In this case, the MOE software uses the following default settings:
+    
+        Potential:              {}
+        Initial Placement:      {}
+        Initial Score Function: {}
+        Ligand Optimization:    {}  // NOTE: The ligand is optimized in the active site
+        Final Score Function:   {}
+    
+#,   
+        yesno defaults.delwat,
+        opt.rescoring, yesno defaults.mtscorees,
+        defaults.maxpose,
+        defaults.remaxpose,
+        yesno defaults.inducedfit,
+        yesno defaults.rigidlig,
+        yesno defaults.preopt,
+        yesno defaults.protonate,
+        yesno defaults.forceexe,
+        second first pot_Info[],
+        opt.placement,
+        opt.scoring,
+        opt.refine,
+        opt.rescoring
+    ];
+
+endfunction
 
 local function main []
     local startcputime = cpuclock[];
     local starttime = clock[];
     local inopt;
     ArgvReset ArgvExpand argv;
-    local [recfilename, ligfilename, conffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, ifformat, preopt, protonate, forceexe] = ArgvPull [ ['-rec', '-lig','-conf','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-ifformat','-preopt','-protonate','-forceexe'], [1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0] ];
+    local [recfilename, ligfilename, conffilename, dockedligfname, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, ifformat, preopt, protonate, forceexe, printhelp] = 
+        ArgvPull [ ['-rec', '-lig','-conf','-dockedlig','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-ifformat','-preopt','-protonate','-forceexe','-help'], 
+        [1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0] ];
     local remaining = ArgvAll [];
     if not isnull remaining then
+        usage[];
         exit twrite ['ERROR: Unknown command line options: {}\n',remaining];
+    endif
+    if printhelp then
+        usage[];
+        exit[];
     endif
     inopt.delwat = delwat;
     inopt.inducedfit = inducedfit;
@@ -361,12 +466,19 @@ local function main []
                 ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
                 ['double','int','double','char','double','double']        
             ];
-            db_Sort [confmdbname,'BFIRank',1];
-            if (db_nEntries confmdbname) > inopt.mtcsconf then
-                db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-inopt.mtcsconf)]];
-            endif
-            db_Sort [confmdbname,'BFIRank',0];
+// TODO: Provide a mechanism to limit the number of conformers used.
+//            db_Sort [confmdbname,'BFIRank',1];
+//            if inopt.mtcsconf > 0 then
+//                if (db_nEntries confmdbname) > inopt.mtcsconf then
+//                    db_Delete [confmdbname, (db_Entries confmdbname)[igen ((db_nEntries confmdbname)-inopt.mtcsconf)]];
+//                endif
+//            endif
+//            db_Sort [confmdbname,'BFIRank',0];
+            write ['NOTE: Using {} conformers provided in {}.\n', db_nEntries confmdbname, confmdbname];
             opt.retainData = not (first db_Fields confmdbname == 'mol');
+        elseif not isnull dockedligfname then
+            local dockedligmdbname = twrite ['{}.mdb',fbase ftail dockedligfname];
+            db_ImportSD [db_Open [ dockedligmdbname,'create' ],dockedligfname,'mol'];
         endif
 
         // For older versions of MOE - need to rename BFIRank to mseq so it can be used in MTCS calculation    
@@ -489,7 +601,14 @@ local function main []
             if MOE_VERSION < 2018 then
                 db_RenameField [outf,'mseq','BFIRank'];
             endif
-
+        elseif not isnull dockedligmdbname then
+            opt = tagcat [ [ligmdbname: dockedligmdbname, placement: 'None'], opt ];
+            DockFile [rec, site, dockedligmdbname, outf, opt];
+        
+            // For older versions of MOE - need to rename mseq to BFIRank so it can be used in MTCS calculation
+            if MOE_VERSION < 2018 then
+                db_RenameField [outf,'mseq','BFIRank'];
+            endif
         else
             DockAtoms [ rec,  site,  lig, outf, opt];
         endif
