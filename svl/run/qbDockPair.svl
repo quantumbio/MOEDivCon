@@ -1,7 +1,6 @@
 #svl
 
-//  USAGE:
-//      moebatch -run qbDockPair.svl -rec receptor.pdb -lig ligand.mol2 -conf conformers.sdf
+//  USAGE: See below
 
 global argv;
 
@@ -13,6 +12,18 @@ function mol_Create;
 function MM;
 function StructurePreparation;
 function Protonate3D;
+function db_ImportSD;
+function db_Sort;
+function db_Delete;
+function db_ExportSD;
+function DockAtoms;
+function DockFile;
+
+// infile forward declarations
+function DockOpt;
+function usage;
+function checkMolecule;
+function dockmdb2mol2;
 
 const DEFAULT_OPT = [
     delwat      : 0,        // Delete waters prior to performing docking/placement but AFTER any optimization if -preopt chosen
@@ -20,13 +31,129 @@ const DEFAULT_OPT = [
     ifformat    : 'pdb',    // output this version of output for induced fit (can be either 'pdb' or 'mol2')
     mtscorees   : 0,        // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
     mtcsconf    : 0,        // Number of MTCS conformers to use (these are the best X conformers according to BFintensity). If zero (default) use ALL conformers (WARNING: this can be expensive.)
-    maxpose     : 50,       // Number of poses to optimize (per posed conformer) prior to final score
+    maxpose     : 25,       // Number of poses to optimize (per posed conformer) prior to final score
+//    maxpose     : 5,       // Number of poses to optimize (per posed conformer) prior to final score
     remaxpose   : 5,        // Max number of poses to return per conformer (after optimization)
     rigidlig    : 0,        // Run with the ligand/conformation treated rigidly
     preopt      : 0,        // Run an optimization of the protein:ligand complex prior to docking
     protonate   : 0,        // Run Protonate3D prior to docking/scoring
-    forceexe    : 0         // Force the calculation to proceed even if there are structural defects
+    forceexe    : 0,        // Force the calculation to proceed even if there are structural defects
+    mtscoreexe  : 0,        // Run MTScoreE using the qmechanic commandline found in QBHOME
+    qbhome      : ''        // Path to QBHOME (if set - otherwise null)
+    
 ];
+
+local function usage []
+
+    local defaults = DEFAULT_OPT;
+    local opt = DockOpt[];
+    
+    pot_Load '$MOE/lib/Amber10EHT.ff.gz';
+    
+    local function yesno inVar
+        if inVar then
+            return 'YES';
+        else
+            return 'NO';
+        endif
+    endfunction
+    
+    local function yesnotoken inToken
+        if isnull inToken then
+            return 'NOT DEFINED';
+        else
+            return inToken;
+        endif    
+    endfunction
+write [
+#token
+
+USAGE:
+    $ moebatch -run ./DivConSuite/svl/run/qbDockPair.svl -rec receptor.pdb -lig placed_ligand.mol2
+
+AVAILABLE OPTIONS
+
+    -rec <file>         (Required) Receptor or Target:ligand in PDB or MOL2 format (DEFAULT: none)
+    
+    -lig <file>         (Optional) Placed Ligand in PDB or MOL2 format 
+                            (DEFAULT: Ligand if -rec includes target:ligand)
+    -conf <file>        (Optional) [MTCS] Conformers in SDF format. 
+                            (DEFAULT: built-in MOE conformers)
+    -o <filename>       Output base filename (DEFAULT: <ligand_filename>_dock.mdb)
+    -delwat (bool)      Delete waters prior to docking (DEFAULT: {})
+    -mtscoreexe <QBHOME> This option will execute QBHOME/bin/qmechanic as provided. If QBHOME is set in
+                        the shell environment it can be used as well (command line argument takes
+                        precedence).
+                        Current QBHOME: {}
+    
+    -mtscorees (bool)   Use MTScoreES instead of MOE {} score (DEFAULT: {})
+    -maxpose <num>      Number of poses to refine (per comformer if -conf) prior to final score (DEFAULT: {})
+    -remaxpose <num>    Number of poses to return (per conformer if -conf) after refinement prior 
+                            to final score (DEFAULT: {})
+    -inducedfit (bool)  Use induced-fit (refined) target docking and return the associated PDB 
+                            (DEFAULT: {})
+    -rigidlig (bool)    Dock the ligand/conformer rigidly with no in-site optimization (DEFAULT: {})
+    -preopt (bool)      Optimize the target:placed_ligand PRIOR to performing docking (DEFAULT: {})
+    -protonate (bool)   Run Protonate3D on the target:placed_ligand PRIOR to docking (DEFAULT: {})
+    -forceexe (bool)    Force execution even when Check Molecule process fails (DEFAULT: {})
+    -help               Print this help screen and quit without running any further steps.
+
+FILES RETURNED/GENERATED (to be used in MTScoreE)
+
+    pro_<ligand>_predock.pdb    A fully prepared PDB file of the receptor 
+                                    (e.g. AFTER -preopt or -protonate if these options are selected)
+    lig_<ligand>_predock.mol2   A fully prepared mol2 file of the placed ligand 
+                                    (e.g. AFTER -preopt or -protonate if these options are selected)
+    <ligand>_dock.sdf           The docked ligand poses generated using the MOE docker if 
+                                    -inducedfit is NOT selected
+    <ligand>_dock_<num>.pdb     The docked target:ligand poses generated using the MOE docker if 
+                                    -inducedfit IS selected
+    
+SUBSEQUENT USAGE (in MTScoreE [Ensemble] Score)
+
+    Once the above noted files are generated
+
+    * FOR RIGID RECEPTOR SCORING:
+        $ /path/to/DivConSuite/bin/qmechanic pro_<ligand>_predock.pdb       \\
+            --ligand lig_<ligand>_predock.mol2 --mtdock <ligand>_dock.sdf   \\
+            --mtscore ensembe -v 2 --np 2
+
+    * FOR INDICED FIT RECEPTOR SCORING:
+        $ /path/to/DivConSuite/bin/qmechanic pro_<ligand>_predock.pdb       \\
+            --ligand lig_<ligand>_predock.mol2 --mtdock <ligand>_dock_*.pdb \\
+            --mtscore ensembe -v 2 --np 2
+
+DOCUMENTATION
+    The qbDockPair.svl script is used to encapsulate the steps required to use MOE to dock a
+    ligand in preparation for MTScoreE (Ensemble) and MTScoreES (EndState). You may generate an
+    SDF in another way or with an alternative docking function, but it is suggested that a
+    similar workflow is used. In this case, the MOE software uses the following default settings:
+    
+        Potential:              {}
+        Initial Placement:      {}
+        Initial Score Function: {}
+        Ligand Optimization:    {}  // NOTE: The ligand is optimized in the active site
+        Final Score Function:   {}
+    
+#,   
+        yesno defaults.delwat,
+        yesnotoken getenv 'QBHOME',
+        opt.rescoring, yesno defaults.mtscorees,
+        defaults.maxpose,
+        defaults.remaxpose,
+        yesno defaults.inducedfit,
+        yesno defaults.rigidlig,
+        yesno defaults.preopt,
+        yesno defaults.protonate,
+        yesno defaults.forceexe,
+        second first pot_Info[],
+        opt.placement,
+        opt.scoring,
+        opt.refine,
+        opt.rescoring
+    ];
+
+endfunction
 
 local function DockOpt []
 
@@ -126,13 +253,6 @@ local function checkMolecule[]
     
 endfunction
 
-function db_ImportSD;
-function db_Sort;
-function db_Delete;
-function db_ExportSD;
-function DockAtoms;
-function DockFile;
-
 local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
     local mdb = db_Open db_file;
     local mfield = '';
@@ -153,11 +273,14 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
     local chains = [];
     local inopt;
     local pdata;
+    local filelist = [];
+    
     while (ent = db_NextEntry [mdb, ent]) loop
         local psys = SystemPush [];
         
         count = count + 1;
         local outmol2 = twrite ['{}_{}.{}', fbase mol2_file, count, fext mol2_file];
+        filelist = cat [filelist, outmol2];
         write['Translating .... {}\n',outmol2];
         pdata = tag [fldnames, db_ReadFields [mdb, ent, fldnames]];
     
@@ -246,105 +369,8 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
         
         SystemPop psys;
     endloop
-
-endfunction
-
-local function usage []
-
-    local defaults = DEFAULT_OPT;
-    local opt = DockOpt[];
     
-    pot_Load '$MOE/lib/Amber10EHT.ff.gz';
-    
-    local function yesno inVar
-        if inVar then
-            return 'YES';
-        else
-            return 'NO';
-        endif
-    endfunction
-write [
-#token
-
-USAGE:
-    $ moebatch -run ./DivConSuite/svl/run/qbDockPair.svl -rec receptor.pdb -lig placed_ligand.mol2
-
-AVAILABLE OPTIONS
-
-    -rec <file>         (Required) Receptor or Target:ligand in PDB or MOL2 format (DEFAULT: none)
-    
-    -lig <file>         (Optional) Placed Ligand in PDB or MOL2 format 
-                            (DEFAULT: Ligand if -rec includes target:ligand)
-    -conf <file>        (Optional) [MTCS] Conformers in SDF format. 
-                            (DEFAULT: built-in MOE conformers)
-    -o <filename>       Output base filename (DEFAULT: <ligand_filename>_dock.mdb)
-    -delwat (bool)      Delete waters prior to docking (DEFAULT: {})
-    -mtscorees (bool)   Use MTScoreES instead of MOE {} score (DEFAULT: {})
-    -maxpose <num>      Number of poses to refine (per comformer) prior to final score (DEFAULT: {})
-    -remaxpose <num>    Number of poses to return (per conformer) after refinement prior 
-                            to final score (DEFAULT: {})
-    -inducedfit (bool)  Use induced-fit (refined) target docking and return the associated PDB 
-                            (DEFAULT: {})
-    -rigidlig (bool)    Dock the ligand/conformer rigidly with no in-site optimization (DEFAULT: {})
-    -preopt (bool)      Optimize the target:placed_ligand PRIOR to performing docking (DEFAULT: {})
-    -protonate (bool)   Run Protonate3D on the target:placed_ligand PRIOR to docking (DEFAULT: {})
-    -forceexe (bool)    Force execution even when Check Molecule process fails (DEFAULT: {})
-    -help               Print this help screen and quit without running any further steps.
-
-FILES RETURNED/GENERATED (to be used in MTScoreE)
-
-    pro_<ligand>_predock.pdb    A fully prepared PDB file of the receptor 
-                                    (e.g. AFTER -preopt or -protonate if these options are selected)
-    lig_<ligand>_predock.mol2   A fully prepared mol2 file of the placed ligand 
-                                    (e.g. AFTER -preopt or -protonate if these options are selected)
-    <ligand>_dock.sdf           The docked ligand poses generated using the MOE docker if 
-                                    -inducedfit is NOT selected
-    <ligand>_dock_<num>.pdb     The docked target:ligand poses generated using the MOE docker if 
-                                    -inducedfit IS selected
-    
-SUBSEQUENT USAGE (in MTScoreE [Ensemble] Score)
-
-    Once the above noted files are generated
-
-    * FOR RIGID RECEPTOR SCORING:
-        $ /path/to/DivConSuite/bin/qmechanic pro_<ligand>_predock.pdb       \\
-            --ligand lig_<ligand>_predock.mol2 --mtdock <ligand>_dock.sdf   \\
-            --mtscore ensembe -v 2 --np 2
-
-    * FOR INDICED FIT RECEPTOR SCORING:
-        $ /path/to/DivConSuite/bin/qmechanic pro_<ligand>_predock.pdb       \\
-            --ligand lig_<ligand>_predock.mol2 --mtdock <ligand>_dock_*.pdb \\
-            --mtscore ensembe -v 2 --np 2
-
-DOCUMENTATION
-    The qbDockPair.svl script is used to encapsulate the steps required to use MOE to dock a
-    ligand in preparation for MTScoreE (Ensemble) and MTScoreES (EndState). You may generate an
-    SDF in another way or with an alternative docking function, but it is suggested that a
-    similar workflow is used. In this case, the MOE software uses the following default settings:
-    
-        Potential:              {}
-        Initial Placement:      {}
-        Initial Score Function: {}
-        Ligand Optimization:    {}  // NOTE: The ligand is optimized in the active site
-        Final Score Function:   {}
-    
-#,   
-        yesno defaults.delwat,
-        opt.rescoring, yesno defaults.mtscorees,
-        defaults.maxpose,
-        defaults.remaxpose,
-        yesno defaults.inducedfit,
-        yesno defaults.rigidlig,
-        yesno defaults.preopt,
-        yesno defaults.protonate,
-        yesno defaults.forceexe,
-        second first pot_Info[],
-        opt.placement,
-        opt.scoring,
-        opt.refine,
-        opt.rescoring
-    ];
-
+    return filelist;
 endfunction
 
 local function main []
@@ -352,9 +378,19 @@ local function main []
     local starttime = clock[];
     local inopt;
     ArgvReset ArgvExpand argv;
+    // -------
+//        Command line processing in MOE appears to be a multi-step process depending upon whether we are removing arguments from the stream (for error trapping)
+//            and whether we are trying to determine whether an option is chosen. This is specifically the case when it comes to -mtscoreexe which can take an argument or not. 
+//              Steps:
+//            1. Just read or Get whether it is set (yes/no bool)
+//            2. Skip it in the main argument processing since it may have an argument or it may not (depending on whether QBHOME is used)
+//            3. Finally remove it from the stream, and place a set path in a variable if one is chosen (if not, it is just null).
+    // -------
+    local [mtscoreexe] = ArgvGet [ ['-mtscoreexe'], [0]];
     local [recfilename, ligfilename, conffilename, dockedligfname, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, ifformat, preopt, protonate, forceexe, printhelp] = 
         ArgvPull [ ['-rec', '-lig','-conf','-dockedlig','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-ifformat','-preopt','-protonate','-forceexe','-help'], 
         [1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0] ];
+    local [runqmechanic] = ArgvPull [ ['-mtscoreexe'], [1] ];
     local remaining = ArgvAll [];
     if not isnull remaining then
         usage[];
@@ -375,13 +411,14 @@ local function main []
     inopt.preopt = preopt;
     inopt.protonate = protonate;
     inopt.forceexe = forceexe;
+    inopt.mtscoreexe = mtscoreexe;
 
     // In the event that no conformers are provided we will use the standard docking function.
     //  With that in mind, we should bump up the defaults.
     local defaults = DEFAULT_OPT;
     if isnull conffilename then
-        defaults.maxpose = ceil (DEFAULT_OPT.maxpose * (DEFAULT_OPT.maxpose/DEFAULT_OPT.remaxpose/2));
-        defaults.remaxpose = ceil (DEFAULT_OPT.remaxpose * (DEFAULT_OPT.maxpose/DEFAULT_OPT.remaxpose/2));
+        defaults.maxpose = ceil (DEFAULT_OPT.maxpose * (DEFAULT_OPT.maxpose/DEFAULT_OPT.remaxpose));
+        defaults.remaxpose = ceil (DEFAULT_OPT.remaxpose * (DEFAULT_OPT.maxpose/DEFAULT_OPT.remaxpose));
     endif
     
     inopt = tagcat [inopt, defaults];
@@ -395,6 +432,27 @@ local function main []
         endif
     else
         exit twrite ['Use -rec command line argument to provide an input file for RECEPTOR'];
+    endif
+    
+    if inopt.mtscoreexe then
+        if not isnull runqmechanic then
+            inopt.qbhome = runqmechanic;
+        elseif not isnull getenv ['QBHOME'] then
+            inopt.qbhome = getenv ['QBHOME'];
+        else
+            usage [];
+            exit twrite ['Envionrment variable QBHOME is not set. Either set this shell variable or provide the path to QBHOME in -mtscoreexe argument.\n'];
+        endif
+        local qmechanicexec = twrite ['{}/bin/qmechanic', inopt.qbhome];
+        local file_info = fstat qmechanicexec;
+        if file_info(1) <> 'file' then
+            usage [];
+            exit twrite ['Executable: {} does not exist\n\tPlease correctly set your QBHOME enivronment variable or -mtscoreexe argument.\n',qmechanicexec];
+        endif
+        if not bitand [file_info(3), 0x04] then
+            usage [];
+            exit twrite ['Executable: {} is not allowed to be executed\n',qmechanicexec];
+        endif
     endif
     
     // perform some house cleaning
@@ -583,13 +641,15 @@ local function main []
         
         // Write the _predock versions of any input PDB & mol2 files so that these can be used in qmechanic
         local syskeys = SystemPush rec;
-        write ['pro_{}_predock.{}\n', fbase ligfilename, fext recfilename];
-        WriteAuto [twrite ['pro_{}_predock.{}', fbase ligfilename, fext recfilename]];
+        local pro_predock = twrite ['pro_{}_predock.{}', fbase ligfilename, fext recfilename];
+        write ['{}\n', pro_predock];
+        WriteAuto [pro_predock];
         SystemPop syskeys;
 
-        write ['lig_{}_predock.{}\n', fbase ligfilename, ligfext];
+        local lig_predock = twrite ['lig_{}_predock.{}', fbase ligfilename, ligfext];
+        write ['{}\n', lig_predock];
         syskeys = SystemPush lig;
-        WriteAuto [twrite ['lig_{}_predock.{}', fbase ligfilename, ligfext]];
+        WriteAuto [lig_predock];
         SystemPop syskeys;
 
         write ['NOTE: RUNNING {} Docking with {} as MOE/Dock Final Scoring Function\n', opt.refine, opt.rescoring];
@@ -616,15 +676,37 @@ local function main []
     endif
     
     db_Sort [dockmdb,'S',0];
+    local dockfiles;
     if inopt.inducedfit then
-        dockmdb2mol2 [dockmdb,twrite ['{}.{}',fbase ftail outf,inopt.ifformat],ligID,recfilename,inopt];
+        dockfiles = dockmdb2mol2 [dockmdb,twrite ['{}.{}',fbase ftail outf,inopt.ifformat],ligID,recfilename,inopt];
     else
-        db_ExportSD [ dockmdb, twrite ['{}.sdf',fbase outf] ];
+        dockfiles = twrite ['{}.sdf',fbase outf];
+        db_ExportSD [ dockmdb, dockfiles];
         local mdbdata = db_Read [dockmdb,first db_Entries dockmdb];
         fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol];
     endif
 
-    write ['Docking finished in {} seconds & {} CPUseconds.\n', starttime-clock[], startcputime-cpuclock[] ];
-
+    write ['Docking finished in {} seconds & {} CPUseconds.\n', clock[] - starttime, cpuclock[] - startcputime];
+    
+    if inopt.mtscoreexe then
+        starttime = clock[];
+        startcputime = cpuclock[];
+        
+        local qme_command = twrite ['{} {} --ligand {} -h garf --mtdock {} --mtscore ensemble --np 2 -v 2 -O',qmechanicexec, pro_predock, lig_predock, dockfiles];
+        write ['Running: {}\n',qme_command];
+        local pkey = exe_open_shell[qme_command,cd [],[],0];
+        local out_fno = exe_stdout pkey;
+        write '    -----------------------\n';
+        while exe_status pkey loop
+            local outline;
+            while not isnull (outline = freadb [out_fno, 'line', 1]) loop
+                write ['    {}\n', outline];
+            endloop
+        endloop
+        write '    -----------------------\n';
+        exe_close pkey;
+        
+        write ['MTScoreE finished in {} seconds.\n', clock[] - starttime];
+    endif
 endfunction
 
