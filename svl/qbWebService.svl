@@ -111,6 +111,9 @@ global function qbWS_MTScore [target_mol, ligand_mol, hostname, portnum]
 //    local tmpJSON = curl_read url;
 
     local [tmpJSON, err] = task_call [ 'curl_read',  url, [errmsg:'ignore'] ];
+#if 1
+    fwrite ['debug-WSRETURN.txt','{}',tmpJSON];
+#endif
     write ['tmpJSON: {}\n',tmpJSON];
     curl_close url;
     write ['err: {}\n', err];
@@ -123,10 +126,6 @@ global function qbWS_MTScore [target_mol, ligand_mol, hostname, portnum]
         tmpJSON.success = 0;
     endif
 
-
-#if 1
-    fwrite ['debug-WSRETURN.txt','{}',tmpJSON];
-#endif
     // Return the JSON tagged vector to be used by other functions
 //    return qbReadJSONStream tmpJSON;
     return tmpJSON;
