@@ -215,7 +215,12 @@ endfunction
 // the return value for the function is a tagged vector for the entire document.
 //      TODO : we are using tagged vectors but it is unknown how deep SVL supports. 
 global function qbReadJSONStream inOUTPUT
-    local inString = string inOUTPUT;
+    if isflatchar inOUTPUT or isscalartok inOUTPUT then
+        local inString = string inOUTPUT;
+    else
+        write ['Error: input JSON is not correctly formed: {} | {}\n',type cat inOUTPUT,cat inOUTPUT];
+        return null[];
+    endif
 
     //  HACK WARNING!
     // remove all carriage returns.

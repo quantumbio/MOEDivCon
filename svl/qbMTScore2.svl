@@ -15,15 +15,19 @@ function qbWS_MTScore;
 function qbWSTestEndpoint;
 function qbWSConfig;
 
-local function ScoreMTScore_dG [recatoms, ligatoms, ff, rec]
+local function active atoms
+    return atoms | not aInert atoms;
+endfunction
+
+global function ScoreMTScore_dG [recatoms, ligatoms, ff, rec]
     // This function is effectively a "wrapper" for the call to the MTScore webservice
 //    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
     local tmpJSON = qbWS_MTScore [recatoms,ligatoms];
- write ['JSON Returned: {} \n', tmpJSON];
+// write ['JSON Returned: {} \n', tmpJSON];
     if tmpJSON.success then
         return atof tmpJSON.('MTScoreES(s)');
     else
-        return 0.00;
+        return null[];
     endif
 endfunction
 
@@ -331,8 +335,8 @@ local function ReadyMonitor wkey
                     Message [second cat WindowGetData [wkey, 'msgkey'], ''];
                     WindowSetAttr[wkey, [   slist:    [value : -1 ]]];  
             endif
-        
-            local syskeys = SystemPush Atoms[];    // limit the chances of concurrent molecule object editing errors
+
+            local syskeys = SystemPush active Atoms[];    // limit the chances of concurrent molecule object editing errors
             static sys_serial, q_save, pot_serial;
             local atoms = Atoms[];
 
@@ -476,7 +480,7 @@ global function qbInteractiveMTScoreUI opt
         endfunction
         return twrite ['{}',twrite ['{}:{}:{}', formNum timevec(7), formNum timevec(8), formNum timevec(9)]];
     endfunction
-    
+        
     if second task_fork [master:'mutual', idle:1, prio:0] === 'child' then
         ReadyMonitor wkey;
         exit [];
@@ -507,48 +511,67 @@ global function qbInteractiveMTScoreUI opt
                 Message [msgkey, twrite ['MTScoreES (dG): {} kcal/mol\n', scoresList(first values.slist)]];
             endif
         elseif trigger === 'addCurrent' then
+            WindowSetAttr [wkey, [addCurrent:  [sensitive: 0]]];
             if currentState <> SystemTopologyState [] 
-                        or not (currentPos === aPos Atoms[]) 
+                        or not (currentPos === aPos active Atoms[]) 
                         or values.optlevel <> currentOptLevel then
                 if values.optlevel <> 'None' then
                     Message [ msgkey, RUNNINGMM ];
                     local originalFixed = Atoms[] | aFixed Atoms[];
                     aSetFixed [Atoms[], 1];
-                    aSetFixed [_Atoms '$$ligand', 0];
+                    aSetFixed [active _Atoms '$$ligand', 0];
                     if values.optlevel == 'Pocket' then
-                        aSetFixed [_Atoms '$$pocket', 0];
+                        aSetFixed [active _Atoms '$$pocket', 0];
                     endif
                     MM [ gtest:0.01, maxit:200 ];
                     aSetFixed [Atoms[], 0];
                     aSetFixed [originalFixed, 1];
                 endif
-                currentOptLevel = values.optlevel;
-                currentState = SystemTopologyState [];
-                currentPos = aPos Atoms[];
-                WindowSetAttr[wkey, [
-                    currentState:   [value : currentState ],
-                    currentPos:     [value : currentPos ],
-                    msgkey:         [value : msgkey ]
-                ]];  
                 Message [ msgkey, RUNNINGMT ];
                 local pdata = SystemPush Atoms[];
-                currentMTScoreES = ScoreMTScore_dG [cat _Atoms '$$receptor', cat _Atoms '$$ligand'];
+                // Try #1:
+//                currentMTScoreES = ScoreMTScore_dG [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'];
+                currentMTScoreES = first task_call ['ScoreMTScore_dG', [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'], [errmsg:'ignore']];
+                // Try #2:
+                if isnull currentMTScoreES then
+                    write ['MTScore Calculation failed (likely unable to reach host): trying again....\n'];
+                    sleep 1.0;
+//                    currentMTScoreES = ScoreMTScore_dG [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'];
+                    currentMTScoreES = first task_call ['ScoreMTScore_dG', [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'], [errmsg:'ignore']];
+                endif
                 tmpLabel = StartName[];
-                db_Write [ dataFile, 0, [
-                        Label : string tmpLabel,
-                        Complex : _moe_Extract [Chains[]],
-                        MTScoreES : currentMTScoreES
-                ]];
                 SystemPop pdata;
+                if not isscalarnum currentMTScoreES then
+                    if isnull currentMTScoreES then
+                        currentMTScoreES = 'ERROR';
+                    endif
+                    Message [msgkey, twrite ['MTScoreES (dG): {}\n', currentMTScoreES]];
+                else
+                    currentOptLevel = values.optlevel;
+                    currentState = SystemTopologyState [];
+                    currentPos = aPos active Atoms[];
+                    WindowSetAttr[wkey, [
+                        currentState:   [value : currentState ],
+                        currentPos:     [value : currentPos ],
+                        msgkey:         [value : msgkey ]
+                    ]];  
+                    db_Write [ dataFile, 0, [
+                            Label : string tmpLabel,
+                            Complex : _moe_Extract [Chains[]],
+                            MTScoreES : currentMTScoreES
+                    ]];
+                    Message [msgkey, twrite ['MTScoreES (dG): {} kcal/mol\n', currentMTScoreES]];
+                endif
                 [dataFile,molList,scoresList,namesList] = SyncMDB wkey;
-                Message [msgkey, twrite ['MTScoreES (dG): {} kcal/mol\n', currentMTScoreES]];
                 WindowSetAttr[wkey, [   slist:    [value : length molList ]]];
             else
-                local tmpMsg = Message [0,'The molecule has not changed since last execution! Please edit molecule in order to run again.'];
+                local tmpMsg = Message [0,'The molecule has not changed since last execution. Please edit molecule in order to run again.'];
                 sleep 5;
                 Message [tmpMsg,''];
             endif
+            WindowSetAttr [wkey, [addCurrent:  [sensitive: 1]]];
         elseif trigger === 'deleteSelection' then
+            WindowSetAttr [wkey, [deleteSelection:  [sensitive: 0]]];
             db_Delete [dataFile, molList(first values.slist)];
             [dataFile,molList,scoresList,namesList] = SyncMDB wkey;
             Message [second cat WindowGetData [wkey, 'msgkey'], ''];
@@ -560,6 +583,7 @@ global function qbInteractiveMTScoreUI opt
                 currentPos:     [value : currentPos ],
                 msgkey:         [value : msgkey ]
             ]];  
+            WindowSetAttr [wkey, [deleteSelection:  [sensitive: 1]]];
         elseif trigger === 'button_MOEPreparation' then
             run ['structprep_ui.svl', [cmd:'interactive']];
             status.ran_structprep = 1;
@@ -574,9 +598,9 @@ global function qbInteractiveMTScoreUI opt
             local prevSelection = Atoms[] | aSelected Atoms[];
             aSetSelected [Atoms[], 0];
             if values.optlevel == 'Ligand' then
-                aSetSelected [_Atoms '$$ligand', 1];
+                aSetSelected [active _Atoms '$$ligand', 1];
             elseif values.optlevel == 'Pocket' then
-                aSetSelected [cat [_Atoms '$$pocket',_Atoms '$$ligand'], 1];
+                aSetSelected [cat [active _Atoms '$$pocket',active _Atoms '$$ligand'], 1];
             endif
             sleep 1.0;
             aSetSelected [Atoms[], 0];
