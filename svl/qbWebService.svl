@@ -85,7 +85,7 @@ local function getWSDefaults [hostname, port, username, stdion, qmechanicexec, p
         elseif protocol === 'http' or protocol === 'https' then
             port = GetRCNumber ['QuantumBio.qbWSPort',8080];
         else
-            port = 'NA';
+            port = 0;
         endif
     endif
         
@@ -182,7 +182,7 @@ global function qbWSTestEndpoint url
     err = '';
     
     local [hostname, port, username, stdion, qmechanicexec, protocol] = parseURL url;
-    
+
     if protocol === 'http' or protocol === 'https' then
         local curlkey = curl_open [url: tok_cat [url, twrite ['/qmechanic/']]];
         [curl_out, err] = task_call [ 'curl_read',  curlkey, [errmsg:'ignore'] ];
@@ -342,7 +342,7 @@ global function qbWS_MTScore [target_mol, ligand_mol, hostname, port, username, 
                 local boundCount = 0;
                 while exe_status pkey loop
                     if not OS_MSWIN then
-                        fwaitr out_fno;
+//                        fwaitr out_fno;       // TODO: fwaitr doesn't seem to work on Windows or Mac. This may take some more experimentation.
                     endif
                     outline = cat freadb [out_fno, 'line', 1];
 //                    write ['{} | {} | {} \n', length outline, length boundary, boundCount];
@@ -394,6 +394,7 @@ global function qbWS_MTScore [target_mol, ligand_mol, hostname, port, username, 
 
     tmpJSON = qbReadJSONStream tmpJSON;
     if err === '' and not isnull tmpJSON then
+        write ['Complete: {}\n', tmpJSON];
         tmpJSON.success = 1;
     else
         write ['ERROR: {}\n', err];
@@ -709,7 +710,7 @@ local function main []
             exit twrite ['Executable: {} is not allowed to be executed\n',getWSHostNPort [hostname, port, username, stdion, qmechanicexec]];
         endif
     endif
-exit[];
+
     write ['Scoring {} target atoms & {} ligand atoms on qbWebService: {}\n', length rec, length lig, getWSHostNPort[hostname, port, username, stdion]];
     local scoreData = qbWS_MTScore [rec, lig, hostname, port, username, stdion, qmechanicexec];
     write ['scoreData: {}\n', qbWriteJSONStream scoreData];
