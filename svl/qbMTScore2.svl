@@ -153,8 +153,10 @@ const WINDOW_NAME = 'QuantumBio/MTScore BETA';		// window title
 // MakePanel only takes care of what the panel looks like but not the contents or processing any triggers.
 local function MakePanel opt
 
-    local opt_enableSidepanel = GetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', 0];
-
+//    local opt_enableSidepanel = GetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', 1];
+    DelRC ['QuantumBio.MTInteractions.enableSidepanel'];        // currently unsupported option.
+    local opt_enableSidepanel = 1;
+    
     local openicon = gr_icon ['$MOE/lib/icon/open.ico', 12, 'foreground'];
     
 //    write ['{}\n',qbWSConfig ['getWidget']];       // lmw - standard WS config widget
@@ -163,6 +165,7 @@ local function MakePanel opt
         title: WINDOW_NAME,
         name: 'shell', 
         text: [select ['Detach', 'Attach', opt_enableSidepanel], 'Close'],
+        sensitive : [0,1],
         onTrigger: ['return', 'exit'],
         Vbox: [
             Hbox:   qbWSConfig ['getWidget'],       // lmw - standard WS config widget
@@ -539,6 +542,7 @@ global function qbInteractiveMTScoreUI opt
 //                    currentMTScoreES = ScoreMTScore_dG [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'];
                     currentMTScoreES = first task_call ['ScoreMTScore_dG', [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'], [errmsg:'ignore']];
                 endif
+                Message [ msgkey, RUNNINGMT ];
                 tmpLabel = StartName[];
                 SystemPop pdata;
                 if not isscalarnum currentMTScoreES then
@@ -625,12 +629,13 @@ global function qbInteractiveMTScoreUI opt
             db_Write [ dataFile, molList(first values.slist), [Label : string namesList(first values.slist) ] ];
             [dataFile,molList,scoresList,namesList] = SyncMDB wkey;
         elseif trigger === 'shell' then
-            WindowDestroy WindowKey wkey;
             if values.shell === 'Attach' or values.shell === 'Detach' then
-                SetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', values.shell==='Attach'];
-                task_call [ 'qbInteractiveMTScoreUI', [], [master:'none', creator:'detach', statics: 'new'] ];
+//                SetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', values.shell==='Attach'];
+//                task_call [ 'qbInteractiveMTScoreUI', [], [master:'none', creator:'detach', statics: 'new'] ];
+            else
+                WindowDestroy WindowKey wkey;
+                break;
             endif
-            break;
         elseif qbWSConfig ['processWidget', wkey, trigger, values] then
             values = WindowValues wkey;
         endif
