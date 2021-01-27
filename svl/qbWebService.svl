@@ -25,9 +25,17 @@ local function boundaryGen[]
     return sample [shuffle boundary_chars, 40];
 endfunction
 
-local function which executable
-    local outline = [];
-    executable = twrite ['{} type -p {}',exe_cmd_str['sh'], executable];
+global function which executable
+    local outline;
+
+    if OS_UNIX then
+	executable = twrite ['command -v {}', executable];
+    elseif OS_MSWIN then
+	executable = twrite ['where {}', executable];
+    else
+	print 'Invalid OS'; return;
+    endif
+
     local [pkey, err] = task_call ['exe_open_shell', [executable,cd [],[],0], [errmsg:'ignore']];
     if err == '' then
         pkey = exe_open_shell[executable,cd [],[],0];
@@ -38,6 +46,40 @@ local function which executable
         endif
         exe_close pkey;
     endif
+    return token outline;
+endfunction
+
+global function ssh_which [executable, hostname, username]
+    local outline;
+    local err = '';
+    local pkey;
+    local port = 22;    // NOTE: this is currently assuming port=22 (it would be nice to allow the user to set the port too)
+    
+    if isnull username then
+        username = MOE_USER;
+    endif
+    
+    executable = twrite ['{} {}@{} -p {} -o BatchMode=yes command -v {}',exe_cmd_str['ssh'], username, hostname, port, executable];   
+
+    if ssh_host_ok [hostname, 0, [ssh_user:username]] <> 1 then
+        err = 'SSH ERROR';
+    endif
+    
+    if err == '' then
+        [pkey, err] = task_call ['exe_open_shell', [executable,cd [],[],0], [errmsg:'ignore']];
+    endif
+    
+    if err == '' then
+        pkey = exe_open_shell[executable,cd [],[],0];
+        local out_fno = exe_stdout pkey;
+        local in_fno = exe_stdin pkey;
+        if exe_status pkey then
+            outline = cat freadb [out_fno, 'line', 1];
+        endif
+        exe_close pkey;
+        outline = twrite ['ssh://{}@{}:{}/{}', username, hostname, port, outline];
+    endif
+
     return token outline;
 endfunction
 
@@ -204,7 +246,7 @@ global function qbWSTestEndpoint url
             endif
         else
             qme_command = twrite ['{} {}@{} -p {} -o BatchMode=yes {} --stdio -v 0 --np 2 -O', exe_cmd_str['ssh'], username, hostname, port, qmechanicexec];
-            if not ssh_host_ok [hostname, 0, [ssh_user:username]] then
+            if ssh_host_ok [hostname, 0, [ssh_user:username]] <> 1 then
                 err = twrite ['Unable to contact {}@{}:{} using passwordless ssh: please contact your administrator', username, hostname, port];
             endif
         endif
@@ -237,7 +279,7 @@ global function qbWSTestEndpoint url
         //                        write ['3 | {}\n', outline];
                             curl_out = cat [curl_out, outline];
                         else
-                            write ['X | {}\n', outline];
+//                            write ['X | {}\n', outline];
                         endif
                     endloop
             endif
@@ -357,7 +399,7 @@ global function qbWS_MTScore [target_mol, ligand_mol, hostname, port, username, 
 //                        write ['3 | {}\n', outline];
                         tmpJSON = cat [tmpJSON, outline];
                     else
-                        write ['X | {}\n', outline];
+//                        write ['X | {}\n', outline];
                     endif
                 endloop
             endif
@@ -432,7 +474,6 @@ global function qbRunMTPairList listfile
     local fnum = fopen listfile;
     write ['CALC:      TARGET     :    LIGAND   | InteractE  E_sol  MTScoreES | TIME\n'];
     while length (L = cat freadb [fnum, 'line', 1]) loop
-        write ['this one\n'];
         if second task_fork [] == 'child' then
             L = fieldsplit [ L," "];
             qbMTScoreFile [token first L, token second L];
@@ -545,9 +586,12 @@ global function qbWSConfig [cmd, wkey, trigger, values]
             ];
 
             function UpdateStatus [wConfKey,trig]
+                static prevHost;
                 if isnull trig then
                     trig = '';
                 endif
+                WindowSetAttr [wConfKey, [wsStatus: [text: 'Checking Connection....', foreground: 'orange']]];
+                WindowSetAttr [wConfKey, [panel: [sensitive:[0,1]]]];
 
                 local vals = WindowValues wConfKey;
                 if vals.qbInterface === 'qbWebService' then
@@ -557,12 +601,22 @@ global function qbWSConfig [cmd, wkey, trigger, values]
                     WindowSetAttr [wConfKey,[wsStatus : [bubbleHelp:'Be sure your remote hostname and port are set correctly and \nthat there are no firewalls between your host and the remote host.']]];
                     if trig <> 'qbWSPort' then WindowSetAttr [wConfKey,[qbWSPort : [shortcut: wsPortList,value: GetRCNumber ['QuantumBio.qbWSPort',8080]]]]; endif
                 elseif vals.qbInterface === 'Executable' and vals.qbWSHostname <> 'localhost'  then
+                    if neL [prevHost,vals.qbWSHostname] then
+                        prevHost = vals.qbWSHostname;
+                        execList = uniq cat [tok_drop [(first url_Parse ssh_which ['qmechanic',vals.qbWSHostname,vals.qbWSUsername]).path, 1], execList];
+                        WindowSetAttr [wConfKey,[qbExecutable : [shortcut: execList]]];
+                    endif
                     WindowSetAttr [wConfKey,[qbWSUsername : [sensitive:1]]];
                     WindowSetAttr [wConfKey,[qbExecutable : [sensitive:1]]];
                     WindowSetAttr [wConfKey,[qbWSPort : [sensitive:0]]];  // NOTE: currently MOE does not support ssh with alternate ports.
                     WindowSetAttr [wConfKey,[wsStatus : [bubbleHelp:'Be sure your remote username, hostname, ssh port, and executable path are set correctly \n(and ssh is set for passwordless entry to remote host from this localhost).']]];
                     if trig <> 'qbWSPort' then WindowSetAttr [wConfKey,[qbWSPort : [shortcut: sshPortList, value: GetRCNumber ['QuantumBio.qbSSHPort',22]]]]; endif
                 elseif vals.qbInterface === 'Executable' and vals.qbWSHostname === 'localhost'  then
+                    if neL [prevHost,vals.qbWSHostname] then
+                        prevHost = vals.qbWSHostname;
+                        execList = uniq cat [which ['qmechanic'], execList];
+                        WindowSetAttr [wConfKey,[qbExecutable : [shortcut: execList]]];
+                    endif
                     WindowSetAttr [wConfKey,[qbWSUsername : [sensitive:0]]];
                     WindowSetAttr [wConfKey,[qbExecutable : [sensitive:1]]];
                     WindowSetAttr [wConfKey,[qbWSPort : [sensitive:0]]];
@@ -581,8 +635,10 @@ global function qbWSConfig [cmd, wkey, trigger, values]
                 local tmpConnect = qbWSTestEndpoint tmpURL;
                 if length tmpConnect == 0 then
                     WindowSetAttr [wConfKey, [wsStatus: [text: 'No Connection', foreground: 'red']]];
+                    WindowSetAttr [wConfKey, [panel: [sensitive:[0,1]]]];
                 else
                     WindowSetAttr [wConfKey, [wsStatus: [text: 'Connection OK', foreground: 'blue']]];
+                    WindowSetAttr [wConfKey, [panel: [sensitive:[1,1]]]];
                 endif
                 
             endfunction
@@ -594,7 +650,7 @@ global function qbWSConfig [cmd, wkey, trigger, values]
                 if trig === 'panel' then
                     if vals.panel == 'Cancel' then break; endif
                     if vals.panel == 'Save' then
-                        UpdateStatus [wConfKey,trig];
+//                        UpdateStatus [wConfKey,trig];
                         hostList = uniq cat [vals.qbWSHostname, GetRC ['QuantumBio.hostList','localhost']];
                         execList = uniq cat [vals.qbExecutable, GetRC ['QuantumBio.execList','qmechanic']];
                         SetRC ['QuantumBio.hostList',token droplast cat apt swrite ['{};', keep [uniq hostList,5]]];
