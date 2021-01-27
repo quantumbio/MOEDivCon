@@ -154,7 +154,7 @@ const WINDOW_NAME = 'QuantumBio/MTScore BETA';		// window title
 local function MakePanel opt
 
 //    local opt_enableSidepanel = GetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', 1];
-    DelRC ['QuantumBio.MTInteractions.enableSidepanel'];        // currently unsupported option.
+    DelRC ['QuantumBio.MTInteractions.enableSidepanel'];        // currently unsupported option - remove the option and start from scratch for now
     local opt_enableSidepanel = 1;
     
     local openicon = gr_icon ['$MOE/lib/icon/open.ico', 12, 'foreground'];
