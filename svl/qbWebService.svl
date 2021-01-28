@@ -365,7 +365,7 @@ global function qbWS_MTScore [target_mol, ligand_mol, hostname, port, username, 
         else
             if OS_MSWIN then
                 // When fwaitr is used on Windows, it doesn't return data.
-                write ['Note: only blocking I/O is supported by MOE on Windows.\n  Use qbWebService instead of Executable if you wish to run calculation without blocking.\n'];
+//                write ['Note: only blocking I/O is supported by MOE on Windows.\n  Use qbWebService instead of Executable if you wish to run calculation without blocking.\n'];
             endif
             qme_command = twrite ['{} {}@{} -p {} -C -o BatchMode=yes {} --stdio 30 -v 0 --np 2 -O', exe_cmd_str['ssh'], username, hostname, port, qmechanicexec];
         endif
