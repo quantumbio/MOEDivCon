@@ -159,7 +159,6 @@ global function parseURL url
         port = info.port;
         qmechanicexec = info.path;
     else
-//        write ['err: {}\n', err];
         return [hostname, port, username, stdion, qmechanicexec, protocol];
     endif
     
@@ -228,6 +227,9 @@ global function qbWSTestEndpoint url
     if protocol === 'http' or protocol === 'https' then
         local curlkey = curl_open [url: tok_cat [url, twrite ['/qmechanic/']]];
         [curl_out, err] = task_call [ 'curl_read',  curlkey, [errmsg:'ignore'] ];
+        if err <> '' then
+            err = twrite ['Unable to reach webservice: {}', tok_cat [url, twrite ['/qmechanic/']]];
+        endif
         curl_close curlkey;
     elseif protocol === 'file' or protocol === 'ssh' then
         local qme_command;
@@ -247,7 +249,7 @@ global function qbWSTestEndpoint url
         else
             qme_command = twrite ['{} {}@{} -p {} -o BatchMode=yes {} --stdio -v 0 --np 2 -O', exe_cmd_str['ssh'], username, hostname, port, qmechanicexec];
             if ssh_host_ok [hostname, 0, [ssh_user:username]] <> 1 then
-                err = twrite ['Unable to contact {}@{}:{} using passwordless ssh: please contact your administrator', username, hostname, port];
+                err = twrite ['Unable to contact ssh://{}@{}:{} using passwordless ssh:\n    please contact your administrator', username, hostname, port];
             endif
         endif
 
@@ -287,12 +289,10 @@ global function qbWSTestEndpoint url
             exe_close pkey;
         
             if isnull qbReadJSONStream curl_out then
-                err = 'failed to read data from stream\n    (verify ssh username, hostname, port, path to qmechanic, and version)';
+                err = twrite ['{}\n    (verify ssh username, hostname, port, path to qmechanic, and version)',qme_command];
             else
                 err = '';
             endif
-        elseif err == '' then
-            err = 'failed to read data from stream\n    (verify ssh username, hostname, port, path to qmechanic, and version)';
         endif
     endif
 
@@ -584,16 +584,34 @@ global function qbWSConfig [cmd, wkey, trigger, values]
                     ]
                 ]
             ];
-
+            
             function UpdateStatus [wConfKey,trig]
                 static prevHost;
+                static prevURL;
+                
                 if isnull trig then
                     trig = '';
                 endif
+                
+                if trig == 'init' then
+                    prevHost = null[];
+                    prevURL = null[];
+                endif
+                
+                local vals = WindowValues wConfKey;
+                local tmpURL;
+                tmpURL = getWSHostNPort [
+                    vals.qbWSHostname,
+                    vals.qbWSPort,
+                    vals.qbWSUsername,
+                    vals.qbInterface === 'Executable',
+                    vals.qbExecutable];
+                if eqL [prevURL, tmpURL] then return;  endif
+                prevURL = tmpURL;
+
                 WindowSetAttr [wConfKey, [wsStatus: [text: 'Checking Connection....', foreground: 'orange']]];
                 WindowSetAttr [wConfKey, [panel: [sensitive:[0,1]]]];
 
-                local vals = WindowValues wConfKey;
                 if vals.qbInterface === 'qbWebService' then
                     WindowSetAttr [wConfKey,[qbWSUsername : [sensitive:0]]];
                     WindowSetAttr [wConfKey,[qbExecutable : [sensitive:0]]];
@@ -625,7 +643,7 @@ global function qbWSConfig [cmd, wkey, trigger, values]
                 endif
                 vals = WindowValues wConfKey;
 
-                local tmpURL = getWSHostNPort [
+                tmpURL = getWSHostNPort [
                     vals.qbWSHostname,
                     vals.qbWSPort,
                     vals.qbWSUsername,
@@ -641,16 +659,35 @@ global function qbWSConfig [cmd, wkey, trigger, values]
                     WindowSetAttr [wConfKey, [panel: [sensitive:[1,1]]]];
                 endif
                 
+                prevURL = tmpURL;
+                
             endfunction
-    
+            
+            function HostMonitor wConfKey
+                local prevHost;
+                local vals;
+                while WindowKey wConfKey loop
+                    vals = WindowValues wConfKey;
+                    if neL [prevHost, vals.qbWSHostname] then
+                        prevHost = vals.qbWSHostname;
+                        UpdateStatus wConfKey;
+                    endif
+                    sleep 2;
+                endloop
+            endfunction
+            
             WindowShow wConfKey;
-            UpdateStatus wConfKey; 
+            UpdateStatus [wConfKey, 'init']; 
+            if second task_fork [master:'none', idle:1, prio:0] === 'child' then
+                HostMonitor wConfKey;
+                exit [];
+            endif
             loop
                 local [vals, trig] = WindowWait wConfKey;
                 if trig === 'panel' then
                     if vals.panel == 'Cancel' then break; endif
                     if vals.panel == 'Save' then
-//                        UpdateStatus [wConfKey,trig];
+                        UpdateStatus [wConfKey,trig];
                         hostList = uniq cat [vals.qbWSHostname, GetRC ['QuantumBio.hostList','localhost']];
                         execList = uniq cat [vals.qbExecutable, GetRC ['QuantumBio.execList','qmechanic']];
                         SetRC ['QuantumBio.hostList',token droplast cat apt swrite ['{};', keep [uniq hostList,5]]];
