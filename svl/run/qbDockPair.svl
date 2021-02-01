@@ -387,9 +387,9 @@ local function main []
 //            3. Finally remove it from the stream, and place a set path in a variable if one is chosen (if not, it is just null).
     // -------
     local [mtscoreexe] = ArgvGet [ ['-mtscoreexe'], [0]];
-    local [recfilename, ligfilename, conffilename, dockedligfname, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, ifformat, preopt, protonate, forceexe, printhelp] = 
-        ArgvPull [ ['-rec', '-lig','-conf','-dockedlig','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-ifformat','-preopt','-protonate','-forceexe','-help'], 
-        [1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0] ];
+    local [recfilename, ligfilename, novelligfname, conffilename, dockedligfname, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, ifformat, preopt, protonate, forceexe, printhelp] = 
+        ArgvPull [ ['-rec', '-lig','-novel-lig','-conf','-dockedlig','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-ifformat','-preopt','-protonate','-forceexe','-help'], 
+        [1,1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0] ];
     local [runqmechanic] = ArgvPull [ ['-mtscoreexe'], [1] ];
     local remaining = ArgvAll [];
     if not isnull remaining then
@@ -537,6 +537,9 @@ local function main []
         elseif not isnull dockedligfname then
             local dockedligmdbname = twrite ['{}.mdb',fbase ftail dockedligfname];
             db_ImportSD [db_Open [ dockedligmdbname,'create' ],dockedligfname,'mol'];
+        elseif not isnull novelligfname then
+            local novelligmdbname = twrite ['{}.mdb',fbase ftail novelligfname];
+            db_ImportSD [db_Open [ novelligmdbname,'create' ],novelligfname,'mol'];
         endif
 
         // For older versions of MOE - need to rename BFIRank to mseq so it can be used in MTCS calculation    
@@ -656,21 +659,17 @@ local function main []
         if not isnull confmdbname then
             opt = tagcat [ [ligmdbname: confmdbname], opt ];
             DockFile [rec, site, confmdbname, outf, opt];
-        
-            // For older versions of MOE - need to rename mseq to BFIRank so it can be used in MTCS calculation
-            if MOE_VERSION < 2018 then
-                db_RenameField [outf,'mseq','BFIRank'];
-            endif
         elseif not isnull dockedligmdbname then
             opt = tagcat [ [ligmdbname: dockedligmdbname, placement: 'None'], opt ];
             DockFile [rec, site, dockedligmdbname, outf, opt];
-        
-            // For older versions of MOE - need to rename mseq to BFIRank so it can be used in MTCS calculation
-            if MOE_VERSION < 2018 then
-                db_RenameField [outf,'mseq','BFIRank'];
-            endif
+        elseif not isnull novelligmdbname then
+            DockFile [rec, site, novelligmdbname, outf, opt];
         else
             DockAtoms [ rec,  site,  lig, outf, opt];
+        endif
+        // For older versions of MOE - need to rename mseq to BFIRank so it can be used in MTCS calculation
+        if MOE_VERSION < 2018 then
+            db_RenameField [outf,'mseq','BFIRank'];
         endif
         dockmdb = outf;
     endif
