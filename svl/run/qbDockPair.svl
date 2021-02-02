@@ -485,8 +485,10 @@ local function main []
     
     rec = diff [rec,lig];   // make sure the receptor does not include the ligand.
 
-    if isnull outf then
+    if isnull outf and isnull novelligfname then
         outf = twrite ['{}_dock.mdb',fbase ftail ligfilename];
+    elseif isnull outf and not isnull novelligfname then
+        outf = twrite ['{}_dock.mdb',fbase ftail novelligfname];
     else
         outf = twrite ['{}.mdb',fbase outf];
     endif;
