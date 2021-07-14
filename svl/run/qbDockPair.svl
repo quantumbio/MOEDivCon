@@ -213,7 +213,7 @@ local function DockOpt []
         rxnFile: '',
         rxsite: [  ],
         edsupport: 1,
-        ed_data: [ ed_dockpath : '' ],
+//        ed_data: [ ed_dockpath : '' ],
         check_pose_geom: [  ],
         multiLigand: 0,
         need_dmat: 1,
