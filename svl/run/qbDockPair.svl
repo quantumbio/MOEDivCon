@@ -13,6 +13,7 @@ function MM;
 function StructurePreparation;
 function Protonate3D;
 function db_ImportSD;
+function db_ImportMOL2;
 function db_Sort;
 function db_Delete;
 function db_ExportSD;
@@ -28,7 +29,7 @@ function dockmdb2mol2;
 const DEFAULT_OPT = [
     delwat      : 0,        // Delete waters prior to performing docking/placement but AFTER any optimization if -preopt chosen
     inducedfit  : 0,        // Run induced fit (optimized protein) on dock
-    ifformat    : 'pdb',    // output this version of output for induced fit (can be either 'pdb' or 'mol2')
+    offormat    : 'pdb',    // output this version of output for induced fit (can be either 'pdb' or 'mol2')
     mtscorees   : 0,        // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
     mtcsconf    : 0,        // Number of MTCS conformers to use (these are the best X conformers according to BFintensity). If zero (default) use ALL conformers (WARNING: this can be expensive.)
     maxpose     : 25,       // Number of poses to optimize (per posed conformer) prior to final score
@@ -39,6 +40,7 @@ const DEFAULT_OPT = [
     protonate   : 0,        // Run Protonate3D prior to docking/scoring
     forceexe    : 0,        // Force the calculation to proceed even if there are structural defects
     mtscoreexe  : 0,        // Run MTScoreE using the qmechanic commandline found in QBHOME
+    testinp     : 0,        // Test the input but then quit.
     qbhome      : ''        // Path to QBHOME (if set - otherwise null)
     
 ];
@@ -77,6 +79,8 @@ AVAILABLE OPTIONS
     
     -lig <file>         (Optional) Placed Ligand in PDB or MOL2 format 
                             (DEFAULT: Ligand if -rec includes target:ligand)
+    -novellig <file>    (Optional) One or more novel ligands in MOL2, MDB, or SDF
+                            (DEFAULT: Whatever species is provided as the placed ligand)
     -conf <file>        (Optional) [MTCS] Conformers in SDF format. 
                             (DEFAULT: built-in MOE conformers)
     -o <filename>       Output base filename (DEFAULT: <ligand_filename>_dock.mdb)
@@ -293,10 +297,10 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
         else
             ReadAuto targ_pdb;
             if mainopt.delwat then
-                write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING\n'];
+                write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING (used -delwat to remove solvent)\n'];
                 oDestroy uniq cat aResidue _Atoms '$$solvent';
             else
-                write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
+                write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING (use -delwat to remove solvent)\n'];
             endif
             targ_chains = Chains[];
         endif
@@ -387,9 +391,9 @@ local function main []
 //            3. Finally remove it from the stream, and place a set path in a variable if one is chosen (if not, it is just null).
     // -------
     local [mtscoreexe] = ArgvGet [ ['-mtscoreexe'], [0]];
-    local [recfilename, ligfilename, novelligfname, conffilename, dockedligfname, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, ifformat, preopt, protonate, forceexe, printhelp] = 
-        ArgvPull [ ['-rec', '-lig','-novel-lig','-conf','-dockedlig','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-ifformat','-preopt','-protonate','-forceexe','-help'], 
-        [1,1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0] ];
+    local [recfilename, ligfilename, novelligfname, conffilename, dockedligfname, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, offormat, preopt, protonate, forceexe, printhelp, testinp] = 
+        ArgvPull [ ['-rec', '-lig','-novellig','-conf','-dockedlig','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-offormat','-preopt','-protonate','-forceexe','-help','-testinp'], 
+        [1,1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0,0] ];
     local [runqmechanic] = ArgvPull [ ['-mtscoreexe'], [1] ];
     local remaining = ArgvAll [];
     if not isnull remaining then
@@ -407,11 +411,12 @@ local function main []
     inopt.mtcsconf = atoi mtcsconf;
     inopt.remaxpose = atoi remaxpose;
     inopt.rigidlig = rigidlig;
-    inopt.ifformat = ifformat;
+    inopt.offormat = offormat;
     inopt.preopt = preopt;
     inopt.protonate = protonate;
     inopt.forceexe = forceexe;
     inopt.mtscoreexe = mtscoreexe;
+    inopt.testinp = testinp;
 
     // In the event that no conformers are provided we will use the standard docking function.
     //  With that in mind, we should bump up the defaults.
@@ -419,6 +424,12 @@ local function main []
     if isnull conffilename then
         defaults.maxpose = ceil (DEFAULT_OPT.maxpose * (DEFAULT_OPT.maxpose/DEFAULT_OPT.remaxpose));
         defaults.remaxpose = ceil (DEFAULT_OPT.remaxpose * (DEFAULT_OPT.maxpose/DEFAULT_OPT.remaxpose));
+    endif
+    
+    if inducedfit then
+        defaults.offormat = 'pdb';
+    else
+        defaults.offormat = 'sdf';
     endif
     
     inopt = tagcat [inopt, defaults];
@@ -519,6 +530,7 @@ local function main []
             Protonate3D [Atoms[],rec,rec,[],[],[]];    // protonate both the protein and the ligand
         endif
 
+        local bool_DelNovelligmdb = 0;
         if not isnull conffilename then
             local confmdbname = twrite ['{}.mdb',fbase ftail conffilename];
             db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol',
@@ -540,8 +552,18 @@ local function main []
             local dockedligmdbname = twrite ['{}.mdb',fbase ftail dockedligfname];
             db_ImportSD [db_Open [ dockedligmdbname,'create' ],dockedligfname,'mol'];
         elseif not isnull novelligfname then
-            local novelligmdbname = twrite ['{}.mdb',fbase ftail novelligfname];
-            db_ImportSD [db_Open [ novelligmdbname,'create' ],novelligfname,'mol'];
+            local novelligmdbname;
+            if fext ftail novelligfname <> 'mdb' then
+                novelligmdbname = twrite ['1234567890-{}.mdb',fbase ftail novelligfname];
+                if fext ftail novelligfname == 'sdf' then
+                    db_ImportSD [db_Open [ novelligmdbname,'create' ], novelligfname,'mol'];
+                elseif fext ftail novelligfname == 'mol2' then
+                    db_ImportMOL2 [novelligfname, db_Open [ novelligmdbname,'create' ],'mol'];
+                endif
+                bool_DelNovelligmdb = 1;
+            else
+                novelligmdbname = novelligfname;
+            endif                
         endif
 
         // For older versions of MOE - need to rename BFIRank to mseq so it can be used in MTCS calculation    
@@ -620,6 +642,10 @@ local function main []
             write ['Molecular system parameterized.'];
         endif
         
+        if inopt.testinp then
+            write ['Input test complete (remove -testinp to run simulation as reqested)\n'];
+        endif
+        
         if inopt.preopt then
             write ['NOTE: RUNNING MM OPT with {}\n', 'Amber10EHT.ff'];
             local tetherWeight = rep [opt.refine_opt.tether, length Atoms[]];
@@ -631,10 +657,10 @@ local function main []
         endif
 
         if inopt.delwat then
-            write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING\n'];
+            write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING (used -delwat to remove solvent)\n'];
             oDestroy uniq cat aResidue _Atoms '$$solvent';
         else
-            write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING\n'];
+            write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING (use -delwat to remove solvent)\n'];
         endif
         lig = lig | oValid lig;
         rec = rec | oValid rec;
@@ -666,6 +692,9 @@ local function main []
             DockFile [rec, site, dockedligmdbname, outf, opt];
         elseif not isnull novelligmdbname then
             DockFile [rec, site, novelligmdbname, outf, opt];
+            if bool_DelNovelligmdb then
+                fdelete novelligmdbname;
+            endif
         else
             DockAtoms [ rec,  site,  lig, outf, opt];
         endif
@@ -679,10 +708,14 @@ local function main []
     db_Sort [dockmdb,'S',0];
     local dockfiles;
     if inopt.inducedfit then
-        dockfiles = dockmdb2mol2 [dockmdb,twrite ['{}.{}',fbase ftail outf,inopt.ifformat],ligID,recfilename,inopt];
+        dockfiles = dockmdb2mol2 [dockmdb,twrite ['{}.{}',fbase ftail outf,inopt.offormat],ligID,recfilename,inopt];
     else
         dockfiles = twrite ['{}.sdf',fbase outf];
         db_ExportSD [ dockmdb, dockfiles];
+        if inopt.offormat <> 'sdf' then
+            dockfiles = dockmdb2mol2 [dockmdb,twrite ['{}.{}',fbase ftail outf,inopt.offormat],ligID,recfilename,inopt];
+        endif
+write ['test: {}\n', dockfiles];
         local mdbdata = db_Read [dockmdb,first db_Entries dockmdb];
         fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol];
     endif
