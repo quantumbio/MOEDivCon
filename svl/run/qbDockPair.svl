@@ -377,6 +377,10 @@ local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
     return filelist;
 endfunction
 
+local function runDock [inopt, rec, lig]
+
+endfunction
+
 local function main []
     local startcputime = cpuclock[];
     local starttime = clock[];
@@ -417,11 +421,19 @@ local function main []
     inopt.forceexe = forceexe;
     inopt.mtscoreexe = mtscoreexe;
     inopt.testinp = testinp;
+    
+    inopt.recfilename = recfilename;
+    inopt.ligfilename = ligfilename;
+    inopt.novelligfname = novelligfname;
+    inopt.conffilename = conffilename;
+    inopt.dockedligfname = dockedligfname;
+    inopt.outf = outf;
+    inopt.dockmdb = dockmdb;
 
     // In the event that no conformers are provided we will use the standard docking function.
     //  With that in mind, we should bump up the defaults.
     local defaults = DEFAULT_OPT;
-    if isnull conffilename then
+    if isnull inopt.conffilename then
         defaults.maxpose = ceil (DEFAULT_OPT.maxpose * (DEFAULT_OPT.maxpose/DEFAULT_OPT.remaxpose));
         defaults.remaxpose = ceil (DEFAULT_OPT.remaxpose * (DEFAULT_OPT.maxpose/DEFAULT_OPT.remaxpose));
     endif
@@ -436,10 +448,10 @@ local function main []
     
     write ['inopt: {}\n',inopt];
 
-    if not isnull recfilename then
-        local rec = cat cat cAtoms ReadAuto recfilename;
+    if not isnull inopt.recfilename then
+        local rec = cat cat cAtoms ReadAuto inopt.recfilename;
         if isnull rec then
-            exit twrite ['Cannot read receptor file {}', recfilename];
+            exit twrite ['Cannot read receptor file {}', inopt.recfilename];
         endif
     else
         exit twrite ['Use -rec command line argument to provide an input file for RECEPTOR'];
@@ -474,34 +486,34 @@ local function main []
     rec = rec | oValid rec;
     
     local lig, ligResidue, ligfext;
-    if not isnull ligfilename then
-        lig = cat cat cAtoms ReadAuto ligfilename;
+    if not isnull inopt.ligfilename then
+        lig = cat cat cAtoms ReadAuto inopt.ligfilename;
         ligResidue = aResidue first lig;
-        ligfext = fext ligfilename;
+        ligfext = fext inopt.ligfilename;
         oReparent [diff [lig, first lig], ligResidue];  // MOE appears to need all lignad atoms in a single residue
         if isnull lig then
-            exit twrite ['Cannot read receptor file {}', ligfilename];
+            exit twrite ['Cannot read receptor file {}', inopt.ligfilename];
         endif
     elseif length uniq aResidue _Atoms '$$ligand' == 1 then
         lig = _Atoms '$$ligand';
         ligResidue = aResidue first lig;
-        ligfilename = rName ligResidue;
+        inopt.ligfilename = rName ligResidue;
         ligfext = 'mol2';       // when no file is provided for the ligand we will default to writing out a mol2
-        write ['WARNING: Using Ligand {} found in {}. Use -lig command line argument to provide an input file for LIGAND\n', rName ligResidue, recfilename];
+        write ['WARNING: Using Ligand {} found in {}. Use -lig command line argument to provide an input file for LIGAND\n', rName ligResidue, inopt.recfilename];
     elseif length uniq aResidue _Atoms '$$ligand' > 1 then
-        exit twrite ['{} Ligands found in {}. Use -lig command line argument to provide an input file for LIGAND\n', length uniq aResidue _Atoms '$$ligand', recfilename];
+        exit twrite ['{} Ligands found in {}. Use -lig command line argument to provide an input file for LIGAND\n', length uniq aResidue _Atoms '$$ligand', inopt.recfilename];
     else
-        exit twrite ['No Ligand found in {}. Use -lig command line argument to provide an input file for LIGAND\n', recfilename];
+        exit twrite ['No Ligand found in {}. Use -lig command line argument to provide an input file for LIGAND\n', inopt.recfilename];
     endif
     
     rec = diff [rec,lig];   // make sure the receptor does not include the ligand.
 
-    if isnull outf and isnull novelligfname then
-        outf = twrite ['{}_dock.mdb',fbase ftail ligfilename];
-    elseif isnull outf and not isnull novelligfname then
-        outf = twrite ['{}_dock.mdb',fbase ftail novelligfname];
+    if isnull inopt.outf and isnull inopt.novelligfname then
+        inopt.outf = twrite ['{}_dock.mdb',fbase ftail inopt.ligfilename];
+    elseif isnull inopt.outf and not isnull inopt.novelligfname then
+        inopt.outf = twrite ['{}_dock.mdb',fbase ftail inopt.novelligfname];
     else
-        outf = twrite ['{}.mdb',fbase outf];
+        inopt.outf = twrite ['{}.mdb',fbase inopt.outf];
     endif;
         
     // Need the UID, etc of the ligand read in so the write process can rename back (this circumvents the SDF problem which effectively "washes" out these terms).
@@ -518,8 +530,8 @@ local function main []
     ligID.cNumber = cNumber ligChain;   
     ligID.cTag = cTag ligChain;
     
-    // if the user provides a dockmdb then we assume they wish to perform the final translation to qmechanic-readabe output (SDF or MOL2 depending)
-    if isnull dockmdb then
+    // if the user provides a inopt.dockmdb then we assume they wish to perform the final translation to qmechanic-readabe output (SDF or MOL2 depending)
+    if isnull inopt.dockmdb then
 
         local opt = DockOpt[];
         opt = tagcat [ [maxpose: inopt.maxpose], opt ];
@@ -531,9 +543,9 @@ local function main []
         endif
 
         local bool_DelNovelligmdb = 0;
-        if not isnull conffilename then
-            local confmdbname = twrite ['{}.mdb',fbase ftail conffilename];
-            db_ImportSD [db_Open [ confmdbname,'create' ],conffilename,'mol',
+        if not isnull inopt.conffilename then
+            local confmdbname = twrite ['{}.mdb',fbase ftail inopt.conffilename];
+            db_ImportSD [db_Open [ confmdbname,'create' ],inopt.conffilename,'mol',
                 ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
                 ['BFIntensity','BFIRank','Energy','Z_L','SumBFIntensity','SumNonbondedIntensity'],
                 ['double','int','double','char','double','double']        
@@ -548,21 +560,21 @@ local function main []
 //            db_Sort [confmdbname,'BFIRank',0];
             write ['NOTE: Using {} conformers provided in {}.\n', db_nEntries confmdbname, confmdbname];
             opt.retainData = not (first db_Fields confmdbname == 'mol');
-        elseif not isnull dockedligfname then
-            local dockedligmdbname = twrite ['{}.mdb',fbase ftail dockedligfname];
-            db_ImportSD [db_Open [ dockedligmdbname,'create' ],dockedligfname,'mol'];
-        elseif not isnull novelligfname then
+        elseif not isnull inopt.dockedligfname then
+            local dockedligmdbname = twrite ['{}.mdb',fbase ftail inopt.dockedligfname];
+            db_ImportSD [db_Open [ dockedligmdbname,'create' ],inopt.dockedligfname,'mol'];
+        elseif not isnull inopt.novelligfname then
             local novelligmdbname;
-            if fext ftail novelligfname <> 'mdb' then
-                novelligmdbname = twrite ['1234567890-{}.mdb',fbase ftail novelligfname];
-                if fext ftail novelligfname == 'sdf' then
-                    db_ImportSD [db_Open [ novelligmdbname,'create' ], novelligfname,'mol'];
-                elseif fext ftail novelligfname == 'mol2' then
-                    db_ImportMOL2 [novelligfname, db_Open [ novelligmdbname,'create' ],'mol'];
+            if fext ftail inopt.novelligfname <> 'mdb' then
+                novelligmdbname = twrite ['1234567890-{}.mdb',fbase ftail inopt.novelligfname];
+                if fext ftail inopt.novelligfname == 'sdf' then
+                    db_ImportSD [db_Open [ novelligmdbname,'create' ], inopt.novelligfname,'mol'];
+                elseif fext ftail inopt.novelligfname == 'mol2' then
+                    db_ImportMOL2 [inopt.novelligfname, db_Open [ novelligmdbname,'create' ],'mol'];
                 endif
                 bool_DelNovelligmdb = 1;
             else
-                novelligmdbname = novelligfname;
+                novelligmdbname = inopt.novelligfname;
             endif                
         endif
 
@@ -672,12 +684,12 @@ local function main []
         
         // Write the _predock versions of any input PDB & mol2 files so that these can be used in qmechanic
         local syskeys = SystemPush rec;
-        local pro_predock = twrite ['pro_{}_predock.{}', fbase ligfilename, fext recfilename];
+        local pro_predock = twrite ['pro_{}_predock.{}', fbase inopt.ligfilename, fext inopt.recfilename];
         write ['{}\n', pro_predock];
         WriteAuto [pro_predock];
         SystemPop syskeys;
 
-        local lig_predock = twrite ['lig_{}_predock.{}', fbase ligfilename, ligfext];
+        local lig_predock = twrite ['lig_{}_predock.{}', fbase inopt.ligfilename, ligfext];
         write ['{}\n', lig_predock];
         syskeys = SystemPush lig;
         WriteAuto [lig_predock];
@@ -686,38 +698,38 @@ local function main []
         write ['NOTE: RUNNING {} Docking with {} as MOE/Dock Final Scoring Function\n', opt.refine, opt.rescoring];
         if not isnull confmdbname then
             opt = tagcat [ [ligmdbname: confmdbname], opt ];
-            DockFile [rec, site, confmdbname, outf, opt];
+            DockFile [rec, site, confmdbname, inopt.outf, opt];
         elseif not isnull dockedligmdbname then
             opt = tagcat [ [ligmdbname: dockedligmdbname, placement: 'None'], opt ];
-            DockFile [rec, site, dockedligmdbname, outf, opt];
+            DockFile [rec, site, dockedligmdbname, inopt.outf, opt];
         elseif not isnull novelligmdbname then
-            DockFile [rec, site, novelligmdbname, outf, opt];
+            DockFile [rec, site, novelligmdbname, inopt.outf, opt];
             if bool_DelNovelligmdb then
                 fdelete novelligmdbname;
             endif
         else
-            DockAtoms [ rec,  site,  lig, outf, opt];
+            DockAtoms [ rec,  site,  lig, inopt.outf, opt];
         endif
         // For older versions of MOE - need to rename mseq to BFIRank so it can be used in MTCS calculation
         if MOE_VERSION < 2018 then
-            db_RenameField [outf,'mseq','BFIRank'];
+            db_RenameField [inopt.outf,'mseq','BFIRank'];
         endif
-        dockmdb = outf;
+        inopt.dockmdb = inopt.outf;
     endif
     
-    db_Sort [dockmdb,'S',0];
+    db_Sort [inopt.dockmdb,'S',0];
     local dockfiles;
     if inopt.inducedfit then
-        dockfiles = dockmdb2mol2 [dockmdb,twrite ['{}.{}',fbase ftail outf,inopt.offormat],ligID,recfilename,inopt];
+        dockfiles = dockmdb2mol2 [inopt.dockmdb,twrite ['{}.{}',fbase ftail inopt.outf,inopt.offormat],ligID,inopt.recfilename,inopt];
     else
-        dockfiles = twrite ['{}.sdf',fbase outf];
-        db_ExportSD [ dockmdb, dockfiles];
+        dockfiles = twrite ['{}.sdf',fbase inopt.outf];
+        db_ExportSD [ inopt.dockmdb, dockfiles];
         if inopt.offormat <> 'sdf' then
-            dockfiles = dockmdb2mol2 [dockmdb,twrite ['{}.{}',fbase ftail outf,inopt.offormat],ligID,recfilename,inopt];
+            dockfiles = dockmdb2mol2 [inopt.dockmdb,twrite ['{}.{}',fbase ftail inopt.outf,inopt.offormat],ligID,inopt.recfilename,inopt];
         endif
 write ['test: {}\n', dockfiles];
-        local mdbdata = db_Read [dockmdb,first db_Entries dockmdb];
-        fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail outf],mol_Create mdbdata.mol];
+        local mdbdata = db_Read [inopt.dockmdb,first db_Entries inopt.dockmdb];
+        fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail inopt.outf],mol_Create mdbdata.mol];
     endif
 
     write ['Docking finished in {} seconds & {} CPUseconds.\n', clock[] - starttime, cpuclock[] - startcputime];
