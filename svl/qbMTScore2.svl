@@ -257,7 +257,8 @@ local function MakePanel opt
             Data:   [name:'namesList'],
             Data:   [name:'currentState', value:-1],
             Data:   [name:'currentPos', value:[[0],[0],[0]]],
-            Data:   [name:'msgkey', value:0]
+            Data:   [name:'msgkey', value:0],
+            Data:   [name:'isBricked', value:0]
         ]
     ];
     
@@ -320,6 +321,11 @@ local function ReadyMonitor wkey
     local prevDataFile = '';
     
     loop
+        if second cat WindowGetData [wkey, 'isBricked'] then
+            sleep 1;
+            continue;
+        endif
+
         dataFile = second cat WindowGetData [wkey, 'outdb'];
         
         if dataFile <> '' then
@@ -483,6 +489,12 @@ global function qbInteractiveMTScoreUI opt
         endfunction
         return twrite ['{}',twrite ['{}:{}:{}', formNum timevec(7), formNum timevec(8), formNum timevec(9)]];
     endfunction
+    
+    local function brickpanel [wkey,status]
+        WindowSetAttr[wkey, [
+            isBricked:      [value : status ]
+        ]];  
+    endfunction
         
     if second task_fork [master:'mutual', idle:1, prio:0] === 'child' then
         ReadyMonitor wkey;
@@ -495,7 +507,7 @@ global function qbInteractiveMTScoreUI opt
         molList = values.molList;
         scoresList = values.scoresList;
         namesList = values.namesList;
-//        write ['values: {}\ntrigger: {}\n', values, trigger];        
+        write ['values: {}\ntrigger: {}\n', values, trigger];        
         if trigger === 'showSelection' or trigger === 'slist' then
             if first values.slist and first values.slist <> prevSelected then
                 prevSelected = first values.slist;
@@ -636,8 +648,11 @@ global function qbInteractiveMTScoreUI opt
                 WindowDestroy WindowKey wkey;
                 break;
             endif
-        elseif qbWSConfig ['processWidget', wkey, trigger, values] then
+        elseif trigger === 'button_WSsetup' then
+            brickpanel [wkey,1];
+            qbWSConfig ['processWidget', wkey, trigger, values];
             values = WindowValues wkey;
+            brickpanel [wkey,0];
         endif
     endloop
 

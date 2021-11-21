@@ -31,6 +31,14 @@ static braceCount;      // the braces are counted throughout the JSON file in or
 
 // LOCAL FUNCTIONS
 
+// forward declarations provided
+function convertType;
+function getString;
+function getArrayCell;
+function getArray;
+function getObjectCell;
+function getObject;
+
 // Local utility functions required to break apart and process the JSON document.
 
 local function convertType [inCell]
@@ -69,6 +77,10 @@ local function getArrayCell [position, inString]
         elseif inString(position) == "\"" then              // "
             [position, tmpCurrent] = getString [position+1, inString];
             return [position, token tmpCurrent, done];
+//        elseif inString(position) == "{" and isValue then
+        elseif inString(position) == "{" then
+            [position, tmpCurrent] = getObject [position+1, inString];
+            return [position, tmpCurrent, done];
         else
             tmpCurrent = cat [tmpCurrent, inString(position)];
         endif
@@ -94,7 +106,6 @@ endfunction
 
 // function used to process either the key or value within the object.
 //      (note: this function will call back to getObject if new { is found in value);
-function getObject;
 local function getObjectCell [position, inString, isValue]
     local tmpCurrent, current;
     local done = 0;
@@ -360,24 +371,65 @@ const inOUTPUT1 =
 
 const inOUTPUT2 = 
 #token
-{"total-charge" : "0"}, {"formal-charge" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-0, 0, 0]}, {"hybridization" : ["sp3", "sp3", "sp3",
-"sp3", "sp3", "sp2", "sp2", "sp3", "sp3", "sp3", "sp3", "sp3", "sp3", "sp3",
-"sp3"]}
+{"total-charge" : "0"}, 
+{"formal-charge" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, 
+{"hybridization" : ["sp3", "sp3", "sp3", "sp3", "sp3", "sp2", "sp2", "sp3", "sp3", "sp3", "sp3", "sp3", "sp3", "sp3", "sp3"]}
 #;
+
+const inOUTPUT3 = 
+#token
+{
+  "audit_author": [
+    {
+      "name": "Fermi, G.",
+      "pdbx_ordinal": 1
+    },
+    {
+      "name": "Perutz, M.F.",
+      "pdbx_ordinal": 2
+    }
+  ]
+}
+#;
+
+const inOUTPUT4 = 
+#token
+{
+  "audit_author": [
+    {
+      "name": "Fermi, G.",
+      "pdbx_ordinal": 1
+    }
+  ]
+}
+#;
+
+function json_Read;
+
+global function JSONreadtest_RCSB []
+    catch_errors[];
+//    local object = qbReadJSONStream [inOUTPUT3];
+    local object = json_Read [inOUTPUT3,[]];
+    write ['object: {} | {} | {} \n', length object, type object, object];
+//    write ['audit_author: {} | {}\n', length object.audit_author, object.audit_author];
+//    write ['audit_author(1): {} | {}\n', length object.audit_author(1), object.audit_author(1)];
+//    write ['audit_author(2): {} | {}\n', length object.audit_author(2), object.audit_author(2)];
+endfunction
 
 global function JSONreadtest_WebService []
     catch_errors[];
     local object = qbReadJSONStream [inOUTPUT2];
 
-    write ['object: {} | {}\n', length object, object];
+    write ['object: {} | {} | {} \n', length object, type object, object];
     write ['untaged: {} | {}\n', first untag object];
     write ['============\n'];
     write ['total-charge: {} | {}\n', length object.('total-charge'), object.('total-charge')];
     write ['formal-charge: {} | {}\n', length object.('formal-charge'),object.('formal-charge')];
     write ['hybridization: {} | {}\n', length object.('hybridization'),object.('hybridization')];
 
+    write ['translating .... \n'];
     local tmpString = qbWriteJSONStream object;
+    write ['tmpString: {}\n', tmpString];
     object = qbReadJSONStream[tmpString];
 
     write ['object: {} | {}\n', length object, object];
