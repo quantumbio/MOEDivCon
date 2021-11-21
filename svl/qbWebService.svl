@@ -209,9 +209,19 @@ global function qbWSTestEndpoint url
     if isnull url then
         url = getWSHostNPort[];
     endif
+    
+    local [hostname, port, username, stdion, qmechanicexec, protocol] = parseURL url;
+    
+    local timeout;
+    if protocol === 'http' or protocol === "https" then
+        timeout = 5;        // to cut down chatter, for http/https limit checks to once every 5 seconds or when the URL changes or some error has occured (to allow more shots on goal)
+    else
+        timeout = 120;      // to cut down chatter, for executables limit checks to once every 120 seconds or when the URL changes or some error has occured (to allow more shots on goal)
+    endif
+
 
     if not isnull prevTime and not isnull prevURL then 
-        if 120 > (clock[] - prevTime) and url === prevURL and err === '' then       // to cut down chatter, limit checks to once every 2 minutes or when the URL changes or some error has occured (to allow more shots on goal)
+        if timeout > (clock[] - prevTime) and url === prevURL and err === '' then 
             return qbReadJSONStream curl_out;
         endif
     endif
@@ -222,8 +232,6 @@ global function qbWSTestEndpoint url
     curl_out = "";
     err = '';
     
-    local [hostname, port, username, stdion, qmechanicexec, protocol] = parseURL url;
-
     if protocol === 'http' or protocol === 'https' then
         local curlkey = curl_open [url: tok_cat [url, twrite ['/qmechanic/']]];
         [curl_out, err] = task_call [ 'curl_read',  curlkey, [errmsg:'ignore'] ];
@@ -324,13 +332,12 @@ global function qbWS_MTScore [target_mol, ligand_mol, hostname, port, username, 
     local boundary = boundaryGen[];
     local ctype = cat ["multipart/form-data; boundary=", boundary];
     boundary = cat ["--", boundary]; // add two dashes by the standards
-    
+        
     local Instructions = cat [
         "Content-Disposition: form-data; name=\"Instructions\"", CRLF,
         "Content-Type: text/plain", CRLF,
         CRLF,
         "{ \"options\": {\"mtscore\": \"endstate\"}}", CRLF
-//         "{ \"options\": {\"scoretype\": \"endstate\"}}", CRLF
     ];
 
     local POST_CONTENT = cat [
@@ -588,6 +595,7 @@ global function qbWSConfig [cmd, wkey, trigger, values]
             function UpdateStatus [wConfKey,trig]
                 static prevHost;
                 static prevURL;
+                static prevTime;
                 
                 if isnull trig then
                     trig = '';
@@ -596,6 +604,7 @@ global function qbWSConfig [cmd, wkey, trigger, values]
                 if trig == 'init' then
                     prevHost = null[];
                     prevURL = null[];
+                    prevTime = clock[];
                 endif
                 
                 local vals = WindowValues wConfKey;
@@ -606,8 +615,9 @@ global function qbWSConfig [cmd, wkey, trigger, values]
                     vals.qbWSUsername,
                     vals.qbInterface === 'Executable',
                     vals.qbExecutable];
-                if eqL [prevURL, tmpURL] then return;  endif
+                if ((eqL [prevURL, tmpURL]) and (10 < (clock[] - prevTime))) then return;  endif
                 prevURL = tmpURL;
+                prevTime = clock[];
 
                 WindowSetAttr [wConfKey, [wsStatus: [text: 'Checking Connection....', foreground: 'orange']]];
                 WindowSetAttr [wConfKey, [panel: [sensitive:[0,1]]]];
@@ -668,10 +678,10 @@ global function qbWSConfig [cmd, wkey, trigger, values]
                 local vals;
                 while WindowKey wConfKey loop
                     vals = WindowValues wConfKey;
-                    if neL [prevHost, vals.qbWSHostname] then
+//                    if neL [prevHost, vals.qbWSHostname] then
                         prevHost = vals.qbWSHostname;
                         UpdateStatus wConfKey;
-                    endif
+//                    endif
                     sleep 2;
                 endloop
             endfunction
@@ -728,6 +738,40 @@ global function qbWSConfig [cmd, wkey, trigger, values]
         return 0;
     endif
         
+endfunction
+
+function json_Read;
+
+// qbWS2JSON - a simple function to access a webservice and return a JSON vector
+global function qbWS2JSON url
+    local curl_out;
+    local err;
+
+    if isnull url then
+        url = getWSHostNPort[];
+    endif
+    
+    local [hostname, port, username, stdion, qmechanicexec, protocol] = parseURL url;
+    
+    if protocol === 'http' or protocol === 'https' then
+        local curlkey = curl_open [url: url];
+        [curl_out, err] = task_call [ 'curl_read',  curlkey, [errmsg:'ignore'] ];
+        if err <> '' then
+            err = twrite ['Unable to reach webservice: {}', err];
+        endif
+        curl_close curlkey;
+    endif
+
+    if err === '' then
+    else
+        write ['ERROR: {}\n', err];
+        curl_out = '';
+    endif
+    
+//    return qbReadJSONStream curl_out;
+write ['DATA: {}\n', curl_out];
+    return json_Read [curl_out,[]];
+
 endfunction
 
 // For running on the command line ()
