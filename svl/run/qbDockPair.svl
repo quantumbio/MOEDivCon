@@ -84,6 +84,8 @@ AVAILABLE OPTIONS
                             (DEFAULT: Whatever species is provided as the placed ligand)
     -conf <file>        (Optional) [MTCS] Conformers in SDF format. 
                             (DEFAULT: built-in MOE conformers)
+    -mtz <file>         (Optional) MTZ file to provide density-based placement restraints
+                            (DEFAULT: do not use any density-based restraints)
     -o <filename>       Output base filename (DEFAULT: <ligand_filename>_dock.mdb)
     -delwat (bool)      Delete waters prior to docking (DEFAULT: {})
     -mtscoreexe <QBHOME> This option will execute QBHOME/bin/qmechanic as provided. If QBHOME is set in
@@ -160,7 +162,81 @@ DOCUMENTATION
 
 endfunction
 
+// lmw: UPDATED FOR MOE 2020.0901
 local function DockOpt []
+
+    local opt =     [
+        wall: ['',0,[0,0,0],[1000000,1000000,1000000],0],
+        csearch: 1,
+        confGenMethod: 'Rotate Bonds',
+        ignoreMseq: 0,
+        placement: 'Triangle Matcher',
+        placement_opt: [
+            timeout: 300,
+            nretpose: 1000,
+            mode: 'General',
+            outrmsd: 0,
+            silent: 0
+        ],
+        scoring: 'London dG',
+        dup_placement: 1,
+        maxpose: 30,
+        refine: 'Rigid Receptor',
+        refine_opt: [
+            fixrec: 'Fix',
+            ed_map: 'Fo',
+            ed_f: 'Simulated',
+            ed_phi: 'Simulated',
+            ed_f2: 'Simulated',
+            ed_path: '',
+            ed_res: 2.5000,
+            ed_surflevelD: 3,
+            cutoff: 6,
+            wholeres: 1,
+            mmgbvi: 1,
+            packsidechains: 1,
+            rigidlig: 0,
+            rigidPlanar: 0,
+            tether: 10,
+            gtest: 0.0100,
+            maxit: 500,
+            OverrideSetup: 1,
+            k_potl: 100,
+            roffset: 0.4000,
+            silent: 0
+        ],
+        rescoring: 'GBVI/WSA dG',
+        dup_refine: 1,
+        remaxpose: 5,
+        descexpr: '',
+        edsupport: 1,
+        tempDB: 1,
+        opendbv: 1,
+        task_parts: 1,
+        task_i: 1,
+        dock_results: 'full',
+        result_count: 0,
+        result_sum: 0,
+        run_mode: 'run',
+        resume: 0,
+        force: 0,
+        verbose: 1,
+        scoring_opt: [
+            silent: 0
+        ],
+        rescoring_opt: [
+            silent: 0
+        ],
+        sel_ent_only: 0,
+        sel_ent_only_rec: 0,
+        retainData: 1
+    ];
+
+    return opt;
+
+endfunction
+
+local function OLDDockOpt []
 
     local opt = [
         outrmsd: 1,
@@ -259,6 +335,8 @@ local function edDockOpt[]
     opt.ed_data.ed_f2           = 'Simulated';
     opt.ed_data.ed_box          = 0;
     opt.ed_data.mode            = 'Electron Density';
+    
+    opt.edata                   = '<Cached>';
     
     return opt;
 
@@ -445,7 +523,7 @@ local function main []
     // -------
     local [mtscoreexe] = ArgvGet [ ['-mtscoreexe'], [0]];
     local [recfilename, ligfilename, novelligfname, conffilename, dockedligfname, sffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, offormat, preopt, protonate, forceexe, printhelp, testinp] = 
-        ArgvPull [ ['-rec', '-lig','-novellig','-conf','-dockedlig','-sffile','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-offormat','-preopt','-protonate','-forceexe','-help','-testinp'], 
+        ArgvPull [ ['-rec', '-lig','-novellig','-conf','-dockedlig','-mtz','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-offormat','-preopt','-protonate','-forceexe','-help','-testinp'], 
         [1,1,1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0,0] ];
     local [runqmechanic] = ArgvPull [ ['-mtscoreexe'], [1] ];
     local remaining = ArgvAll [];
@@ -587,24 +665,28 @@ local function main []
         
         // process the MTZ/SF file if provided
         if not isnull inopt.sffilename then
-            write ['Execute density driven docking...\n'];
-            opt = edDockOpt[];
-            local mtzdata = mtz_Read inopt.sffilename;
-            local tmpResolution = (round ((inv sqrt second mtzdata.resolution) * 10)) / 10;
-            write ['MTZResolution:\t{}\n', tmpResolution];
+            if MOE_VERSION > 2020.09 then
+                write ['Execute density driven docking...\n'];
+                opt = edDockOpt[];
+                local mtzdata = mtz_Read inopt.sffilename;
+                local tmpResolution = (round ((inv sqrt second mtzdata.resolution) * 10)) / 10;
+                write ['MTZResolution:\t{}\n', tmpResolution];
             
-            opt.placement_opt.ed_path = inopt.sffilename;
-            opt.placement_opt.ed_sfdata = mtzdata;
-            opt.placement_opt.ed_res = tmpResolution;
+                opt.placement_opt.ed_path = inopt.sffilename;
+                opt.placement_opt.ed_sfdata = mtzdata;
+                opt.placement_opt.ed_res = tmpResolution;
 
-            opt.refine_opt.ed_path = inopt.sffilename;
-            opt.refine_opt.ed_sfdata = mtzdata;
-            opt.refine_opt.ed_res = tmpResolution;
+                opt.refine_opt.ed_path = inopt.sffilename;
+                opt.refine_opt.ed_sfdata = mtzdata;
+                opt.refine_opt.ed_res = tmpResolution;
 
-            opt.ed_data.ed_path = inopt.sffilename;
-            opt.ed_data.ed_sfdata = mtzdata;
-            opt.ed_data.ed_dockpath = inopt.sffilename;
-            opt.ed_data.ed_res = tmpResolution;
+                opt.ed_data.ed_path = inopt.sffilename;
+                opt.ed_data.ed_sfdata = mtzdata;
+                opt.ed_data.ed_dockpath = inopt.sffilename;
+                opt.ed_data.ed_res = tmpResolution;
+            else
+                exit twrite ['ERROR: -mtz is only supported with MOE version 2020.0901 or later.\n'];
+            endif
         else
             write ['Execute density independent docking...\n'];
             opt = DockOpt[];
