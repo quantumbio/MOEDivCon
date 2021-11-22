@@ -173,7 +173,7 @@ local function DockOpt []
         placement: 'Triangle Matcher',
         placement_opt: [
             timeout: 300,
-            nretpose: 1000,
+//            nretpose: 1000,
             mode: 'General',
             outrmsd: 0,
             silent: 0
