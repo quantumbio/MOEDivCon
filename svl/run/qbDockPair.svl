@@ -86,7 +86,11 @@ AVAILABLE OPTIONS
                             (DEFAULT: built-in MOE conformers)
     -mtz <file>         (Optional) MTZ file to provide density-based placement restraints
                             (DEFAULT: do not use any density-based restraints)
+                            
     -o <filename>       Output base filename (DEFAULT: <ligand_filename>_dock.mdb)
+    -O (bool)           Delete any identically named dock output MDB files found in the directory.
+                        NOTE: Any PDB/SDF/MOL2 files generated after the docking process will overwrite
+                            files of the same name without warning.
     -delwat (bool)      Delete waters prior to docking (DEFAULT: {})
     -mtscoreexe <QBHOME> This option will execute QBHOME/bin/qmechanic as provided. If QBHOME is set in
                         the shell environment it can be used as well (command line argument takes
@@ -522,9 +526,9 @@ local function main []
 //            3. Finally remove it from the stream, and place a set path in a variable if one is chosen (if not, it is just null).
     // -------
     local [mtscoreexe] = ArgvGet [ ['-mtscoreexe'], [0]];
-    local [recfilename, ligfilename, novelligfname, conffilename, dockedligfname, sffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, offormat, preopt, protonate, forceexe, printhelp, testinp] = 
-        ArgvPull [ ['-rec', '-lig','-novellig','-conf','-dockedlig','-mtz','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-offormat','-preopt','-protonate','-forceexe','-help','-testinp'], 
-        [1,1,1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0,0] ];
+    local [recfilename, ligfilename, novelligfname, conffilename, dockedligfname, sffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, offormat, preopt, protonate, forceexe, printhelp, testinp, overwrite] = 
+        ArgvPull [ ['-rec', '-lig','-novellig','-conf','-dockedlig','-mtz','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-offormat','-preopt','-protonate','-forceexe','-help','-testinp','-O'], 
+        [1,1,1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0,0,0] ];
     local [runqmechanic] = ArgvPull [ ['-mtscoreexe'], [1] ];
     local remaining = ArgvAll [];
     if not isnull remaining then
@@ -643,6 +647,16 @@ local function main []
     else
         inopt.outf = twrite ['{}.mdb',fbase inopt.outf];
     endif;
+    
+    if ftype inopt.outf <> '' then
+        if overwrite and ftype inopt.outf == 'file' then
+            fdelete inopt.outf;
+        elseif ftype inopt.outf <> 'file' then
+            exit twrite ['Filename {} is a type {} and must be removed prior to running qbDockPair.svl.\n',inopt.outf,ftype inopt.outf];
+        else
+            exit twrite ['File {} is found in the present working directory. Use -O to delete file or -o to select alternative basename.\n',inopt.outf];
+        endif
+    endif 
         
     // Need the UID, etc of the ligand read in so the write process can rename back (this circumvents the SDF problem which effectively "washes" out these terms).
     local ligChain = rChain ligResidue;
