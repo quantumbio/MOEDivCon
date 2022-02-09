@@ -19,6 +19,7 @@ function db_Delete;
 function db_ExportSD;
 function DockAtoms;
 function DockFile;
+function mtz_Read;
 
 // infile forward declarations
 function DockOpt;
@@ -83,7 +84,13 @@ AVAILABLE OPTIONS
                             (DEFAULT: Whatever species is provided as the placed ligand)
     -conf <file>        (Optional) [MTCS] Conformers in SDF format. 
                             (DEFAULT: built-in MOE conformers)
+    -mtz <file>         (Optional) MTZ file to provide density-based placement restraints
+                            (DEFAULT: do not use any density-based restraints)
+                            
     -o <filename>       Output base filename (DEFAULT: <ligand_filename>_dock.mdb)
+    -O (bool)           Delete any identically named dock output MDB files found in the directory.
+                        NOTE: Any PDB/SDF/MOL2 files generated after the docking process will overwrite
+                            files of the same name without warning.
     -delwat (bool)      Delete waters prior to docking (DEFAULT: {})
     -mtscoreexe <QBHOME> This option will execute QBHOME/bin/qmechanic as provided. If QBHOME is set in
                         the shell environment it can be used as well (command line argument takes
@@ -159,15 +166,89 @@ DOCUMENTATION
 
 endfunction
 
+// lmw: UPDATED FOR MOE 2020.0901
 local function DockOpt []
+
+    local opt =     [
+        wall: ['',0,[0,0,0],[1000000,1000000,1000000],0],
+        csearch: 1,
+        confGenMethod: 'Rotate Bonds',
+        ignoreMseq: 0,
+        placement: 'Triangle Matcher',
+        placement_opt: [
+            timeout: 300,
+//            nretpose: 1000,
+            mode: 'General',
+            outrmsd: 0,
+            silent: 0
+        ],
+        scoring: 'London dG',
+        dup_placement: 1,
+        maxpose: 30,
+        refine: 'Rigid Receptor',
+        refine_opt: [
+            fixrec: 'Fix',
+            ed_map: 'Fo',
+            ed_f: 'Simulated',
+            ed_phi: 'Simulated',
+            ed_f2: 'Simulated',
+            ed_path: '',
+            ed_res: 2.5000,
+            ed_surflevelD: 3,
+            cutoff: 6,
+            wholeres: 1,
+            mmgbvi: 1,
+            packsidechains: 1,
+            rigidlig: 0,
+            rigidPlanar: 0,
+            tether: 10,
+            gtest: 0.0100,
+            maxit: 500,
+            OverrideSetup: 1,
+            k_potl: 100,
+            roffset: 0.4000,
+            silent: 0
+        ],
+        rescoring: 'GBVI/WSA dG',
+        dup_refine: 1,
+        remaxpose: 5,
+        descexpr: '',
+        edsupport: 1,
+        tempDB: 1,
+        opendbv: 1,
+        task_parts: 1,
+        task_i: 1,
+        dock_results: 'full',
+        result_count: 0,
+        result_sum: 0,
+        run_mode: 'run',
+        resume: 0,
+        force: 0,
+        verbose: 1,
+        scoring_opt: [
+            silent: 0
+        ],
+        rescoring_opt: [
+            silent: 0
+        ],
+        sel_ent_only: 0,
+        sel_ent_only_rec: 0,
+        retainData: 1
+    ];
+
+    return opt;
+
+endfunction
+
+local function OLDDockOpt []
 
     local opt = [
         outrmsd: 1,
         sel_ent_only_rec: 0,
         sel_ent_only: 0,
         wall: [ '', 0, [ 0, 0, 0 ], [ 1000000, 1000000, 1000000 ], 0 ],
-        csearch: 0,
-        confGenMethod: 'None',
+        csearch: 1,
+        confGenMethod: 'Rotate Bonds',
         ignoreMseq: 0,
 //	    retainData: [ 1, 0, 1, 1],
         placement: 'Triangle Matcher',
@@ -229,6 +310,38 @@ local function DockOpt []
         BatchFile: 'dock_batch.svl'
     ];
 
+    return opt;
+
+endfunction
+
+local function edDockOpt[]
+    local opt = DockOpt[];
+    
+    opt.placement = 'Electron Density';
+    
+    opt.placement_opt.ed_map    = '2FOFCWT';
+    opt.placement_opt.ed_f      = 'F-obs';
+    opt.placement_opt.ed_phi    = 'Simulated';
+    opt.placement_opt.ed_f2     = 'Simulated';
+    opt.placement_opt.ed_box    = 0;
+    opt.placement_opt.mode      = 'Electron Density';
+
+    opt.refine_opt.ed_map       = '2FOFCWT';
+    opt.refine_opt.ed_f         = 'F-obs';
+    opt.refine_opt.ed_phi       = 'Simulated';
+    opt.refine_opt.ed_f2        = 'Simulated';
+    opt.refine_opt.ed_box       = 0;
+    opt.refine_opt.mode         = 'Electron Density';
+
+    opt.ed_data.ed_map          = '2FOFCWT';
+    opt.ed_data.ed_f            = 'F-obs';
+    opt.ed_data.ed_phi          = 'Simulated';
+    opt.ed_data.ed_f2           = 'Simulated';
+    opt.ed_data.ed_box          = 0;
+    opt.ed_data.mode            = 'Electron Density';
+    
+    opt.edata                   = '<Cached>';
+    
     return opt;
 
 endfunction
@@ -413,9 +526,9 @@ local function main []
 //            3. Finally remove it from the stream, and place a set path in a variable if one is chosen (if not, it is just null).
     // -------
     local [mtscoreexe] = ArgvGet [ ['-mtscoreexe'], [0]];
-    local [recfilename, ligfilename, novelligfname, conffilename, dockedligfname, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, offormat, preopt, protonate, forceexe, printhelp, testinp] = 
-        ArgvPull [ ['-rec', '-lig','-novellig','-conf','-dockedlig','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-offormat','-preopt','-protonate','-forceexe','-help','-testinp'], 
-        [1,1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0,0] ];
+    local [recfilename, ligfilename, novelligfname, conffilename, dockedligfname, sffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, offormat, preopt, protonate, forceexe, printhelp, testinp, overwrite] = 
+        ArgvPull [ ['-rec', '-lig','-novellig','-conf','-dockedlig','-mtz','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-offormat','-preopt','-protonate','-forceexe','-help','-testinp','-O'], 
+        [1,1,1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0,0,0] ];
     local [runqmechanic] = ArgvPull [ ['-mtscoreexe'], [1] ];
     local remaining = ArgvAll [];
     if not isnull remaining then
@@ -445,6 +558,7 @@ local function main []
     inopt.novelligfname = validFile novelligfname;
     inopt.conffilename = validFile conffilename;
     inopt.dockedligfname = validFile dockedligfname;
+    inopt.sffilename = validFile sffilename;
     inopt.outf = outf;
     inopt.dockmdb = validFile dockmdb;
 
@@ -525,7 +639,7 @@ local function main []
     endif
     
     rec = diff [rec,lig];   // make sure the receptor does not include the ligand.
-
+    
     if isnull inopt.outf and isnull inopt.novelligfname then
         inopt.outf = twrite ['{}_dock.mdb',fbase ftail inopt.ligfilename];
     elseif isnull inopt.outf and not isnull inopt.novelligfname then
@@ -533,6 +647,16 @@ local function main []
     else
         inopt.outf = twrite ['{}.mdb',fbase inopt.outf];
     endif;
+    
+    if ftype inopt.outf <> '' then
+        if overwrite and ftype inopt.outf == 'file' then
+            fdelete inopt.outf;
+        elseif ftype inopt.outf <> 'file' then
+            exit twrite ['Filename {} is a type {} and must be removed prior to running qbDockPair.svl.\n',inopt.outf,ftype inopt.outf];
+        else
+            exit twrite ['File {} is found in the present working directory. Use -O to delete file or -o to select alternative basename.\n',inopt.outf];
+        endif
+    endif 
         
     // Need the UID, etc of the ligand read in so the write process can rename back (this circumvents the SDF problem which effectively "washes" out these terms).
     local ligChain = rChain ligResidue;
@@ -551,7 +675,37 @@ local function main []
     // if the user provides a inopt.dockmdb then we assume they wish to perform the final translation to qmechanic-readabe output (SDF or MOL2 depending)
     if isnull inopt.dockmdb then
 
-        local opt = DockOpt[];
+        local opt;
+        
+        // process the MTZ/SF file if provided
+        if not isnull inopt.sffilename then
+            if MOE_VERSION > 2020.09 then
+                write ['Execute density driven docking...\n'];
+                opt = edDockOpt[];
+                local mtzdata = mtz_Read inopt.sffilename;
+                local tmpResolution = (round ((inv sqrt second mtzdata.resolution) * 10)) / 10;
+                write ['MTZResolution:\t{}\n', tmpResolution];
+            
+                opt.placement_opt.ed_path = inopt.sffilename;
+                opt.placement_opt.ed_sfdata = mtzdata;
+                opt.placement_opt.ed_res = tmpResolution;
+
+                opt.refine_opt.ed_path = inopt.sffilename;
+                opt.refine_opt.ed_sfdata = mtzdata;
+                opt.refine_opt.ed_res = tmpResolution;
+
+                opt.ed_data.ed_path = inopt.sffilename;
+                opt.ed_data.ed_sfdata = mtzdata;
+                opt.ed_data.ed_dockpath = inopt.sffilename;
+                opt.ed_data.ed_res = tmpResolution;
+            else
+                exit twrite ['ERROR: -mtz is only supported with MOE version 2020.0901 or later.\n'];
+            endif
+        else
+            write ['Execute density independent docking...\n'];
+            opt = DockOpt[];
+        endif
+
         opt = tagcat [ [maxpose: inopt.maxpose], opt ];
         opt = tagcat [ [remaxpose: inopt.remaxpose], opt ];
         
@@ -578,6 +732,8 @@ local function main []
 //            db_Sort [confmdbname,'BFIRank',0];
             write ['NOTE: Using {} conformers provided in {}.\n', db_nEntries confmdbname, confmdbname];
             opt.retainData = not (first db_Fields confmdbname == 'mol');
+            opt.csearch = 0;
+            opt.confGenMethod = 'None';
         elseif not isnull inopt.dockedligfname then
             local dockedligmdbname = twrite ['{}.mdb',fbase ftail inopt.dockedligfname];
             db_ImportSD [db_Open [ dockedligmdbname,'create' ],inopt.dockedligfname,'mol'];
