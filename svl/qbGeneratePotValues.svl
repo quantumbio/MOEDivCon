@@ -248,15 +248,19 @@ global function qbCalculateInteractionFromFile [fname_complex,[selChain, selSequ
     ReadAuto fname_complex;
         
     local interestResidue = Residues [] | totok cLetter rChain Residues [] == selChain and rUID Residues[] == selSequence;
-    
     if isnull interestResidue then
         write ['ERROR: [{},{}] not found!\n', selChain, selSequence];
         return;
     endif
 
-    local interactions = qbMeasurePotential[interestResidue,diff [Residues[], interestResidue]];
-    local score = dock_score_GBVIWSA_dG ['scoreLigX', [cat rAtoms diff [Residues[], interestResidue],cat rAtoms interestResidue]];
-    write ['interactions: {} | {}\n', add second untag third interactions, score];
+    local receptorResidues = diff [Residues[], interestResidue];
+
+    write ['NOTE: calculating score between {} {} {} and other {} residues in file {}\n',
+        cName rChain interestResidue, rName interestResidue, rUID interestResidue, length receptorResidues, fname_complex];
+
+    local interactions = qbMeasurePotential[interestResidue,receptorResidues];
+    local score = dock_score_GBVIWSA_dG ['scoreLigX', [cat rAtoms receptorResidues,cat rAtoms interestResidue]];
+    write ['interactionE: {} | MOEScore (GBVI): {} kcal/mol\n', add second untag third interactions, score];
     SystemPop pdata;
 
 endfunction
