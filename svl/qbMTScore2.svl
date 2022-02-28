@@ -507,7 +507,7 @@ global function qbInteractiveMTScoreUI opt
         molList = values.molList;
         scoresList = values.scoresList;
         namesList = values.namesList;
-        write ['values: {}\ntrigger: {}\n', values, trigger];        
+//        write ['values: {}\ntrigger: {}\n', values, trigger];        
         if trigger === 'showSelection' or trigger === 'slist' then
             if first values.slist and first values.slist <> prevSelected then
                 prevSelected = first values.slist;

@@ -167,6 +167,11 @@ local function getObject [position, inString]
 endfunction
 
 local function removecomma tmpString
+// DEBUG:
+//    write ['tmpString: {} | {}\n',length tmpString, tmpString];
+    if length tmpString == 0 then
+        return tmpString;
+    endif
     if last tmpString == "," then
         return droplast tmpString;
     else
@@ -281,9 +286,11 @@ global function json_Extract moeObjectKeys
     object.atoms.hybridization = cat aGeometry Atoms[];
     object.atoms.('formal charge') = cat aFCharge Atoms[];
 //    local allBonds = getBondConnections Atoms[];
-//    object.bonds.connections.ids = cat aName allBonds;
-//    object.bonds.connections.index = cat aNumber allBonds;
-//    object.bonds.order = app bOrder allBonds;
+//write ['lengths: {} | {}\n', length Atoms[], length (rType aResidue Atoms[] == 'none') ];
+    local allBonds = getBondConnections (Atoms[] | rType aResidue Atoms[] == 'none');     // For performance, just output bonds for unknowns
+    object.bonds.connections.ids = cat aName allBonds;
+    object.bonds.connections.index = cat aNumber allBonds;
+    object.bonds.order = app bOrder allBonds;
     object.properties.('total charge') = add aFCharge Atoms [];
     SystemPop psys;
     
