@@ -19,6 +19,13 @@ function json_Read;
 
 function url_Parse;
 
+const DEFAULT_MTOPT = [
+    hamiltonian :   'garf',
+    pocket      :   8.0,
+    nb_cutoff   :   11.0,
+    mtscore     :   'endstate'
+];
+
 // Local Functions
 local function boundaryGen[]
     const boundary_chars = "_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -92,9 +99,14 @@ local function getTargetChunk target_mol
     ];
 endfunction
 
-local function getLigandChunk ligand_mol
+local function getLigandChunk [ligand_mol,name]
+    if isnull name then
+        name='Ligand';
+    endif
+
     return cat [
-        "Content-Disposition: form-data; name=\"Ligand\"", CRLF,
+//        swrite ["Content-Disposition: form-data; name=\"{}\"",string name], CRLF,
+        swrite ['Content-Disposition: form-data; name=\"{}\"', name], CRLF,
         "Content-Type: text/plain", CRLF,
         CRLF,
         string twrite ['{}',qbWriteJSONStream json_Extract ligand_mol], CRLF    
@@ -102,6 +114,16 @@ local function getLigandChunk ligand_mol
 endfunction
 
 local function getWSDefaults [hostname, port, username, stdion, qmechanicexec, protocol]
+
+    if isnull qmechanicexec then
+        qmechanicexec = GetRC ['QuantumBio.qbExecutable','qmechanic'];
+    endif
+
+    if qmechanicexec == 'noopt' then
+        hostname = 'localhost';
+        stdion = 1;
+        protocol = 'file';
+    endif
 
     if isnull hostname then
         hostname = GetRC ['QuantumBio.qbWSHostname','localhost'];
@@ -170,9 +192,8 @@ global function parseURL url
         
 endfunction
 
-global function getWSHostNPort [hostname, port, username, stdion, qmechanicexec]
-    local protocol;
-    [hostname, port, username, stdion, qmechanicexec, protocol] = getWSDefaults [hostname, port, username, stdion, qmechanicexec];
+global function getWSHostNPort [hostname, port, username, stdion, qmechanicexec, protocol]
+    [hostname, port, username, stdion, qmechanicexec, protocol] = getWSDefaults [hostname, port, username, stdion, qmechanicexec, protocol];
     
     if stdion then
         qmechanicexec = twrite ['/{}', qmechanicexec];
@@ -231,6 +252,11 @@ global function qbWSTestEndpoint url
     
     curl_out = "";
     err = '';
+    
+    if qmechanicexec === 'noopt' then
+        write ['SUCCESSFUL NOOPT\n'];
+        return qbReadJSONStream qbWriteJSONStream [status:'success'];
+    endif
     
     if protocol === 'http' or protocol === 'https' then
         local curlkey = curl_open [url: tok_cat [url, twrite ['/qmechanic/']]];
@@ -337,7 +363,7 @@ global function qbWS_MTScore [target_mol, ligand_mol, hostname, port, username, 
         "Content-Disposition: form-data; name=\"Instructions\"", CRLF,
         "Content-Type: text/plain", CRLF,
         CRLF,
-        "{ \"options\": {\"mtscore\": \"endstate\"}}", CRLF
+        qbWriteJSONStream DEFAULT_MTOPT, CRLF
     ];
 
     local POST_CONTENT = cat [
@@ -346,15 +372,15 @@ global function qbWS_MTScore [target_mol, ligand_mol, hostname, port, username, 
         boundary, CRLF,
         getTargetChunk target_mol,
         boundary, CRLF,
-        getLigandChunk ligand_mol,
+        getLigandChunk [ligand_mol],
         boundary, "--", CRLF    
     ];
 
 #if 1
-    fwrite ['debug-WSPOST.txt', '{}\n', POST_CONTENT];
+    fwrite ['debug-WSPOST.json', '{}{}{}{}\n',droplast droplast POST_MT,CRLF,CRLF,POST_CONTENT];
 #endif
 
-    write ['Sending data in debug-WSPOST.txt via {}\n', getWSHostNPort[hostname, port, username, stdion, qmechanicexec]];
+    write ['Sending data in debug-WSPOST.json via {}\n', getWSHostNPort[hostname, port, username, stdion, qmechanicexec]];
     if stdion then
         local qme_command;
         if protocol === 'file' then
@@ -455,6 +481,242 @@ global function qbWS_MTScore [target_mol, ligand_mol, hostname, port, username, 
     return tmpJSON;
 endfunction
 
+// add env var
+
+const DEFAULT_OPT = [
+    hamiltonian :   'garf',
+    pocket      :   8.0,
+    nb_cutoff   :   11.0,
+    mtscore     :   'ensemble',
+    mtcs    : [ 
+        opt  : [
+            algorithm      : 'torsion',
+            gnorm          : 0.01,
+            maxOptCycles   : 100,
+            species        : 'novel'
+            ]
+            ],
+    mtdock  : [ 
+        opt  : [
+            algorithm      : 'torsion',
+            gnorm          : 0.01,
+            maxOptCycles   : 100,
+            species        : 'novel'
+            ]
+            ]
+];
+
+local function recursiveTagCat [inopt,defopt]
+    local tmpTag;
+    for tmpTag in tags inopt loop
+        if isflat inopt.(tmpTag) then
+            defopt.(tmpTag) = inopt.(tmpTag);
+        else
+            defopt.(tmpTag) = recursiveTagCat [inopt.(tmpTag),defopt.(tmpTag)];
+        endif
+    endloop
+    return defopt;
+endfunction
+
+global function qbWS_JSON_TEST opt
+//    local retOpt = nestedTagCat [opt, DEFAULT_OPT];
+//    opt = tagcat [opt, DEFAULT_OPT];
+//    local function recursiveTagCat [inopt,defopt]
+//        local tmpTag;
+//        for tmpTag in tags inopt loop
+//            write ['tmpTag: {}\n',tmpTag];
+//            if isflat inopt.(tmpTag) then
+//                defopt.(tmpTag) = inopt.(tmpTag);
+//            else
+//                defopt.(tmpTag) = recursiveTagCat [inopt.(tmpTag),defopt.(tmpTag)];
+//            endif
+//        endloop
+//        return defopt;
+//    endfunction
+    
+    write ['{}\n',qbWriteJSONStream recursiveTagCat[opt,DEFAULT_OPT]];
+//    return qbWriteJSONStream recursiveTagCat[opt,DEFAULT_OPT];
+endfunction
+    
+global function qbWS_MTScoreE [target_mol, ligand_mol, pose_mols, opt, hostname, port, username, stdion, qmechanicexec, protocol]
+    opt = recursiveTagCat [opt, DEFAULT_OPT];
+    [hostname, port, username, stdion, qmechanicexec, protocol] = getWSDefaults [hostname, port, username, stdion, qmechanicexec, protocol];
+    local url = getWSHostNPort [hostname, port, username, stdion, qmechanicexec, protocol];
+
+    local tmpJSON;
+    local err;
+    
+    if not length qbWSTestEndpoint url then
+        write ['ERROR: Failed connection to {}\n', url];
+        tmpJSON.success = 0;
+        return tmpJSON;
+    endif
+    
+    local boundary = boundaryGen[];
+    local ctype = cat ["multipart/form-data; boundary=", boundary];
+    boundary = cat ["--", boundary]; // add two dashes by the standards
+        
+    local Instructions = cat [
+        "Content-Disposition: form-data; name=\"Instructions\"", CRLF,
+        "Content-Type: text/plain", CRLF,
+        CRLF,
+//        "{ \"options\": {\"mtscore\": \"endstate\"}}"
+        qbWriteJSONStream opt
+        , CRLF
+    ];
+    
+    write ['process ligs: {}\n', length pose_mols];
+    
+    local poseChunks;
+    local pdata;
+//    pdata = SystemPush [];
+    local pocketLigandChunk = getLigandChunk [ligand_mol,'Ligand'];
+//    SystemPop pdata; 
+//    pdata = SystemPush [];
+    local novelLigandChunk = getLigandChunk [ligand_mol,'Novel'];
+//    SystemPop pdata; 
+    local i = 1;
+    while i <= length pose_mols loop
+        pdata = SystemPush [];
+        write ['{}\n',i];
+        poseChunks = append [poseChunks, cat [
+        boundary, CRLF,
+        getLigandChunk [mol_Create pose_mols(i),'Pose']
+        ]];
+        i = i + 1;
+        SystemPop pdata;        
+    endloop
+    write ['process ligs: {} | {} \n', length poseChunks,  type poseChunks];
+    write ['{}\n', length poseChunks];
+    poseChunks = swrite ['{}', poseChunks];
+    
+//    poseChunks = append [poseChunks, getLigandChunk ligand_mol();
+    
+    local POST_CONTENT = cat [
+        boundary, CRLF,
+        Instructions,
+        boundary, CRLF,
+        getTargetChunk target_mol,
+        boundary, CRLF,
+        pocketLigandChunk,
+        boundary, CRLF,
+        novelLigandChunk,
+//        getLigandChunk [firstLigandMol,'Ligand'],
+        poseChunks,
+        boundary, "--", CRLF    
+    ];
+
+#if 1
+    fwrite ['debug-WSPOST.json', '{}{}{}{}\n',droplast droplast POST_MT,CRLF,CRLF,POST_CONTENT];
+#endif
+
+    if qmechanicexec === 'noopt' then
+        write ['Complete: {}\n', 'SEE debug-WSPOST.json for INPUT'];
+        tmpJSON.success = 1;
+        return tmpJSON;
+    endif
+    
+    write ['Sending data in debug-WSPOST.json via {}\n', getWSHostNPort[hostname, port, username, stdion, qmechanicexec]];
+    if stdion then
+        local qme_command;
+        if protocol === 'file' then
+            if not OS_MSWIN then
+                local tmpExec = which qmechanicexec;
+                if tmpExec <> '' then qmechanicexec = tmpExec; endif
+                qme_command = twrite ['{} {} --stdio -v 0 --np 2 -O',exe_cmd_str['sh'], qmechanicexec];
+                local file_info = fstat qmechanicexec;
+                if isnull tmpExec or not exe_cmd_ok ['sh',exe_cmd_str['sh']] or file_info(1) <> 'file' or not bitand [file_info(3), 0x04] then
+                    err = twrite ['Unable to execute {}',qme_command];
+                endif
+            else
+                err = 'Microsoft Windows is not supported for local execution of qmechanic';
+            endif
+        else
+            if OS_MSWIN then
+                // When fwaitr is used on Windows, it doesn't return data.
+//                write ['Note: only blocking I/O is supported by MOE on Windows.\n  Use qbWebService instead of Executable if you wish to run calculation without blocking.\n'];
+            endif
+            qme_command = twrite ['{} {}@{} -p {} -C -o BatchMode=yes {} --stdio 30 -v 0 --np 2 -O', exe_cmd_str['ssh'], username, hostname, port, qmechanicexec];
+        endif
+        write ['Running: {}\n',qme_command];
+        local pkey;
+        [pkey, err] = task_call ['exe_open_shell', [qme_command,cd [],[],0], [errmsg:'ignore']];
+        if err == '' then
+            pkey = exe_open_shell[qme_command,cd [],[],0];
+            local out_fno = exe_stdout pkey;
+            local in_fno = exe_stdin pkey;
+            
+            if exe_status pkey then
+                fwriteb [in_fno, 'char', swrite ['{}{}',POST_MT,POST_CONTENT]];            
+                fflush in_fno;                
+                local outline;
+                local boundCount = 0;
+                while exe_status pkey loop
+                    if not OS_MSWIN then
+//                        fwaitr out_fno;       // TODO: fwaitr doesn't seem to work on Windows or Mac. This may take some more experimentation.
+                    endif
+                    outline = cat freadb [out_fno, 'line', 1];
+//                    write ['{} | {} | {} \n', length outline, length boundary, boundCount];
+                    if strpos [boundary, outline] and boundCount == 1 then
+//                        write ['1 | {}\n', outline];
+                        boundCount = 0;
+                        break;
+                    elseif strpos [boundary, outline] then
+//                        write ['2 | {}\n', outline];
+                        boundCount = 1;
+                    elseif boundCount == 1 then
+//                        write ['3 | {}\n', outline];
+                        tmpJSON = cat [tmpJSON, outline];
+                    else
+//                        write ['X | {}\n', outline];
+                    endif
+                endloop
+            endif
+
+            if exe_status pkey then task_call ['fwriteb', [in_fno, 'char', swrite ['{}\n',SHUTDOWN]], [errmsg:'ignore']]; endif // try to SHUTDOWN qmechanic, but it has a timeout and will die in a few seconds anyway
+            exe_close pkey;
+        
+            if isnull qbReadJSONStream tmpJSON then
+                err = 'qmechanic returned a problem - please see qmechanic.qb.log for more information and contact support@quantumbioinc.com';
+            else
+                err = '';
+            endif
+        else
+            err = twrite ['{} ({})', err, pkey];
+        endif
+    else
+        local urlHandle = curl_open [
+            url: tok_cat [getWSHostNPort[hostname, port], '/qmechanic/movabletype'],
+            httpheader: [ 'Transfer-Encoding: Chunked', 
+                     'TargetName: target.json',
+                     'LigandName: ligand.json']
+                     // 'PosesName: poses.json'
+        ]; 
+
+        curl_write  [urlHandle, POST_CONTENT];
+
+        [tmpJSON, err] = task_call [ 'curl_read',  urlHandle, [errmsg:'ignore'] ];
+        curl_close urlHandle;
+    endif
+
+#if 1
+        fwrite ['debug-WSRETURN.txt','{}',tmpJSON];
+#endif
+
+    tmpJSON = qbReadJSONStream tmpJSON;
+    if err === '' and not isnull tmpJSON then
+        write ['Complete: {}\n', tmpJSON];
+        tmpJSON.success = 1;
+    else
+        write ['ERROR: {}\n', err];
+        tmpJSON.success = 0;
+    endif
+
+    // Return the JSON tagged vector to be used by other functions
+//    return qbReadJSONStream tmpJSON;
+    return tmpJSON;
+endfunction
+
 // Tester function for the MTScore tool
 
 // Can be run in the SVL window or on the MOE/batch commandline:
@@ -474,6 +736,54 @@ global function qbMTScoreFile [targetfile,ligandfile]
 //    write ['MTScore: {} : {} | {} {} {}  | {} sec\n', fbase ftail targetfile, fbase ftail ligandfile, tmpJSON.('MTScore'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
 
     SystemPop pdata;
+endfunction
+
+// Can be run in the SVL window or on the MOE/batch commandline:
+//      $ moebatch -licwait -exec "eval [qbMTScoreEFile ['4w7t_protein.pdb', '4w7t_ligand.sdf']]" -exit
+//          qmechanicexec should be left blank (null) if want to use default/current settings. qmechanicexec can be 'noopt' to skip calculation and just output JSON file.
+//
+// forward declarations:
+function db_NextEntry;
+function db_Open;
+function db_ImportSD;
+function db_ImportMOL2;
+function db_Fields;
+
+global function qbMTScoreEFile [targetfile,ligandfile,posefile,opt,qmechanicexec]
+    local psys = SystemPush [];
+    write ['MTScore: {} : {} | {}', fbase ftail targetfile, fbase ftail ligandfile, fbase ftail posefile];
+    local starttime = clock [];
+    local targetobj, ligandobj, poseobj;
+    targetobj = ReadAuto targetfile;
+    ligandobj = ReadAuto ligandfile;
+        
+    if fext posefile <> 'mdb' then
+        local new_posefile = twrite ['{}.mdb',fbase ftail posefile];
+        if fext ftail posefile == 'sdf' then
+            db_ImportSD [db_Open [ new_posefile,'create' ], posefile,'mol'];
+        elseif fext ftail posefile == 'mol2' then
+            db_ImportMOL2 [posefile, db_Open [ new_posefile,'create' ],'mol'];
+        endif
+        posefile = new_posefile;
+    endif
+    
+    local mdb = db_Open posefile;
+    local mfield = '';
+    local [fldnames, fldtypes] = db_Fields mdb;
+    mfield = fldnames | fldtypes == 'molecule';
+    local ent = 0;
+    local pdata;
+    while (ent = db_NextEntry [mdb, ent]) loop
+        pdata = tag [fldnames, db_ReadFields [mdb, ent, fldnames]];
+        poseobj =  append [poseobj, pdata.(first mfield)];
+    endloop
+    write ['{}\n',length poseobj];
+
+    local tmpJSON = qbWS_MTScoreE [targetobj,ligandobj,poseobj,opt,[],[],[],[],qmechanicexec,[]];
+    write ['{} {} {}  | {} sec\n', tmpJSON.('MTScoreES'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
+//    write ['MTScore: {} : {} | {} {} {}  | {} sec\n', fbase ftail targetfile, fbase ftail ligandfile, tmpJSON.('MTScore'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
+
+    SystemPop psys;
 endfunction
 
 global function qbRunMTPairList listfile
