@@ -501,7 +501,7 @@ global function qbInteractiveMTScoreUI opt
         exit [];
     endif
 
-// main loop
+// main loop //
     loop
         local [values, trigger] = WindowWait wkey;
         molList = values.molList;
