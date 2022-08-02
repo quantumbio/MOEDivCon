@@ -1,3 +1,5 @@
+<span style="color:red">Note: some functions may not be available without additional license files from QuantumBio, CCG, or other 3rd parties.</span>
+
 # MOE/DivCon
 
 The MOE/DivCon Scientific Vector Language (SVL) package is a set of support applications which 
@@ -36,7 +38,7 @@ We will then create a symbolic link from within the ${HOME}/moefiles/svl to that
 ## Install the included QuantumBio Menu
 
 Finally, to easily access the software from within MOE, you should install the QuantumBio menu. 
-This menu can be found in the Extra menu on the main MOE window.
+This menu can be found in the Extra menu on the main MOE window. 
 
 ```
     % cd ${HOME}/moefiles/menu
