@@ -739,7 +739,7 @@ global function qbGM_MTScore [target_mol, ligand_mol, opt]
             write ['Complete: {}\n', tmpJSON];
             
             // TODO: this translation shouldn't be needed
-            tmpJSON.('MTScoreES(s)') = twrite ['{}', tmpJSON.Results.wtMTScoreES];
+            tmpJSON.('MTScoreES(s)') = twrite ['{}', tmpJSON.Results.('wtMTScoreES(s)')];
         else
             tmpJSON.success = 0;
             write ['ERROR: reading {}\n', first tmpJSON];

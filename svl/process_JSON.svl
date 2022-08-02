@@ -598,7 +598,7 @@ global function db_ExportJSON [db_file, json_file, fields, options]
 	local chains = mol_Create mol;
 	cSetName [chains | cName chains == '', mol(1)(MOL_NAME)];
 
-	write_molecule [fnum, cat cAtoms chains, mode, mol(1)(MOL_NAME), pdata];
+//	write_molecule [fnum, cat cAtoms chains, mode, mol(1)(MOL_NAME), pdata];
 	oDestroy chains;
     endloop
 
