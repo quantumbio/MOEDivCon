@@ -250,22 +250,23 @@ local function MakePanel opt
                         bubbleHelp: 'Add the selected ligand within the MOE window to the list and calculate MTScoreES.'
                 ]
             ]
-            , Hbox:   [
-                Label:  [
-                    text: 'Ensemble: ',
-                    bubbleHelp: 'Execute Ensemble MTScore calculation using chosen executor on chosen structures.\n   All mseq poses will be used when "Input" is selected otherwise the MOE/Dock tool will be used.'
-                ]
-                , Radio:  [
-                    name: 'docklevel',
-                    text: ['Input','Dock'],
-                    onTrigger: 'return',
-                    bubbleHelp: 'Use the input protein:ligand poses or generate poses using MOE/Dock'                
-                ]
-                , Button: [
-                        name: 'runSelected', text: 'RunE',
-                        bubbleHelp: 'Add the selected ligand within the MOE window to the list and calculate MTScoreES.'
-                ]
-            ]
+            // TODO: add in ensemble code
+//            , Hbox:   [
+//                Label:  [
+//                    text: 'Ensemble: ',
+//                    bubbleHelp: 'Execute Ensemble MTScore calculation using chosen executor on chosen structures.\n   All mseq poses will be used when "Input" is selected otherwise the MOE/Dock tool will be used.'
+//                ]
+//                , Radio:  [
+//                    name: 'docklevel',
+//                    text: ['Input','Dock'],
+//                    onTrigger: 'return',
+//                    bubbleHelp: 'Use the input protein:ligand poses or generate poses using MOE/Dock'                
+//                ]
+//                , Button: [
+//                        name: 'runSelected', text: 'RunE',
+//                        bubbleHelp: 'Add the selected ligand within the MOE window to the list and calculate MTScoreES.'
+//                ]
+//            ]
             , Listbox : [
                 name: 'slist'
                 , onTrigger: 'return'
