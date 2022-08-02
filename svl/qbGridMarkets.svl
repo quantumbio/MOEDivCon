@@ -24,6 +24,7 @@ function GetEnvoyStatus;
 function get_supported_divcon_versions;
 function qbGM_MTScore;
 function qbReadJSONStream;
+function qbuuid;
 
 // DEV VERSION
 const QBDOCK_SVL='/Users/lance/DropboxQB/Developer/MOEDivCon-current/svl/run/qbDockPair.svl';
@@ -376,6 +377,7 @@ local function opt2MTScoreCLI [opt, dockfiles]
         write ['ERROR: Receptor and Ligand filenames are required.\n'];
     else
         if isnull opt.novelligfname     then opt.novelligfname = ''; endif;
+        if isnull opt.jobtag            then opt.jobtag = qbuuid[] ; endif;
         
         local pro_predock;
         local lig_predock;
@@ -423,8 +425,8 @@ local function opt2MTScoreCLI [opt, dockfiles]
             dockfiles = '';
             mtscorearg = '--mtscore endstate';
         endif
-        MTScoreCLI = twrite ['{} --ligand {} {} -h {} {} {} --np {} -v 2 -O -p {}', 
-                                pro_predock, lig_predock, topfile, opt.mtpotential, dockfiles, mtscorearg, opt.nprocs, cat second untag outfiles];
+        MTScoreCLI = twrite ['{} --ligand {} {} -h {} {} {} --np {} -v 2 -O --jobtag {} -p {}', 
+                                pro_predock, lig_predock, topfile, opt.mtpotential, dockfiles, mtscorearg, opt.nprocs, opt.jobtag, cat second untag outfiles];
     endif
     
     write ['MTScoreCLI: {}\n', MTScoreCLI];
@@ -625,6 +627,8 @@ global function qbGM_MTScore [target_mol, ligand_mol, opt]
     else
         project_name = StartName opt.ligfilename;
     endif
+    
+    if isnull opt.jobtag            then opt.jobtag = qbuuid[] ; endif;
 
     if not isnull opt.novelligfname then
         opt.dockfiles = getLigandNames opt.novelligfname;
@@ -707,10 +711,12 @@ global function qbGM_MTScore [target_mol, ligand_mol, opt]
         write ['in MDB {} update\n', opt.dataFile];
         db_EnsureField [ opt.dataFile, 'DCLogFileName', 'char' ];
         db_EnsureField [ opt.dataFile, 'DCJSONFileName', 'char' ];
+        db_EnsureField [ opt.dataFile, 'jobtag', 'char' ];
         outfile = first opt.outfiles;
         local dbEntry;
         dbEntry.DCLogFileName = swrite ['{}', outfile.log];
         dbEntry.DCJSONFileName = swrite ['{}', outfile.json];
+        dbEntry.jobtag = swrite ['{}', opt.jobtag];
         db_Write [ opt.dataFile, opt.molEntry, dbEntry ];
     endif
 
