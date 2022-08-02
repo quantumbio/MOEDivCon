@@ -1,0 +1,811 @@
+#svl
+
+//  USAGE: See below
+
+global argv;
+
+// For running on the command line ()
+//
+//  EXAMPLE: % moebatch -run $QBHOME/svl/qbGridMarkets.svl -rec thrombin_030215.pdb -lig thrombin_030215_Lig3b.mol2
+//
+
+// CCG forward declarations
+function ArgvReset;
+function ArgvExpand;
+function ArgvGet;
+function ArgvPull;
+function json_Read;
+function json_Write;
+function db_ImportSD;
+
+// Local forward declarations
+function postEnvoy;
+function GetEnvoyStatus;
+function get_supported_divcon_versions;
+function qbGM_MTScore;
+function qbReadJSONStream;
+
+// DEV VERSION
+const QBDOCK_SVL='/Users/lance/DropboxQB/Developer/MOEDivCon-current/svl/run/qbDockPair.svl';
+
+// Constants copied from gridmarkets_MOE_plugin.svl VERSION = '1.7.1'
+const ENVOY_URL     = 'http://localhost:8090';
+const GMLOGO        = [[0x2b, 0x2b, 0x2b, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2b, 0x2b, 0x2b, 0xff], [0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff], [0x2c, 0x2c, 0x2c, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x6b, 0x6b, 0x6b, 0xff, 0xe4, 0xe4, 0xe4, 0xff, 0xf6, 0xf6, 0xf6, 0xff, 0xd2, 0xd2, 0xd2, 0xff, 0x3a, 0x3a, 0x3a, 0xff, 0x2c, 0x2c, 0x2c, 0xff], [0x2c, 0x2c, 0x2c, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x57, 0x57, 0x57, 0xff, 0x93, 0x93, 0x93, 0xff, 0x9c, 0x9c, 0x9c, 0xff, 0x83, 0x83, 0x83, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xd8, 0xd8, 0xd8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xba, 0xba, 0xba, 0xff, 0x2c, 0x2c, 0x2c, 0xff], [0x2c, 0x2c, 0x2c, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x89, 0x89, 0x89, 0xff, 0xdf, 0xdf, 0xdf, 0xff, 0xea, 0xea, 0xea, 0xff, 0xe2, 0xe2, 0xe2, 0xff, 0xde, 0xde, 0xde, 0xff, 0xe0, 0xe0, 0xe0, 0xff, 0xe0, 0xe0, 0xe0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xd3, 0xd3, 0xd3, 0xff, 0x2c, 0x2c, 0x2c, 0xff], [0x2c, 0x2c, 0x2c, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xc7, 0xc7, 0xc7, 0xff, 0xfc, 0xfc, 0xfc, 0xff, 0xcc, 0xcc, 0xcc, 0xff, 0x7b, 0x7b, 0x7b, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x31, 0x31, 0x31, 0xff, 0x8f, 0x8f, 0x8f, 0xff, 0xc5, 0xc5, 0xc5, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0xef, 0xef, 0xff, 0x7b, 0x7b, 0x7b, 0xff, 0x2c, 0x2c, 0x2c, 0xff], [0x2c, 0x2c, 0x2c, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xcf, 0xcf, 0xcf, 0xff, 0xff, 0xff, 0xff, 0xff, 0x79, 0x79, 0x79, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xb4, 0xb4, 0xb4, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf8, 0xf8, 0xf8, 0xff, 0x9d, 0x9d, 0x9d, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2c, 0x2c, 0x2c, 0xff], [0x2c, 0x2c, 0x2c, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x9a, 0x9a, 0x9a, 0xff, 0xff, 0xff, 0xff, 0xff, 0x66, 0x66, 0x66, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xff, 0xff, 0xff, 0xff, 0x9b, 0x9b, 0x9b, 0xff, 0x78, 0x78, 0x78, 0xff, 0xe9, 0xe9, 0xe9, 0xff, 0x3a, 0x3a, 0x3a, 0xff, 0x2c, 0x2c, 0x2c, 0xff], [0x2c, 0x2c, 0x2c, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xf9, 0xf9, 0xf9, 0xff, 0xcc, 0xcc, 0xcc, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x76, 0x76, 0x76, 0xff, 0xa5, 0xa5, 0xa5, 0xff, 0x92, 0x92, 0x92, 0xff, 0xc3, 0xc3, 0xc3, 0xff, 0xd6, 0xd6, 0xd6, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xe3, 0xe3, 0xe3, 0xff, 0xbe, 0xbe, 0xbe, 0xff, 0x2c, 0x2c, 0x2c, 0xff], [0x2c, 0x2c, 0x2c, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x77, 0x77, 0x77, 0xff, 0xff, 0xff, 0xff, 0xff, 0x59, 0x59, 0x59, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xc1, 0xc1, 0xc1, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x8c, 0x8c, 0x8c, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xa7, 0xa7, 0xa7, 0xff, 0xe4, 0xe4, 0xe4, 0xff, 0x2c, 0x2c, 0x2c, 0xff], [0x2c, 0x2c, 0x2c, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xac, 0xac, 0xac, 0xff, 0xf3, 0xf3, 0xf3, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xaa, 0xaa, 0xaa, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf7, 0xf7, 0xf7, 0xff, 0x5f, 0x5f, 0x5f, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x69, 0x69, 0x69, 0xff, 0xe3, 0xe3, 0xe3, 0xff, 0x4b, 0x4b, 0x4b, 0xff], [0x2c, 0x2c, 0x2c, 0xff, 0xa5, 0xa5, 0xa5, 0xff, 0xd9, 0xd9, 0xd9, 0xff, 0xf2, 0xf2, 0xf2, 0xff, 0xe4, 0xe4, 0xe4, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xec, 0xec, 0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbb, 0xbb, 0xbb, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x44, 0x44, 0x44, 0xff, 0xe2, 0xe2, 0xe2, 0xff, 0x67, 0x67, 0x67, 0xff], [0xb0, 0xb0, 0xb0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfa, 0xfa, 0xfa, 0xff, 0xa2, 0xa2, 0xa2, 0xff, 0x8b, 0x8b, 0x8b, 0xff, 0xaf, 0xaf, 0xaf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xb5, 0xb5, 0xb5, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x7f, 0x7f, 0x7f, 0xff, 0xdf, 0xdf, 0xdf, 0xff, 0x2c, 0x2c, 0x2c, 0xff], [0xfc, 0xfc, 0xfc, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfc, 0xfc, 0xfc, 0xff, 0xdd, 0xdd, 0xdd, 0xff, 0xed, 0xed, 0xed, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc7, 0xc7, 0xc7, 0xff, 0xc4, 0xc4, 0xc4, 0xff, 0xf5, 0xf5, 0xf5, 0xff, 0xee, 0xee, 0xee, 0xff, 0x43, 0x43, 0x43, 0xff], [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf2, 0xf2, 0xf2, 0xff, 0x37, 0x37, 0x37, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x72, 0x72, 0x72, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xe9, 0xe9, 0xe9, 0xff, 0xf3, 0xf3, 0xf3, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xde, 0xde, 0xde, 0xff], [0xd0, 0xd0, 0xd0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x8b, 0x8b, 0x8b, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x8a, 0x8a, 0x8a, 0xff, 0xe3, 0xe3, 0xe3, 0xff, 0xfb, 0xfb, 0xfb, 0xff, 0xf6, 0xf6, 0xf6, 0xff, 0xc3, 0xc3, 0xc3, 0xff, 0x3f, 0x3f, 0x3f, 0xff, 0xf3, 0xf3, 0xf3, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff], [0x36, 0x36, 0x36, 0xff, 0xd1, 0xd1, 0xd1, 0xff, 0xf9, 0xf9, 0xf9, 0xff, 0xf7, 0xf7, 0xf7, 0xff, 0xb0, 0xb0, 0xb0, 0xff, 0xad, 0xad, 0xad, 0xff, 0xff, 0xff, 0xff, 0xff, 0xb7, 0xb7, 0xb7, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf5, 0xf5, 0xf5, 0xff], [0x2c, 0x2c, 0x2c, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x52, 0x52, 0x52, 0xff, 0x4a, 0x4a, 0x4a, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0xae, 0xae, 0xae, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf3, 0xf3, 0xf3, 0xff, 0xbc, 0xbc, 0xbc, 0xff, 0x81, 0x81, 0x81, 0xff, 0x5e, 0x5e, 0x5e, 0xff, 0x84, 0x84, 0x84, 0xff, 0xc6, 0xc6, 0xc6, 0xff, 0xf4, 0xf4, 0xf4, 0xff, 0xe0, 0xe0, 0xe0, 0xff, 0xef, 0xef, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf5, 0xf5, 0xf5, 0xff, 0x8b, 0x8b, 0x8b, 0xff], [0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x65, 0x65, 0x65, 0xff, 0xd4, 0xd4, 0xd4, 0xff, 0xf7, 0xf7, 0xf7, 0xff, 0xf8, 0xf8, 0xf8, 0xff, 0xf6, 0xf6, 0xf6, 0xff, 0xf5, 0xf5, 0xf5, 0xff, 0xed, 0xed, 0xed, 0xff, 0xb8, 0xb8, 0xb8, 0xff, 0x2e, 0x2e, 0x2e, 0xff, 0x37, 0x37, 0x37, 0xff, 0x83, 0x83, 0x83, 0xff, 0x4a, 0x4a, 0x4a, 0xff, 0x2e, 0x2e, 0x2e, 0xff], [0x2b, 0x2b, 0x2b, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2c, 0x2c, 0x2c, 0xff, 0x2b, 0x2b, 0x2b, 0xff]];
+const DATA_HEADER   = 'Content-Type: application/json';
+
+const DIVCON_JOB = [
+    id:'job-DC'                 // ID of job
+    , name:'DivCon Job'       // Name of job
+    , app_name:'divcon'          // Name of application to be run
+    , app_version:'2022-b4874'              // By default use the most recent version
+    , operation:'simulation'     // Simuation operation
+    , machine_type:'gm3200'      // Define the machine type
+    , path:'/qmechanic-job'      // Set to the removeRoot
+    , params:[
+        divcon_app:'qmechanic'    // the default DivCon Suite app is qmechanic (other apps will become available later)
+//       , args:''                 // Arguments to sent to qmechanic
+    ]         
+//    , dependencies:[]              // The dependent jobs (those coming before)
+];
+
+const MOE_JOB = [
+    id:'job-MOE'                 // ID of job
+    , name:'MOE Job'       // Name of job
+    , app_name:'moe'          // Name of application to be run
+    , app_version:'2020.0901'              // By default use the tested version of MOE
+    , operation:'simulation'     // Simuation operation
+    , machine_type:'gm1000'      // Define the machine type
+    , path:'/qmechanic-job'      // Set to the removeRoot
+    , params:[
+        context:'quantumbio'   // run on machine which has access to 
+        , divcon_version:'2022-b4874'              // By default use the most recent version
+        , args:''                 // Arguments to sent to moebatch which will likely call QBIO SVL like ${QBHOME}/svl/run/qbDockPair.svl ....
+        , options:''
+        , threads_per_machine:8
+        , instances_min:0
+        , simulation_type:'docking'
+        , parts:1
+    ]
+//    , dependencies:[]              // The dependent jobs (those coming before)
+];
+
+// these settings come from $QBHOME/svl/run/qbDockPair.svl file
+const DEFAULT_OPT = [
+    delwat      : 0        // Delete waters prior to performing docking/placement but AFTER any optimization if -preopt chosen
+    , inducedfit  : 0        // Run induced fit (optimized protein) on dock
+    , offormat    : 'pdb'    // output this version of output for induced fit (can be either 'pdb' or 'mol2')
+    , mtscorees   : 1        // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
+    , mtcsconf    : 0        // Number of MTCS conformers to use (these are the best X conformers according to BFintensity). If zero (default) use ALL conformers (WARNING: this can be expensive.)
+    , maxpose     : 25       // Number of poses to optimize (per posed conformer) prior to final score
+//   , maxpose     : 5       // Number of poses to optimize (per posed conformer) prior to final score
+    , remaxpose   : 5        // Max number of poses to return per conformer (after optimization)
+    , rigidlig    : 0        // Run with the ligand/conformation treated rigidly
+    , preopt      : 0        // Run an optimization of the protein:ligand complex prior to docking
+    , protonate   : 0        // Run Protonate3D prior to docking/scoring
+    , forceexe    : 1        // Force the calculation to proceed even if there are structural defects
+    , testinp     : 0        // Test the input but then quit.
+    , mtpotential : 'garf'   // pair potential used in MT.
+    , nprocs      : 8        // number of cores to use in calculation.
+    , dockfiles   : []       // the input SDF file(s) to provide to qmechanic
+    , outfiles    : []       // the output JSON and LOG files coming back from qmechanic
+    , dataFile    : []       // mdb file into which values should be (optionally) written
+    , molEntry    : 0        // entry (row) in the mdb file into which the data should be added
+];
+
+// ======================================================================
+// copied directly from gridmarkets_MOE_plugin.svl v.1.7.1
+//      NOTE: this copied functions should likely be global functions in the GM plugin.
+local function get_gm_logo []
+    local convertedLogo = [];
+    
+    local img = GMLOGO;
+    local rows = length img;
+    local row = 1;
+
+    while row <= rows loop
+        local row_data = img(row);
+        local columns = length row_data;
+        local convertedRowData = [];
+
+        local col = 1;
+        while col <= columns loop
+            local a = bitshl[255 - row_data[col + 3], 24]; // alpha is inverted hence the (255 - value)
+            local transparency_factor = a / 255;            
+
+            local r = bitshl[row_data[col + 2], 16];
+            local g = bitshl[row_data[col + 1], 8];
+            local b = row_data[col];
+
+            // account for integer overflow
+            if a < 0 then
+                a = a + pow[2, INT_BITS];
+            endif
+
+            convertedRowData[(col + 3) / 4] = a + r + g + b;
+            
+            col = col + 4;
+        endloop;
+
+        convertedLogo[row] = [convertedRowData];
+        row = row + 1;
+    endloop;
+
+    return convertedLogo;
+endfunction
+
+// ======================================================================
+
+global function qbExecEngine_GridMarkets [cmd, arg, opt]
+    local engine = 'GridMarkets';
+//write ['in qbExecEngine_{}: {}\n',engine, cmd];
+
+    function GetEngineConfig;
+    function GetWidget;
+    function ProcessWidget;
+    function GetStatusWidget;
+    function SaveRC;
+    function TestEndpoint;
+    function RunMTScore;
+    function UpdateQBDB;
+
+    if cmd == 'ID' then return engine;
+    elseif cmd == 'ONOFF' then return 1;
+    elseif cmd == 'getEngineConfig' then
+        return GetEngineConfig [engine];
+    elseif cmd == 'getWidget' then
+        return GetWidget [arg];
+    elseif cmd == 'processWidget' then
+        return ProcessWidget[arg, opt];
+    elseif cmd == 'getStatusWidget' then
+        return GetStatusWidget [];
+    elseif cmd == 'SaveRC' then
+        return SaveRC [arg, opt];
+    elseif cmd == 'testEndpoint' then
+        return TestEndpoint [];
+    elseif cmd == 'RunMTScore' then
+        return RunMTScore [cmd,arg];
+    elseif cmd == 'UpdateQBDB' then
+        return UpdateQBDB [cmd,arg];
+    endif
+        
+    function TestEndpoint []
+        local daemon = postEnvoy[];       
+        local status = second daemon;
+        return status;
+    endfunction
+
+    function RunMTScore [cmd,arg]
+        local [recatoms,ligatoms,mdbreference] = arg;
+        return qbGM_MTScore [recatoms,ligatoms,mdbreference];
+    endfunction
+
+    function UpdateQBDB [cmd,dataFile]
+        if first ftype dataFile <> '' then
+            local entry_key;
+            for entry_key in db_Entries dataFile loop       // loop through each entry
+                local dbEntry = db_Read [ dataFile, entry_key ];
+                if not isnull dbEntry.DCJSONFileName and isnull dbEntry.MTScoreES then
+                    if first ftype twrite ['{}', dbEntry.DCJSONFileName] <> '' then
+                        local inlineJSON = swrite ['{}', freadb [twrite ['{}', dbEntry.DCJSONFileName],'line']];
+                        local tmpJSON = json_Read [inlineJSON,[]];
+                        if second tmpJSON <> 'error' then
+                            tmpJSON = first tmpJSON;
+            
+                            // TODO: this translation shouldn't be needed
+                            tmpJSON.('MTScoreES(s)') = twrite ['{}', tmpJSON.Results.wtMTScoreES];
+                            dbEntry.MTScoreES = atof tmpJSON.('MTScoreES(s)');
+                            db_Write [ dataFile, entry_key, dbEntry ];
+                        else
+                            write ['ERROR: reading {}\n', first tmpJSON];
+                        endif
+                    endif
+                endif
+            endloop
+        endif
+    endfunction
+
+    function GetStatusWidget []
+//        write ['in GetStatusWidget: {}\n', engine];
+        local [daemon,authResp,user_info_data,envoy_info,divcon_version] = GetEnvoyStatus[];
+
+        return [
+            text: twrite ['GridMarkets: {} credits', user_info_data.data.credits_available],
+            bubbleHelp:twrite ['You are currently connected to Envoy v.{} and you have {} credits available.\n  To modify settings or purchase credits, choose Envoy Application.', envoy_info.version,user_info_data.data.credits_available]
+        ];
+    endfunction
+
+    function GetEngineConfig [engine]
+        local values;
+        
+        return values;
+    endfunction
+    
+    function GetWidget [arg]
+        write ['in GetWidget: {}\n', engine];
+
+        // create graphics object of GROB_SZ size
+        local GROB_SZ = [ 20, 20 ];
+        local rkey = gr_create [
+            title: 'gmlogo',
+            size: GROB_SZ,
+            units: 'pix'
+        ];
+        gr_pixmap [rkey, [0,
+            [0, GROB_SZ[2]],  
+            [0, 0],
+            get_gm_logo []
+        ]];
+        local REFRESH2_ICON = gr_icon ['refresh2', 16, 'foreground'];
+        local panel;
+        local [daemon,authResp,user_info_data,envoy_info,divcon_version] = GetEnvoyStatus[];
+        local currentEnvoyStatus;
+        if second daemon <> 'error' then
+            currentEnvoyStatus.status = twrite ['Envoy v.{}',envoy_info.version];
+            currentEnvoyStatus.blurb = twrite ['To modify settings or purchase credits, choose Envoy Application.'];
+        else
+            currentEnvoyStatus.status = twrite ['Envoy N/A'];
+            currentEnvoyStatus.blurb = twrite ['Install or Start Envoy application to execute job on the cloud.'];
+        endif
+
+        panel = [
+            Hbox : [  extendH: 1
+            , Label : [graphics: rkey]
+            , Label : [ name: 'EnvoyStatus', text : currentEnvoyStatus.status]
+            , Hbox : [ extendH :1]
+            , Label : [ text : '']
+            , Button : [
+                name: 'credits_avail',
+                text: twrite ['{}  ', swrite ['{f.2}', user_info_data.data.credits_available]],
+                onTrigger : 'return',
+                graphics: REFRESH2_ICON,
+                grPosition: 'right',
+                bubbleHelp: 'Click to reload your account credits'
+            ]
+            ]
+            , Hbox: [Label : [ text: 'DivCon Version:', font: 'mediumBold'], Label : [name: 'DivConVersion', text: divcon_version]]
+            , Hbox: [Label : [ text: 'Username:', font: 'mediumBold'], Label : [name: 'GMUserName', text: authResp.Username]]
+            , Hbox : [extendH :1, Label : [ name: 'EnvoyBlurb', extendH: 1, alignment: 'center', text : currentEnvoyStatus.blurb]]
+            , Hbox : [extendH :1, Label : [ extendH: 1, alignment: 'center', text : 'Support: https://www.pharma.gridmarkets.com/', foreground: 'blue']]
+        ];
+        
+        return panel;    
+    endfunction
+    
+    function UpdateStatus [wConfKey, trig]
+        local [daemon,authResp,user_info_data,envoy_info,divcon_version] = GetEnvoyStatus[];
+        local vals = WindowValues wConfKey;
+        if vals.qbInterface === engine then
+            WindowSetAttr [wConfKey, [wsStatus: [text: 'Checking Connection....', foreground: 'orange']]];
+            local currentEnvoyStatus;
+            if second daemon == 'error' then
+                WindowSetAttr [wConfKey, [wsStatus: [text: 'No Connection', foreground: 'red']]];
+                WindowSetAttr [wConfKey, [panel: [sensitive:[1,1]]]];
+                currentEnvoyStatus.status = twrite ['Envoy N/A'];
+                currentEnvoyStatus.blurb = twrite ['Install or Start Envoy application to execute job on the cloud.'];
+            else
+                WindowSetAttr [wConfKey, [wsStatus: [text: 'Connection OK', foreground: 'blue']]];
+                WindowSetAttr [wConfKey, [panel: [sensitive:[1,1]]]];
+                currentEnvoyStatus.status = twrite ['Envoy v.{}',envoy_info.version];
+                currentEnvoyStatus.blurb = twrite ['To modify settings or purchase credits, choose Envoy Application.'];
+            endif
+            WindowSetAttr [wConfKey, [credits_avail: [text: twrite ['{}  ', swrite ['{f.2}', user_info_data.data.credits_available]] ]]];
+            WindowSetAttr [wConfKey, [DivConVersion: [text: divcon_version ]]];
+            WindowSetAttr [wConfKey, [GMUserName: [text: authResp.Username ]]];
+            WindowSetAttr [wConfKey, [EnvoyBlurb: [text: currentEnvoyStatus.blurb ]]];
+            WindowSetAttr [wConfKey, [EnvoyStatus: [text: currentEnvoyStatus.status ]]];
+        endif
+    endfunction
+
+    function ProcessWidget [arg, opt]
+        arg = cat arg;
+        local [wkey, trig, vals] = arg;
+        
+        UpdateStatus [wkey, trig];
+    endfunction
+    
+    function SaveRC [arg, opt]
+        local [wkey, trig, vals] = arg;
+        write ['vals-test: {} | {}\n', length vals, vals];
+        write ['trig-test: {} | {}\n', length trig, trig];
+        write ['\nvals.qbInterface: {}\n', vals.qbInterface];
+        SetRC ['QuantumBio.qbInterface',vals.qbInterface];
+    endfunction
+
+endfunction
+
+local function getLigandNames infile
+    local dockfiles = [];
+    local newinfile = twrite ['{}.mdb', fbase infile];
+    
+    if fext infile == 'sdf' then
+        db_ImportSD [db_Open [ newinfile,'create' ], infile,'mol'];
+    elseif fext infile == 'mdb' then
+        newinfile = infile;
+    else
+        write ['ERROR: {} is not an MDB or SDF file.', infile];
+        return dockfiles;
+    endif
+    
+    local mdb_key = db_Open [newinfile,'read'];
+    local entries = db_Entries mdb_key;
+    local ent;
+    for ent in entries loop
+        local compoundNumber = first first first db_ReadFields [mdb_key, ent, 'mol' ];     // Instead use mol name
+        dockfiles = cat [dockfiles, twrite ['{}-dock.sdf', compoundNumber]];
+    endloop
+
+    return dockfiles;
+endfunction
+
+local function opt2DockPairCLI opt
+    opt = tagcat [opt, DEFAULT_OPT];
+    
+    local qbDockPairCLI = '';
+    
+    if isnull opt.recfilename or isnull opt.ligfilename then
+        write ['ERROR: Receptor and Ligand filenames are required.\n'];
+    else
+        if not opt.inducedfit then opt.offormat = 'sdf'; endif;
+        
+        qbDockPairCLI = twrite ['-rec {} -lig {} -offormat {} -o {} -maxpose {} -remaxpose {} -mtcsconf {} -O', 
+                                opt.recfilename, opt.ligfilename, opt.offormat, opt.outf, opt.maxpose, opt.remaxpose, opt.mtcsconf];
+    
+        if not isnull opt.novelligfname     then qbDockPairCLI = twrite ['{} -novellig {}', qbDockPairCLI, opt.novelligfname]; endif;
+        if not isnull opt.conffilename      then qbDockPairCLI = twrite ['{} -conf {}', qbDockPairCLI, opt.conffilename]; endif;
+//        if not isnull opt.dockedligfname    then qbDockPairCLI = twrite ['{} -dockedlig {}', qbDockPairCLI, opt.dockedligfname]; endif;   // if user provides this file we skip MOE completely.
+        if not isnull opt.sffilename        then qbDockPairCLI = twrite ['{} -mtz {}', qbDockPairCLI, opt.sffilename]; endif;
+        if not isnull opt.dockmdb           then qbDockPairCLI = twrite ['{} -dockmdb {}', qbDockPairCLI, opt.dockmdb]; endif;
+
+        if opt.delwat       then qbDockPairCLI = twrite ['{} -delwat', qbDockPairCLI]; endif;
+        if opt.inducedfit   then qbDockPairCLI = twrite ['{} -inducedfit', qbDockPairCLI]; endif;
+        if opt.rigidlig     then qbDockPairCLI = twrite ['{} -rigidlig', qbDockPairCLI]; endif;
+        if opt.preopt       then qbDockPairCLI = twrite ['{} -preopt', qbDockPairCLI]; endif;
+        if opt.forceexe     then qbDockPairCLI = twrite ['{} -forceexe', qbDockPairCLI]; endif;
+        if opt.protonate     then qbDockPairCLI = twrite ['{} -protonate', qbDockPairCLI]; endif;
+        
+    endif
+    
+    return qbDockPairCLI;
+endfunction
+
+local function opt2MTScoreCLI [opt, dockfiles]
+    opt = tagcat [opt, DEFAULT_OPT];
+
+    local MTScoreCLI = '';
+    if isnull opt.recfilename or isnull opt.ligfilename then
+        write ['ERROR: Receptor and Ligand filenames are required.\n'];
+    else
+        if isnull opt.novelligfname     then opt.novelligfname = ''; endif;
+        
+        local pro_predock;
+        local lig_predock;
+        local topfile;
+        local outfiles;
+        local mtscorearg;
+        if not isnull dockfiles then
+            topfile = append [opt.topfile, twrite ['{}-top.sdf', fbase dockfiles]];
+            outfiles.json = twrite ['{}-mt.json', fbase dockfiles];
+            outfiles.log = twrite ['{}-mt.log', fbase dockfiles];
+            opt.outfiles = append [opt.outfiles,outfiles];
+            dockfiles = twrite ['--mtdock {}',dockfiles];
+        else
+            if not isnull opt.dockedligfname then
+                topfile = '';
+                outfiles.json = twrite ['{}-mt.json', fbase opt.dockedligfname];
+                outfiles.log = twrite ['{}-mt.log', fbase opt.dockedligfname];
+                opt.outfiles = append [opt.outfiles,outfiles];
+                dockfiles = twrite ['--mtdock {}.sdf',fbase opt.dockedligfname];
+            elseif not opt.mtscorees then
+                topfile = '';
+                outfiles.json = twrite ['{}-mt.json', fbase opt.outf];
+                outfiles.log = twrite ['{}-mt.log', fbase opt.outf];
+                opt.outfiles = append [opt.outfiles,outfiles];
+                dockfiles = twrite ['--mtdock {}.sdf',fbase opt.outf];
+            else
+                topfile = '';
+                outfiles.json = twrite ['{}-mt.json', fbase opt.outf];
+                outfiles.log = twrite ['{}-mt.log', fbase opt.outf];
+                opt.outfiles = append [opt.outfiles,outfiles];
+            endif
+        endif
+           
+        if not isnull opt.dockedligfname then
+            pro_predock = opt.recfilename;
+            lig_predock = opt.ligfilename;
+            mtscorearg = '--mtscore ensemble';
+        elseif not opt.mtscorees then
+            pro_predock = twrite ['pro_{}_predock.{}', fbase opt.ligfilename, fext opt.recfilename];
+            lig_predock = twrite ['lig_{}_predock.{}', fbase opt.ligfilename, fext opt.ligfilename];
+            mtscorearg = '--mtscore ensemble';
+        else
+            pro_predock = opt.recfilename;
+            lig_predock = opt.ligfilename;
+            dockfiles = '';
+            mtscorearg = '--mtscore endstate';
+        endif
+        MTScoreCLI = twrite ['{} --ligand {} {} -h {} {} {} --np {} -v 2 -O -p {}', 
+                                pro_predock, lig_predock, topfile, opt.mtpotential, dockfiles, mtscorearg, opt.nprocs, cat second untag outfiles];
+    endif
+    
+    write ['MTScoreCLI: {}\n', MTScoreCLI];
+    
+    return [MTScoreCLI, opt];
+endfunction
+
+global function postEnvoy [endpoint, postfield]
+
+    local curl_payload;
+    if isnull endpoint then
+        curl_payload.url = ENVOY_URL;
+    else
+        curl_payload.url = tok_cat [ENVOY_URL, endpoint];
+    endif
+    curl_payload.httpheader = DATA_HEADER;
+    
+    if not isnull postfield then
+        curl_payload.postfields = postfield;
+    endif
+
+    local url_key = curl_open curl_payload;
+    local json = _curl_read url_key;
+    
+    write ['json: {}\n', json];
+
+    curl_close url_key;
+    return json;
+
+endfunction
+
+local function GetEnvoyStatus []
+    local daemon,authResp,user_info_data,envoy_info,divcon_version;
+    
+    //DEFAULTS
+    user_info_data.data.credits_available = 0;
+    envoy_info.version = 'Unknown';
+    authResp.Username = 'Unknown';
+    divcon_version = get_supported_divcon_versions[];
+
+    daemon = postEnvoy[];
+    
+    if second daemon <> 'error' then
+        authResp = postEnvoy '/auth';
+        user_info_data = postEnvoy '/user-info';
+        envoy_info = postEnvoy '/info';
+        if second user_info_data <> 'error' then
+            user_info_data = first json_Read [first user_info_data,[]];
+        else
+            user_info_data = [];
+            user_info_data.data.credits_available = 0;
+        endif
+        if second envoy_info <> 'error' then
+            envoy_info = first json_Read [first envoy_info,[]];
+        else
+            envoy_info = [];
+            envoy_info.version = 'Unknown';
+        endif
+        if second authResp <> 'error' then
+            authResp = first json_Read [first authResp,[]];
+        else
+            authResp = [];
+            authResp.Username = 'Unknown';
+        endif
+    endif
+
+    return [daemon,authResp,user_info_data,envoy_info,divcon_version]; 
+endfunction
+
+global function get_supported_divcon_versions []
+//    local envoy_products = first postEnvoy '/products';
+    local envoy_products = postEnvoy '/products';
+    local supported_divcon_version = 'Unknown';
+// write ['envoy_products: {} | {}\n', length envoy_products, envoy_products];
+    if second envoy_products <> 'error' then
+        local products = first json_Read [ first envoy_products, []];
+//        local parsed_json = first json_Read [ envoy_products, []];
+//        local products = parsed_json;
+        local product;
+        for product in products loop;
+            if product.app_type === 'divcon' then
+                supported_divcon_version = append [supported_divcon_version, product.version];
+            endif
+        endloop;
+
+//    supported_divcon_version = reverse (sort supported_divcon_version);
+        supported_divcon_version = last supported_divcon_version;
+    endif
+    return supported_divcon_version;
+endfunction
+
+local function StartName inFileName
+    if isnull inFileName then
+        inFileName = cTag first Chains[];
+    endif
+    local timevec = clock_to_timevec clock [];
+    function formNum [inVal]
+        if inVal < 10 then  return twrite ['0{}',inVal];
+        else                return twrite ['{}',inVal];
+        endif
+    endfunction
+    return twrite ['{}_{}', fbase inFileName,
+                        twrite ['{}{}{}{}{}', formNum timevec(7), formNum timevec(8), formNum timevec(3), formNum timevec(2), formNum timevec(1)]];
+endfunction
+
+local function validFile infile
+    if isnull infile then; return infile; endif
+    if 'file' == first fstat infile then; return infile; endif
+
+    if 'dir' == first fstat infile then
+//            usage[];
+        exit twrite ['ERROR: Provided filename is a directory: {}\n',infile];
+    endif
+
+    if '' == first fstat infile then
+//            usage[];
+        exit twrite ['ERROR: Provided filename is not found: {}\n',infile];
+    endif
+endfunction
+
+local function replace_SPLICE [inJSON, SPLICE_string, SPLICE_JSON]
+    inJSON = swrite ['{}',inJSON];                      // make sure we're working with strings
+    SPLICE_string = swrite ['\"{}\"', SPLICE_string];   // must also pull out the quotation marks
+    SPLICE_JSON = swrite ['{}',SPLICE_JSON];            // make sure we're working with strings
+
+    if not strpos [SPLICE_string, inJSON] then
+        return inJSON;
+    endif
+
+    if "[" == first SPLICE_JSON and "]" == last SPLICE_JSON then
+        write['in if\n'];
+        return splice [ inJSON, strpos [SPLICE_string, inJSON], length SPLICE_string, swrite ['{}',SPLICE_JSON] ];  // dependencies are often an array of one (which SVL assumes to be a string)
+    else
+        return splice [ inJSON, strpos [SPLICE_string, inJSON], length SPLICE_string, swrite ['[{}]',SPLICE_JSON] ];  // dependencies are often an array of one (which SVL assumes to be a string)
+    endif
+    
+endfunction
+
+// This job will run MOE/docking
+local function gmjob_moedock [moe_job, opt]
+    opt = tagcat [opt, DEFAULT_OPT];
+    if isnull QBDOCK_SVL then
+        moe_job.params.args = twrite ['${{QBHOME}/svl/run/qbDockPair.svl {}', opt2DockPairCLI opt];
+    else
+        moe_job.params.args = twrite ['./qbDockPair.svl {}', opt2DockPairCLI opt];
+    endif
+    return moe_job;
+//    local moe_job_json = first json_Write [moe_job, []];
+//    return moe_job_json;
+endfunction
+
+// This job will run DivCon (MT)
+local function gmjob_divcon [divcon_job, opt]
+    opt = tagcat [opt, DEFAULT_OPT];
+    local task;
+    local dockfile;
+    local MTCLI;
+    if length opt.dockfiles > 1 then
+        for dockfile in opt.dockfiles loop
+            task.name = dockfile;
+            [MTCLI, opt] = opt2MTScoreCLI [opt, dockfile];
+            task.args = twrite ['{}',MTCLI];
+            divcon_job.params.tasks = append [divcon_job.params.tasks, task];
+        endloop
+    else
+            [MTCLI, opt] = opt2MTScoreCLI [opt, dockfile];
+            divcon_job.params.args = twrite ['{}',MTCLI];
+    endif
+    
+    local dependencies;    
+    if not isnull divcon_job.dependencies then
+        if length divcon_job.dependencies == 1 then
+            dependencies = divcon_job.dependencies;
+            divcon_job.dependencies = 'SPLICE_DEP';
+        endif
+    endif
+//    local divcon_job_json = first json_Write [divcon_job, []];    
+//    divcon_job_json = replace_SPLICE [divcon_job_json, 'SPLICE_DEP', first json_Write [dependencies, []]];
+//    return divcon_job_json;
+    return [divcon_job, opt];
+endfunction
+
+global function qbGM_MTScore [target_mol, ligand_mol, opt]
+    opt = tagcat [opt, DEFAULT_OPT];
+
+    local syskeys;
+    local project_name;
+    if not isnull target_mol and not isnull ligand_mol then
+        syskeys = SystemPush ligand_mol;
+        project_name = StartName [];
+        opt.recfilename = twrite ['r{}.mol2',project_name];
+        opt.ligfilename = twrite ['l{}.mol2',project_name];
+        WriteAuto twrite ['{}', opt.ligfilename];
+        SystemPop syskeys;
+        syskeys = SystemPush target_mol;
+        WriteAuto twrite ['{}', opt.recfilename];
+        SystemPop syskeys;
+    else
+        project_name = StartName opt.ligfilename;
+    endif
+
+    if not isnull opt.novelligfname then
+        opt.dockfiles = getLigandNames opt.novelligfname;
+    endif
+    if isnull opt.outf and isnull opt.novelligfname then
+        opt.outf = twrite ['{}_dock.mdb',fbase ftail opt.ligfilename];
+    elseif isnull opt.outf and not isnull opt.novelligfname then
+        opt.outf = twrite ['{}_dock.mdb',fbase ftail opt.novelligfname];
+    else
+        opt.outf = twrite ['{}.mdb',fbase opt.outf];
+    endif;
+        
+    local watch_files;
+    watch_files.(twrite ['/{}/.+',project_name]) = cd[];
+    write ['watch_files: {}\n', first json_Write [watch_files, []]];
+
+    local project_data;
+    project_data.project_files.localRoot = cd[];
+    project_data.project_files.remoteRoot = twrite ['/{}', project_name];
+    project_data.project_files.files = [validFile ftail opt.recfilename,validFile ftail opt.ligfilename];
+    
+    if not isnull QBDOCK_SVL then
+        fcopydel [QBDOCK_SVL, ftail QBDOCK_SVL];
+        project_data.project_files.files = cat [project_data.project_files.files, ftail QBDOCK_SVL];
+    endif
+
+    if not isnull opt.dockedligfname then   project_data.project_files.files = append [project_data.project_files.files, validFile ftail opt.dockedligfname]; endif;
+    if not isnull opt.novelligfname then    project_data.project_files.files = append [project_data.project_files.files, validFile ftail opt.novelligfname]; endif;
+    if not isnull opt.conffilename then     project_data.project_files.files = append [project_data.project_files.files, validFile ftail opt.conffilename]; endif;
+    if not isnull opt.sffilename then       project_data.project_files.files = append [project_data.project_files.files, validFile ftail opt.sffilename]; endif;
+
+    project_data.project_request.name = project_name;
+    project_data.project_request.submission_name = project_name;
+    project_data.project_request.description = '';
+    project_data.project_request.jobs = 'SPLICE_JOB';
+        
+    project_data.watch_files = watch_files;
+    
+    local jobs;
+    
+    local divcon_job = DIVCON_JOB;
+    divcon_job.app_version = last get_supported_divcon_versions[];
+    if not opt.mtscorees and isnull opt.dockedligfname then
+        local moe_job = MOE_JOB;
+        moe_job.params.divcon_version = last get_supported_divcon_versions[];
+//        moe_job.id = twrite ['MOE_JOB-{}',project_name];
+        moe_job.name = twrite ['MOE-{}',project_name];
+        moe_job.path = twrite ['/{}',project_name];
+//        local moe_job_json = gmjob_moedock [moe_job, opt];
+        moe_job = gmjob_moedock [moe_job, opt];
+        local moe_job_json = first json_Write [moe_job, []];
+        moe_job_json = splice [moe_job_json, strpos ["app_name",moe_job_json], length "app_name", "app"];           // app is a reserved word in SVL - app_name is used instead
+        jobs = append [jobs, moe_job_json];
+        divcon_job.dependencies = moe_job.id;
+    endif
+
+//    divcon_job.id = twrite ['DivCon_JOB-{}',project_name];
+    divcon_job.name = twrite ['DivCon-{}',project_name];
+    divcon_job.path = twrite ['/{}',project_name];
+//    local divcon_job_json = gmjob_divcon [divcon_job, opt];
+    local dependencies = divcon_job.dependencies;
+    [divcon_job, opt] = gmjob_divcon [divcon_job, opt];
+    local divcon_job_json = first json_Write [divcon_job, []];
+    divcon_job_json = replace_SPLICE [divcon_job_json, 'SPLICE_DEP', first json_Write [dependencies, []]];
+    divcon_job_json = splice [divcon_job_json, strpos ["app_name",divcon_job_json], length "app_name", "app"];  // app is a reserved word in SVL - app_name is used instead
+    jobs = append [jobs, divcon_job_json];
+    
+    jobs = droplast cat apt swrite ['{},',jobs]; 
+    
+    local project_json = replace_SPLICE [first json_Write [project_data, []], 'SPLICE_JOB', jobs];
+    
+    fwrite ['DEBUG.json','{}\n',project_json];
+    
+    write ['outfiles: {} | {}\n', length cat opt.outfiles, cat opt.outfiles];
+    write ['outfiles: {} | {}\n', length (ftype cat opt.outfiles == ''), (ftype cat opt.outfiles == '')];
+
+    // update the MDB file based on what is running
+    local outfile;
+    if not isnull opt.dataFile then
+        write ['in MDB {} update\n', opt.dataFile];
+        db_EnsureField [ opt.dataFile, 'DCLogFileName', 'char' ];
+        db_EnsureField [ opt.dataFile, 'DCJSONFileName', 'char' ];
+        outfile = first opt.outfiles;
+        local dbEntry;
+        dbEntry.DCLogFileName = swrite ['{}', outfile.log];
+        dbEntry.DCJSONFileName = swrite ['{}', outfile.json];
+        db_Write [ opt.dataFile, opt.molEntry, dbEntry ];
+    endif
+
+// exit [];
+
+    local json = first postEnvoy ['/project-submit',twrite ['{}',project_json]];
+    json = first json_Read json;
+    write ['json: {} | {}\n', length json, json];
+    
+    while anytrue (ftype cat second untag cat opt.outfiles == '') loop
+//        write [' waiting ... {}\n', (ftype cat second untag cat opt.outfiles == '')];
+        sleep 30;
+    endloop
+    
+    local retOutput;
+    for outfile in opt.outfiles loop  
+        write ['reading: {}\n', outfile.json];
+//        local tmpJSON = qbReadJSONStream freadb [outfile.json,'line'];
+        local inlineJSON = swrite ['{}', freadb [outfile.json,'line']];
+        
+    write ['inlineJSON: {}\n', inlineJSON];
+        local tmpJSON = json_Read [inlineJSON,[]];
+        if second tmpJSON <> 'error' then
+            tmpJSON = first tmpJSON;
+            tmpJSON.success = 1;
+            write ['Complete: {}\n', tmpJSON];
+            
+            // TODO: this translation shouldn't be needed
+            tmpJSON.('MTScoreES(s)') = twrite ['{}', tmpJSON.Results.wtMTScoreES];
+        else
+            tmpJSON.success = 0;
+            write ['ERROR: reading {}\n', first tmpJSON];
+        endif
+        retOutput = append [retOutput,  tmpJSON];
+    endloop
+    write ['retOutput: {}\n', retOutput];
+    write ['tmpJSON: {}\n', tmpJSON.('MTScoreES(s)')];
+
+    if not isnull opt.dataFile then
+        write ['in MDB {} update\n', opt.dataFile];
+        db_EnsureField [opt.dataFile, 'MTScoreES', 'double'];
+        dbEntry.MTScoreES = atof tmpJSON.('MTScoreES(s)');
+        db_Write [ opt.dataFile, opt.molEntry, dbEntry ];
+    endif
+
+    return first retOutput;
+endfunction
+
+local function main[]
+    local inopt = DEFAULT_OPT;
+    ArgvReset ArgvExpand argv;
+    local [mtscoreexe] = ArgvGet [ ['-mtscoreexe'], [0]];
+    local [recfilename, ligfilename, novelligfname, conffilename, dockedligfname, sffilename, outf, delwat, mtscorees, maxpose, mtcsconf, remaxpose, inducedfit, rigidlig, dockmdb, offormat, preopt, protonate, forceexe, printhelp, testinp, overwrite] = 
+        ArgvPull [ ['-rec', '-lig','-novellig','-conf','-dockedlig','-mtz','-o','-delwat','-mtscorees','-maxpose','-mtcsconf', '-remaxpose','-inducedfit','-rigidlig','-dockmdb','-offormat','-preopt','-protonate','-forceexe','-help','-testinp','-O'], 
+        [1,1,1,1,1,1,1,0,0,1,1,1,0,0,1,1,0,0,0,0,0,0] ];
+    local [runqmechanic] = ArgvPull [ ['-mtscoreexe'], [1] ];
+    local remaining = ArgvAll [];
+    if not isnull remaining then
+//        usage[];
+        exit twrite ['ERROR: Unknown command line options: {}\n',remaining];
+    endif
+
+    inopt.delwat = delwat;
+    inopt.inducedfit = inducedfit;
+    inopt.mtscorees = mtscorees;
+    inopt.maxpose = atoi maxpose;
+    inopt.mtcsconf = atoi mtcsconf;
+    inopt.remaxpose = atoi remaxpose;
+    inopt.rigidlig = rigidlig;
+    inopt.offormat = offormat;
+    if preopt then inopt.preopt = preopt; endif;
+    if protonate then inopt.protonate = protonate; endif;
+    if forceexe then inopt.forceexe = forceexe; endif;
+    inopt.mtscoreexe = mtscoreexe;
+    inopt.testinp = testinp;
+    
+    inopt.recfilename = validFile recfilename;
+    inopt.ligfilename = validFile ligfilename;
+    inopt.novelligfname = validFile novelligfname;
+    inopt.conffilename = validFile conffilename;
+    inopt.dockedligfname = validFile dockedligfname;
+    inopt.sffilename = validFile sffilename;
+    inopt.outf = outf;
+    inopt.dockmdb = validFile dockmdb;
+
+//    get_supported_divcon_versions[];
+    write ['Running?        {}\n', first postEnvoy[]];
+    write ['Authenticated?  {}\n', first postEnvoy '/auth'];
+    write ['User Info?      {}\n', first postEnvoy '/user-info'];
+    write ['Projects:       {}\n', first postEnvoy '/projects'];
+    write ['Products:       {}\n', first postEnvoy '/products'];
+    write ['Machines:       {}\n', first postEnvoy ['/machines', twrite ['{{\"operation\":\"{}\",\"app\":\"{}\"}',"simulation", "NAMD"]]];
+//    exit[];
+    qbGM_MTScore [[], [], inopt];
+    
+endfunction
+
+#eof

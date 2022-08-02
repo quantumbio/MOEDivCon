@@ -16,6 +16,7 @@ function json_Extract;
 function qbWriteJSONStream;
 function qbReadJSONStream;
 function json_Read;
+function qbWS_MTScore;
 
 function url_Parse;
 
@@ -113,6 +114,533 @@ local function getLigandChunk [ligand_mol,name]
     ];
 endfunction
 
+function getWSDefaults;
+function getWSHostNPort;
+function qbWSTestEndpoint;
+
+function UpdateStatus [wConfKey,trig]
+    static prevHost;
+    static prevURL;
+    static prevTime;
+
+    local wsPortList = ['8080','8081','8082'];
+    local execList = uniq cat [GetRC ['QuantumBio.qbExecutable','qmechanic'],app token fieldsplit [string GetRC ['QuantumBio.execList','qmechanic'],";"]];
+    local sshPortList = ['22'];
+
+    if isnull trig then
+        trig = '';
+    endif
+    
+    if trig == 'init' then
+        prevHost = null[];
+        prevURL = null[];
+        prevTime = clock[];
+    endif
+    
+    local vals = WindowValues wConfKey;
+    local tmpURL;
+    if vals.qbInterface === 'qbWebService' then
+    write ['in qbWebService: {}\n', vals.qbInterface];
+        tmpURL = getWSHostNPort [
+            vals.qbWSHostname,
+            vals.qbWSPort,
+            vals.qbWSUsername,
+            vals.qbInterface === 'Executable',
+            vals.qbExecutable];
+    else
+    write ['in Executable: {}\n', vals.qbInterface];
+        tmpURL = getWSHostNPort [
+            vals.qbSSHHostname,
+            vals.qbSSHPort,
+            vals.qbSSHUsername,
+            vals.qbInterface === 'Executable',
+            vals.qbExecutable];    
+    endif
+    write ['tmpURL:  {} | {}\n', length tmpURL, tmpURL];
+    write ['prevURL: {} | {}\n', length prevURL, prevURL];
+//    if ((eqL [prevURL, tmpURL]) and (10 < (clock[] - prevTime))) then return;  endif
+    prevURL = tmpURL;
+    prevTime = clock[];
+
+    WindowSetAttr [wConfKey, [wsStatus: [text: 'Checking Connection....', foreground: 'orange']]];
+    WindowSetAttr [wConfKey, [panel: [sensitive:[0,1]]]];
+
+    if vals.qbInterface === 'qbWebService' then
+//        WindowSetAttr [wConfKey,[qbWSUsername : [sensitive:0]]];
+//        WindowSetAttr [wConfKey,[qbExecutable : [sensitive:0]]];
+//        WindowSetAttr [wConfKey,[qbWSPort : [sensitive:1]]];      
+        WindowSetAttr [wConfKey,[wsStatus : [bubbleHelp:'Be sure your remote hostname and port are set correctly and \nthat there are no firewalls between your host and the remote host.']]];
+        if trig <> 'qbWSPort' then WindowSetAttr [wConfKey,[qbWSPort : [shortcut: wsPortList,value: GetRCNumber ['QuantumBio.qbWSPort',8080]]]]; endif
+    elseif vals.qbInterface === 'Executable' and vals.qbWSHostname <> 'localhost'  then
+        if neL [prevHost,vals.qbWSHostname] then
+            prevHost = vals.qbWSHostname;
+            execList = uniq cat [tok_drop [(first url_Parse ssh_which ['qmechanic',vals.qbWSHostname,vals.qbWSUsername]).path, 1], execList];
+            WindowSetAttr [wConfKey,[qbExecutable : [shortcut: execList]]];
+        endif
+        WindowSetAttr [wConfKey,[qbSSHUsername : [sensitive:1]]];
+        WindowSetAttr [wConfKey,[qbExecutable : [sensitive:1]]];
+        WindowSetAttr [wConfKey,[qbSSHPort : [sensitive:0]]];  // NOTE: currently MOE does not support ssh with alternate ports.
+        WindowSetAttr [wConfKey,[wsStatus : [bubbleHelp:'Be sure your remote username, hostname, ssh port, and executable path are set correctly \n(and ssh is set for passwordless entry to remote host from this localhost).']]];
+        if trig <> 'qbWSPort' then WindowSetAttr [wConfKey,[qbWSPort : [shortcut: sshPortList, value: GetRCNumber ['QuantumBio.qbSSHPort',22]]]]; endif
+    elseif vals.qbInterface === 'Executable' and vals.qbWSHostname === 'localhost'  then
+        if neL [prevHost,vals.qbWSHostname] then
+            prevHost = vals.qbWSHostname;
+            execList = uniq cat [which ['qmechanic'], execList];
+            WindowSetAttr [wConfKey,[qbExecutable : [shortcut: execList]]];
+        endif
+        WindowSetAttr [wConfKey,[qbSSHUsername : [sensitive:0]]];
+        WindowSetAttr [wConfKey,[qbExecutable : [sensitive:1]]];
+        WindowSetAttr [wConfKey,[qbSSHPort : [sensitive:0]]];
+        WindowSetAttr [wConfKey,[wsStatus : [bubbleHelp:'Be sure the local executable path is set correctly and that you have permission to access/run this executable.']]];
+        if trig <> 'qbWSPort' then WindowSetAttr [wConfKey,[qbWSPort : [shortcut: sshPortList, value: GetRCNumber ['QuantumBio.qbSSHPort',22]]]]; endif
+    endif
+    vals = WindowValues wConfKey;
+
+    tmpURL = getWSHostNPort [
+        vals.qbWSHostname,
+        vals.qbWSPort,
+        vals.qbWSUsername,
+        vals.qbInterface === 'Executable',
+        vals.qbExecutable];
+
+    local tmpConnect = qbWSTestEndpoint tmpURL;
+    if length tmpConnect == 0 then
+        WindowSetAttr [wConfKey, [wsStatus: [text: 'No Connection', foreground: 'red']]];
+        WindowSetAttr [wConfKey, [panel: [sensitive:[0,1]]]];
+    else
+        WindowSetAttr [wConfKey, [wsStatus: [text: 'Connection OK', foreground: 'blue']]];
+        WindowSetAttr [wConfKey, [panel: [sensitive:[1,1]]]];
+    endif
+    
+    prevURL = tmpURL;
+    
+endfunction
+
+function HostMonitor wConfKey
+    local prevHost;
+    local vals;
+    while WindowKey wConfKey loop
+        vals = WindowValues wConfKey;
+//                    if neL [prevHost, vals.qbWSHostname] then
+            prevHost = vals.qbWSHostname;
+            UpdateStatus wConfKey;
+//                    endif
+        sleep 2;
+    endloop
+endfunction
+
+global function qbExecEngine_qbWebService [cmd, arg, opt]
+    local engine = 'qbWebService';
+//write ['in qbExecEngine_{}: {}\n',engine, cmd];
+    local [hostname, port, username, stdion, qmechanicexec, protocol] = getWSDefaults [];
+    local url = getWSHostNPort [hostname, port, username, stdion, qmechanicexec];
+    
+    local DEFAULTS = [
+        qbWSHostname: GetRC ['QuantumBio.qbWSHostname','localhost'],
+        qbWSPort:     GetRCNumber ['QuantumBio.qbWSPort',8080]
+    ];
+        
+    // forward declarations for interface command functions
+    function GetEngineConfig;       // return the config values (as if Panel executed) from the RC file.
+    function GetWidget;
+    function ProcessWidget;
+    function SaveRC;
+    function GetStatusWidget;
+    function TestEndpoint;
+    function RunMTScore;
+
+    // standard interface commands - required for all plugins
+    if cmd == 'ID' then return engine;
+    elseif cmd == 'ONOFF' then return 1;
+    elseif cmd == 'getEngineConfig' then
+        return GetEngineConfig [engine];
+    elseif cmd == 'getWidget' then
+        return GetWidget [arg];
+    elseif cmd == 'processWidget' then
+        return ProcessWidget[arg, opt];
+    elseif cmd == 'getStatusWidget' then
+        return GetStatusWidget [];
+    elseif cmd == 'SaveRC' then
+        return SaveRC [arg, opt];
+    elseif cmd == 'testEndpoint' then
+        return TestEndpoint [];
+    elseif cmd == 'RunMTScore' then
+        return RunMTScore [cmd,arg];
+    endif
+    
+    function apprHost inName
+        const hostlen = 25;
+        inName = string inName;
+        if length inName > hostlen then
+            inName = twrite ['{}...',resize [inName,hostlen]];
+        endif
+        return twrite ['{}',inName];
+    endfunction
+
+    function TestEndpoint []
+        local status = '';
+        if length qbWSTestEndpoint [] < 1 then
+            status = 'error';
+        endif
+        return status;
+    endfunction
+
+    function RunMTScore [cmd,arg]
+        local [recatoms,ligatoms] = arg;
+        return qbWS_MTScore [recatoms,ligatoms];    
+    endfunction
+
+    function GetStatusWidget []
+        write ['in GetStatusWidget: {}\n', engine];
+        return [
+            text: twrite ['{}:{}', apprHost twrite ['{}://{}@{}',protocol, username, hostname],port],
+            bubbleHelp:twrite ['{}://{}@{}:{}/{}',protocol, username, hostname, port, qmechanicexec]
+        ];
+    endfunction
+
+    function GetEngineConfig [engine]
+        local values;
+        write ['in GetEngineConfig\n'];
+        
+        return values;
+    endfunction
+
+    function GetWidget [arg]
+        write ['in GetWidget: {}\n', engine];
+        local wsPortList = ['8080','8081','8082'];
+        local hostList = uniq cat [GetRC ['QuantumBio.qbWSHostname','localhost'],app token fieldsplit [string GetRC ['QuantumBio.hostList','localhost'],";"]];
+        local [hostname, port, username, stdion, qmechanicexec, protocol] = getWSDefaults [];
+        local url = getWSHostNPort [hostname, port, username, stdion, qmechanicexec];
+
+        local panel = [
+                Text    :  [
+                    title: 'Hostname:', name: 'qbWSHostname', type: 'char',allowBlank:0,len:30,
+                    value: hostname,
+                    shortcut: hostList,
+                    onTrigger: 'return',
+                    bubbleHelp: 'Enter hostname (default: localhost).'
+                ]
+                , Hbox    :   [            
+                    Text : [
+                        title: 'Port:', name: 'qbWSPort', type: 'int',allowBlank:0,len:5,
+                        value: port,
+//                        shortcut: wsPortList,
+                        onTrigger: 'return',
+                        bubbleHelp: 'Enter the port number (default: 8080 for webservice).'
+                    ]
+//                    , Label : [ text: '', name: 'wsStatus', centerH: 1, extendH: 1 ]
+                ]
+        ];
+        return panel;
+    endfunction
+    
+    function UpdateStatus [wConfKey, trig]
+    write ['IN NEW UPDATE: {} : {}\n', engine, trig];
+        static prevHost;
+        static prevURL;
+        static prevTime;
+
+        local wsPortList = ['8080','8081','8082'];
+        local execList = uniq cat [GetRC ['QuantumBio.qbExecutable','qmechanic'],app token fieldsplit [string GetRC ['QuantumBio.execList','qmechanic'],";"]];
+
+        if isnull trig then
+            trig = '';
+        endif
+    
+        if trig == 'init' then
+            prevHost = null[];
+            prevURL = null[];
+            prevTime = clock[];
+        endif
+    
+        local vals = WindowValues wConfKey;
+        local tmpURL;
+        write ['in qbWebService: {}\n', vals.qbInterface];
+            tmpURL = getWSHostNPort [
+                vals.qbWSHostname,
+                vals.qbWSPort,
+                vals.qbWSUsername,
+                vals.qbInterface === 'Executable',
+                vals.qbExecutable];
+        write ['tmpURL:  {} | {}\n', length tmpURL, tmpURL];
+        write ['prevURL: {} | {}\n', length prevURL, prevURL];
+    //    if ((eqL [prevURL, tmpURL]) and (10 < (clock[] - prevTime))) then return;  endif
+        prevURL = tmpURL;
+        prevTime = clock[];
+
+        WindowSetAttr [wConfKey, [wsStatus: [text: 'Checking Connection....', foreground: 'orange']]];
+        WindowSetAttr [wConfKey, [panel: [sensitive:[0,1]]]];
+        WindowSetAttr [wConfKey,[wsStatus : [bubbleHelp:'Be sure your remote hostname and port are set correctly and \nthat there are no firewalls between your host and the remote host.']]];
+        if trig <> 'qbWSPort' then WindowSetAttr [wConfKey,[qbWSPort : [shortcut: wsPortList,value: GetRCNumber ['QuantumBio.qbWSPort',8080]]]]; endif
+        vals = WindowValues wConfKey;
+
+        tmpURL = getWSHostNPort [
+            vals.qbWSHostname,
+            vals.qbWSPort,
+            vals.qbWSUsername,
+            vals.qbInterface === 'Executable',
+            vals.qbExecutable];
+
+        local tmpConnect = qbWSTestEndpoint tmpURL;
+        if length tmpConnect == 0 then
+            WindowSetAttr [wConfKey, [wsStatus: [text: 'No Connection', foreground: 'red']]];
+            WindowSetAttr [wConfKey, [panel: [sensitive:[0,1]]]];
+        else
+            WindowSetAttr [wConfKey, [wsStatus: [text: 'Connection OK', foreground: 'blue']]];
+            WindowSetAttr [wConfKey, [panel: [sensitive:[1,1]]]];
+        endif
+    
+        prevURL = tmpURL;
+    
+    endfunction
+    
+    function ProcessWidget [arg, opt]
+        arg = cat arg;
+        local [wkey, trig, vals] = arg;
+        write ['received trigger {} in engine {}\n', trig, engine];
+        UpdateStatus [wkey, trig];
+        return 1;
+    endfunction
+    
+    function SaveRC [arg, opt]
+        local [wkey, trig, vals] = arg;
+        write ['vals-test: {} | {}\n', length vals, vals];
+        write ['trig-test: {} | {}\n', length trig, trig];
+        local hostList = uniq cat [vals.qbWSHostname, GetRC ['QuantumBio.hostList','localhost']];
+        local execList = uniq cat [vals.qbExecutable, GetRC ['QuantumBio.execList','qmechanic']];
+        SetRC ['QuantumBio.hostList',token droplast cat apt swrite ['{};', keep [uniq hostList,5]]];
+        SetRC ['QuantumBio.execList',token droplast cat apt swrite ['{};', keep [uniq execList,5]]];
+        SetRC ['QuantumBio.qbInterface',vals.qbInterface];
+        SetRC ['QuantumBio.qbWSHostname',vals.qbWSHostname];
+        SetRCNumber ['QuantumBio.qbWSPort',vals.qbWSPort];
+    endfunction
+    
+endfunction
+
+global function qbExecEngine_Executable [cmd, arg, opt]
+    local engine = 'Executable';
+//write ['in qbExecEngine_{}: {}\n',engine, cmd];
+    local [hostname, port, username, stdion, qmechanicexec, protocol] = getWSDefaults [];
+    local url = getWSHostNPort [hostname, port, username, stdion, qmechanicexec];
+    
+    local DEFAULTS = [
+        qbSSHHostname: GetRC ['QuantumBio.qbSSHHostname','localhost'],
+        qbSSHPort:     GetRCNumber ['QuantumBio.qbSSHPort',8080]
+    ];
+
+    function GetEngineConfig;
+    function GetWidget;
+    function ProcessWidget;
+    function GetStatusWidget;
+    function SaveRC;
+    function TestEndpoint;
+    function RunMTScore;
+    
+    if cmd == 'ID' then return engine;
+    elseif cmd == 'ONOFF' then return 1;
+    elseif cmd == 'getEngineConfig' then
+        return GetEngineConfig [engine];
+    elseif cmd == 'getWidget' then
+        return GetWidget [arg];
+    elseif cmd == 'processWidget' then
+        return ProcessWidget[arg, opt];
+    elseif cmd == 'getStatusWidget' then
+        return GetStatusWidget [];
+    elseif cmd == 'SaveRC' then
+        return SaveRC [arg, opt];
+    elseif cmd == 'testEndpoint' then
+        return TestEndpoint [];
+    elseif cmd == 'RunMTScore' then
+        return RunMTScore [cmd,arg];
+    endif
+
+    function apprHost inName
+        const hostlen = 25;
+        inName = string inName;
+        if length inName > hostlen then
+            inName = twrite ['{}...',resize [inName,hostlen]];
+        endif
+        return twrite ['{}',inName];
+    endfunction
+    
+    function TestEndpoint []
+        local status = '';
+        if length qbWSTestEndpoint [] < 1 then
+            status = 'error';
+        endif
+        return status;
+    endfunction
+    
+    function RunMTScore [cmd,arg]
+        local [recatoms,ligatoms] = arg;
+        return qbWS_MTScore [recatoms,ligatoms];    
+    endfunction
+    
+    function GetStatusWidget []
+        write ['in GetStatusWidget: {}\n', engine];
+        return [
+            text: twrite ['{}:{}', apprHost twrite ['{}://{}@{}',protocol, username, hostname],port],
+            bubbleHelp:twrite ['{}://{}@{}:{}/{}',protocol, username, hostname, port, qmechanicexec]
+        ];
+    endfunction
+
+    function GetEngineConfig [engine]
+        local values;
+        
+        return values;
+    endfunction
+    
+    function GetWidget [arg]
+        local [hostname, port, username, stdion, qmechanicexec, protocol] = getWSDefaults [];
+        local url = getWSHostNPort [hostname, port, username, stdion, qmechanicexec];
+//        local sshPortList = ['22'];
+        local hostList = uniq cat [GetRC ['QuantumBio.qbWSHostname','localhost'],app token fieldsplit [string GetRC ['QuantumBio.hostList','localhost'],";"]];
+        local execList = uniq cat [GetRC ['QuantumBio.qbExecutable','qmechanic'],app token fieldsplit [string GetRC ['QuantumBio.execList','qmechanic'],";"]];
+        local sshUsername = [getenv 'MOE_USER'];
+        write ['in GetWidget: {}\n', engine];
+        local panelTest = [
+                Text    :  [
+                    title: 'Hostname:', name: 'qbSSHHostname', type: 'char',allowBlank:0,len:30,
+                    value: hostname,
+                    shortcut: hostList,
+                    onTrigger: 'return',
+                    bubbleHelp: 'Enter hostname (default: localhost).'
+                ],
+                Text    :  [
+                    title: 'Username (ssh):', name: 'qbSSHUsername', type: 'char',allowBlank:1,len:20,sensitive:1,
+                    value: username,
+                    shortcut: sshUsername,
+                    onTrigger: 'return',
+                    bubbleHelp: twrite ['Enter your username which will be used if Executable is \nselected and a remote host is chosen (default: {}).',getenv 'MOE_USER']
+                ],
+                Hbox    :   [            
+                    Text : [
+                        title: 'Port:', name: 'qbSSHPort', type: 'int',allowBlank:0,len:5,sensitive:0,
+                        value: 22,
+//                        shortcut: sshPortList,
+                        onTrigger: 'return',
+                        bubbleHelp: 'Enter the port number (only available: 22 for ssh).'
+                    ]
+//                    , Label : [ text: '', name: 'wsStatus', centerH: 1, extendH: 1 ]
+                ],
+                Text    :  [
+                    title: 'Executable:', name: 'qbExecutable', type: 'char',allowBlank:1,len:30,sensitive:1,
+                    value: qmechanicexec,
+                    shortcut: execList,
+                    onTrigger: 'return',
+                    bubbleHelp: twrite ['Enter the full path to the executable on the machine it will be run on.\n(DEFAULT: {} where qmechanic is in your $PATH)','qmechanic']
+                ]
+        ];
+        return panelTest;    
+    endfunction
+    
+    function UpdateStatus [wConfKey, trig]
+    write ['IN NEW UPDATE: {} : {}\n', engine, trig];
+        static prevHost;
+        static prevURL;
+        static prevTime;
+
+        local execList = uniq cat [GetRC ['QuantumBio.qbExecutable','qmechanic'],app token fieldsplit [string GetRC ['QuantumBio.execList','qmechanic'],";"]];
+        local sshPortList = ['22'];
+
+        if isnull trig then
+            trig = '';
+        endif
+    
+        if trig == 'init' then
+            prevHost = null[];
+            prevURL = null[];
+            prevTime = clock[];
+        endif
+    
+        local vals = WindowValues wConfKey;
+        local tmpURL;
+        write ['in Executable: {}\n', vals.qbInterface];
+            tmpURL = getWSHostNPort [
+                vals.qbSSHHostname,
+                vals.qbSSHPort,
+                vals.qbSSHUsername,
+                vals.qbInterface === 'Executable',
+                vals.qbExecutable];    
+        write ['tmpURL:  {} | {}\n', length tmpURL, tmpURL];
+        write ['prevURL: {} | {}\n', length prevURL, prevURL];
+    //    if ((eqL [prevURL, tmpURL]) and (10 < (clock[] - prevTime))) then return;  endif
+        prevURL = tmpURL;
+        prevTime = clock[];
+
+        WindowSetAttr [wConfKey, [wsStatus: [text: 'Checking Connection....', foreground: 'orange']]];
+        WindowSetAttr [wConfKey, [panel: [sensitive:[0,1]]]];
+
+        if vals.qbInterface === 'Executable' and vals.qbWSHostname <> 'localhost'  then
+            if neL [prevHost,vals.qbWSHostname] then
+                prevHost = vals.qbWSHostname;
+                execList = uniq cat [tok_drop [(first url_Parse ssh_which ['qmechanic',vals.qbWSHostname,vals.qbWSUsername]).path, 1], execList];
+                WindowSetAttr [wConfKey,[qbExecutable : [shortcut: execList]]];
+            endif
+            WindowSetAttr [wConfKey,[qbSSHUsername : [sensitive:1]]];
+            WindowSetAttr [wConfKey,[qbExecutable : [sensitive:1]]];
+            WindowSetAttr [wConfKey,[qbSSHPort : [sensitive:0]]];  // NOTE: currently MOE does not support ssh with alternate ports.
+            WindowSetAttr [wConfKey,[wsStatus : [bubbleHelp:'Be sure your remote username, hostname, ssh port, and executable path are set correctly \n(and ssh is set for passwordless entry to remote host from this localhost).']]];
+            if trig <> 'qbWSPort' then WindowSetAttr [wConfKey,[qbWSPort : [shortcut: sshPortList, value: GetRCNumber ['QuantumBio.qbSSHPort',22]]]]; endif
+        elseif vals.qbInterface === 'Executable' and vals.qbWSHostname === 'localhost'  then
+            if neL [prevHost,vals.qbWSHostname] then
+                prevHost = vals.qbWSHostname;
+                execList = uniq cat [which ['qmechanic'], execList];
+                WindowSetAttr [wConfKey,[qbExecutable : [shortcut: execList]]];
+            endif
+            WindowSetAttr [wConfKey,[qbSSHUsername : [sensitive:0]]];
+            WindowSetAttr [wConfKey,[qbExecutable : [sensitive:1]]];
+            WindowSetAttr [wConfKey,[qbSSHPort : [sensitive:0]]];
+            WindowSetAttr [wConfKey,[wsStatus : [bubbleHelp:'Be sure the local executable path is set correctly and that you have permission to access/run this executable.']]];
+            if trig <> 'qbWSPort' then WindowSetAttr [wConfKey,[qbWSPort : [shortcut: sshPortList, value: GetRCNumber ['QuantumBio.qbSSHPort',22]]]]; endif
+        endif
+        vals = WindowValues wConfKey;
+
+        tmpURL = getWSHostNPort [
+            vals.qbWSHostname,
+            vals.qbWSPort,
+            vals.qbWSUsername,
+            vals.qbInterface === 'Executable',
+            vals.qbExecutable];
+
+        local tmpConnect = qbWSTestEndpoint tmpURL;
+        if length tmpConnect == 0 then
+            WindowSetAttr [wConfKey, [wsStatus: [text: 'No Connection', foreground: 'red']]];
+            WindowSetAttr [wConfKey, [panel: [sensitive:[0,1]]]];
+        else
+            WindowSetAttr [wConfKey, [wsStatus: [text: 'Connection OK', foreground: 'blue']]];
+            WindowSetAttr [wConfKey, [panel: [sensitive:[1,1]]]];
+        endif
+    
+        prevURL = tmpURL;
+    endfunction
+    
+    function ProcessWidget [arg, opt]
+        arg = cat arg;
+        local [wkey, trig, vals] = arg;
+        write ['received trigger {} in engine {}\n', trig, engine];
+        write ['vals in engine: {} | {}\n', length vals, vals];
+        UpdateStatus [wkey, trig];
+        return 1;
+    endfunction
+    
+    function SaveRC [arg, opt]
+        local [wkey, trig, vals] = arg;
+        write ['vals-test: {} | {}\n', length vals, vals];
+        write ['trig-test: {} | {}\n', length trig, trig];
+        local hostList = uniq cat [vals.qbWSHostname, GetRC ['QuantumBio.hostList','localhost']];
+        local execList = uniq cat [vals.qbExecutable, GetRC ['QuantumBio.execList','qmechanic']];
+        SetRC ['QuantumBio.hostList',token droplast cat apt swrite ['{};', keep [uniq hostList,5]]];
+        SetRC ['QuantumBio.execList',token droplast cat apt swrite ['{};', keep [uniq execList,5]]];
+        SetRC ['QuantumBio.qbInterface',vals.qbInterface];
+        SetRC ['QuantumBio.qbSSHHostname',vals.qbSSHHostname];
+        SetRC ['QuantumBio.qbSSHUsername',vals.qbSSHUsername];
+        SetRC ['QuantumBio.qbExecutable',vals.qbExecutable];
+        SetRCNumber ['QuantumBio.qbSSHPort',vals.qbSSHPort];
+    endfunction
+
+endfunction
+
 local function getWSDefaults [hostname, port, username, stdion, qmechanicexec, protocol]
 
     if isnull qmechanicexec then
@@ -125,12 +653,16 @@ local function getWSDefaults [hostname, port, username, stdion, qmechanicexec, p
         protocol = 'file';
     endif
 
-    if isnull hostname then
-        hostname = GetRC ['QuantumBio.qbWSHostname','localhost'];
-    endif
-
     if isnull stdion then
         stdion = ( 'Executable' === GetRC ['QuantumBio.qbInterface','qbWebService'] );
+    endif
+
+    if isnull hostname then
+        if stdion then
+            hostname = GetRC ['QuantumBio.qbSSHHostname','localhost'];
+        else
+            hostname = GetRC ['QuantumBio.qbWSHostname','localhost'];
+        endif
     endif
 
     if stdion then
@@ -154,7 +686,11 @@ local function getWSDefaults [hostname, port, username, stdion, qmechanicexec, p
     endif
         
     if isnull username then
-        username = GetRC ['QuantumBio.qbWSUsername',getenv 'MOE_USER'];
+        if stdion then
+            username = GetRC ['QuantumBio.qbSSHUsername',getenv 'MOE_USER'];
+        else
+            username = GetRC ['QuantumBio.qbWSUsername',getenv 'MOE_USER'];
+        endif
     endif
     
     if isnull qmechanicexec then
@@ -925,6 +1461,8 @@ global function qbWSConfig [cmd, wkey, trigger, values]
                     vals.qbWSUsername,
                     vals.qbInterface === 'Executable',
                     vals.qbExecutable];
+    write ['tmpURL:  {} | {}\n', length tmpURL, tmpURL];
+    write ['prevURL: {} | {}\n', length prevURL, prevURL];
                 if ((eqL [prevURL, tmpURL]) and (10 < (clock[] - prevTime))) then return;  endif
                 prevURL = tmpURL;
                 prevTime = clock[];
