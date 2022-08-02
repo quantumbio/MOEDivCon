@@ -346,6 +346,7 @@ local function SyncMDB wkey
     db_EnsureField [dataFile, 'MTScoreES', 'double'];
     db_EnsureField [dataFile, 'mseq', 'int'];
     db_EnsureField [dataFile, 'S', 'float'];
+    db_EnsureField [dataFile, 'jobtag', 'char'];
         
     db_SetEnv [ dataFile, 'QBMDBType', 'MTDB' ];
     // if the contents are MT contents, then read them in and add them to the viewer list
