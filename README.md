@@ -1,4 +1,4 @@
-<span style="color:red">Note: some functions may not be available without additional license files from QuantumBio, CCG, or other 3rd parties.</span>
+**Note: some functions may require additional licenses from QuantumBio, CCG, or other 3rd parties.**
 
 # MOE/DivCon
 
