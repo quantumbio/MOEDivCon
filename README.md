@@ -40,6 +40,8 @@ We will then create a symbolic link from within the ${HOME}/moefiles/svl to that
 Finally, to easily access the software from within MOE, you should install the QuantumBio menu. 
 This menu can be found in the Extra menu on the main MOE window. 
 
+**After you install MOE/DivCon using these steps, restart MOE and MOE/batch.**
+
 ```
     % cd ${HOME}/moefiles/menu
     % ln -s /path/you/wish/to/install/MOEDivCon/MOEDivCon-GridMarkets/moe-menus menu-extra-qb
