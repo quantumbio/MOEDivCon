@@ -6,7 +6,6 @@
 // functions to search/provide executors for running jobs
 local function exec_EngineList[]
     local rfcn = sym_find_f 'qbExecEngine_*';
-//    write ['test: {}\n', rfcn];
     local rfcnid = apt call [rfcn, 'ID'];
     local rfcnon = apt call [rfcn, 'ONOFF'];
 //    local rfcwgt = apt call [rfcn, 'getWidget'];
@@ -19,7 +18,6 @@ endfunction
 
 local function exec_EngineWidgets[]
     local rfcn = sym_find_f 'qbExecEngine_*';
-//    write ['test: {}\n', rfcn];
     local rfcnid = apt call [rfcn, 'ID'];
     local rfcnon = apt call [rfcn, 'ONOFF'];
     local rfcwgt = apt call [rfcn, 'getWidget'];
@@ -99,8 +97,6 @@ endfunction
 
 global function qbExecManager [cmd, arg]
     cmd = twrite ['{}', cmd];
-//write ['in qbExecManager: cmd: {} | {} || arg: {} \n', length cmd, cmd, length arg];
-//    local [rfcn,rfcnid,rfcwgt] = exec_EngineList[];
     local [rfcn,rfcnid] = exec_EngineList[];
     // forward declarations for interface command functions
     function ProcessWidget;
@@ -125,7 +121,6 @@ global function qbExecManager [cmd, arg]
     endif
     
     function TestEndpoint [cmd]
-//write ['in TestEndpoint\n'];
         return call [rfcn(indexof [GetRC ['QuantumBio.qbInterface','qbWebService'],rfcnid]), [cmd]];
     endfunction
     
@@ -142,7 +137,6 @@ global function qbExecManager [cmd, arg]
         local serviceInfo = call [rfcn(indexof [GetRC ['QuantumBio.qbInterface','qbWebService'],rfcnid]), ['getStatusWidget',[]]];
         local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
         
-write ['serviceInfo: {}\n', serviceInfo];
         serviceInfo.name = 'qbwebservice_info';
 
         local statusWidget = [
@@ -202,12 +196,9 @@ write ['serviceInfo: {}\n', serviceInfo];
 
         loop
             [vals, trig] = WindowWait wConfKey;
-            write ['trig: {}\n', trig];
-            write ['vals: {}\n', vals];
             if trig === 'panel' then
                 if vals.panel == 'Cancel' then break; endif
                 if vals.panel == 'Save' then
-                    write ['in Panel Save: {}\n', vals.qbInterface];
                     SetRC ['QuantumBio.qbInterface',vals.qbInterface];
                     call [rfcn(indexof [vals.('qbInterface'),rfcnid]), ['SaveRC',[wConfKey, trig, vals]]];
                     break;
@@ -220,7 +211,6 @@ write ['serviceInfo: {}\n', serviceInfo];
         endloop
         WindowDestroy wConfKey;
         local serviceInfo = call [rfcn(indexof [GetRC ['QuantumBio.qbInterface','qbWebService'],rfcnid]), ['getStatusWidget',[]]];
-        write ['serviceInfo: {}\n', serviceInfo];
         
         WindowSetAttr [wkey, [qbwebservice_info : serviceInfo]];
 

@@ -44,10 +44,8 @@ global function ScoreMTScore_dG [recatoms, ligatoms, opt]
 //    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
 
 //    local tmpJSON = qbWS_MTScore [recatoms,ligatoms];
-write ['in new ScoreMTScore_dG\n'];
     local tmpJSON = qbExecManager ['RunMTScore', [recatoms,ligatoms, opt]];
     
- write ['JSON Returned: {} \n', tmpJSON];
     if tmpJSON.success then
         return atof tmpJSON.('MTScoreES(s)');
     else
@@ -101,7 +99,6 @@ global function dock_score_qbMTScore [cmd, arg, opt]
     elseif cmd === 'validateOptions' then        // arg = val
         SetRC ['QuantumBio.qbWSHostname',arg.qbWSHostname];
         SetRCNumber ['QuantumBio.qbWSPort',arg.qbWSPort];
-//        write ['RC: {} | {}\n', arg.qbWSHostname, arg.qbWSPort];
         return;
     elseif cmd === 'openReceptor' then      // arg = rec
         return;
@@ -183,10 +180,6 @@ local function MakePanel opt
     
     local openicon = gr_icon ['$MOE/lib/icon/open.ico', 12, 'foreground'];
     local configicon = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
-
-    
-//    write ['qbWSConfig:     {}\n',qbWSConfig ['getWidget']];       // lmw - standard WS config widget
-//    write ['qbExecManager:  {}\n',qbExecManager ['getStatusWidget']];       // lmw - standard WS config widget
             
     local window = [
         title: WINDOW_NAME,
@@ -358,7 +351,6 @@ local function SyncMDB wkey
     local ent = 0;
     local inEntry;
         
-    write ['in {}\n', db_GetEnv [dataFile, 'source']];
     if db_GetEnv [dataFile, 'source'] == 'DOCK' then
         write ['in db_GetEnv\n'];
         local syskeys = SystemPush [];
@@ -437,7 +429,6 @@ local function MergeMDB [inQBMDB, inDockMDB, inTargetMol]
 
     for fldname in fldnames loop
         fldtype = fldtypes (indexof [fldname, fldnames]);
-        write ['fldname: {} / fldtype: {}\n', fldname, fldtype];
         db_EnsureField [inQBMDB, fldname, fldtype];
     endloop
     local newmseq;
@@ -461,11 +452,9 @@ local function MergeMDB [inQBMDB, inDockMDB, inTargetMol]
         mol_Create inEntry.mol;
         inEntry.mseq = newmseq;
         inEntry.Label = string first inEntry.mol;
-        write ['Chains: {}\n', length Chains[]];
         RenderProtein [Chains[]];
         inEntry.Complex = _moe_Extract [Atoms[], GKeyList[], [mol_name: first cTag Chains[]]];
         local tmpKey = db_Write [ inQBMDB, 0, inEntry];
-        write ['tmpKey: {}\n', tmpKey];
         outKeys = append [outKeys, tmpKey];
     endloop
     SystemPop syskeys;
@@ -473,7 +462,6 @@ local function MergeMDB [inQBMDB, inDockMDB, inTargetMol]
     if length outKeys > 0 then
         success = first outKeys;
     endif
-write ['success: {}\n', success];
     return success;
 endfunction
 
@@ -525,7 +513,6 @@ local function ReadyMonitor wkey
             elseif second cat WindowGetData [wkey, 'optlevel'] <> 'None' then
                     WindowSetAttr[wkey, [   addCurrent: [text : 'Add' ], addState: [value : 1 ]]];
             else
-//                    write ['in update THIS 1\n'];
                     WindowSetAttr[wkey, [   addCurrent: [text : 'Update' ], addState: [value : 0 ]]];
             endif
 
@@ -627,7 +614,6 @@ local function ReadyMonitor wkey
 endfunction
 
 global function MTScore_dG_TaskManager mdbreference
-write ['in MTScore_dG_TaskManager\n'];
     local pdata = SystemPush [];
         local dbEntry = db_Read [ mdbreference.dataFile, mdbreference.molEntry];
         _moe_Create [dbEntry.Complex];
@@ -719,7 +705,6 @@ global function qbInteractiveMTScoreUI opt
         molList = values.molList;
         scoresList = values.scoresList;
         namesList = values.namesList;
-        write ['trigger: {}\n', trigger];        
         if trigger === 'showSelection' or trigger === 'slist' then
             if first values.slist and first values.slist <> prevSelected then
                 prevSelected = first values.slist;
@@ -776,7 +761,6 @@ global function qbInteractiveMTScoreUI opt
                     else
                         newmseq = (max cat db_ReadColumn [dataFile, 'mseq' ]) + 1;
                     endif
-                    write ['newmseq: {}\n', newmseq];
                     local molEntry = db_Write [ dataFile, 0, [
                             Label : string tmpLabel
                             , Complex : _moe_Extract [Chains[]]
@@ -790,7 +774,6 @@ global function qbInteractiveMTScoreUI opt
                 mdbreference.msgkey = msgkey;
                 mdbreference.wkey = wkey;
                 
-                write ['going to call MTScore_dG_TaskManager\n'];
                 if second task_fork [master:'parent', idle:1, prio:0] === 'child' then
                     if values.optlevel == 'Dock' then
                         local dockMDB = twrite ['{}.mdb', qbuuid[]];
@@ -808,7 +791,6 @@ global function qbInteractiveMTScoreUI opt
                         SystemPop psys;
                         fdelete dockMDB;
                     endif
-write ['mdbreference.molEntry: {}\n', mdbreference.molEntry];
                     MTScore_dG_TaskManager mdbreference;
                     exit [];
                 endif

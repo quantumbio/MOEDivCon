@@ -138,7 +138,6 @@ endfunction
 
 global function qbExecEngine_GridMarkets [cmd, arg, opt]
     local engine = 'GridMarkets';
-//write ['in qbExecEngine_{}: {}\n',engine, cmd];
 
     function GetEngineConfig;
     function GetWidget;
@@ -206,7 +205,6 @@ global function qbExecEngine_GridMarkets [cmd, arg, opt]
     endfunction
 
     function GetStatusWidget []
-//        write ['in GetStatusWidget: {}\n', engine];
         local [daemon,authResp,user_info_data,envoy_info,divcon_version] = GetEnvoyStatus[];
 
         return [
@@ -222,7 +220,6 @@ global function qbExecEngine_GridMarkets [cmd, arg, opt]
     endfunction
     
     function GetWidget [arg]
-        write ['in GetWidget: {}\n', engine];
 
         // create graphics object of GROB_SZ size
         local GROB_SZ = [ 20, 20 ];
@@ -306,9 +303,6 @@ global function qbExecEngine_GridMarkets [cmd, arg, opt]
     
     function SaveRC [arg, opt]
         local [wkey, trig, vals] = arg;
-        write ['vals-test: {} | {}\n', length vals, vals];
-        write ['trig-test: {} | {}\n', length trig, trig];
-        write ['\nvals.qbInterface: {}\n', vals.qbInterface];
         SetRC ['QuantumBio.qbInterface',vals.qbInterface];
     endfunction
 
@@ -451,8 +445,6 @@ global function postEnvoy [endpoint, postfield]
     local url_key = curl_open curl_payload;
     local json = _curl_read url_key;
     
-    write ['json: {}\n', json];
-
     curl_close url_key;
     return json;
 
@@ -557,7 +549,6 @@ local function replace_SPLICE [inJSON, SPLICE_string, SPLICE_JSON]
     endif
 
     if "[" == first SPLICE_JSON and "]" == last SPLICE_JSON then
-        write['in if\n'];
         return splice [ inJSON, strpos [SPLICE_string, inJSON], length SPLICE_string, swrite ['{}',SPLICE_JSON] ];  // dependencies are often an array of one (which SVL assumes to be a string)
     else
         return splice [ inJSON, strpos [SPLICE_string, inJSON], length SPLICE_string, swrite ['[{}]',SPLICE_JSON] ];  // dependencies are often an array of one (which SVL assumes to be a string)
@@ -643,7 +634,6 @@ global function qbGM_MTScore [target_mol, ligand_mol, opt]
         
     local watch_files;
     watch_files.(twrite ['/{}/.+',project_name]) = cd[];
-    write ['watch_files: {}\n', first json_Write [watch_files, []]];
 
     local project_data;
     project_data.project_files.localRoot = cd[];
@@ -702,13 +692,9 @@ global function qbGM_MTScore [target_mol, ligand_mol, opt]
     
     fwrite ['DEBUG.json','{}\n',project_json];
     
-    write ['outfiles: {} | {}\n', length cat opt.outfiles, cat opt.outfiles];
-    write ['outfiles: {} | {}\n', length (ftype cat opt.outfiles == ''), (ftype cat opt.outfiles == '')];
-
     // update the MDB file based on what is running
     local outfile;
     if not isnull opt.dataFile then
-        write ['in MDB {} update\n', opt.dataFile];
         db_EnsureField [ opt.dataFile, 'DCLogFileName', 'char' ];
         db_EnsureField [ opt.dataFile, 'DCJSONFileName', 'char' ];
         db_EnsureField [ opt.dataFile, 'jobtag', 'char' ];
@@ -724,20 +710,15 @@ global function qbGM_MTScore [target_mol, ligand_mol, opt]
 
     local json = first postEnvoy ['/project-submit',twrite ['{}',project_json]];
     json = first json_Read json;
-    write ['json: {} | {}\n', length json, json];
     
     while anytrue (ftype cat second untag cat opt.outfiles == '') loop
-//        write [' waiting ... {}\n', (ftype cat second untag cat opt.outfiles == '')];
         sleep 30;
     endloop
     
     local retOutput;
     for outfile in opt.outfiles loop  
-        write ['reading: {}\n', outfile.json];
-//        local tmpJSON = qbReadJSONStream freadb [outfile.json,'line'];
         local inlineJSON = swrite ['{}', freadb [outfile.json,'line']];
         
-    write ['inlineJSON: {}\n', inlineJSON];
         local tmpJSON = json_Read [inlineJSON,[]];
         if second tmpJSON <> 'error' then
             tmpJSON = first tmpJSON;
@@ -752,11 +733,8 @@ global function qbGM_MTScore [target_mol, ligand_mol, opt]
         endif
         retOutput = append [retOutput,  tmpJSON];
     endloop
-    write ['retOutput: {}\n', retOutput];
-    write ['tmpJSON: {}\n', tmpJSON.('MTScoreES(s)')];
 
     if not isnull opt.dataFile then
-        write ['in MDB {} update\n', opt.dataFile];
         db_EnsureField [opt.dataFile, 'MTScoreES', 'double'];
         dbEntry.MTScoreES = atof tmpJSON.('MTScoreES(s)');
         db_Write [ opt.dataFile, opt.molEntry, dbEntry ];
