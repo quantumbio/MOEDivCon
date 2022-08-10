@@ -140,7 +140,6 @@ function UpdateStatus [wConfKey,trig]
     local vals = WindowValues wConfKey;
     local tmpURL;
     if vals.qbInterface === 'qbWebService' then
-    write ['in qbWebService: {}\n', vals.qbInterface];
         tmpURL = getWSHostNPort [
             vals.qbWSHostname,
             vals.qbWSPort,
@@ -148,7 +147,6 @@ function UpdateStatus [wConfKey,trig]
             vals.qbInterface === 'Executable',
             vals.qbExecutable];
     else
-    write ['in Executable: {}\n', vals.qbInterface];
         tmpURL = getWSHostNPort [
             vals.qbSSHHostname,
             vals.qbSSHPort,
@@ -156,8 +154,8 @@ function UpdateStatus [wConfKey,trig]
             vals.qbInterface === 'Executable',
             vals.qbExecutable];    
     endif
-    write ['tmpURL:  {} | {}\n', length tmpURL, tmpURL];
-    write ['prevURL: {} | {}\n', length prevURL, prevURL];
+//    write ['tmpURL:  {} | {}\n', length tmpURL, tmpURL];
+//    write ['prevURL: {} | {}\n', length prevURL, prevURL];
 //    if ((eqL [prevURL, tmpURL]) and (10 < (clock[] - prevTime))) then return;  endif
     prevURL = tmpURL;
     prevTime = clock[];
@@ -231,7 +229,6 @@ endfunction
 
 global function qbExecEngine_qbWebService [cmd, arg, opt]
     local engine = 'qbWebService';
-//write ['in qbExecEngine_{}: {}\n',engine, cmd];
     local [hostname, port, username, stdion, qmechanicexec, protocol] = getWSDefaults [];
     local url = getWSHostNPort [hostname, port, username, stdion, qmechanicexec];
     
@@ -291,7 +288,6 @@ global function qbExecEngine_qbWebService [cmd, arg, opt]
     endfunction
 
     function GetStatusWidget []
-        write ['in GetStatusWidget: {}\n', engine];
         return [
             text: twrite ['{}:{}', apprHost twrite ['{}://{}@{}',protocol, username, hostname],port],
             bubbleHelp:twrite ['{}://{}@{}:{}/{}',protocol, username, hostname, port, qmechanicexec]
@@ -300,13 +296,11 @@ global function qbExecEngine_qbWebService [cmd, arg, opt]
 
     function GetEngineConfig [engine]
         local values;
-        write ['in GetEngineConfig\n'];
         
         return values;
     endfunction
 
     function GetWidget [arg]
-        write ['in GetWidget: {}\n', engine];
         local wsPortList = ['8080','8081','8082'];
         local hostList = uniq cat [GetRC ['QuantumBio.qbWSHostname','localhost'],app token fieldsplit [string GetRC ['QuantumBio.hostList','localhost'],";"]];
         local [hostname, port, username, stdion, qmechanicexec, protocol] = getWSDefaults [];
@@ -335,7 +329,6 @@ global function qbExecEngine_qbWebService [cmd, arg, opt]
     endfunction
     
     function UpdateStatus [wConfKey, trig]
-    write ['IN NEW UPDATE: {} : {}\n', engine, trig];
         static prevHost;
         static prevURL;
         static prevTime;
@@ -355,15 +348,14 @@ global function qbExecEngine_qbWebService [cmd, arg, opt]
     
         local vals = WindowValues wConfKey;
         local tmpURL;
-        write ['in qbWebService: {}\n', vals.qbInterface];
             tmpURL = getWSHostNPort [
                 vals.qbWSHostname,
                 vals.qbWSPort,
                 vals.qbWSUsername,
                 vals.qbInterface === 'Executable',
                 vals.qbExecutable];
-        write ['tmpURL:  {} | {}\n', length tmpURL, tmpURL];
-        write ['prevURL: {} | {}\n', length prevURL, prevURL];
+//        write ['tmpURL:  {} | {}\n', length tmpURL, tmpURL];
+//        write ['prevURL: {} | {}\n', length prevURL, prevURL];
     //    if ((eqL [prevURL, tmpURL]) and (10 < (clock[] - prevTime))) then return;  endif
         prevURL = tmpURL;
         prevTime = clock[];
@@ -397,15 +389,12 @@ global function qbExecEngine_qbWebService [cmd, arg, opt]
     function ProcessWidget [arg, opt]
         arg = cat arg;
         local [wkey, trig, vals] = arg;
-        write ['received trigger {} in engine {}\n', trig, engine];
         UpdateStatus [wkey, trig];
         return 1;
     endfunction
     
     function SaveRC [arg, opt]
         local [wkey, trig, vals] = arg;
-        write ['vals-test: {} | {}\n', length vals, vals];
-        write ['trig-test: {} | {}\n', length trig, trig];
         local hostList = uniq cat [vals.qbWSHostname, GetRC ['QuantumBio.hostList','localhost']];
         local execList = uniq cat [vals.qbExecutable, GetRC ['QuantumBio.execList','qmechanic']];
         SetRC ['QuantumBio.hostList',token droplast cat apt swrite ['{};', keep [uniq hostList,5]]];
@@ -419,7 +408,6 @@ endfunction
 
 global function qbExecEngine_Executable [cmd, arg, opt]
     local engine = 'Executable';
-//write ['in qbExecEngine_{}: {}\n',engine, cmd];
     local [hostname, port, username, stdion, qmechanicexec, protocol] = getWSDefaults [];
     local url = getWSHostNPort [hostname, port, username, stdion, qmechanicexec];
     
@@ -477,7 +465,6 @@ global function qbExecEngine_Executable [cmd, arg, opt]
     endfunction
     
     function GetStatusWidget []
-        write ['in GetStatusWidget: {}\n', engine];
         return [
             text: twrite ['{}:{}', apprHost twrite ['{}://{}@{}',protocol, username, hostname],port],
             bubbleHelp:twrite ['{}://{}@{}:{}/{}',protocol, username, hostname, port, qmechanicexec]
@@ -497,7 +484,6 @@ global function qbExecEngine_Executable [cmd, arg, opt]
         local hostList = uniq cat [GetRC ['QuantumBio.qbWSHostname','localhost'],app token fieldsplit [string GetRC ['QuantumBio.hostList','localhost'],";"]];
         local execList = uniq cat [GetRC ['QuantumBio.qbExecutable','qmechanic'],app token fieldsplit [string GetRC ['QuantumBio.execList','qmechanic'],";"]];
         local sshUsername = [getenv 'MOE_USER'];
-        write ['in GetWidget: {}\n', engine];
         local panelTest = [
                 Text    :  [
                     title: 'Hostname:', name: 'qbSSHHostname', type: 'char',allowBlank:0,len:30,
@@ -535,7 +521,6 @@ global function qbExecEngine_Executable [cmd, arg, opt]
     endfunction
     
     function UpdateStatus [wConfKey, trig]
-    write ['IN NEW UPDATE: {} : {}\n', engine, trig];
         static prevHost;
         static prevURL;
         static prevTime;
@@ -555,15 +540,14 @@ global function qbExecEngine_Executable [cmd, arg, opt]
     
         local vals = WindowValues wConfKey;
         local tmpURL;
-        write ['in Executable: {}\n', vals.qbInterface];
             tmpURL = getWSHostNPort [
                 vals.qbSSHHostname,
                 vals.qbSSHPort,
                 vals.qbSSHUsername,
                 vals.qbInterface === 'Executable',
                 vals.qbExecutable];    
-        write ['tmpURL:  {} | {}\n', length tmpURL, tmpURL];
-        write ['prevURL: {} | {}\n', length prevURL, prevURL];
+//        write ['tmpURL:  {} | {}\n', length tmpURL, tmpURL];
+//        write ['prevURL: {} | {}\n', length prevURL, prevURL];
     //    if ((eqL [prevURL, tmpURL]) and (10 < (clock[] - prevTime))) then return;  endif
         prevURL = tmpURL;
         prevTime = clock[];
@@ -618,16 +602,12 @@ global function qbExecEngine_Executable [cmd, arg, opt]
     function ProcessWidget [arg, opt]
         arg = cat arg;
         local [wkey, trig, vals] = arg;
-        write ['received trigger {} in engine {}\n', trig, engine];
-        write ['vals in engine: {} | {}\n', length vals, vals];
         UpdateStatus [wkey, trig];
         return 1;
     endfunction
     
     function SaveRC [arg, opt]
         local [wkey, trig, vals] = arg;
-        write ['vals-test: {} | {}\n', length vals, vals];
-        write ['trig-test: {} | {}\n', length trig, trig];
         local hostList = uniq cat [vals.qbWSHostname, GetRC ['QuantumBio.hostList','localhost']];
         local execList = uniq cat [vals.qbExecutable, GetRC ['QuantumBio.execList','qmechanic']];
         SetRC ['QuantumBio.hostList',token droplast cat apt swrite ['{};', keep [uniq hostList,5]]];
@@ -790,7 +770,6 @@ global function qbWSTestEndpoint url
     err = '';
     
     if qmechanicexec === 'noopt' then
-        write ['SUCCESSFUL NOOPT\n'];
         return qbReadJSONStream qbWriteJSONStream [status:'success'];
     endif
     
@@ -841,17 +820,12 @@ global function qbWSTestEndpoint url
                     while exe_status pkey loop
                         outline = cat freadb [out_fno, 'line', 1];
                         if strpos [boundary, outline] and boundCount == 1 then
-        //                        write ['1 | {}\n', outline];
                             boundCount = 0;
                             break;
                         elseif strpos [boundary, outline] then
-        //                        write ['2 | {}\n', outline];
                             boundCount = 1;
                         elseif boundCount == 1 then
-        //                        write ['3 | {}\n', outline];
                             curl_out = cat [curl_out, outline];
-                        else
-//                            write ['X | {}\n', outline];
                         endif
                     endloop
             endif
@@ -956,19 +930,13 @@ global function qbWS_MTScore [target_mol, ligand_mol, hostname, port, username, 
 //                        fwaitr out_fno;       // TODO: fwaitr doesn't seem to work on Windows or Mac. This may take some more experimentation.
                     endif
                     outline = cat freadb [out_fno, 'line', 1];
-//                    write ['{} | {} | {} \n', length outline, length boundary, boundCount];
                     if strpos [boundary, outline] and boundCount == 1 then
-//                        write ['1 | {}\n', outline];
                         boundCount = 0;
                         break;
                     elseif strpos [boundary, outline] then
-//                        write ['2 | {}\n', outline];
                         boundCount = 1;
                     elseif boundCount == 1 then
-//                        write ['3 | {}\n', outline];
                         tmpJSON = cat [tmpJSON, outline];
-                    else
-//                        write ['X | {}\n', outline];
                     endif
                 endloop
             endif
@@ -1100,9 +1068,7 @@ global function qbWS_MTScoreE [target_mol, ligand_mol, pose_mols, opt, hostname,
         qbWriteJSONStream opt
         , CRLF
     ];
-    
-    write ['process ligs: {}\n', length pose_mols];
-    
+        
     local poseChunks;
     local pdata;
 //    pdata = SystemPush [];
@@ -1114,7 +1080,6 @@ global function qbWS_MTScoreE [target_mol, ligand_mol, pose_mols, opt, hostname,
     local i = 1;
     while i <= length pose_mols loop
         pdata = SystemPush [];
-        write ['{}\n',i];
         poseChunks = append [poseChunks, cat [
         boundary, CRLF,
         getLigandChunk [mol_Create pose_mols(i),'Pose']
@@ -1122,8 +1087,6 @@ global function qbWS_MTScoreE [target_mol, ligand_mol, pose_mols, opt, hostname,
         i = i + 1;
         SystemPop pdata;        
     endloop
-    write ['process ligs: {} | {} \n', length poseChunks,  type poseChunks];
-    write ['{}\n', length poseChunks];
     poseChunks = swrite ['{}', poseChunks];
     
 //    poseChunks = append [poseChunks, getLigandChunk ligand_mol();
@@ -1192,19 +1155,13 @@ global function qbWS_MTScoreE [target_mol, ligand_mol, pose_mols, opt, hostname,
 //                        fwaitr out_fno;       // TODO: fwaitr doesn't seem to work on Windows or Mac. This may take some more experimentation.
                     endif
                     outline = cat freadb [out_fno, 'line', 1];
-//                    write ['{} | {} | {} \n', length outline, length boundary, boundCount];
                     if strpos [boundary, outline] and boundCount == 1 then
-//                        write ['1 | {}\n', outline];
                         boundCount = 0;
                         break;
                     elseif strpos [boundary, outline] then
-//                        write ['2 | {}\n', outline];
                         boundCount = 1;
                     elseif boundCount == 1 then
-//                        write ['3 | {}\n', outline];
                         tmpJSON = cat [tmpJSON, outline];
-                    else
-//                        write ['X | {}\n', outline];
                     endif
                 endloop
             endif
@@ -1268,7 +1225,6 @@ global function qbMTScoreFile [targetfile,ligandfile]
     
 //    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
     local tmpJSON = qbWS_MTScore [targetobj,ligandobj];
-    write ['{} {} {}  | {} sec\n', tmpJSON.('MTScoreES'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
 //    write ['MTScore: {} : {} | {} {} {}  | {} sec\n', fbase ftail targetfile, fbase ftail ligandfile, tmpJSON.('MTScore'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
 
     SystemPop pdata;
@@ -1287,7 +1243,6 @@ function db_Fields;
 
 global function qbMTScoreEFile [targetfile,ligandfile,posefile,opt,qmechanicexec]
     local psys = SystemPush [];
-    write ['MTScore: {} : {} | {}', fbase ftail targetfile, fbase ftail ligandfile, fbase ftail posefile];
     local starttime = clock [];
     local targetobj, ligandobj, poseobj;
     targetobj = ReadAuto targetfile;
@@ -1313,10 +1268,8 @@ global function qbMTScoreEFile [targetfile,ligandfile,posefile,opt,qmechanicexec
         pdata = tag [fldnames, db_ReadFields [mdb, ent, fldnames]];
         poseobj =  append [poseobj, pdata.(first mfield)];
     endloop
-    write ['{}\n',length poseobj];
 
     local tmpJSON = qbWS_MTScoreE [targetobj,ligandobj,poseobj,opt,[],[],[],[],qmechanicexec,[]];
-    write ['{} {} {}  | {} sec\n', tmpJSON.('MTScoreES'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
 //    write ['MTScore: {} : {} | {} {} {}  | {} sec\n', fbase ftail targetfile, fbase ftail ligandfile, tmpJSON.('MTScore'),tmpJSON.('E_Sol'),tmpJSON.('dG'), (clock [] - starttime) ];
 
     SystemPop psys;
@@ -1461,8 +1414,6 @@ global function qbWSConfig [cmd, wkey, trigger, values]
                     vals.qbWSUsername,
                     vals.qbInterface === 'Executable',
                     vals.qbExecutable];
-    write ['tmpURL:  {} | {}\n', length tmpURL, tmpURL];
-    write ['prevURL: {} | {}\n', length prevURL, prevURL];
                 if ((eqL [prevURL, tmpURL]) and (10 < (clock[] - prevTime))) then return;  endif
                 prevURL = tmpURL;
                 prevTime = clock[];
