@@ -190,10 +190,8 @@ global function qbExecEngine_GridMarkets [cmd, arg, opt]
                         local tmpJSON = json_Read [inlineJSON,[]];
                         if second tmpJSON <> 'error' then
                             tmpJSON = first tmpJSON;
-            
-                            // TODO: this translation shouldn't be needed
-                            tmpJSON.('MTScoreES(s)') = twrite ['{}', tmpJSON.Results.wtMTScoreES];
-                            dbEntry.MTScoreES = atof tmpJSON.('MTScoreES(s)');
+                            write ['Returned: {}\n', tmpJSON];
+                            dbEntry.MTScoreES =  tmpJSON.Results.('wtMTScoreES(s)');
                             db_Write [ dataFile, entry_key, dbEntry ];
                         else
                             write ['ERROR: reading {}\n', first tmpJSON];
@@ -705,8 +703,6 @@ global function qbGM_MTScore [target_mol, ligand_mol, opt]
         dbEntry.jobtag = swrite ['{}', opt.jobtag];
         db_Write [ opt.dataFile, opt.molEntry, dbEntry ];
     endif
-
-// exit [];
 
     local json = first postEnvoy ['/project-submit',twrite ['{}',project_json]];
     json = first json_Read json;
