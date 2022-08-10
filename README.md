@@ -49,3 +49,34 @@ This menu can be found in the Extra menu on the main MOE window.
 
 ![Extra Menu](./doc/images/qb_extra_menu.png)
 
+## GridMarkets Envoy Installation
+
+When you have completed the installation of the QuantumBio-GridMarkets Integration Manager, if you have not already done so, if you have need to sign up for a GridMarkets account and install the Envoy package on your local workstation/laptop. This software will take care of the secure communications between your environment and the GridMarkets platform. The instructions for this process are found on the following link:
+
+ * https://www.pharma.gridmarkets.com/quantumbio-setup
+
+## Examples
+
+Finally, once you have successfully installed our QuantumBio-GridMarkets Interface Manager and the associated Envoy tool, you can execute GridMarkets calculations remotely (on the cloud) just as you would run them locally. A MOE/DivCon based tutorial is available on the following link (and webinars will be added over comming weeks and months).
+
+ * https://www.pharma.gridmarkets.com/quantumbio
+ 
+The Manager also includes a command line based tool which is a modified version of the qmechanic wrapper script supplied in our regular distribution. This script supports the addition of the --cloud command line option which communicates with Envoy (which ultimately communicates with the GridMarkets cloud).
+ 
+  * General QM/MM: http://www.quantumbioinc.com/resources/manual/divconcli/
+  * MovableType: http://www.quantumbioinc.com/resources/manual/movabletype/
+
+For example, this command line will run the MTScoreES (EndState) simulation on a single protein:ligand complex as referenced in the following online tutorial:
+
+ * https://www.quantumbioinc.com/resources/manual/movabletype/#MTScoreES-cli
+
+```
+$ wget http://downloads.quantumbioinc.com/media/tutorials/MT/4w7t_protein.pdb
+$ wget http://downloads.quantumbioinc.com/media/tutorials/MT/4w7t_ligand.mol2
+$ /path/to/MOEDivCon-GridMarkets/bin/qmechanic 4w7t_protein.pdb --ligand 4w7t_ligand.mol2 --mtscore endstate --cloud GridMarkets
+```
+
+Any of the DivCon/qmechanic tutorials found on the QuantumBio website may be run with the addition of --cloud GridMarkets on the command line. Please see the simple pricing for this cloud-based service on this link:
+
+ * https://www.pharma.gridmarkets.com/quantumbio
+ 
