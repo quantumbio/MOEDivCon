@@ -132,6 +132,6 @@ elif [[ $EXEC_LOCATION == *"local"* ]]; then
 #    ${NUMACTL} $QBHOME/${PLTFM_VER}/bin/qmechanic.bin "$@" #| fold -w 80 -s 
     ${NUMACTL} $QBHOME/${PLTFM_VER}/bin/qmechanic.bin "${ARGS[@]}" #| fold -w 80 -s 
 else
-    echo "ERROR: Unknonw execution location ${EXEC_LOCATION}. Current acceptable options are 'local' and 'GridMarkets'."
+    echo "ERROR: Unknown execution location ${EXEC_LOCATION}. Current acceptable options are 'local' and 'GridMarkets'."
     exit 1
 fi
