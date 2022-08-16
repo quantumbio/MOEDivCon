@@ -15,6 +15,9 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+set -- "${ARGS[@]}"
+unset ARGS
+
 EXEC_LOCATION=$(echo $EXEC_LOCATION | tr '[:upper:]' '[:lower:]')
 
 if [ ! "$QMECHANIC_HOME" ]; then
@@ -49,10 +52,10 @@ if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
     export ENVOY_UI_URL='http://localhost:8091'
     export DATA_HEADER='Content-Type: application/json'
 
-    SUBNAME="${ARGS[0]%.*}"
+    SUBNAME="${1%%.*}"
 
     declare -a COMM_LIST
-    for i in "${ARGS[@]}" ; do
+    for i in "${@}" ; do
          if test -f "$i" ; then
              COMM_LIST[${#COMM_LIST[@]}]="$i"
          fi
@@ -72,14 +75,39 @@ if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
         AUTHDATA=$( curl -s  ${ENVOY_URL}/products )
         export divcon_version=`echo ${AUTHDATA} | jq '[.[] | select(.app_type=="divcon")] | .[-1] | .version'`
 
+        AUTHDATA=$( curl -s -X POST ${ENVOY_URL}/machines -H "${DATA_HEADER}" -d "{\"operation\":\"simulation\",\"app\":\"DivCon\"}" )
+        export machine=`echo ${AUTHDATA} | jq '.data[] | .id'`
+        cores=${machine:3}
+        cores=${cores%???}
+
+        declare -a ARGS
+        while [[ $# -gt 0 ]]; do
+            case $1 in 
+                --np|-n)
+                    shift   # past argument
+                    shift   # past value
+                    ;;
+                --overwrite|-O)
+                    shift   # past argument
+                    ;;
+                *)
+                    ARGS+=("$1") # save
+                    shift
+                    ;;
+            esac
+        done
+        ARGS+=("--np ${cores} --overwrite")
+        set -- "${ARGS[@]}"
+        unset ARGS
+
         echo "Envoy Version:     ${envoy_version}"
         echo "DivCon Version:    ${divcon_version}"
         echo "Username:          ${username}"
         echo "Credits Available: ${credits_available}"
+        echo "Machine / Cores:   ${machine} / ${cores}"
 
         FILELIST=`echo ${COMM_LIST[@]} | sed 's/ /\n/g' | jq --slurp --raw-input 'split("\n")[:-1]'`
 
-        #read -r -d '' SUBTEMP << EOM
         SUBTEMP=$(cat <<-EOM
 {
   "project_files": {
@@ -98,11 +126,11 @@ if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
         "app": "divcon",
         "app_version": ${divcon_version},
         "operation": "simulation",
-        "machine_type": "gm3200",
+        "machine_type": ${machine},
         "path": "/${SUBNAME}",
         "params": {
           "divcon_app": "qmechanic",
-          "args": "${ARGS[@]}"
+          "args": "${@}"
         }
       }
     ]
@@ -129,9 +157,8 @@ elif [[ $EXEC_LOCATION == *"local"* ]]; then
     . $QMECHANIC_HOME/etc/qbenv.sh
     export LD_LIBRARY_PATH=$QBHOME/${PLTFM_VER}/lib/rt/lib/amd64/jetvm:$QBHOME/${PLTFM_VER}/lib/rt/lib/amd64:$QBHOME/${PLTFM_VER}/lib/rt/jetrt:$LD_LIBRARY_PATH
 
-#    ${NUMACTL} $QBHOME/${PLTFM_VER}/bin/qmechanic.bin "$@" #| fold -w 80 -s 
-    ${NUMACTL} $QBHOME/${PLTFM_VER}/bin/qmechanic.bin "${ARGS[@]}" #| fold -w 80 -s 
+    ${NUMACTL} $QBHOME/${PLTFM_VER}/bin/qmechanic.bin "$@" #| fold -w 80 -s 
 else
-    echo "ERROR: Unknonw execution location ${EXEC_LOCATION}. Current acceptable options are 'local' and 'GridMarkets'."
+    echo "ERROR: Unknonw execution location ${EXEC_LOCATION}. Acceptable options include: 'local' and 'GridMarkets'."
     exit 1
 fi
