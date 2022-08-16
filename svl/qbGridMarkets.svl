@@ -487,25 +487,35 @@ local function GetEnvoyStatus []
 endfunction
 
 global function get_supported_divcon_versions []
-//    local envoy_products = first postEnvoy '/products';
     local envoy_products = postEnvoy '/products';
     local supported_divcon_version = 'Unknown';
-// write ['envoy_products: {} | {}\n', length envoy_products, envoy_products];
     if second envoy_products <> 'error' then
         local products = first json_Read [ first envoy_products, []];
-//        local parsed_json = first json_Read [ envoy_products, []];
-//        local products = parsed_json;
         local product;
         for product in products loop;
             if product.app_type === 'divcon' then
                 supported_divcon_version = append [supported_divcon_version, product.version];
             endif
         endloop;
-
-//    supported_divcon_version = reverse (sort supported_divcon_version);
         supported_divcon_version = last supported_divcon_version;
     endif
     return supported_divcon_version;
+endfunction
+
+global function get_supported_gridmarket_machines simtype
+    if isnull simtype then
+        simtype = 'DivCon';
+    endif
+    local envoy_machines = postEnvoy ['/machines', twrite ['{{\"operation\":\"{}\",\"app\":\"{}\"}',"simulation", "DivCon"]];
+    local machine_type = 'Unknown';
+    local cores = 'Unknown';
+    if second envoy_machines <> 'error' then
+        local machines = first json_Read [ first envoy_machines, []];
+        machines = first machines.data;
+        machine_type = machines.id;
+        cores = toint cat token cat [(string machine_type)(3), (string machine_type)(4)];
+    endif
+    return [machine_type,cores];
 endfunction
 
 local function StartName inFileName
@@ -659,6 +669,9 @@ global function qbGM_MTScore [target_mol, ligand_mol, opt]
     
     local divcon_job = DIVCON_JOB;
     divcon_job.app_version = last get_supported_divcon_versions[];
+    local [machine_type, cores] = get_supported_gridmarket_machines[];
+    divcon_job.machine_type = machine_type;
+    opt.nprocs = cores;
     if not opt.mtscorees and isnull opt.dockedligfname then
         local moe_job = MOE_JOB;
         moe_job.params.divcon_version = last get_supported_divcon_versions[];
@@ -782,7 +795,7 @@ local function main[]
     write ['User Info?      {}\n', first postEnvoy '/user-info'];
     write ['Projects:       {}\n', first postEnvoy '/projects'];
     write ['Products:       {}\n', first postEnvoy '/products'];
-    write ['Machines:       {}\n', first postEnvoy ['/machines', twrite ['{{\"operation\":\"{}\",\"app\":\"{}\"}',"simulation", "NAMD"]]];
+    write ['Machines:       {}\n', first postEnvoy ['/machines', twrite ['{{\"operation\":\"{}\",\"app\":\"{}\"}',"simulation", "DivCon"]]];
 //    exit[];
     qbGM_MTScore [[], [], inopt];
     
