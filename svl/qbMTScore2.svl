@@ -707,6 +707,7 @@ global function qbInteractiveMTScoreUI opt
 // main loop //
     loop
         local [values, trigger] = WindowWait wkey;
+// write ['trigger: {}\n', trigger];
         molList = values.molList;
         scoresList = values.scoresList;
         namesList = values.namesList;
@@ -821,15 +822,18 @@ global function qbInteractiveMTScoreUI opt
             ]];  
             WindowSetAttr [wkey, [deleteSelection:  [sensitive: 1]]];
         elseif trigger === 'button_MOEPreparation' then
-            run ['structprep_ui.svl', [cmd:'interactive']];
-            status.ran_structprep = 1;
-            sleep 2.0;      // needs a couple of seconds to init StructurePrep function
-            while WindowKey 'Structure Preparation' loop
-                sleep 0.15;
-                if WindowKey 'Protonate3D' then
-                    status.ran_protonate = 1;
-                endif
-            endloop
+            if second task_fork [master:'parent', idle:1, prio:0] === 'child' then
+                run ['structprep_ui.svl', [cmd:'interactive']];
+                status.ran_structprep = 1;
+                sleep 2.0;      // needs a couple of seconds to init StructurePrep function
+                while WindowKey 'Structure Preparation' loop
+                    sleep 0.15;
+                    if WindowKey 'Protonate3D' then
+                        status.ran_protonate = 1;
+                    endif
+                endloop
+                exit [];
+            endif
         elseif trigger === 'optlevel' then                
             local prevSelection = Atoms[] | aSelected Atoms[];
             aSetSelected [Atoms[], 0];
@@ -870,11 +874,11 @@ global function qbInteractiveMTScoreUI opt
                 break;
             endif
         elseif trigger === 'button_WSsetup' then
-            brickpanel [wkey,1];
-//            qbWSConfig ['processWidget', wkey, trigger, values];
-            qbExecManager ['processWidget', [wkey, trigger, values]];
-            values = WindowValues wkey;
-            brickpanel [wkey,0];
+            if second task_fork [master:'parent', idle:1, prio:0] === 'child' then
+                qbExecManager ['processWidget', [wkey, trigger, values]];
+                values = WindowValues wkey;
+                exit [];
+            endif
         endif
     endloop
 

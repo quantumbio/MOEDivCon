@@ -160,59 +160,65 @@ global function qbExecManager [cmd, arg]
         local [wkey, trigger, values] = arg;
         if trigger === 'button_WSsetup' then
             local rfcwgt;
+            local windowName = 'DivConExecutorSetup';
             [rfcn,rfcnid,rfcwgt] = exec_EngineWidgets [];
-            local wConfKey = WindowCreate [
-                title: 'DivCon Executor Setup',
-                name: 'panel', windowName: 'DivConExecutorSetup',
-                text: ['Save', 'Cancel'],
-                    Vbox:   [   name:   'PageManager', extendH: 1, flushLeft: 1
-                    , Radio : [
-                        name: 'qbInterface'
-                        , onTrigger: 'return',
-                        flushLeft: 1, columns: 3, extendH: 1,
-                        text: rfcnid
+            local wConfKey;
+            if anytrue (WindowNameList [] == windowName) then
+                wConfKey = WindowShow [windowName, 1];
+            else
+                wConfKey = WindowCreate [
+                    title: 'DivCon Executor Setup',
+                    name: 'panel', windowName: windowName,
+                    text: ['Save', 'Cancel'],
+                        Vbox:   [   name:   'PageManager', extendH: 1, flushLeft: 1
+                        , Radio : [
+                            name: 'qbInterface'
+                            , onTrigger: 'return',
+                            flushLeft: 1, columns: 3, extendH: 1,
+                            text: rfcnid
+                        ]
+                        , Separator : []
+                        , Pager:  [
+                            name:   'execSetupPages', flushTop:1
+                            , Hbox:   [name: twrite ['{}Page',first rfcn], Vbox:first rfcwgt]
+                            , Hbox:   [name: twrite ['{}Page',second rfcn], Vbox:second rfcwgt]
+                            , Hbox:   [name: twrite ['{}Page',third rfcn], Vbox:third rfcwgt]
+                        ]
+                        , Separator : []
+                        , Label : [ text: '', name: 'wsStatus', centerH: 1, extendH: 1 ]
                     ]
-                    , Separator : []
-                    , Pager:  [
-                        name:   'execSetupPages', flushTop:1
-                        , Hbox:   [name: twrite ['{}Page',first rfcn], Vbox:first rfcwgt]
-                        , Hbox:   [name: twrite ['{}Page',second rfcn], Vbox:second rfcwgt]
-                        , Hbox:   [name: twrite ['{}Page',third rfcn], Vbox:third rfcwgt]
-                    ]
-                    , Separator : []
-                    , Label : [ text: '', name: 'wsStatus', centerH: 1, extendH: 1 ]
-                ]
-            ];
-        
-        WindowSetAttr [wConfKey, [execSetupPages:   [page:indexof [GetRC['QuantumBio.qbInterface', first rfcn],rfcnid]]]];
-        WindowSetAttr [wConfKey, [qbInterface:      [value:GetRC['QuantumBio.qbInterface', first rfcn] ]]];
-        
-        WindowShow wConfKey;
-
-        // Update status for the RC-chosen connection
-        local vals = WindowValues wConfKey;
-        local trig = 'init';
-        call [rfcn(indexof [vals.('qbInterface'),rfcnid]), ['processWidget',[wConfKey, trig, vals]]];
-
-        loop
-            [vals, trig] = WindowWait wConfKey;
-            if trig === 'panel' then
-                if vals.panel == 'Cancel' then break; endif
-                if vals.panel == 'Save' then
-                    SetRC ['QuantumBio.qbInterface',vals.qbInterface];
-                    call [rfcn(indexof [vals.('qbInterface'),rfcnid]), ['SaveRC',[wConfKey, trig, vals]]];
-                    break;
-                endif
-            elseif trig === 'qbInterface' then
-                WindowSetAttr [wConfKey, [execSetupPages: [page:indexof [vals.(trig),rfcnid]]]];
+                ];
             endif
-            // cycle through all rfnc's and run their panal processor
-            call [rfcn(indexof [vals.('qbInterface'),rfcnid]), ['processWidget',[wConfKey, trig, vals]]];
-        endloop
-        WindowDestroy wConfKey;
-        local serviceInfo = call [rfcn(indexof [GetRC ['QuantumBio.qbInterface','qbWebService'],rfcnid]), ['getStatusWidget',[]]];
         
-        WindowSetAttr [wkey, [qbwebservice_info : serviceInfo]];
+            WindowSetAttr [wConfKey, [execSetupPages:   [page:indexof [GetRC['QuantumBio.qbInterface', first rfcn],rfcnid]]]];
+            WindowSetAttr [wConfKey, [qbInterface:      [value:GetRC['QuantumBio.qbInterface', first rfcn] ]]];
+        
+            WindowShow wConfKey;
+
+            // Update status for the RC-chosen connection
+            local vals = WindowValues wConfKey;
+            local trig = 'init';
+            call [rfcn(indexof [vals.('qbInterface'),rfcnid]), ['processWidget',[wConfKey, trig, vals]]];
+
+            loop
+                [vals, trig] = WindowWait wConfKey;
+                if trig === 'panel' then
+                    if vals.panel == 'Cancel' then break; endif
+                    if vals.panel == 'Save' then
+                        SetRC ['QuantumBio.qbInterface',vals.qbInterface];
+                        call [rfcn(indexof [vals.('qbInterface'),rfcnid]), ['SaveRC',[wConfKey, trig, vals]]];
+                        break;
+                    endif
+                elseif trig === 'qbInterface' then
+                    WindowSetAttr [wConfKey, [execSetupPages: [page:indexof [vals.(trig),rfcnid]]]];
+                endif
+                // cycle through all rfnc's and run their panal processor
+                call [rfcn(indexof [vals.('qbInterface'),rfcnid]), ['processWidget',[wConfKey, trig, vals]]];
+            endloop
+            WindowDestroy wConfKey;
+            local serviceInfo = call [rfcn(indexof [GetRC ['QuantumBio.qbInterface','qbWebService'],rfcnid]), ['getStatusWidget',[]]];
+        
+            WindowSetAttr [wkey, [qbwebservice_info : serviceInfo]];
 
         endif
         
