@@ -44,7 +44,7 @@ This menu can be found in the Extra menu on the main MOE window.
 
 ```
     % cd ${HOME}/moefiles/menu
-    % ln -s /path/you/wish/to/install/MOEDivCon/MOEDivCon-GridMarkets/moe-menus menu-extra-qb
+    % ln -s /path/you/wish/to/install/MOEDivCon/MOEDivCon-GridMarkets/menu/menu-extra-MTScore menu-extra-MTScore
 ```
 
 ![Extra Menu](./doc/images/qb_extra_menu.png)
