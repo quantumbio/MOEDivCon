@@ -29,6 +29,8 @@ function qbuuid;
 // DEV VERSION
 const QBDOCK_SVL='/Users/lance/DropboxQB/Developer/MOEDivCon-current/svl/run/qbDockPair.svl';
 
+const GMVERSION='0.2';
+
 // Constants copied from gridmarkets_MOE_plugin.svl VERSION = '1.7.1'
 const ENVOY_URL     = 'http://localhost:8090';
 const ENVOY_UI_URL  = 'http://localhost:8091';
@@ -265,7 +267,15 @@ global function qbExecEngine_GridMarkets [cmd, arg, opt]
                 bubbleHelp: 'Click to reload your account credits'
             ]
             ]
-            , Hbox: [Label : [ text: 'DivCon Version:', font: 'mediumBold'], Label : [name: 'DivConVersion', text: divcon_version]]
+            , Hbox: [
+                Label : [ text: 'DivCon Version:', font: 'mediumBold']
+                , Label : [name: 'DivConVersion', text: divcon_version]
+                , Label : [ text : '']
+                , Hbox : [ extendH :1]
+                , Label : [ text : '']
+                , Label : [ text: 'Plugin: ', font: 'mediumBold']
+                , Label : [name: 'PluginVersion', text: GMVERSION]
+            ]
             , Hbox: [Label : [ text: 'Username:', font: 'mediumBold'], Label : [name: 'GMUserName', text: authResp.Username]]
             , Hbox : [extendH :1, Label : [ name: 'EnvoyBlurb', extendH: 1, alignment: 'center', text : currentEnvoyStatus.blurb]]
             , Hbox : [extendH :1, Label : [ extendH: 1, alignment: 'center', text : 'Support: support@gridmarkets.com', foreground: 'blue']]
