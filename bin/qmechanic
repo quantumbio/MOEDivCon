@@ -76,9 +76,9 @@ if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
         export divcon_version=`echo ${AUTHDATA} | jq '[.[] | select(.app_type=="divcon")] | .[-1] | .version'`
 
         AUTHDATA=$( curl -s -X POST ${ENVOY_URL}/machines -H "${DATA_HEADER}" -d "{\"operation\":\"simulation\",\"app\":\"DivCon\"}" )
-        export machine=`echo ${AUTHDATA} | jq '.data[] | .id'`
-        cores=${machine:3}
-        cores=${cores%???}
+        export machine=`echo ${AUTHDATA} | jq '.data[0] | .id'`
+        [[ $machine =~ [^0-9]*([0-9]+) ]]
+        cores=${BASH_REMATCH[1]:0:2}
 
         declare -a ARGS
         while [[ $# -gt 0 ]]; do
@@ -141,9 +141,8 @@ if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
 }
 EOM
     )
-
         echo ${SUBTEMP} | envsubst | jq . >& DEBUG.json
-        
+
         SUBMITDATA=$( curl -s -X POST  ${ENVOY_URL}/project-submit -H "${DATA_HEADER}" -d "${SUBTEMP}" )
 
         echo ${SUBMITDATA}
