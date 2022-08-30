@@ -81,6 +81,7 @@ if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
         cores=${BASH_REMATCH[1]:0:2}
 
         declare -a ARGS
+        boolPubSet=0
         while [[ $# -gt 0 ]]; do
             case $1 in 
                 --np|-n)
@@ -90,13 +91,26 @@ if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
                 --overwrite|-O)
                     shift   # past argument
                     ;;
+                --publish|-p)
+                    ARGS+=("$1") # save
+                    shift   # past argument
+                    while [[ $# -gt 0 && "$1" != "-"* ]]; do
+                        ARGS+=("$1") # save
+                        shift
+                    done
+                    ARGS+=("log") # save
+                    boolPubSet=1
+                    ;;
                 *)
                     ARGS+=("$1") # save
                     shift
                     ;;
             esac
         done
-        ARGS+=("-p log --np ${cores} --overwrite")
+        ARGS+=(" --np ${cores} --overwrite")
+        if [[ ${boolPubSet} -ne 1 ]]; then
+            ARGS+=(" -p log ")
+        fi
         set -- "${ARGS[@]}"
         unset ARGS
 
