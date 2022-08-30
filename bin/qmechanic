@@ -96,7 +96,7 @@ if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
                     ;;
             esac
         done
-        ARGS+=("--np ${cores} --overwrite")
+        ARGS+=("-p log --np ${cores} --overwrite")
         set -- "${ARGS[@]}"
         unset ARGS
 
@@ -143,8 +143,11 @@ EOM
     )
         echo ${SUBTEMP} | envsubst | jq . >& DEBUG.json
 
+        echo "Command Line:      % qmechanic ${@}"
+
         SUBMITDATA=$( curl -s -X POST  ${ENVOY_URL}/project-submit -H "${DATA_HEADER}" -d "${SUBTEMP}" )
 
+        echo
         echo ${SUBMITDATA}
         echo "  Visit ${ENVOY_UI_URL} to manage GridMarkets job ${SUBNAME}"
     fi
