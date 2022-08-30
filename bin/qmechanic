@@ -164,7 +164,7 @@ EOM
         echo ${SUBTEMP} | envsubst | jq . >& DEBUG.json
 
         echo "Command Line:      % qmechanic ${@}"
-exit
+
         SUBMITDATA=$( curl -s -X POST  ${ENVOY_URL}/project-submit -H "${DATA_HEADER}" -d "${SUBTEMP}" )
 
         echo
