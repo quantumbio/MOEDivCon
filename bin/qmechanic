@@ -82,6 +82,7 @@ if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
 
         declare -a ARGS
         boolPubSet=0
+        boolSetLog=0
         while [[ $# -gt 0 ]]; do
             case $1 in 
                 --np|-n)
@@ -96,9 +97,14 @@ if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
                     shift   # past argument
                     while [[ $# -gt 0 && "$1" != "-"* ]]; do
                         ARGS+=("$1") # save
+                        if [[ "${1}" == "log" ]]; then
+                            boolSetLog=1
+                        fi
                         shift
                     done
-                    ARGS+=("log") # save
+                    if [[ ${boolSetLog} -ne 1 ]]; then
+                        ARGS+=("log") # save
+                    fi
                     boolPubSet=1
                     ;;
                 *)
@@ -158,7 +164,7 @@ EOM
         echo ${SUBTEMP} | envsubst | jq . >& DEBUG.json
 
         echo "Command Line:      % qmechanic ${@}"
-
+exit
         SUBMITDATA=$( curl -s -X POST  ${ENVOY_URL}/project-submit -H "${DATA_HEADER}" -d "${SUBTEMP}" )
 
         echo
