@@ -9,6 +9,9 @@ global argv;
 //  EXAMPLE: % moebatch -run $QBHOME/svl/qbGridMarkets.svl -rec thrombin_030215.pdb -lig thrombin_030215_Lig3b.mol2
 //
 
+// QB forward declarations
+function qbInstalledVersion;
+
 // CCG forward declarations
 function ArgvReset;
 function ArgvExpand;
@@ -292,7 +295,7 @@ global function qbExecEngine_GridMarkets [cmd, arg, opt]
                 , Hbox : [ extendH :1]
                 , Label : [ text : '']
                 , Label : [ text: 'Plugin: ', font: 'mediumBold']
-                , Label : [name: 'PluginVersion', text: ' ']
+                , Label : [name: 'PluginVersion', text: twrite ['{}',qbInstalledVersion[] ]]
             ]
             , Hbox: [Label : [ text: 'Username:', font: 'mediumBold'], Label : [name: 'GMUserName', text: authResp.Username]]
             , Hbox : [extendH :1, Label : [ name: 'EnvoyBlurb', extendH: 1, alignment: 'center', text : currentEnvoyStatus.blurb]]

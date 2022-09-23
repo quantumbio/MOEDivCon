@@ -21,15 +21,14 @@ function qbWSConfig;
 function qbExecManager;
 function MTScore_dG_TaskManager;
 function qbuuid;
-function qbGetGitVersion;
+function qbQBAvailableVersion;
+function qbInstalledVersion;
 
 // CCG global function forward declarations
 function RenderProtein;
 function DockAtoms;
 function dock_score_GBVIWSA_dG;
 function MM; 
-
-const GMVERSION = '0.2';
 
 local function active atoms
     return atoms | not aInert atoms;
@@ -180,7 +179,7 @@ function qbExecManager;
 // MakePanel only takes care of what the panel looks like but not the contents or processing any triggers.
 local function MakePanel opt
     
-    local WINDOW_NAME = twrite ['QuantumBio/MTScore v:{}',GMVERSION];		// window title
+    local WINDOW_NAME = twrite ['QuantumBio/MTScore v:{}',qbInstalledVersion[]];		// window title
     
 //    local opt_enableSidepanel = GetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', 1];
     DelRC ['QuantumBio.MTInteractions.enableSidepanel'];        // currently unsupported option - remove the option and start from scratch for now
@@ -714,8 +713,8 @@ global function qbInteractiveMTScoreUI opt
     endfunction
     
     local function checkVersion wkey
-        local availableVersion = qbGetGitVersion[];
-        if (not isnull availableVersion) and (atof token last wordsplit [string availableVersion, "-"] > atof GMVERSION) then
+        local availableVersion = qbQBAvailableVersion[];
+        if (not isnull availableVersion) and (atof token last wordsplit [string availableVersion, "-"] > qbInstalledVersion[]) then
             WindowSetAttr[wkey, [ button_Upgrade: [
                 background : 'darkBlue', bubbleHelp: twrite ['Current version available: {}', availableVersion]
             ] ]];

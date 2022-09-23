@@ -1,0 +1,36 @@
+#svl
+
+const QB_GUI_VERSION=0.2;
+
+// CCG forward declarations
+function curl_open;
+function _curl_read;
+function curl_close;
+function json_Read;
+
+global function qbInstalledVersion []
+    return QB_GUI_VERSION;
+endfunction
+
+global function qbQBAvailableVersion gitProject
+    if isnull gitProject then
+        gitProject = 'https://api.github.com/repos/quantumbio/MOEDivCon/releases';
+    endif
+        
+    local url_key = curl_open [url: gitProject, useragent: 'MOE-2020'];
+    
+    local json = _curl_read url_key;
+    curl_close url_key;
+    
+    local version;
+    
+    if second json <> 'error' then
+        json = first json_Read first [json, []];
+        version = (first json).tag_name;
+    else
+        write ['error: {}\n', json];
+    endif
+    return version;
+endfunction
+
+#eof

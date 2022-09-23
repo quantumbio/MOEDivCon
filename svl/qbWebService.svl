@@ -91,30 +91,6 @@ global function ssh_which [executable, hostname, username]
     return token outline;
 endfunction
 
-// TODO: not sure if this should be here
-global function qbGetGitVersion gitProject
-    if isnull gitProject then
-        gitProject = 'https://api.github.com/repos/quantumbio/MOEDivCon/releases';
-    endif
-        
-    local url_key = curl_open [url: gitProject, useragent: 'MOE-2020'];
-    
-    local json = _curl_read url_key;
-    curl_close url_key;
-    
-    local version;
-    
-    if second json <> 'error' then
-        json = first json_Read first [json, []];
-        write ['json: {} | {}\n', length json, (first json).tag_name];
-        version = (first json).tag_name;
-    else
-        write ['error: {}\n', json];
-    endif
-    return version;
-endfunction
-// 
-
 local function getTargetChunk target_mol
     return cat [
         "Content-Disposition: form-data; name=\"Target\"", CRLF,
