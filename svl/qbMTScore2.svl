@@ -21,12 +21,15 @@ function qbWSConfig;
 function qbExecManager;
 function MTScore_dG_TaskManager;
 function qbuuid;
+function qbGetGitVersion;
 
 // CCG global function forward declarations
 function RenderProtein;
 function DockAtoms;
 function dock_score_GBVIWSA_dG;
 function MM; 
+
+const GMVERSION = '0.2';
 
 local function active atoms
     return atoms | not aInert atoms;
@@ -172,38 +175,49 @@ endfunction
 
 // functions necessary for the qbInteractiveMTScoreUpdate panel
 
-const WINDOW_NAME = 'QuantumBio/MTScore BETA';		// window title
 function qbExecManager;
 
 // MakePanel only takes care of what the panel looks like but not the contents or processing any triggers.
 local function MakePanel opt
-
+    
+    local WINDOW_NAME = twrite ['QuantumBio/MTScore v:{}',GMVERSION];		// window title
+    
 //    local opt_enableSidepanel = GetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', 1];
     DelRC ['QuantumBio.MTInteractions.enableSidepanel'];        // currently unsupported option - remove the option and start from scratch for now
     local opt_enableSidepanel = 1;
     
     local openicon = gr_icon ['$MOE/lib/icon/open.ico', 12, 'foreground'];
     local configicon = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
+    local dltools = gr_icon ['$MOE/lib/icon/fsb_tools.ico', 12, 'foreground'];
             
     local window = [
-        title: WINDOW_NAME,
-        name: 'shell', 
-        text: [select ['Detach', 'Attach', opt_enableSidepanel], 'Close'],
-        sensitive : [0,1],
-        onTrigger: ['return', 'exit'],
-        Vbox: [
-//            Hbox:   qbWSConfig ['getWidget'],       // lmw - standard WS config widget
-            Hbox:   qbExecManager ['getStatusWidget'],       // lmw - standard WS config widget
+        title: WINDOW_NAME
+        , name: 'shell'
+        , text: [select ['Detach', 'Attach', opt_enableSidepanel], 'Close']
+        , sensitive : [0,1]
+        , helpPage: 'https://www.quantumbioinc.com/resources/'
+        , onTrigger: ['return', 'exit']
+        , Vbox: [
             Hbox:   [
-                Label:  [
+                extendH: 1
+                ,Label:  [
                     text: 'Status: '
-                ],
-                Label: [
-                    name: 'sysok',
-                    text: ''
                 ]
-            ],
-            Button: [
+                , Label: [
+                    name: 'sysok'
+                    , text: ' '
+                    , extendH: 1 
+                ]
+                , Hbox: [extendH: 1 ]
+                , Label : [ text : '']
+                , Button: [
+                    name: 'button_Upgrade', graphics: dltools, grPosition: 'right'
+                    , bubbleHelp: 'Your version is current.'
+                ]
+            ]
+            , Hbox:   qbExecManager ['getStatusWidget']       // lmw - standard WS config widget
+
+            , Button: [
                 text: 'Structure Preparation', name: 'button_MOEPreparation', extendH: 1,
                 bubbleHelp: 
                     'Configure and run the MOE-based structure preparation.\n'
@@ -698,10 +712,23 @@ global function qbInteractiveMTScoreUI opt
             isBricked:      [value : status ]
         ]];  
     endfunction
+    
+    local function checkVersion wkey
+        local availableVersion = qbGetGitVersion[];
+        if (not isnull availableVersion) and (atof token last wordsplit [string availableVersion, "-"] > atof GMVERSION) then
+            WindowSetAttr[wkey, [ button_Upgrade: [
+                background : 'darkBlue', bubbleHelp: twrite ['Current version available: {}', availableVersion]
+            ] ]];
+        endif    
+    endfunction
         
     if second task_fork [master:'mutual', idle:1, prio:0] === 'child' then
         ReadyMonitor wkey;
         exit [];
+    endif
+
+    if second task_fork [master:'mutual', idle:1, prio:0] === 'child' then
+        checkVersion wkey;
     endif
     
 // main loop //
@@ -873,6 +900,8 @@ global function qbInteractiveMTScoreUI opt
                 WindowDestroy WindowKey wkey;
                 break;
             endif
+        elseif trigger === 'button_Upgrade' then
+            LaunchDocument 'https://github.com/quantumbio/MOEDivCon/releases';    
         elseif trigger === 'button_WSsetup' then
             if second task_fork [master:'parent', idle:1, prio:0] === 'child' then
                 qbExecManager ['processWidget', [wkey, trigger, values]];
