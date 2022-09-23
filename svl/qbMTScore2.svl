@@ -197,7 +197,8 @@ local function MakePanel opt
         , helpPage: 'https://www.quantumbioinc.com/resources/'
         , onTrigger: ['return', 'exit']
         , Vbox: [
-            Hbox:   [
+            extendH:1
+            , Hbox:   [
                 extendH: 1
                 ,Label:  [
                     text: 'Status: '
@@ -215,7 +216,6 @@ local function MakePanel opt
                 ]
             ]
             , Hbox:   qbExecManager ['getStatusWidget']       // lmw - standard WS config widget
-
             , Button: [
                 text: 'Structure Preparation', name: 'button_MOEPreparation', extendH: 1,
                 bubbleHelp: 
@@ -230,7 +230,9 @@ local function MakePanel opt
                         text: 'MDB: '
                 ]
                 , FSBText: [
-                    name: 'outdb', len: 25, extendH: 1, mode: 'saveAs',sensitive:0,
+                    name: 'outdb'
+//                    , len: 25
+                    , extendH: 1, mode: 'saveAs',sensitive:0,
                     bubbleHelp:
                         'The database to which the generated structures\n'
                         'will be written.'
@@ -241,7 +243,8 @@ local function MakePanel opt
                 ]
             ]
             , Hbox:   [
-                Label:  [
+                extendH:1
+                , Label:  [
                     text: 'Optimize: ',
                     bubbleHelp: 'Optimize ligand or receptor pocket prior to score.'
                 ]
@@ -256,7 +259,7 @@ local function MakePanel opt
                     bubbleHelp: 'Configure QuantumBio Executor (application, host and port).'
                 ]
                 , Button: [
-                        name: 'addCurrent', text: 'Add',
+                        name: 'addCurrent', text: 'Add',extendH:1,
                         bubbleHelp: 'Add the selected ligand within the MOE window to the list and calculate MTScoreES.'
                 ]
             ]
@@ -291,9 +294,11 @@ local function MakePanel opt
                 , width: 40
             ]
             , Hbox:   [
-                Text    :   [
+                extendH:1
+                , Text    :   [
                     name:   'tLigName'
-                    , len:    20
+//                    , len:    20
+                    , extendH:1
                     , type:   'char'
                     , onTrigger: 'return'
                 ]
@@ -306,7 +311,8 @@ local function MakePanel opt
                         , bubbleHelp: 'Delete selected ligand from the list.'
                 ]            ]
             , Hbox:   [
-                Label    :   [
+                extendH:1
+                , Label    :   [
                     text:    'Show: '
                     , bubbleHelp: 'Select which pose to show when example is selected in sidecar.\n NOTE: this function is currently unavailable and will be added in a future version.'                
                 ]
