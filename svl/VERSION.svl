@@ -1,6 +1,6 @@
 #svl
 
-const QB_GUI_VERSION=0.2;
+const QB_GUI_VERSION=0.4;
 
 // CCG forward declarations
 function curl_open;
