@@ -41,10 +41,18 @@ fi
 if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
     if ! [ -x "$(command -v jq)" ]; then
       echo 'Error: jq is not installed. jq is required in order to execute cloud-based DivCon tools.' >&2
+      echo '        Some possible commands to run to install jq include:' >&2
+      echo '        % sudo yum install jq' >&2
+      echo '        % sudo apt install jq' >&2
+      echo '        % sudo brew install jq' >&2
       exit 1
     fi
     if ! [ -x "$(command -v curl)" ]; then
       echo 'Error: curl is not installed. curl is required in order to execute cloud-based DivCon tools.' >&2
+      echo '        Some possible commands to run to install curl include:' >&2
+      echo '        % sudo yum install curl' >&2
+      echo '        % sudo apt install curl' >&2
+      echo '        % sudo brew install curl' >&2
       exit 1
     fi
 

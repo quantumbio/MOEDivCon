@@ -28,7 +28,7 @@ global function qbQBAvailableVersion gitProject
         json = first json_Read first [json, []];
         version = (first json).tag_name;
     else
-        write ['error: {}\n', json];
+        write ['ERROR: {}\n', json];
     endif
     return version;
 endfunction
