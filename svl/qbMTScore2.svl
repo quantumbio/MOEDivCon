@@ -728,9 +728,13 @@ global function qbInteractiveMTScoreUI opt
                 sleep 1;      
                 WindowSetAttr[wkey, [ button_Upgrade: [background : 'darkBlue' ] ]];      
             endloop
+        elseif (not isnull availableVersion) and (atof token last wordsplit [string availableVersion, "-"] <= qbInstalledVersion[]) then
+            WindowSetAttr[wkey, [ button_Upgrade: [
+                background : 'none', bubbleHelp: twrite ['Version up to date: {}', availableVersion]
+            ] ]];
         else
             WindowSetAttr[wkey, [ button_Upgrade: [
-                background : 'red', bubbleHelp: 'Unable to connect to version server to determine current available version.'
+                background : 'red', bubbleHelp: 'Unable to connect to version server\nto determine current available version.'
             ] ]];
         endif
     endfunction
