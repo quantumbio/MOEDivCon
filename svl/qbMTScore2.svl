@@ -203,12 +203,10 @@ local function MakePanel opt
                 ,Label:  [
                     text: 'Status: '
                 ]
-                , Label: [
+                , Hbox: [extendH:1, Label: [
                     name: 'sysok'
                     , text: ' '
-                    , extendH: 1 
-                ]
-                , Hbox: [extendH: 1 ]
+                ]]
                 , Label : [ text : '']
                 , Button: [
                     name: 'button_Upgrade', graphics: dltools, grPosition: 'right'

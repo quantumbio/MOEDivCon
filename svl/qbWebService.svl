@@ -443,7 +443,7 @@ global function qbExecEngine_Executable [cmd, arg, opt]
     endif
 
     function apprHost inName
-        const hostlen = 25;
+        const hostlen = 50;
         inName = string inName;
         if length inName > hostlen then
             inName = twrite ['{}...',resize [inName,hostlen]];

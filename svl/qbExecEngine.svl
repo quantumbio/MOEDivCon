@@ -146,8 +146,7 @@ global function qbExecManager [cmd, arg]
                     text: 'SVR:',
                     font: 'mediumFixedBold'
                 ],
-                Label: serviceInfo
-                , Hbox: [extendH: 1 ]
+                Hbox: [extendH: 1, Label: serviceInfo]
                 , Label : [ text : '']
                 , Button: [
                     title: '', name: 'button_WSsetup', graphics: config,
