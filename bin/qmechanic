@@ -1,0 +1,194 @@
+#!/bin/bash
+
+EXEC_LOCATION="local"
+declare -a ARGS
+while [[ $# -gt 0 ]]; do
+    case $1 in 
+        --cloud)
+            EXEC_LOCATION="$2"
+            shift   # past argument
+            shift   # past value
+            ;;
+        *)
+            ARGS+=("$1") # save
+            shift
+            ;;
+    esac
+done
+set -- "${ARGS[@]}"
+unset ARGS
+
+EXEC_LOCATION=$(echo $EXEC_LOCATION | tr '[:upper:]' '[:lower:]')
+
+if [ ! "$QMECHANIC_HOME" ]; then
+    PRG=$0
+    
+    progdir=`dirname "$PRG"`
+    if [ "$progdir" = "." ]; then
+	    progdir=`pwd`
+    fi
+
+    if [ "`echo "$progdir" | grep -s '^/'`" ]; then
+        progdir=$progdir
+    else
+        progdir=`pwd`/"$progdir"
+    fi
+    
+    QMECHANIC_HOME=`echo "$progdir" | sed 's:/bin$::'`
+    export QMECHANIC_HOME
+fi
+
+if [[ $EXEC_LOCATION == *"gridmarkets"* ]]; then
+    if ! [ -x "$(command -v jq)" ]; then
+      echo 'Error: jq is not installed. jq is required in order to execute cloud-based DivCon tools.' >&2
+      echo '        Some possible commands to run to install jq include:' >&2
+      echo '        % sudo yum install jq' >&2
+      echo '        % sudo apt install jq' >&2
+      echo '        % sudo brew install jq' >&2
+      exit 1
+    fi
+    if ! [ -x "$(command -v curl)" ]; then
+      echo 'Error: curl is not installed. curl is required in order to execute cloud-based DivCon tools.' >&2
+      echo '        Some possible commands to run to install curl include:' >&2
+      echo '        % sudo yum install curl' >&2
+      echo '        % sudo apt install curl' >&2
+      echo '        % sudo brew install curl' >&2
+      exit 1
+    fi
+
+    export ENVOY_URL='http://localhost:8090'
+    export ENVOY_UI_URL='http://localhost:8091'
+    export DATA_HEADER='Content-Type: application/json'
+
+    SUBNAME="${1%%.*}"
+
+    declare -a COMM_LIST
+    for i in "${@}" ; do
+         if test -f "$i" ; then
+             COMM_LIST[${#COMM_LIST[@]}]="$i"
+         fi
+    done
+    TESTDATA=$( curl -isS ${ENVOY_URL} 2>&1 >/dev/null )
+    echo $TESTDATA
+    if [[ $TESTDATA == *"Connection refused"* ]]; then
+        echo "ERROR: Envoy is not running at $ENVOY_URL. Please start Envoy and try again.\m    Visit https://www.pharma.gridmarkets.com/ for more information or to download Envoy."
+    else
+
+        AUTHDATA=$( curl -s  ${ENVOY_URL}/auth )
+        username=`echo ${AUTHDATA} | jq '.Username'`
+        AUTHDATA=$( curl -s  ${ENVOY_URL}/user-info )
+        credits_available=`echo ${AUTHDATA} | jq '.data.credits_available'`
+        AUTHDATA=$( curl -s  ${ENVOY_URL}/info )
+        envoy_version=`echo ${AUTHDATA} | jq '.version'`
+        AUTHDATA=$( curl -s  ${ENVOY_URL}/products )
+        export divcon_version=`echo ${AUTHDATA} | jq '[.[] | select(.app_type=="divcon")] | .[-1] | .version'`
+
+        AUTHDATA=$( curl -s -X POST ${ENVOY_URL}/machines -H "${DATA_HEADER}" -d "{\"operation\":\"simulation\",\"app\":\"DivCon\"}" )
+        export machine=`echo ${AUTHDATA} | jq '.data[0] | .id'`
+        [[ $machine =~ [^0-9]*([0-9]+) ]]
+        cores=${BASH_REMATCH[1]:0:2}
+
+        declare -a ARGS
+        boolPubSet=0
+        boolSetLog=0
+        while [[ $# -gt 0 ]]; do
+            case $1 in 
+                --np|-n)
+                    shift   # past argument
+                    shift   # past value
+                    ;;
+                --overwrite|-O)
+                    shift   # past argument
+                    ;;
+                --publish|-p)
+                    ARGS+=("$1") # save
+                    shift   # past argument
+                    while [[ $# -gt 0 && "$1" != "-"* ]]; do
+                        ARGS+=("$1") # save
+                        if [[ "${1}" == "log" ]]; then
+                            boolSetLog=1
+                        fi
+                        shift
+                    done
+                    if [[ ${boolSetLog} -ne 1 ]]; then
+                        ARGS+=("log") # save
+                    fi
+                    boolPubSet=1
+                    ;;
+                *)
+                    ARGS+=("$1") # save
+                    shift
+                    ;;
+            esac
+        done
+        ARGS+=(" --np ${cores} --overwrite")
+        if [[ ${boolPubSet} -ne 1 ]]; then
+            ARGS+=(" -p log ")
+        fi
+        set -- "${ARGS[@]}"
+        unset ARGS
+
+        echo "Envoy Version:     ${envoy_version}"
+        echo "DivCon Version:    ${divcon_version}"
+        echo "Username:          ${username}"
+        echo "Credits Available: ${credits_available}"
+        echo "Machine / Cores:   ${machine} / ${cores}"
+
+        FILELIST=`echo ${COMM_LIST[@]} | sed 's/ /\n/g' | jq --slurp --raw-input 'split("\n")[:-1]'`
+
+        SUBTEMP=$(cat <<-EOM
+{
+  "project_files": {
+    "localRoot": "${PWD}",
+    "remoteRoot": "/${SUBNAME}",
+    "files":  ${FILELIST}
+  },
+  "project_request": {
+    "name": "${SUBNAME}",
+    "submission_name": "${SUBNAME}",
+    "description": "",
+    "jobs": [
+      {
+        "id": "job-DC",
+        "name": "DivCon-${SUBNAME}",
+        "app": "divcon",
+        "app_version": ${divcon_version},
+        "operation": "simulation",
+        "machine_type": ${machine},
+        "path": "/${SUBNAME}",
+        "params": {
+          "divcon_app": "qmechanic",
+          "args": "${@}"
+        }
+      }
+    ]
+  },
+  "watch_files": {
+    "/${SUBNAME}/.+": "${PWD}"
+  }
+}
+EOM
+    )
+        echo ${SUBTEMP} | envsubst | jq . >& DEBUG.json
+
+        echo "Command Line:      % qmechanic ${@}"
+
+        SUBMITDATA=$( curl -s -X POST  ${ENVOY_URL}/project-submit -H "${DATA_HEADER}" -d "${SUBTEMP}" )
+
+        echo
+        echo ${SUBMITDATA}
+        echo "  Visit ${ENVOY_UI_URL} to manage GridMarkets job ${SUBNAME}"
+    fi
+
+elif [[ $EXEC_LOCATION == *"local"* ]]; then
+    # clear out excess LD_LIBRARY_PATH info and only provide ONLY our libs
+    unset LD_LIBRARY_PATH
+    unset DYLD_LIBRARY_PATH
+    . $QMECHANIC_HOME/etc/qbenv.sh
+    export LD_LIBRARY_PATH=$QBHOME/${PLTFM_VER}/lib/rt/lib/amd64/jetvm:$QBHOME/${PLTFM_VER}/lib/rt/lib/amd64:$QBHOME/${PLTFM_VER}/lib/rt/jetrt:$LD_LIBRARY_PATH
+
+    ${NUMACTL} $QBHOME/${PLTFM_VER}/bin/qmechanic.bin "$@" #| fold -w 80 -s 
+else
+    echo "ERROR: Unknonw execution location ${EXEC_LOCATION}. Acceptable options include: 'local' and 'GridMarkets'."
+    exit 1
+fi
