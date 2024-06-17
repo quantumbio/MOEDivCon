@@ -11,19 +11,47 @@
 // RETURN:	MTScore score.
 // NOTE:	This function must be used within a private system.
 
+// Turn on/off new features
+const NEWTOOLS = 0;
+
+// QBio function forward declarations
 function qbWS_MTScore;
 function qbWSTestEndpoint;
 function qbWSConfig;
+function qbExecManager;
+function MTScore_dG_TaskManager;
+function qbuuid;
+function qbQBAvailableVersion;
+function qbInstalledVersion;
+
+// CCG global function forward declarations
+function RenderProtein;
+function DockAtoms;
+function dock_score_GBVIWSA_dG;
+function MM; 
 
 local function active atoms
     return atoms | not aInert atoms;
 endfunction
 
-global function ScoreMTScore_dG [recatoms, ligatoms, ff, rec]
+local function StartName []
+    local timevec = clock_to_timevec clock [];
+    function formNum [inVal]
+        inVal = round inVal;
+        if inVal < 10 then  return twrite ['0{}',inVal];
+        else                return twrite ['{}',inVal];
+        endif
+    endfunction
+    return twrite ['{}',twrite ['{}:{}:{}', formNum timevec(7), formNum timevec(8), formNum timevec(9)]];
+endfunction
+
+global function ScoreMTScore_dG [recatoms, ligatoms, opt]
     // This function is effectively a "wrapper" for the call to the MTScore webservice
 //    local tmpJSON = qbWS_MTScore [diff [Atoms[], _Atoms '$$ligand'],_Atoms '$$ligand'];
-    local tmpJSON = qbWS_MTScore [recatoms,ligatoms];
-// write ['JSON Returned: {} \n', tmpJSON];
+
+//    local tmpJSON = qbWS_MTScore [recatoms,ligatoms];
+    local tmpJSON = qbExecManager ['RunMTScore', [recatoms,ligatoms, opt]];
+    
     if tmpJSON.success then
         return atof tmpJSON.('MTScoreES(s)');
     else
@@ -77,7 +105,6 @@ global function dock_score_qbMTScore [cmd, arg, opt]
     elseif cmd === 'validateOptions' then        // arg = val
         SetRC ['QuantumBio.qbWSHostname',arg.qbWSHostname];
         SetRCNumber ['QuantumBio.qbWSPort',arg.qbWSPort];
-//        write ['RC: {} | {}\n', arg.qbWSHostname, arg.qbWSPort];
         return;
     elseif cmd === 'openReceptor' then      // arg = rec
         return;
@@ -112,7 +139,6 @@ global function dock_score_qbMTScore [cmd, arg, opt]
     return score;
 endfunction
 
-function MM; // forward declaration
 global function qbInteractiveMTScoreUpdate []
     const RUNNINGMT = 'Running MTScore to update current binding affinity....';
     const RUNNINGMM = 'Running MM opt of ligand+pocket to update current binding affinity....';
@@ -148,37 +174,47 @@ endfunction
 
 // functions necessary for the qbInteractiveMTScoreUpdate panel
 
-const WINDOW_NAME = 'QuantumBio/MTScore BETA';		// window title
+function qbExecManager;
 
 // MakePanel only takes care of what the panel looks like but not the contents or processing any triggers.
 local function MakePanel opt
-
+    
+    local WINDOW_NAME = twrite ['QuantumBio/MTScore v:{}',qbInstalledVersion[]];		// window title
+    
 //    local opt_enableSidepanel = GetRCBoolean ['QuantumBio.MTInteractions.enableSidepanel', 1];
     DelRC ['QuantumBio.MTInteractions.enableSidepanel'];        // currently unsupported option - remove the option and start from scratch for now
     local opt_enableSidepanel = 1;
     
     local openicon = gr_icon ['$MOE/lib/icon/open.ico', 12, 'foreground'];
-    
-//    write ['{}\n',qbWSConfig ['getWidget']];       // lmw - standard WS config widget
+    local configicon = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
+    local dltools = gr_icon ['$MOE/lib/icon/fsb_tools.ico', 12, 'foreground'];
             
     local window = [
-        title: WINDOW_NAME,
-        name: 'shell', 
-        text: [select ['Detach', 'Attach', opt_enableSidepanel], 'Close'],
-        sensitive : [0,1],
-        onTrigger: ['return', 'exit'],
-        Vbox: [
-            Hbox:   qbWSConfig ['getWidget'],       // lmw - standard WS config widget
-            Hbox:   [
-                Label:  [
+        title: WINDOW_NAME
+        , name: 'shell'
+        , text: [select ['Detach', 'Attach', opt_enableSidepanel], 'Close']
+        , sensitive : [0,1]
+        , helpPage: 'https://www.quantumbioinc.com/resources/'
+        , onTrigger: ['return', 'exit']
+        , Vbox: [
+            extendH:1
+            , Hbox:   [
+                extendH: 1
+                ,Label:  [
                     text: 'Status: '
-                ],
-                Label: [
-                    name: 'sysok',
-                    text: ''
                 ]
-            ],
-            Button: [
+                , Hbox: [extendH:1, Label: [
+                    name: 'sysok'
+                    , text: ' '
+                ]]
+                , Label : [ text : '']
+                , Button: [
+                    name: 'button_Upgrade', graphics: dltools, grPosition: 'right'
+                    , bubbleHelp: 'Your version is current.'
+                ]
+            ]
+            , Hbox:   qbExecManager ['getStatusWidget']       // lmw - standard WS config widget
+            , Button: [
                 text: 'Structure Preparation', name: 'button_MOEPreparation', extendH: 1,
                 bubbleHelp: 
                     'Configure and run the MOE-based structure preparation.\n'
@@ -187,78 +223,115 @@ local function MakePanel opt
                     '   Noted, if not performed.'
             ],
             Mbox: [
-                columns: 3, extendH: 1,
-                Label: [
-                    text: 'MDB: '
-                ],
-
-                FSBText: [
-                name: 'outdb', len: 25, extendH: 1, mode: 'saveAs',sensitive:0,
-                bubbleHelp:
-                    'The database to which the generated structures\n'
-                    'will be written.'
-                ],
-                Button: [
+                columns: 3, extendH: 1
+                , Label: [
+                        text: 'MDB: '
+                ]
+                , FSBText: [
+                    name: 'outdb'
+//                    , len: 25
+                    , extendH: 1, mode: 'saveAs',sensitive:0,
+                    bubbleHelp:
+                        'The database to which the generated structures\n'
+                        'will be written.'
+                ]
+                , Button: [
                     title: '', name: 'browse_outdb', graphics: openicon,
                     bubbleHelp: 'Select / Create MDB to store ligands of interest.\nNew DB will be created while existing DB will be read and added to list below.'
                 ]
-            ],
-            Hbox:   [
-                Label:  [
+            ]
+            , Hbox:   [
+                extendH:1
+                , Label:  [
                     text: 'Optimize: ',
                     bubbleHelp: 'Optimize ligand or receptor pocket prior to score.'
-                ],
-                Radio:  [
+                ]
+                , Radio:  [
                     name: 'optlevel',
-                    text: ['None','Ligand','Pocket'],
+                    text: ['None','Ligand','Pocket','Dock'],
                     onTrigger: 'return',
                     bubbleHelp: 'Optimize ligand or receptor pocket prior to score.'                
-                ],
-                Button: [
-                        name: 'addCurrent', text: 'Add',
+                ]
+                , Button: [
+                    name: 'configDock', graphics: configicon,
+                    bubbleHelp: 'Configure QuantumBio Executor (application, host and port).'
+                ]
+                , Button: [
+                        name: 'addCurrent', text: 'Add',extendH:1,
                         bubbleHelp: 'Add the selected ligand within the MOE window to the list and calculate MTScoreES.'
                 ]
-                ,
-                Button: [
-                        name: 'deleteSelection', text: 'X', font: 'mediumBold',flushLeft: 0,
-                        bubbleHelp: 'Delete selected ligand from the list.'
+            ]
+#if NEWTOOLS
+            , Hbox:   [
+                Label:  [
+                    text: 'Ensemble: ',
+                    bubbleHelp: 'Execute Ensemble MTScore calculation using chosen executor on chosen structures.\n   All mseq poses will be used when "Input" is selected otherwise the MOE/Dock tool will be used.'
                 ]
-            ],
-            Listbox : [
-                name: 'slist',
-                onTrigger: 'return',
-                multiSelect: 0,
-                type: 'int',
-                sortEnable: 1,
-//                header: twrite ['{}\{.{}n\}', listHeader, length listHeader] ,
-                header: 'Label\tScore{15n}',
-//                header: 'MTScoreES (kcal/mol)',
-                resizeV:1,
-                extendH:1,
-//                len:5,
-//                :5,
-//                resizeH:1,
-                width: 30
-            ],
-            Hbox:   [
-                Text    :   [
-                    name:   'tLigName',
-                    len:    20,
-                    type:   'char',
-                    onTrigger: 'return'
-                ],
-                Button  :   [
-                    name:   'bRename',
-                    text:   'Rename'
+                , Radio:  [
+                    name: 'docklevel',
+                    text: ['Input','Dock'],
+                    onTrigger: 'return',
+                    bubbleHelp: 'Use the input protein:ligand poses or generate poses using MOE/Dock'                
                 ]
-            ],
-            Data:   [name:'molList'],
-            Data:   [name:'scoresList'],
-            Data:   [name:'namesList'],
-            Data:   [name:'currentState', value:-1],
-            Data:   [name:'currentPos', value:[[0],[0],[0]]],
-            Data:   [name:'msgkey', value:0],
-            Data:   [name:'isBricked', value:0]
+                , Button: [
+                        name: 'runSelected', text: 'RunE',
+                        bubbleHelp: 'Add the selected ligand within the MOE window to the list and calculate MTScoreES.'
+                ]
+            ]
+#endif
+            , Listbox : [
+                name: 'slist'
+                , onTrigger: 'return'
+                , multiSelect: 0
+                , type: 'int'
+                , sortEnable: 1
+                , zebra: 1
+                , header: 'Label\tMTScoreES\tPoses\tMTScoreE'
+                , resizeV:1
+                , extendH:1
+                , width: 40
+            ]
+            , Hbox:   [
+                extendH:1
+                , Text    :   [
+                    name:   'tLigName'
+//                    , len:    20
+                    , extendH:1
+                    , type:   'char'
+                    , onTrigger: 'return'
+                ]
+                , Button  :   [
+                    name:   'bRename'
+                    , text:   'Rename'
+                ]
+                , Button: [
+                        name: 'deleteSelection', text: 'X', font: 'mediumBold',flushLeft: 0
+                        , bubbleHelp: 'Delete selected ligand from the list.'
+                ]            ]
+            , Hbox:   [
+                extendH:1
+                , Label    :   [
+                    text:    'Show: '
+                    , bubbleHelp: 'Select which pose to show when example is selected in sidecar.\n NOTE: this function is currently unavailable and will be added in a future version.'                
+                ]
+                , Radio:  [
+                    name: 'showlevel'
+                    , text: ['Top','All','Selected']
+                    , onTrigger: 'return'
+                    , sensitive: 0
+                    , bubbleHelp: 'Select which pose to show when example is selected in sidecar.\n NOTE: this function is currently unavailable and will be added in a future version.'                
+                ]
+            ]
+            ,   Data:   [name:'molList']
+            ,   Data:   [name:'scoresList']
+            ,   Data:   [name:'namesList']
+            ,   Data:   [name:'poseCountList']
+            ,   Data:   [name:'ensembleScoreList']
+            ,   Data:   [name:'currentState', value:-1]
+            ,   Data:   [name:'currentPos', value:[[0],[0],[0]]]
+            ,   Data:   [name:'msgkey', value:0]
+            ,   Data:   [name:'addState', value:1]
+            ,   Data:   [name:'isBricked', value:0]
         ]
     ];
     
@@ -286,28 +359,142 @@ local function SyncMDB wkey
     db_EnsureField [dataFile, 'Label', 'char'];
     db_EnsureField [dataFile, 'Complex', 'moe'];
     db_EnsureField [dataFile, 'MTScoreES', 'double'];
+    db_EnsureField [dataFile, 'mseq', 'int'];
+    db_EnsureField [dataFile, 'S', 'float'];
+    db_EnsureField [dataFile, 'jobtag', 'char'];
+        
+    db_SetEnv [ dataFile, 'QBMDBType', 'MTDB' ];
     // if the contents are MT contents, then read them in and add them to the viewer list
     local molList = [];
     local scoresList = [];
     local namesList = [];
+    local poseCountList = [];
+    local ensembleScoreList = [];
     local ent = 0;
+    local inEntry;
+        
+    if db_GetEnv [dataFile, 'source'] == 'DOCK' then
+        write ['in db_GetEnv\n'];
+        local syskeys = SystemPush [];
+        while ent = db_NextEntry [dataFile,ent] loop
+            Close [force: 1];
+            inEntry = db_Read [ dataFile, ent];
+            if isnull inEntry.Complex then
+                write ['in isnull tmpComplex: {} | {} | {}\n', length inEntry.mol, type inEntry.mol, inEntry.mol];
+                mol_Create inEntry.receptor;
+                mol_Create inEntry.mol;
+                inEntry.Label = first inEntry.mol;
+                write ['Chains: {}\n', length Chains[]];
+                RenderProtein [Chains[]];
+                local moe = _moe_Extract [Atoms[], GKeyList[], [mol_name: first cTag Chains[]]];
+                db_Write [ dataFile, ent, [ Label : string inEntry.Label, Complex : moe ]];
+            endif
+        endloop
+        SystemPop syskeys;
+    endif
+
+    ent = 0;
+    syskeys = SystemPush [];
     while ent = db_NextEntry [dataFile,ent] loop
-        local [tmpLabel, tmpComplex, tmpMTScoreES] = db_ReadFields [ dataFile, ent, ['Label','Complex','MTScoreES'] ];
-        if not isnull tmpLabel and not isnull tmpComplex and not isnull tmpMTScoreES then
+        Close [force: 1];
+        inEntry = db_Read [ dataFile, ent];
+        if isnull inEntry.S then
+            _moe_Create [inEntry.Complex];
+            inEntry.S = dock_score_GBVIWSA_dG ['scoreLigX', [cat [cat _Atoms '$$receptor', cat _Atoms '$$solvent'],cat _Atoms '$$ligand']];
+            write ['Updating GBVIWSA_dG score (missing): {} | {} | {}\n', inEntry.Label, inEntry.mseq, inEntry.S];
+            db_Write [ dataFile, ent, [ S : inEntry.S ]];
+        endif
+    endloop
+    SystemPop syskeys;
+    
+    db_Sort [dataFile,['mseq','S'],[0,0]];
+    ent = 0;
+    local mseqEntry;
+    local mseqColumn = cat db_ReadColumn [dataFile, 'mseq' ];
+    local entry_keys = db_Entries dataFile;
+    for mseqEntry in uniq mseqColumn loop
+        ent = first (entry_keys | mseqColumn == mseqEntry);
+        inEntry = db_Read [ dataFile, ent ];
+        if not isnull inEntry.Label and not isnull inEntry.Complex then
+            if isnull inEntry.MTScoreES then
+                inEntry.MTScoreES = 0.0;
+            endif
             molList = append [molList,ent];
-            scoresList = append [scoresList, tmpMTScoreES];
-            namesList = append [namesList, tmpLabel];
+            scoresList = append [scoresList, inEntry.MTScoreES];
+            namesList = append [namesList, inEntry.Label];
+            poseCountList = append [poseCountList, length (mseqColumn | mseqColumn == inEntry.mseq)];
+            ensembleScoreList = append [ensembleScoreList, '-'];
         endif
     endloop
 
     WindowSetAttr[wkey, [
-        slist:      [text : apt twrite ['{}\t{}',namesList,scoresList]],
-        molList:    [value:molList],
-        scoresList: [value:scoresList],
-        namesList:  [value:namesList]
+        slist:      [text : apt twrite ['{}\t{}\t{}\t{}',namesList,scoresList,poseCountList,ensembleScoreList]]
+        , molList:    [value:molList]
+        , scoresList: [value:scoresList]
+        , namesList:  [value:namesList]
+        , poseCountList: [value:poseCountList]
+        , ensembleScoreList: [value:ensembleScoreList]
     ]];                
 
     return [dataFile,molList,scoresList,namesList];
+endfunction
+
+local function MergeMDB [inQBMDB, inDockMDB, inTargetMol]
+    local success = 0;
+    
+    local [fldnames, fldtypes] = db_Fields inDockMDB;
+    local fldname, fldtype, mfield;
+    mfield = fldnames | fldtypes == 'molecule';
+    if length mfield == 1 and isnull inTargetMol then
+        exit 'ERROR: If there is only one mfield then you must provide target mol';
+    endif
+
+    for fldname in fldnames loop
+        fldtype = fldtypes (indexof [fldname, fldnames]);
+        db_EnsureField [inQBMDB, fldname, fldtype];
+    endloop
+    local newmseq;
+    if isnull db_ReadColumn [inQBMDB, 'mseq' ] then
+        newmseq = 1;
+    else
+        newmseq = (max cat db_ReadColumn [inQBMDB, 'mseq' ]) + 1;
+    endif
+    local ent = 0;
+    local outKeys = [];
+    local inEntry;
+    local syskeys = SystemPush [];
+    while ent = db_NextEntry [inDockMDB,ent] loop
+        Close [force: 1];
+        inEntry = db_Read [ inDockMDB, ent];
+        if length mfield == 2 then
+            mol_Create inEntry.receptor;
+        else
+            mol_Create inTargetMol;
+        endif
+        mol_Create inEntry.mol;
+        inEntry.mseq = newmseq;
+        inEntry.Label = string first inEntry.mol;
+        RenderProtein [Chains[]];
+        inEntry.Complex = _moe_Extract [Atoms[], GKeyList[], [mol_name: first cTag Chains[]]];
+        local tmpKey = db_Write [ inQBMDB, 0, inEntry];
+        outKeys = append [outKeys, tmpKey];
+    endloop
+    SystemPop syskeys;
+    
+    if length outKeys > 0 then
+        success = first outKeys;
+    endif
+    return success;
+endfunction
+
+local function DeleteMDB [inQBMDB, ent]
+    local inEntry = db_Read [ inQBMDB, ent];
+    if isnull inEntry then
+        return;
+    endif
+    local entry_keys = db_Entries inQBMDB;
+    local mseqs = db_ReadColumn [ inQBMDB, 'mseq' ];
+    db_Delete [inQBMDB, entry_keys | mseqs == inEntry.mseqs];
 endfunction
 
 // Monitor loop for addressing changing items in the UI
@@ -329,6 +516,7 @@ local function ReadyMonitor wkey
         dataFile = second cat WindowGetData [wkey, 'outdb'];
         
         if dataFile <> '' then
+            qbExecManager ['UpdateQBDB', [dataFile]];
             if dbState <> db_State dataFile then
                 dbState = db_State dataFile;
                 SyncMDB wkey;
@@ -342,7 +530,12 @@ local function ReadyMonitor wkey
             if second cat WindowGetData [wkey, 'currentState'] <> SystemTopologyState [] or 
                 not (second cat WindowGetData [wkey, 'currentPos'] === aPos Atoms[]) then
                     Message [second cat WindowGetData [wkey, 'msgkey'], ''];
-                    WindowSetAttr[wkey, [   slist:    [value : -1 ]]];  
+                    WindowSetAttr[wkey, [   slist:    [value : -1 ]]];
+                    WindowSetAttr[wkey, [   addCurrent: [text : 'Add' ], addState: [value : 1 ]]];
+            elseif second cat WindowGetData [wkey, 'optlevel'] <> 'None' then
+                    WindowSetAttr[wkey, [   addCurrent: [text : 'Add' ], addState: [value : 1 ]]];
+            else
+                    WindowSetAttr[wkey, [   addCurrent: [text : 'Update' ], addState: [value : 0 ]]];
             endif
 
             local syskeys = SystemPush active Atoms[];    // limit the chances of concurrent molecule object editing errors
@@ -413,8 +606,9 @@ local function ReadyMonitor wkey
             elseif length uniq aResidue _Atoms '$$pocket' < 1 then
                 systext = 'Designate residues as pocket';
                 sysbool = 0;
-            elseif length qbWSTestEndpoint [] < 1 then
-                systext = 'Can not connect to qbWebService';
+//            elseif length qbWSTestEndpoint [] < 1 then
+            elseif qbExecManager ['testEndpoint', wkey]  == 'error' then
+                systext = 'Can not connect to chosen executor.';
                 sysbool = 0;
             endif
 
@@ -425,14 +619,50 @@ local function ReadyMonitor wkey
             sys_serial = SystemTopologyState[];
             pot_serial = (pot_Info[]).serial;
             SystemPop syskeys;
+        elseif second cat WindowGetData [wkey, 'optlevel'] <> 'None' then
+                    WindowSetAttr[wkey, [   addCurrent: [text : 'Add' ], addState: [value : 1 ]]];
+        elseif not (isnull first second cat WindowGetData [wkey, 'slist']) then
+                    WindowSetAttr[wkey, [   addCurrent: [text : 'Update' ], addState: [value : 0 ]]];
         endif
         
-        if sysbool == 0 then
-            sleep 1.0;
-        else
-            sleep 0.25;
-        endif
+        sleep 1.0;
+        
+//        if sysbool == 0 then
+//            sleep 1.0;
+//        else
+//            sleep 5.0;
+//        endif
     endloop
+endfunction
+
+global function MTScore_dG_TaskManager mdbreference
+    local pdata = SystemPush [];
+        local dbEntry = db_Read [ mdbreference.dataFile, mdbreference.molEntry];
+        _moe_Create [dbEntry.Complex];
+    // Try #1:
+//                currentMTScoreES = ScoreMTScore_dG [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'];
+//    local currentMTScoreES = first task_call ['ScoreMTScore_dG', [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand', mdbreference], [errmsg:'ignore']];
+    local currentMTScoreES = ScoreMTScore_dG [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand', mdbreference];
+    // Try #2:
+    if isnull currentMTScoreES then
+        write ['MTScore Calculation failed (likely unable to reach host): trying again....\n'];
+        sleep 1.0;
+//                    currentMTScoreES = ScoreMTScore_dG [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'];
+//        currentMTScoreES = first task_call ['ScoreMTScore_dG', [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand', mdbreference], [errmsg:'ignore']];
+    endif
+//    Message [ msgkey, RUNNINGMT ];
+    SystemPop pdata;
+    if not isscalarnum currentMTScoreES then
+        if isnull currentMTScoreES then
+            currentMTScoreES = 'ERROR';
+        endif
+//        Message [msgkey, twrite ['MTScoreES (dG): {}\n', currentMTScoreES]];
+    else
+        dbEntry.MTScoreES = currentMTScoreES;
+        db_Write [ mdbreference.dataFile, mdbreference.molEntry, dbEntry ];
+    endif
+//    local [dataFile,molList,scoresList,namesList] = SyncMDB mdbreference.wkey;
+//    WindowSetAttr[mdbreference.wkey, [   slist:    [value : length molList ]]];
 endfunction
 
 // qbAmberTIPanel is a function which is to take care of all of the AMBERTI processing (so the changes to CCG code is minimal)
@@ -479,21 +709,34 @@ global function qbInteractiveMTScoreUI opt
     local tmpLabel, tmpComplex, tmpMTScoreES;
 
 // local functions
-    local function StartName []
-        local timevec = clock_to_timevec clock [];
-        function formNum [inVal]
-            inVal = round inVal;
-            if inVal < 10 then  return twrite ['0{}',inVal];
-            else                return twrite ['{}',inVal];
-            endif
-        endfunction
-        return twrite ['{}',twrite ['{}:{}:{}', formNum timevec(7), formNum timevec(8), formNum timevec(9)]];
-    endfunction
     
     local function brickpanel [wkey,status]
         WindowSetAttr[wkey, [
             isBricked:      [value : status ]
         ]];  
+    endfunction
+    
+    local function checkVersion wkey
+        local availableVersion = qbQBAvailableVersion[];
+        if (not isnull availableVersion) and (atof token last wordsplit [string availableVersion, "-"] > qbInstalledVersion[]) then
+            WindowSetAttr[wkey, [ button_Upgrade: [
+                background : 'darkBlue', bubbleHelp: twrite ['New version available: {}', availableVersion]
+            ] ]];
+            loop
+                sleep 1;
+                WindowSetAttr[wkey, [ button_Upgrade: [background : 'none' ] ]];      
+                sleep 1;      
+                WindowSetAttr[wkey, [ button_Upgrade: [background : 'darkBlue' ] ]];      
+            endloop
+        elseif (not isnull availableVersion) and (atof token last wordsplit [string availableVersion, "-"] <= qbInstalledVersion[]) then
+            WindowSetAttr[wkey, [ button_Upgrade: [
+                background : 'none', bubbleHelp: twrite ['Version up to date: {}', availableVersion]
+            ] ]];
+        else
+            WindowSetAttr[wkey, [ button_Upgrade: [
+                background : 'red', bubbleHelp: 'Unable to connect to version server\nto determine current available version.'
+            ] ]];
+        endif
     endfunction
         
     if second task_fork [master:'mutual', idle:1, prio:0] === 'child' then
@@ -501,20 +744,26 @@ global function qbInteractiveMTScoreUI opt
         exit [];
     endif
 
+    if second task_fork [master:'parent', idle:1, prio:0] === 'child' then
+        checkVersion wkey;
+    endif
+    
 // main loop //
     loop
         local [values, trigger] = WindowWait wkey;
+// write ['trigger: {}\n', trigger];
         molList = values.molList;
         scoresList = values.scoresList;
         namesList = values.namesList;
-//        write ['values: {}\ntrigger: {}\n', values, trigger];        
         if trigger === 'showSelection' or trigger === 'slist' then
             if first values.slist and first values.slist <> prevSelected then
                 prevSelected = first values.slist;
                 local parentResidue = uniq aResidue _Atoms '$$ligand';
                 local tmpBondLook = first aBondLook cat _Atoms '$$ligand';
+                local inEntity = db_Read [ dataFile, molList(first values.slist) ];
                 oDestroy Chains[];
-                _moe_Create [ db_ReadFields [dataFile, molList(first values.slist), 'Complex'], [view:0] ];
+//                _moe_Create [ db_ReadFields [dataFile, molList(first values.slist), 'Complex'], [view:0] ];
+                _moe_Create [ inEntity.Complex, [view:0] ];
                 currentState = SystemTopologyState [];
                 currentPos = aPos Atoms[];
                 WindowSetAttr[wkey, [
@@ -532,37 +781,20 @@ global function qbInteractiveMTScoreUI opt
                         or values.optlevel <> currentOptLevel then
                 if values.optlevel <> 'None' then
                     Message [ msgkey, RUNNINGMM ];
-                    local originalFixed = Atoms[] | aFixed Atoms[];
-                    aSetFixed [Atoms[], 1];
-                    aSetFixed [active _Atoms '$$ligand', 0];
-                    if values.optlevel == 'Pocket' then
-                        aSetFixed [active _Atoms '$$pocket', 0];
+                    if values.optlevel <> 'Dock' then
+                        local originalFixed = Atoms[] | aFixed Atoms[];
+                        aSetFixed [Atoms[], 1];
+                        aSetFixed [active _Atoms '$$ligand', 0];
+                        if values.optlevel == 'Pocket' then
+                            aSetFixed [active _Atoms '$$pocket', 0];
+                        endif
+                        MM [ gtest:0.01, maxit:200 ];
+                        aSetFixed [Atoms[], 0];
+                        aSetFixed [originalFixed, 1];
                     endif
-                    MM [ gtest:0.01, maxit:200 ];
-                    aSetFixed [Atoms[], 0];
-                    aSetFixed [originalFixed, 1];
                 endif
-                Message [ msgkey, RUNNINGMT ];
-                local pdata = SystemPush Atoms[];
-                // Try #1:
-//                currentMTScoreES = ScoreMTScore_dG [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'];
-                currentMTScoreES = first task_call ['ScoreMTScore_dG', [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'], [errmsg:'ignore']];
-                // Try #2:
-                if isnull currentMTScoreES then
-                    write ['MTScore Calculation failed (likely unable to reach host): trying again....\n'];
-                    sleep 1.0;
-//                    currentMTScoreES = ScoreMTScore_dG [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'];
-                    currentMTScoreES = first task_call ['ScoreMTScore_dG', [active cat _Atoms '$$receptor', active cat _Atoms '$$ligand'], [errmsg:'ignore']];
-                endif
-                Message [ msgkey, RUNNINGMT ];
-                tmpLabel = StartName[];
-                SystemPop pdata;
-                if not isscalarnum currentMTScoreES then
-                    if isnull currentMTScoreES then
-                        currentMTScoreES = 'ERROR';
-                    endif
-                    Message [msgkey, twrite ['MTScoreES (dG): {}\n', currentMTScoreES]];
-                else
+                
+                if values.optlevel <> 'Dock' then
                     currentOptLevel = values.optlevel;
                     currentState = SystemTopologyState [];
                     currentPos = aPos active Atoms[];
@@ -571,15 +803,48 @@ global function qbInteractiveMTScoreUI opt
                         currentPos:     [value : currentPos ],
                         msgkey:         [value : msgkey ]
                     ]];  
-                    db_Write [ dataFile, 0, [
-                            Label : string tmpLabel,
-                            Complex : _moe_Extract [Chains[]],
-                            MTScoreES : currentMTScoreES
+                    Message [ msgkey, RUNNINGMT ];
+                    tmpLabel = StartName[];
+                    local newmseq;
+                    if isnull db_ReadColumn [dataFile, 'mseq' ] then
+                        newmseq = 1;
+                    else
+                        newmseq = (max cat db_ReadColumn [dataFile, 'mseq' ]) + 1;
+                    endif
+                    local molEntry = db_Write [ dataFile, 0, [
+                            Label : string tmpLabel
+                            , Complex : _moe_Extract [Chains[]]
+                            , mseq : newmseq
                     ]];
-                    Message [msgkey, twrite ['MTScoreES (dG): {} kcal/mol\n', currentMTScoreES]];
                 endif
-                [dataFile,molList,scoresList,namesList] = SyncMDB wkey;
-                WindowSetAttr[wkey, [   slist:    [value : length molList ]]];
+                
+                local mdbreference;
+                mdbreference.dataFile = dataFile;
+                mdbreference.molEntry = molEntry;
+                mdbreference.msgkey = msgkey;
+                mdbreference.wkey = wkey;
+                
+                if second task_fork [master:'parent', idle:1, prio:0] === 'child' then
+                    if values.optlevel == 'Dock' then
+                        local dockMDB = twrite ['{}.mdb', qbuuid[]];
+                        local dockopt;
+//                        dockopt.refine='Induced Fit';
+//                        dockopt.refine_opt.fixrec='Tether';
+                        local psys = SystemPush Atoms[];
+// TODO: what happens if there are multiple poses? (numposes > 1) idea: throw a yes/no dialog to confirm? then do we go to ensemble docking?
+// TODO: road from RC settings (which would have been set by config)
+// TODO: test use/impact of water?
+// TODO: test what happens with multiple ligands in complex?
+                        DockAtoms [_Atoms '$$receptor', _Atoms '$$ligand', _Atoms '$$ligand', dockMDB, dockopt];
+                        db_Sort [dockMDB,'S',0];
+                        mdbreference.molEntry = MergeMDB [dataFile, dockMDB, mol_Extract _Atoms '$$receptor', dockopt];
+                        SystemPop psys;
+                        dbv_Close dbv_Open dockMDB;
+                        fdelete dockMDB;
+                    endif
+                    MTScore_dG_TaskManager mdbreference;
+                    exit [];
+                endif
             else
                 local tmpMsg = Message [0,'The molecule has not changed since last execution. Please edit molecule in order to run again.'];
                 sleep 5;
@@ -601,16 +866,19 @@ global function qbInteractiveMTScoreUI opt
             ]];  
             WindowSetAttr [wkey, [deleteSelection:  [sensitive: 1]]];
         elseif trigger === 'button_MOEPreparation' then
-            run ['structprep_ui.svl', [cmd:'interactive']];
-            status.ran_structprep = 1;
-            sleep 2.0;      // needs a couple of seconds to init StructurePrep function
-            while WindowKey 'Structure Preparation' loop
-                sleep 0.15;
-                if WindowKey 'Protonate3D' then
-                    status.ran_protonate = 1;
-                endif
-            endloop
-        elseif trigger === 'optlevel' then
+            if second task_fork [master:'parent', idle:1, prio:0] === 'child' then
+                run ['structprep_ui.svl', [cmd:'interactive']];
+                status.ran_structprep = 1;
+                sleep 2.0;      // needs a couple of seconds to init StructurePrep function
+                while WindowKey 'Structure Preparation' loop
+                    sleep 0.15;
+                    if WindowKey 'Protonate3D' then
+                        status.ran_protonate = 1;
+                    endif
+                endloop
+                exit [];
+            endif
+        elseif trigger === 'optlevel' then                
             local prevSelection = Atoms[] | aSelected Atoms[];
             aSetSelected [Atoms[], 0];
             if values.optlevel == 'Ligand' then
@@ -634,6 +902,7 @@ global function qbInteractiveMTScoreUI opt
             endloop
             [dataFile,molList,scoresList,namesList] = SyncMDB wkey;
             if not isnull dataFile then
+                qbExecManager ['UpdateQBDB', [dataFile]];
                 task_call ['dbv_OpenFile', dataFile, [errmsg:'ignore']];
             endif
         elseif trigger === 'bRename' or trigger === 'tLigName' then
@@ -648,11 +917,14 @@ global function qbInteractiveMTScoreUI opt
                 WindowDestroy WindowKey wkey;
                 break;
             endif
+        elseif trigger === 'button_Upgrade' then
+            LaunchDocument 'https://github.com/quantumbio/MOEDivCon/releases';    
         elseif trigger === 'button_WSsetup' then
-            brickpanel [wkey,1];
-            qbWSConfig ['processWidget', wkey, trigger, values];
-            values = WindowValues wkey;
-            brickpanel [wkey,0];
+            if second task_fork [master:'parent', idle:1, prio:0] === 'child' then
+                qbExecManager ['processWidget', [wkey, trigger, values]];
+                values = WindowValues wkey;
+                exit [];
+            endif
         endif
     endloop
 

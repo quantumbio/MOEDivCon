@@ -41,8 +41,10 @@ function getObject;
 
 // Local utility functions required to break apart and process the JSON document.
 
+function json_Write;    // fairly new CCG function to translate tokens to proper JSON strings.
 local function convertType [inCell]
     local tmpCell = string totok inCell;
+    return token first json_Write inCell; // TODO: if this works, remove rest.
     if alltrue (isdigit tmpCell or tmpCell == "-" or tmpCell == "+" or tmpCell == ".") then
         return tonum inCell;
     else
@@ -544,8 +546,66 @@ endfunction
 
 global function fwrite_JSON [file,mol,opt]
     opt = tagcat [opt, FWRITE_JSON_DEFAULTS];
+    write ['mol: {}\n', length mol];
     local taggedVector = json_Extract mol;
     local tmpString = Object2JSON [taggedVector];
     fwrite [file, '{}\n', tmpString];
 endfunction
+
+global function db_ExportJSON [db_file, json_file, fields, options]
+    local mdb = db_Open db_file;
+    local esel = anytrue options.esel and indexof [mdb, dbv_ViewKeys[]];
+    local mode = token options.mode;
+    local fnum, mfield = '';
+
+	// make sure that our database contains the right exportable field
+	// and then open the output file
+    local [fldnames, fldtypes] = db_Fields mdb;
+
+    if fields === [] or fields === '' then
+	fields = fldnames;
+    elseif allfalse (fldtypes == 'molecule') then
+	exit 'Molecule field required for export.';
+    else
+	fldtypes = db_FieldType [mdb, fields];
+	fldnames = fields;
+    endif
+    if add (fldtypes == 'molecule') > 1 then
+	exit 'Multiple molecule fields available, select only one';
+    endif
+    mfield = fldnames | fldtypes == 'molecule';
+
+    if type json_file === 'tok' then		// open output file
+	fnum = fopenw json_file;
+    else
+	fnum = json_file;
+    endif
+
+	// run through the database and write the data to the file
+
+    local psys = SystemPush [];
+
+    local ent = 0;
+    while (ent = db_NextEntry [mdb, ent]) loop
+	if esel then
+	    if not dbv_EntrySelect [mdb,ent] then continue; endif
+	endif
+
+	local pdata = tag [fldnames, db_ReadFields [mdb, ent, fields]];
+	local mol = pdata.(mfield);
+	pdata = pdata | tags pdata <> mfield;
+
+	local chains = mol_Create mol;
+	cSetName [chains | cName chains == '', mol(1)(MOL_NAME)];
+
+//	write_molecule [fnum, cat cAtoms chains, mode, mol(1)(MOL_NAME), pdata];
+	oDestroy chains;
+    endloop
+
+    SystemPop psys;
+
+    if type json_file === 'tok' then fclose fnum; endif
+    db_Close mdb;
+endfunction
+
 

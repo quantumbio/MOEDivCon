@@ -28,22 +28,21 @@ function checkMolecule;
 function dockmdb2mol2;
 
 const DEFAULT_OPT = [
-    delwat      : 0,        // Delete waters prior to performing docking/placement but AFTER any optimization if -preopt chosen
-    inducedfit  : 0,        // Run induced fit (optimized protein) on dock
-    offormat    : 'pdb',    // output this version of output for induced fit (can be either 'pdb' or 'mol2')
-    mtscorees   : 0,        // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
-    mtcsconf    : 0,        // Number of MTCS conformers to use (these are the best X conformers according to BFintensity). If zero (default) use ALL conformers (WARNING: this can be expensive.)
-    maxpose     : 25,       // Number of poses to optimize (per posed conformer) prior to final score
-//    maxpose     : 5,       // Number of poses to optimize (per posed conformer) prior to final score
-    remaxpose   : 5,        // Max number of poses to return per conformer (after optimization)
-    rigidlig    : 0,        // Run with the ligand/conformation treated rigidly
-    preopt      : 0,        // Run an optimization of the protein:ligand complex prior to docking
-    protonate   : 0,        // Run Protonate3D prior to docking/scoring
-    forceexe    : 0,        // Force the calculation to proceed even if there are structural defects
-    mtscoreexe  : 0,        // Run MTScoreE using the qmechanic commandline found in QBHOME
-    testinp     : 0,        // Test the input but then quit.
-    qbhome      : ''        // Path to QBHOME (if set - otherwise null)
-    
+    delwat      : 0        // Delete waters prior to performing docking/placement but AFTER any optimization if -preopt chosen
+    , inducedfit  : 0        // Run induced fit (optimized protein) on dock
+    , offormat    : 'pdb'    // output this version of output for induced fit (can be either 'pdb' or 'mol2')
+    , mtscorees   : 0        // Run (1) 'MTScoreES dG [QuantumBio]' via qbWebService or (0) 'GBVI/WSA dG' for final score
+    , mtcsconf    : 0        // Number of MTCS conformers to use (these are the best X conformers according to BFintensity). If zero (default) use ALL conformers (WARNING: this can be expensive.)
+    , maxpose     : 25       // Number of poses to optimize (per posed conformer) prior to final score
+//   , maxpose     : 5       // Number of poses to optimize (per posed conformer) prior to final score
+    , remaxpose   : 5        // Max number of poses to return per conformer (after optimization)
+    , rigidlig    : 0        // Run with the ligand/conformation treated rigidly
+    , preopt      : 0        // Run an optimization of the protein:ligand complex prior to docking
+    , protonate   : 0        // Run Protonate3D prior to docking/scoring
+    , forceexe    : 0        // Force the calculation to proceed even if there are structural defects
+    , mtscoreexe  : 0        // Run MTScoreE using the qmechanic commandline found in QBHOME
+    , testinp     : 0        // Test the input but then quit.
+    , qbhome      : ''        // Path to QBHOME (if set - otherwise null)
 ];
 
 local function usage []
@@ -240,80 +239,6 @@ local function DockOpt []
 
 endfunction
 
-local function OLDDockOpt []
-
-    local opt = [
-        outrmsd: 1,
-        sel_ent_only_rec: 0,
-        sel_ent_only: 0,
-        wall: [ '', 0, [ 0, 0, 0 ], [ 1000000, 1000000, 1000000 ], 0 ],
-        csearch: 1,
-        confGenMethod: 'Rotate Bonds',
-        ignoreMseq: 0,
-//	    retainData: [ 1, 0, 1, 1],
-        placement: 'Triangle Matcher',
-        scoring: 'London dG',
-        scoring_opt: [  ],
-        dup_placement: 1,
-        
-    // RIGID BODY
-//        placement_opt: [ timeout : 300,	nretpose : 10000 ],
-//        maxpose: 300,
-//        refine: 'None',
-//        refine_opt: [ fixrec : '', rigidlig : 1,	rigidPlanar : 0 ],
-    // Limited OPT
-        placement_opt: [ timeout : 300,	nretpose : 5000 ],
-        maxpose: 50,
-        remaxpose: 5,
-        refine: 'Rigid Receptor',
-        refine_opt: [ 
-            fixrec : 'Fix',	
-            ed_map : 'Fo',	
-            ed_f : 'Simulated',	
-            ed_phi : 'Simulated',	
-            ed_f2 : 'Simulated',	
-            ed_path : '',	
-            ed_res : 2.5,	
-            ed_sfdata : [ [  ], [  ], [  ], 'Simulated', 'Simulated', 'Fo' ],	
-            ed_surflevelD : 3,	
-            cutoff : 6,	
-            wholeres : 1,	
-            mmgbvi : 1,	
-            packsidechains : 1,	
-            rigidlig : 0,	
-            rigidPlanar : 0,	
-            tether : 10,	
-            gtest : 0.01,	
-            maxit : 500,	
-            OverrideSetup : 1,	
-            k_potl : 100,	
-            roffset : 0.4 
-        ],
-        rescoring: 'GBVI/WSA dG',
-        rescoring_opt: [  ],
-        dup_refine: 1,
-        descexpr: '',
-        receptor_mfield: '',
-        ligand_mfield: 'mol',
-        rxnFile: '',
-        rxsite: [  ],
-        edsupport: 1,
-//        ed_data: [ ed_dockpath : '' ],
-        check_pose_geom: [  ],
-        multiLigand: 0,
-        need_dmat: 1,
-        gen_plif: 1,
-        tempDB: '',
-//        ph4: ph4file,
-//        ligmdbname: ligmdbname,
-//        recmdbname: recmdbname,
-        BatchFile: 'dock_batch.svl'
-    ];
-
-    return opt;
-
-endfunction
-
 local function edDockOpt[]
     local opt = DockOpt[];
     
@@ -370,7 +295,141 @@ local function checkMolecule[]
     
 endfunction
 
-local function dockmdb2mol2 [db_file,mol2_file,ligID,targ_pdb,mainopt]
+local function dockmdb2mol2 [dockmdb,dockfiles,ligID,targ_pdb,inopt]
+    local ligfilename = [];  // this needs addressed - this function was moved from elsewhere. Do we want this functionality?
+    local setRName = [];
+    
+    local substring = swrite ['_dock.{}', fext dockfiles];
+    write ['old dockfiles: {} | {} | {}\n',length substring, substring, dockfiles];
+    write ['strpos: {} \n',strpos [substring, swrite ['{}',dockfiles]]];
+    dockfiles = token splice [swrite ['{}',dockfiles],strpos [substring, swrite ['{}',dockfiles]], length substring, [[]]];
+    write ['new dockfiles: {} | {} | {}\n',length substring, substring, dockfiles];
+
+    db_Sort [dockmdb,['mseq','S'],[0,0]];
+    
+    local mseqColumn = cat db_ReadColumn [dockmdb, 'mseq' ];
+    local entry_keys = db_Entries dockmdb;
+    
+    local mfield = '';
+
+	// make sure that our database contains the right exportable field
+	// and then open the output file
+    local [fldnames, fldtypes] = db_Fields dockmdb;
+
+    mfield = fldnames | fldtypes == 'molecule';
+
+	// run through the database and write the data to the file
+    local ent = 0;
+    local count = 0;
+    local mol = [];
+    local targ_chains = [];
+    local lig_chains = [];
+    local chains = [];
+    local pdata;
+    
+//    local ligID;
+    
+    local psys = SystemPush [];
+    if not isnull ligfilename then
+        local lig = cat cat cAtoms ReadAuto ligfilename;
+        local ligResidue = aResidue first lig;
+        local ligChain = rChain ligResidue;
+        ligID.rINS = rINS ligResidue;
+        ligID.rName = rName ligResidue;
+        ligID.rNumber = rNumber ligResidue;
+        ligID.rType = rType ligResidue;
+        ligID.rUID = rUID ligResidue;
+        ligID.cName = fext cName ligChain;
+        ligID.cGroup = cGroup ligChain;   
+        ligID.cNumber = cNumber ligChain;   
+        ligID.cTag = cTag ligChain;
+    endif
+    SystemPop psys;
+   
+    local mseqEntry;
+    dockfiles = [];
+    local mdb_key = db_Open [dockmdb,'read'];
+    for mseqEntry in uniq mseqColumn loop
+//        local compoundNumber = db_ReadFields [mdb_key, first (entry_keys | (mseqColumn == mseqEntry)), 'Compound Number' ];   // This is not generally found
+        local compoundNumber = first first first db_ReadFields [mdb_key, first (entry_keys | (mseqColumn == mseqEntry)), 'mol' ];     // Instead use mol name
+        write ['... Writing: {} {}\n',mseqEntry, compoundNumber];
+        if isnull targ_pdb and length mfield == 1 then
+            dockfiles = cat [dockfiles, twrite ['{}-dock.sdf', compoundNumber]];
+            db_ExportSD [ mdb_key, twrite ['{}-dock.sdf', compoundNumber], [], entry_keys | (mseqColumn == mseqEntry), [del_hlp:0] ];
+            db_ExportSD [ mdb_key, twrite ['{}-dock-top.sdf', compoundNumber], [], first (entry_keys | (mseqColumn == mseqEntry)), [del_hlp:0] ];
+        elseif not isnull targ_pdb or length mfield == 2 then
+            ent = 0;
+            count = 0;
+            mol = [];
+            targ_chains = [];
+            lig_chains = [];
+            chains = [];
+            for ent in (entry_keys | (mseqColumn == mseqEntry)) loop
+                count = count + 1;
+                psys = SystemPush [];
+                pdata = tag [fldnames, db_ReadFields [mdb_key, ent, fldnames]];
+                inopt.pdata = pdata | m_diff [tags pdata, mfield];
+                
+                if isnull targ_pdb then
+                    mol =  pdata.(second mfield);       // receptor in dock.mdb
+                    targ_chains = mol_Create mol;
+                else
+                    ReadAuto targ_pdb;
+                    if inopt.delwat then
+                        write ['NOTE: SOLVENT REMOVED PRIOR TO DOCKING (used -delwat to remove solvent)\n'];
+                        oDestroy uniq cat aResidue _Atoms '$$solvent';
+                    else
+                        write ['NOTE: SOLVENT NOT REMOVED PRIOR TO DOCKING (use -delwat to remove solvent)\n'];
+                    endif
+                    targ_chains = Chains[];
+                endif
+                cSetName [targ_chains | cName targ_chains == '', mol(1)(MOL_NAME)];
+                
+                mol =  pdata.(first mfield);        // ligand in dock.mdb
+                lig_chains = mol_Create mol;
+                cSetName [lig_chains | cName lig_chains == '', mol(1)(MOL_NAME)];
+        
+                ligResidue = first cat cResidues lig_chains;
+                ligChain = rChain ligResidue;
+        
+                rSetINS [ligResidue, ligID.rINS];
+                rSetName [ligResidue, ligID.rName];
+                rSetType [ligResidue, ligID.rType];
+                rSetUID [ligResidue, ligID.rUID];
+                
+                if not isnull setRName then
+                    rSetName [ligResidue, setRName];
+                endif
+
+                cSetName [ligChain, ligID.cName];
+                cSetGroup [ligChain, ligID.cGroup];
+                cSetNumber [ligChain, ligID.cNumber];
+                cSetTag [ligChain, ligID.cTag];
+
+                chains = cat [targ_chains,lig_chains];
+                
+                
+                fwrite_PDB [twrite ['{}-dock-{}.pdb',compoundNumber,count],chains,inopt];
+                
+                if count == 1 then
+//                    fwrite_PDB [twrite ['{}-dock-top.pdb',compoundNumber,count],chains,inopt];    // don't need -top because -1 is the same
+                    fwrite_TriposMOL2 [twrite ['{}-dock-toplig.mol2',compoundNumber,count],lig_chains,inopt];
+                endif
+
+                SystemPop psys;
+            endloop
+        endif
+    endloop
+    db_Close mdb_key;
+    
+    write ['Done Writing: {} SDF(s) with {} ligands.\n',dockmdb, length uniq mseqColumn];
+    
+    return dockfiles;
+
+endfunction
+
+
+local function dockmdb2mol2OLD [db_file,mol2_file,ligID,targ_pdb,mainopt]
     local mdb = db_Open db_file;
     local mfield = '';
 
@@ -897,13 +956,20 @@ local function main []
         dockfiles = dockmdb2mol2 [inopt.dockmdb,twrite ['{}.{}',fbase ftail inopt.outf,inopt.offormat],ligID,inopt.recfilename,inopt];
     else
         dockfiles = twrite ['{}.sdf',fbase inopt.outf];
+#if 1
+        dockfiles = dockmdb2mol2 [inopt.dockmdb,dockfiles,ligID,[],inopt];
+        write ['dockfiles: {} | {}\n', length dockfiles, dockfiles];
+#else
+//        dockfiles = twrite ['{}.sdf',fbase inopt.outf];
         db_ExportSD [ inopt.dockmdb, dockfiles];
         if inopt.offormat <> 'sdf' then
+write ['inopt.recfilename: {} | {} | {}\n', isnull inopt.recfilename, length inopt.recfilename, inopt.recfilename];
             dockfiles = dockmdb2mol2 [inopt.dockmdb,twrite ['{}.{}',fbase ftail inopt.outf,inopt.offormat],ligID,inopt.recfilename,inopt];
         endif
 write ['test: {}\n', dockfiles];
         local mdbdata = db_Read [inopt.dockmdb,first db_Entries inopt.dockmdb];
         fwrite_TriposMOL2 [twrite ['{}.mol2',fbase ftail inopt.outf],mol_Create mdbdata.mol];
+#endif
     endif
 
     write ['Docking finished in {} seconds & {} CPUseconds.\n', clock[] - starttime, cpuclock[] - startcputime];

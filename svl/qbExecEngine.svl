@@ -1,0 +1,229 @@
+#svl
+
+// these are the functions necessary to create/process the configuration panel for the various
+//  execution options available with QuantumBio software (currently: WebService, Command Line, and GridMarkets)
+
+// functions to search/provide executors for running jobs
+local function exec_EngineList[]
+    local rfcn = sym_find_f 'qbExecEngine_*';
+    local rfcnid = apt call [rfcn, 'ID'];
+    local rfcnon = apt call [rfcn, 'ONOFF'];
+//    local rfcwgt = apt call [rfcn, 'getWidget'];
+    rfcnid = rfcnid | rfcnon;
+    rfcn = rfcn | rfcnon;
+//    rfcwgt = rfcwgt | rfcnon;
+//    return [rfcn,rfcnid,rfcwgt];
+    return [rfcn,rfcnid];
+endfunction
+
+local function exec_EngineWidgets[]
+    local rfcn = sym_find_f 'qbExecEngine_*';
+    local rfcnid = apt call [rfcn, 'ID'];
+    local rfcnon = apt call [rfcn, 'ONOFF'];
+    local rfcwgt = apt call [rfcn, 'getWidget'];
+    rfcnid = rfcnid | rfcnon;
+    rfcn = rfcn | rfcnon;
+    rfcwgt = rfcwgt | rfcnon;
+    return [rfcn,rfcnid,rfcwgt];
+endfunction
+
+// ================================================= START copy/mod from $MOE/svl/soap/sar_m.svl v.2022
+// qbuuid generates universal unique identifiers.
+// Parameters:
+// - n : number of uuids to generate (strictly greater than 0)
+// - opt: options
+// - opt.version: version of UUID to generate
+// Returns:
+//   a vector of char vectors, each char vector being an UUID.
+// Specifications:
+// - Version 1: 64 bits / 20 digits obtained by concatenating (left to right):
+//   - uuid version   ( 3 bits /  1 digit )
+//   - clock	      (32 bits / 10 digits)
+//   - differentiator (13 bits /  4 digits)
+//   - seq. count     (16 bits /  5 digits)
+//   NOTE: differentiator is a random number between 0 and 2^13, unique for
+//	 one made-all-at-once sequence (it is the equivalent of the location
+//	 identifier in RFC 4122)
+//   NOTE: versions used in this generator are NOT equivalent with the versions
+//	 mandated by RFC 4122 (unless otherwise indicated in comments below).
+//   ATTENTION: given  the use of a poor (second level) clock resolution,
+//	 it is strongly recommended to require all needed uuids at once, to
+//	 reduce risks of collisions.
+
+global function qbuuid [n, opt]
+    if isnull n then n = 1; endif
+    opt = tagcat [opt, [version: 1]];
+
+    local vuuid = [];
+
+    if n < 1 then return vuuid; endif // safeguard on n
+
+    if opt.version == 1 then
+	const MAXSEQ = pow [2, 16]; // max sequence size in version 1 (!)
+	const MAXDIF = pow [2, 13]; // max differentiator
+
+	if n > MAXSEQ then
+
+		// Hope differentiator will ensure unicity.
+
+	    while n = max [0, n - MAXSEQ] loop
+		vuuid = cat [vuuid, qbuuid [MAXSEQ, opt]];
+	    endloop
+	else
+	    local ver = opt.version; // attention! will be truncated to 3 bits
+	    local clk = clock [];
+	    local dif = rand MAXDIF; // entropic differentiator
+
+		// When n=1, increase entropy by randomly selecting
+		// the number to write in place of the sequence counter.
+
+	    local seq = select [igen n, rand MAXSEQ, n > 1];
+	    vuuid = apt swrite [
+		'{n:1.0f}-{n:10.0f}-{n:4.0f}-{n:5.0f}'
+	    ,	  ver,    clk,     dif,    seq
+	    ];
+
+		// Replace all spaces with 0.
+
+	    vuuid = apt select [["0"], vuuid, app isspace vuuid];
+	endif
+
+    endif
+
+    return vuuid;
+endfunction
+// ================================================= END copy/mod from $MOE/svl/soap/sar_m.svl v.2022
+
+
+global function qbExecManager [cmd, arg]
+    cmd = twrite ['{}', cmd];
+    local [rfcn,rfcnid] = exec_EngineList[];
+    // forward declarations for interface command functions
+    function ProcessWidget;
+    function GetStatusWidget;
+    function TestEndpoint;
+    function RunMTScore;
+    function UpdateQBDB;
+    
+    if cmd == 'processWidget' then
+        return ProcessWidget [cmd, arg];
+    elseif cmd == 'getStatusWidget' then
+        return GetStatusWidget [cmd, arg];
+    elseif cmd == 'testEndpoint' then
+        return TestEndpoint [cmd];
+    elseif cmd == 'RunMTScore' then
+        return RunMTScore [cmd,arg];
+    elseif cmd == 'UpdateQBDB' then
+        return UpdateQBDB [cmd,arg];
+    else
+        write ['ERROR: unknown command {}\n', cmd];
+        return;
+    endif
+    
+    function TestEndpoint [cmd]
+        return call [rfcn(indexof [GetRC ['QuantumBio.qbInterface','qbWebService'],rfcnid]), [cmd]];
+    endfunction
+    
+    function RunMTScore [cmd, arg]
+        return call [rfcn(indexof [GetRC ['QuantumBio.qbInterface','qbWebService'],rfcnid]), [cmd, arg]];
+    endfunction
+    
+    function UpdateQBDB [cmd, arg]
+        return call [rfcn(indexof [GetRC ['QuantumBio.qbInterface','qbWebService'],rfcnid]), [cmd, arg]];
+    endfunction
+    
+    function GetStatusWidget [cmd, arg]
+        local [wkey, trigger, values] = arg;
+        local serviceInfo = call [rfcn(indexof [GetRC ['QuantumBio.qbInterface','qbWebService'],rfcnid]), ['getStatusWidget',[]]];
+        local config = gr_icon ['$MOE/lib/icon/config.ico', 12, 'foreground'];
+        
+        serviceInfo.name = 'qbwebservice_info';
+
+        local statusWidget = [
+//            Hbox:   [
+                extendH: 1,
+                Label: [
+                    text: 'SVR:',
+                    font: 'mediumFixedBold'
+                ],
+                Hbox: [extendH: 1, Label: serviceInfo]
+                , Label : [ text : '']
+                , Button: [
+                    title: '', name: 'button_WSsetup', graphics: config,
+                    bubbleHelp: 'Configure QuantumBio Executor (application, host and port).'
+                ]
+//            ]
+        ];
+        return statusWidget;
+    endfunction
+
+    function ProcessWidget [cmd, arg]
+        local [wkey, trigger, values] = arg;
+        if trigger === 'button_WSsetup' then
+            local rfcwgt;
+            local windowName = 'DivConExecutorSetup';
+            [rfcn,rfcnid,rfcwgt] = exec_EngineWidgets [];
+            local wConfKey;
+            if anytrue (WindowNameList [] == windowName) then
+                wConfKey = WindowShow [windowName, 1];
+            else
+                wConfKey = WindowCreate [
+                    title: 'DivCon Executor Setup',
+                    name: 'panel', windowName: windowName,
+                    text: ['Save', 'Cancel'],
+                        Vbox:   [   name:   'PageManager', extendH: 1, flushLeft: 1
+                        , Radio : [
+                            name: 'qbInterface'
+                            , onTrigger: 'return',
+                            flushLeft: 1, columns: 3, extendH: 1,
+                            text: rfcnid
+                        ]
+                        , Separator : []
+                        , Pager:  [
+                            name:   'execSetupPages', flushTop:1
+                            , Hbox:   [name: twrite ['{}Page',first rfcn], Vbox:first rfcwgt]
+                            , Hbox:   [name: twrite ['{}Page',second rfcn], Vbox:second rfcwgt]
+                            , Hbox:   [name: twrite ['{}Page',third rfcn], Vbox:third rfcwgt]
+                        ]
+                        , Separator : []
+                        , Label : [ text: '', name: 'wsStatus', centerH: 1, extendH: 1 ]
+                    ]
+                ];
+            endif
+        
+            WindowSetAttr [wConfKey, [execSetupPages:   [page:indexof [GetRC['QuantumBio.qbInterface', first rfcn],rfcnid]]]];
+            WindowSetAttr [wConfKey, [qbInterface:      [value:GetRC['QuantumBio.qbInterface', first rfcn] ]]];
+        
+            WindowShow wConfKey;
+
+            // Update status for the RC-chosen connection
+            local vals = WindowValues wConfKey;
+            local trig = 'init';
+            call [rfcn(indexof [vals.('qbInterface'),rfcnid]), ['processWidget',[wConfKey, trig, vals]]];
+
+            loop
+                [vals, trig] = WindowWait wConfKey;
+                if trig === 'panel' then
+                    if vals.panel == 'Cancel' then break; endif
+                    if vals.panel == 'Save' then
+                        SetRC ['QuantumBio.qbInterface',vals.qbInterface];
+                        call [rfcn(indexof [vals.('qbInterface'),rfcnid]), ['SaveRC',[wConfKey, trig, vals]]];
+                        break;
+                    endif
+                elseif trig === 'qbInterface' then
+                    WindowSetAttr [wConfKey, [execSetupPages: [page:indexof [vals.(trig),rfcnid]]]];
+                endif
+                // cycle through all rfnc's and run their panal processor
+                call [rfcn(indexof [vals.('qbInterface'),rfcnid]), ['processWidget',[wConfKey, trig, vals]]];
+            endloop
+            WindowDestroy wConfKey;
+            local serviceInfo = call [rfcn(indexof [GetRC ['QuantumBio.qbInterface','qbWebService'],rfcnid]), ['getStatusWidget',[]]];
+        
+            WindowSetAttr [wkey, [qbwebservice_info : serviceInfo]];
+
+        endif
+        
+    endfunction
+endfunction
+
+#eof

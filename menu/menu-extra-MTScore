@@ -1,4 +1,4 @@
-#    Copyright (c) 1998-2009 QuantumBio Inc. and/or its affiliates.
+#    Copyright (c) 1998-2022 QuantumBio Inc. and/or its affiliates.
 #	
 # This source code is the property of QuantumBio Inc. and/or its affiliates
 # and is considered secret.
@@ -29,10 +29,10 @@
 
 MENU APPEND "Main:Extra"
     "QuantumBio"
-        MENU  "QuantumBio"
+        MENU PREPEND "QuantumBio"
 #    "Standard Preparation..."       exec "qbPrepareSystemPanel[]"
 #    "Fix Charged Atoms..."      exec "qbFixChargedAtomsPanel[]"
-    "Refinement Preparation..."     exec "qbPhenixPrepPanel[]"
+#    "Refinement Preparation..."     exec "qbPhenixPrepPanel[]"
     
 #    SEPARATOR
 #    "New Refinement Preparation"    exec "RefinementPreparationPanel[]"
@@ -46,6 +46,13 @@ MENU APPEND "Main:Extra"
 #            "Toolbox"               submenu "QuantumBio:Toolbox"
 	"MTScoreES - Interactive (beta)"    exec "qbInteractiveMTScoreUI[]"
 	    SEPARATOR
+        ENDMENU
+ENDMENU
+
+MENU APPEND "Main:Extra"
+    "QuantumBio"
+        MENU APPEND "QuantumBio"
+#	    SEPARATOR
             "Help ..."  exec "LaunchDocument'http://www.quantumbioinc.com/support/'"	    
         ENDMENU
 ENDMENU
