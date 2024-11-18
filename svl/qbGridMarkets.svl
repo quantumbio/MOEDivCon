@@ -109,7 +109,7 @@ const DEFAULT_OPT = [
     , protonate   : 0        // Run Protonate3D prior to docking/scoring
     , forceexe    : 1        // Force the calculation to proceed even if there are structural defects
     , testinp     : 0        // Test the input but then quit.
-    , mtpotential : 'garf'   // pair potential used in MT.
+    , mtpotential : 'amberff14sb'   // pair potential used in MT.
     , nprocs      : 8        // number of cores to use in calculation.
     , dockfiles   : []       // the input SDF file(s) to provide to qmechanic
     , outfiles    : []       // the output JSON and LOG files coming back from qmechanic
