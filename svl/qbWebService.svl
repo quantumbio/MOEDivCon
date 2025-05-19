@@ -21,7 +21,7 @@ function qbWS_MTScore;
 function url_Parse;
 
 const DEFAULT_MTOPT = [
-    hamiltonian :   'garf',
+    hamiltonian :   'amberff14sb',
     pocket      :   8.0,
     nb_cutoff   :   11.0,
     mtscore     :   'endstate'
@@ -988,7 +988,7 @@ endfunction
 // add env var
 
 const DEFAULT_OPT = [
-    hamiltonian :   'garf',
+    hamiltonian :   'amberff14sb',
     pocket      :   8.0,
     nb_cutoff   :   11.0,
     mtscore     :   'ensemble',
