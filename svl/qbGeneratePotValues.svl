@@ -241,15 +241,16 @@ endfunction
 // example: qbmoebatch -licwait -exec "eval [qbCalculateInteractionFromFile ['1FK7.pdb', ['L',1]]]" -exit
 
 function cLetter;
+function qbSelectionTranslate;
 function dock_score_GBVIWSA_dG;
-global function qbCalculateInteractionFromFile [fname_complex,[selChain, selSequence]]
+global function qbCalculateInteractionFromFile [fname_complex,inSelection]
     local pdata = SystemPush [];
 
     ReadAuto fname_complex;
-        
-    local interestResidue = Residues [] | totok cLetter rChain Residues [] == selChain and rUID Residues[] == selSequence;
+            
+    local interestResidue =  uniq aResidue qbSelectionTranslate inSelection;
     if isnull interestResidue then
-        write ['ERROR: [{},{}] not found!\n', selChain, selSequence];
+        write ['ERROR: [{}] not found!\n', inSelection];
         return;
     endif
 
@@ -262,6 +263,16 @@ global function qbCalculateInteractionFromFile [fname_complex,[selChain, selSequ
     local score = dock_score_GBVIWSA_dG ['scoreLigX', [cat rAtoms receptorResidues,cat rAtoms interestResidue]];
     write ['interactionE: {} | MOEScore (GBVI): {} kcal/mol\n', add second untag third interactions, score];
     SystemPop pdata;
+
+endfunction
+
+// example: qbmoebatch -licwait -exec "eval [testSelectionTranslate ['1igy.pdb', '/B/*/82..83//']]" -exit
+global function testSelectionTranslate [fname_complex, inSelection]
+    
+    ReadAuto fname_complex;
+    local tmpSelection = toupper string inSelection;
+    write ['SELECTION: {}\n', tmpSelection];
+    write ['TEST: {}: {} ATOMS\n',tmpSelection, length qbSelectionTranslate tmpSelection];
 
 endfunction
 
